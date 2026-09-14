@@ -1,4 +1,4 @@
-# autonoetic-dsh
+# compact-dsh
 
 **The Compact on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)** —
 the plugin composition, annex, and ratification work for the first runtime

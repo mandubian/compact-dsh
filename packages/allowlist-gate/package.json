@@ -1,5 +1,5 @@
 {
-  "name": "@autonoetic/dsh-allowlist-gate",
+  "name": "compact-dsh-allowlist-gate",
   "version": "0.1.0",
   "type": "module",
   "description": "The Compact on dsh \u2014 first gate: deny-by-allowlist at tools/pre-execute, with Compact-shaped denial envelopes (R-3).",

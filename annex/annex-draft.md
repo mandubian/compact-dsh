@@ -1,7 +1,7 @@
 # dsh Annex — DRAFT (no standing yet)
 
 **Runtime**: DeepSeek Harness, `@deepseek-ai/dsh ~0.1.5-rc.1` ·
-**Composition**: the `autonoetic-dsh` plugin set · **Status per F-5:
+**Composition**: the `compact-dsh` plugin set · **Status per F-5:
 drafting** — this document is the annex in progress. Until the mandatory
 floor is fully enforced and ratified, this composition claims **no Compact
 standing** and makes no trust claims (F-5's refuse-to-start discipline
@@ -39,7 +39,7 @@ Registered so far (v0.1.0 of the gate package, partial floor only):
 
 ## 3. Role mapping (draft)
 
-- **Enforcer**: the `autonoetic-dsh` plugin composition on a pinned dsh.
+- **Enforcer**: the `compact-dsh` plugin composition on a pinned dsh.
 - **Subject**: agent sessions on the pinned dsh.
 - **Principal**: operator accounts (human) — and, post-v0.5, any
   artificial Member whose direction initiates or governs (F-3).
