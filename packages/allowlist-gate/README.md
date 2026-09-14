@@ -15,3 +15,10 @@ message (R-9).
 ```
 
 Tests: `npm test` (node:test, no build step). dsh pin: `~0.1.5-rc.1`.
+
+**Contract, verified against the installed `@deepseek-ai/dsh-tools` types:**
+`tools/pre-execute` is a *waterfall* — pass = `return next()`, deny =
+`{ kind:'deny', reason }` (never both); tool identity is `exec.name` /
+`exec.arguments`; and the plugin exports the cordis trio `name`/`inject`/`apply`
+(`inject: ['tools']`). Config arrives as `apply`'s second argument from the
+cordis composition.
