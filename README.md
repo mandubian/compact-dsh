@@ -8,11 +8,14 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > anything yet. The law lives in [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
 > this repository builds the machines that make it real on dsh.
 >
-> **Phase 0 done:** verified dsh contract from the installed package
-> (waterfall pass/deny, cordis exports), first gate plugin with Compact
-> denial envelopes, pin gate, concept pages. **Pending in Phase 0:** the
-> composed-profile check (boot a real dsh with the gate installed from a
-> `dsh plugin add`) — requires a dsh-capable environment.
+> **Phase 0 done — including the composed check:** the allowlist gate runs
+> inside the **real dsh `ToolRuntime`** (real Cordis context, real
+> pre-execute waterfall): uncovered hosts are denied before execution with
+> the Compact envelope; allowed hosts pass through and execute. Verified
+> contract from the installed `@deepseek-ai/dsh-tools` types (waterfall
+> pass/deny, cordis exports), pin gate, concept pages. **Pending:** a full
+> agent-loop profile run (needs a model provider key) — enforcement is
+> already proven at the tool-runtime altitude.
 
 ## The plan
 
