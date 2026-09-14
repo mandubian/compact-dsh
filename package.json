@@ -2,7 +2,7 @@
   "name": "compact-dsh",
   "private": true,
   "type": "module",
-  "description": "The Compact on DeepSeek Harness — plugin composition, annex, and ratification work.",
+  "description": "The Compact on DeepSeek Harness \u2014 plugin composition, annex, and ratification work.",
   "scripts": {
     "test": "node --test \"packages/*/test/*.test.js\"",
     "verify-pin": "node tools/verify-pin.mjs"
@@ -12,5 +12,8 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh": "^0.1.5-rc.1"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }

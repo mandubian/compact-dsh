@@ -1,0 +1,7 @@
+{
+  "name": "compact-envelope",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Compact-shaped denial envelopes (R-3/I-4): rule ID, reason, lawful next moves.",
+  "main": "src/index.js"
+}
