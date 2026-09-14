@@ -1,0 +1,13 @@
+{
+  "name": "autonoetic-dsh",
+  "private": true,
+  "type": "module",
+  "description": "The Compact on DeepSeek Harness \u2014 plugin composition, annex, and ratification work.",
+  "scripts": {
+    "test": "node --test \"packages/*/test/*.test.js\"",
+    "verify-pin": "node tools/verify-pin.mjs"
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}
