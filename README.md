@@ -34,6 +34,8 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | Path | What |
 |---|---|
 | `packages/allowlist-gate/` | First plugin: a `tools/pre-execute` deny-by-allowlist gate issuing Compact-shaped denial envelopes (rule ID + lawful next moves, R-3) |
+| `packages/approval/` | **Phase 1, slice 1**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, revocable grants; uncovered calls escalate as `ask` |
+| `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling) |
