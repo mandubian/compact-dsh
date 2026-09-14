@@ -7,6 +7,12 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > **Status: Phase 0 (foundations) — in progress.** Nothing here enforces
 > anything yet. The law lives in [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
 > this repository builds the machines that make it real on dsh.
+>
+> **Phase 0 done:** verified dsh contract from the installed package
+> (waterfall pass/deny, cordis exports), first gate plugin with Compact
+> denial envelopes, pin gate, concept pages. **Pending in Phase 0:** the
+> composed-profile check (boot a real dsh with the gate installed from a
+> `dsh plugin add`) — requires a dsh-capable environment.
 
 ## The plan
 
@@ -27,6 +33,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/allowlist-gate/` | First plugin: a `tools/pre-execute` deny-by-allowlist gate issuing Compact-shaped denial envelopes (rule ID + lawful next moves, R-3) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
+| `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling) |
 
 ## dsh version policy
 
