@@ -51,6 +51,8 @@ package — partial floor only):
 | I-5 (gates — confinement) | `packages/sandbox-docker/src/provider.js::DockerSandboxProvider` — per-call container; fail-closed unavailability; honest enforcement reporting | `packages/sandbox-docker/test/composed.docker.test.js` (confinement matrix, real daemon) |
 | I-5 (gates — mount grants, the #1002 analog) | `packages/sandbox-docker/src/mount-tool.js` — canonical (realpath) request; protected/missing paths terminal; approval materializes the PathPrefix grant row; provider binds at ceiling; revocation un-mounts | `packages/sandbox-docker/test/composed.docker.test.js::composed cure` |
 | D-8 (no undeclared capability — the host-fs deny-list) | `packages/sandbox-docker/src/mounts.js::DEFAULT_SENSITIVE_PATHS` + provider over-mounts | `packages/sandbox-docker/test/composed.docker.test.js::the deny-list hides secrets` |
+| I-5 (gates — remote-access findings route through the grant layers) | `packages/remote-access/src/analyzer.js` (static detection) + `src/index.js` (routing through `compact-approval.gate`) | `packages/remote-access/test/analyzer-golden.test.js`, `packages/remote-access/test/composed.dsh.test.js` |
+| D-7 (fail-closed — opaque network access) | `packages/remote-access/src/index.js` — unresolvable targets denied with an envelope, never asked forever | `packages/remote-access/test/composed.dsh.test.js::opaque network access is refused` |
 
 Conventions recorded (verified against installed dsh `~0.1.5-rc.1` types):
 the plan's dotted `grants.*` command names are not legal in the host
@@ -99,6 +101,13 @@ Semantics decisions (reviewed, each with a regression test):
   (canonical path, mode ceiling, justification) — the concept's invariants
   (protected/missing terminal, recorded cure, ro ceiling, canonical prefix)
   are unchanged.
+- **Static network analysis over-approximates, fail-closed.** A URL literal
+  in any command-shaped arg is network intent (even in `echo`); a gated host
+  is an FQDN or IP (bare words like `Bearer`, `origin`, `localhost` are
+  never statically provable targets — verbs carrying only those are opaque
+  and refused, not granted); package-manager findings resolve through the
+  DEFAULT registry map, and compositions overriding registries MUST override
+  `packageHosts` too.
 
 ## 3. Role mapping (draft)
 

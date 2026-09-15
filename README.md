@@ -4,8 +4,8 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 2 (sandbox policy & remote access) — in progress.** The
-> law lives in [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
+> **Status: Phase 2 (sandbox policy & remote access) — COMPLETE.** The law
+> lives in [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
 > this repository builds the machines that make it real on dsh.
 >
 > **Phase 0 done — including the composed check:** the allowlist gate runs
@@ -59,7 +59,19 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > **identifiable targets only** — a targetless tool call (opaque command
 > string) collapses to one fingerprint per tool, and approving it would be
 > a hidden blanket grant; opaque strings belong to the remote-access
-> analyzer (slice 2). **Pending:** remote-access static analysis.
+> analyzer (slice 2).
+>
+> **Phase 2, slice 2 done — Phase 2 complete:** the **remote-access
+> analyzer** statically scans shell args for network-access patterns (URL
+> literals, ssh/scp/rsync/nc/telnet remotes, git network subcommands,
+> package-manager registry defaults, bare IPs) and routes every finding
+> through the Phase 1 grant layers — "this command needs network" is
+> approvable **per-host, not per-command** (URL findings carry url+host so
+> the exec cache replays per-URL while host-shaped session grants cover the
+> whole host). Opaque findings (a network verb with no statically resolvable
+> target — `curl $URL`, `git push origin`) fail closed with an envelope
+> naming the repair, never asked forever. Golden vectors pin the detection;
+> the refusal rides the LoopGuard seam.
 
 ## The plan
 
@@ -80,6 +92,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/allowlist-gate/` | First plugin: a `tools/pre-execute` deny-by-allowlist gate issuing Compact-shaped denial envelopes (rule ID + lawful next moves, R-3) |
 | `packages/approval/` | **Phase 1, slices 1–3**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, budgeted (`maxUses`), revocable grants; the `approval/request` answerer materializes `allowed-once` as exec-cache entries (replay hits); `grants-grant`/`grants-list`/`grants-revoke` commands; JSON+fsync persistence (corrupt store = loud boot failure); revocation kills covered cache entries; fingerprint golden vectors; denial-envelope lint; `PathPrefix` mount-grant patterns; provides the `compact-approval` service; gates identifiable targets only |
 | `packages/sandbox-docker/` | **Phase 2, slice 1**: docker `SandboxProvider` (per-call confinement, no-network default, masked-path deny-list, honest enforcement, fail-closed) + `sandbox_request_mount` tool — mount grants (canonical `PathPrefix`, ro ceiling, TTL, revocable) cured through the Phase 1 approval store |
+| `packages/remote-access/` | **Phase 2, slice 2**: static network-access analysis of shell args — findings (URL, remote, package-registry, IP) route through the Phase 1 grant layers (approvable per-host); opaque findings fail closed with an envelope |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |

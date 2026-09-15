@@ -160,7 +160,15 @@ export function approvalPlugin(opts = {}) {
     if (config?.maxPendingPerRoot !== undefined) approval.maxPendingPerRoot = config.maxPendingPerRoot;
     if (config?.pendingTtlMs !== undefined) approval.pendingTtlMs = config.pendingTtlMs;
 
-    ctx.on('tools/pre-execute', async (exec, next) => {
+    /**
+     * The full pre-execute decision as a reusable function (Phase 2 routing):
+     * null = pass/allowed; otherwise the PreToolDecision ({kind:'ask'|'deny',
+     * reason}). Every side effect of the gate — evaluation, flood cap,
+     * ask-correlation record, refusal-seam emission, envelope — happens here,
+     * so a routing plugin (remote-access) that synthesizes target-bearing
+     * calls gets identical semantics to a directly-gated call.
+     */
+    approval.gate = (exec) => {
       const tool = exec?.name ?? 'unknown-tool';
       const args = exec?.arguments ?? {};
       const { root, session } = identityOf(exec?.agent);
@@ -171,9 +179,9 @@ export function approvalPlugin(opts = {}) {
       // "no blanket grants" invariant, D-8). Opaque command strings are the
       // remote-access analyzer's domain (Phase 2 item 3); mount requests
       // carry their own gate.
-      if (Object.keys(canonicalTarget(args)).length === 0) return next();
+      if (Object.keys(canonicalTarget(args)).length === 0) return null;
       const v = approval.evaluate({ tool, args, root, session, now: Date.now() });
-      if (v.verdict === 'allowed') return next();
+      if (v.verdict === 'allowed') return null;
       const report = (kind) => {
         // LoopGuard cooperation — a throwing listener must never take the
         // gate down with it (the gate's answer stands either way)
@@ -197,7 +205,9 @@ export function approvalPlugin(opts = {}) {
         reason: `"${tool}" is not covered by this runtime's grant layers`,
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };
-    });
+    };
+
+    ctx.on('tools/pre-execute', async (exec, next) => approval.gate(exec) ?? next());
 
     ctx.on('approval/request', (req, next) => answerRequest(approval, req, next));
 

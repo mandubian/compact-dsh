@@ -1,0 +1,14 @@
+{
+  "name": "compact-dsh-remote-access",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — static network-access analysis of shell args (port plan Phase 2 item 3): findings route through the Phase 1 grant layers so network access is approvable per-host, not per-command.",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
+  "dependencies": {
+    "compact-envelope": "0.1.0",
+    "compact-dsh-approval": "0.4.1"
+  },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" }
+}
