@@ -45,6 +45,19 @@ export { GrantStore, PersistentGrantStore, evaluate, fingerprint, canonicalTarge
 export const name = 'compact-approval';
 export const inject = ['approval'];
 
+// LoopGuard cooperation (port plan Phase 1 item 7; consumer lands in Phase 3):
+// every refusal this gate constructs — ask (uncovered), ask (dedup-pending),
+// deny (flood) — is emitted on the Cordis event bus. The future guard plugin
+// folds these into trip 12 (irrecoverable gate flailing) of
+// docs/concept-loopguard-trips.md. Decision OUTCOMES are not re-emitted:
+// the host ApprovalService already appends approval/asked + approval/decided
+// to the durable log, and the guard reads decisions from recorded state (D-7).
+export const REFUSAL_EVENT = 'compact-approval/refusal';
+
+function refusalPayload({ kind, verdict, ruleId, tool, fingerprint, root, session }) {
+  return { kind, verdict, ruleId, tool, fingerprint, root, session, at: Date.now() };
+}
+
 /** Identity of the acting agent on the verified dsh contract:
  *  `Agent.session` is a live Session; fork lineage sits in `header.parentSession`.
  *  Root scope = direct parent when forked, else the session itself — one
@@ -137,8 +150,14 @@ export function approvalPlugin(opts = {}) {
       const { root, session } = identityOf(exec?.agent);
       const v = approval.evaluate({ tool, args, root, session, now: Date.now() });
       if (v.verdict === 'allowed') return next();
+      const report = (kind) => {
+        // LoopGuard cooperation — a throwing listener must never take the
+        // gate down with it (the gate's answer stands either way)
+        try { ctx.emit?.(REFUSAL_EVENT, refusalPayload({ kind, verdict: v.verdict, ruleId: v.ruleId, tool, fingerprint: v.fingerprint, root, session })); } catch { /* accounting must not break enforcement */ }
+      };
       if (v.verdict === 'refused-flood') {
         // enforced BEFORE any approval dispatch (port plan Phase 1 item 4)
+        report('deny');
         const env = buildEnvelope({ gate: 'AG', ruleId: 'I-5/flood-cap',
           reason: `too many pending approvals for this root (${v.ruleId})`,
           lawfulNextMoves: ['wait for pending approvals to resolve', 'withdraw an older request', 'escalate to your Principal'] });
@@ -148,6 +167,7 @@ export function approvalPlugin(opts = {}) {
       // the answerer's decision correlation (needs the agent object: the host
       // denies asks without one before any approval dispatch).
       if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args });
+      report('ask');
       const env = buildEnvelope({ gate: 'AG', ruleId: v.ruleId,
         reason: `"${tool}" is not covered by this runtime's grant layers`,
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });

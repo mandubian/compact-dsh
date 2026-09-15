@@ -9,20 +9,25 @@ applies from the first enforced phase onward).
 
 ## 1. Conformance declaration
 
-- **[M] mandatory floor**: enforcement *planned*, not yet implemented.
-  Floor mapping (clause → planned enforcing package → verifier):
+- **[M] mandatory floor**: partially enforced as of Phase 1. Enforced now:
+  I-4 (envelope shape on every refusal of the two gate plugins) and I-5
+  (layered gates with grants, budgets, persistence, revocation). Still
+  *planned*, not yet implemented:
   | Clause | Planned enforcement | Verifier (planned) |
   |---|---|---|
   | I-1 identity & keys | `dsh-identity` (undrafted) | signature checks over attestations |
   | I-2 the record | chained SessionPersistence decorator (port plan Phase 8) | continuity check at read |
   | I-3 attestation | `dsh-rights` (undrafted) | attestation signature + freshness |
-  | I-4 denial envelope | `dsh-allowlist-gate` **(first slice: this repo's first package)** + all later plugins | envelope-field lint |
-  | I-5 gates | `dsh-approval` (port plan Phase 1) | gate-record audit |
   | I-6 contestation | `dsh-rights` amendment queue | petition-lifecycle audit |
   | I-7 verification | `auditor/` CLI (port plan Phase 4) | the auditor itself |
   | I-8 degradation honesty | constitution service surface | degradation notices in log |
   | R-1–R-13 rights | the plugins above + `dsh-rights` | auditor invariants |
   | D-1/D-5–D-8 duties | gates + attestation teaching + register | auditor invariants |
+  Enforced (see §2 for the register):
+  | Clause | Enforced by | Verifier |
+  |---|---|---|
+  | I-4 denial envelope (partial) | `dsh-allowlist-gate` v0.1.0 + `dsh-approval` v0.4.0 | envelope lint over every refusal path |
+  | I-5 gates (partial — network targets) | `dsh-approval` v0.4.0 (five layers, grants, budgets, persistence, revocation, LoopGuard refusal seam) | composed deny→ask→approve→replay-hit cycle + audit-pair test |
 - **[C] capabilities provided**: none yet (confinement, multi-agent,
   scheduling, memory, federation — wake their parts when provided).
 - **[O] optional clauses adopted**: none yet.
@@ -31,7 +36,7 @@ applies from the first enforced phase onward).
 ## 2. Enforcement register
 
 To be generated per phase: `clause ID → enforcing package → verifying test`.
-Registered so far (v0.1.0 of the gate package, v0.2.0 of the approval
+Registered so far (v0.1.0 of the gate package, v0.4.0 of the approval
 package — partial floor only):
 
 | Clause | Enforced by | Verifier |
@@ -42,6 +47,7 @@ package — partial floor only):
 | I-4 (denial envelope — ask/deny paths, partial) | `packages/approval/src/index.js` (envelopes carry rule ID + lawful next moves into the ask `reason`) | `packages/approval/test/composed.dsh.test.js::the ask envelope lists lawful next moves`; envelope lint over every refusal path: `packages/approval/test/envelope-lint.test.js` |
 | D-7 (fail-closed, decisions from recorded state — grant durability) | `packages/approval/src/persist.js::PersistentGrantStore` — grants/budgets/revocations survive restart; corrupt store refuses the boot (no silent reset → no privilege resurrection); pending asks deliberately do not persist (park, not checkpoint) | `packages/approval/test/persist.test.js::a corrupt store file fails the boot loudly`; `::pending-approval bookkeeping never survives a restart` |
 | I-5 (gates — budgets) | `packages/approval/src/grants.js` (`maxUses`/`uses`) + `evaluate.js` (consumption at the answering layer) | `packages/approval/test/budget.test.js` |
+| I-5→D-1 (gate refusals are on the record for the Phase 3 guard) | `packages/approval/src/index.js::REFUSAL_EVENT` — every ask/deny emitted on the Cordis bus; decision outcomes are NOT re-emitted (the host audit pair is the record, D-7) | `packages/approval/test/loopguard-seam.test.js` |
 
 Conventions recorded (verified against installed dsh `~0.1.5-rc.1` types):
 the plan's dotted `grants.*` command names are not legal in the host

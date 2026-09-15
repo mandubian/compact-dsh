@@ -4,8 +4,9 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 1 (layered approval & grants) — in progress.** The law
-> lives in [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
+> **Status: Phase 1 (layered approval & grants) — COMPLETE at the
+> enforcement altitude available today.** The law lives in
+> [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
 > this repository builds the machines that make it real on dsh.
 >
 > **Phase 0 done — including the composed check:** the allowlist gate runs
@@ -32,8 +33,14 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > survive a restart, pending asks deliberately do not; a corrupt store file
 > fails the boot loudly — never a silent grant reset); fingerprint golden
 > vectors pin the canonicalization; an **envelope lint** walks every refusal
-> path asserting rule ID + lawful next moves. **Pending:** LoopGuard
-> cooperation (Phase 3 seam).
+> path asserting rule ID + lawful next moves; every refusal is emitted on
+> the Cordis bus (`compact-approval/refusal`) as the **LoopGuard cooperation
+> seam** — the Phase 3 guard folds it into trip 12 (gate flailing), while
+> decision outcomes stay on the host's own `approval/asked`/`approval/decided`
+> record (D-7). **Outstanding (not Phase 1 scope):** the full agent-loop
+> profile run (needs a model provider key — enforcement is proven at the
+> tool-runtime altitude); the guard plugin that consumes the refusal seam
+> (Phase 3).
 
 ## The plan
 
