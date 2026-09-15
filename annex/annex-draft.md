@@ -59,6 +59,30 @@ materialize exec-cache entries (fingerprint-level, TTL, cross-session).
 The host `ApprovalService` owns the `approval/asked`/`approval/decided`
 audit pair; this composition never appends it.
 
+Semantics decisions (reviewed, each with a regression test):
+
+- **Budgets consume at gate time, not outcome time.** An approved execution
+  that later fails still consumed the grant — the conservative direction.
+  `tools/result` outcome accounting belongs to the Phase 3 guard, not to
+  grant semantics.
+- **Exec-cache replay is identity-based.** A failed approved execution does
+  not burn its cache entry; the identical operation replays until the TTL.
+- **Root scope is separator-anchored.** A root-scoped grant covers exactly
+  the root session and its `/`-descendants; non-hierarchical session ids
+  (dsh uuids) match exactly (documented under-grant, never over — a bare
+  `startsWith` would collide `sess-1`/`sess-10`).
+- **Session grants always expire** ("grants are scoped and expiring" — no
+  blanket grants): a falsy ttlMs means the default hour, never permanent.
+  Plan grants are the exception: their bound is the session itself.
+- **Ask correlation is callId-keyed, FIFO-fallback, stale-dropping.**
+  The host request carries no arguments; a single rec per (agent, tool)
+  would let a later ask overwrite an earlier one and the operator's
+  approval of A could materialize B's fingerprint.
+- **Durability is actually fsync.** The grant store flushes data to disk
+  (fsync before rename, best-effort directory fsync after) on every
+  durable-state mutation — including budget consumption; a restart must
+  never resurrect spent uses or revoked grants.
+
 ## 3. Role mapping (draft)
 
 - **Enforcer**: the `compact-dsh` plugin composition on a pinned dsh.

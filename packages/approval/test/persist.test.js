@@ -94,6 +94,22 @@ test('the plugin restarts into its own memory of approvals', () => {
   assert.equal(a2.evaluate(T('net.fetch', { host: 'other.example' })).verdict, 'pending-approval');
 });
 
+test('spent budget is durable: a restart never resurrects uses', () => {
+  const dir = freshDir();
+  const path = join(dir, 'grants.json');
+  const a1 = createApproval({ persistPath: path });
+  a1.grantSession({ pattern: 'api.example.com', root: 'root-1', ttlMs: 60_000, maxUses: 1, now: NOW });
+  assert.equal(a1.evaluate({ tool: 'net.fetch', args: { host: 'api.example.com' }, root: 'root-1', session: 'root-1', now: NOW }).verdict, 'allowed');
+
+  const a2 = createApproval({ persistPath: path });
+  assert.equal(a2.store.sessionGrants[0].uses, 1, 'the consumed use survived the restart');
+  assert.equal(
+    a2.evaluate({ tool: 'net.fetch', args: { host: 'api.example.com' }, root: 'root-1', session: 'root-1', now: NOW }).verdict,
+    'pending-approval',
+    'the spent grant does not cover again after restart',
+  );
+});
+
 test('flush is atomic: the store directory holds exactly the target file', () => {
   const dir = freshDir();
   const path = join(dir, 'nested', 'grants.json');       // parent dirs are created

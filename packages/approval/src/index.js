@@ -33,7 +33,7 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
-import { GrantStore, patternMatches } from './grants.js';
+import { GrantStore } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget } from './fingerprint.js';
@@ -79,8 +79,13 @@ export function createApproval(opts = {}) {
     execCacheTtlMs: opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs,
     maxPendingPerRoot: opts.maxPendingPerRoot ?? DEFAULTS.maxPendingPerRoot,
     pendingTtlMs: opts.pendingTtlMs ?? DEFAULTS.pendingTtlMs,
-    // ask↔decision correlation: agent object → toolName → {fp, root, session, args}
-    // WeakMap: the ask record lives exactly as long as the asking agent does.
+    // ask↔decision correlation: agent object → toolName → FIFO of ask records.
+    // The host request carries NO tool arguments, so a single rec per
+    // (agent, tool) would let a LATER ask overwrite an EARLIER one — and the
+    // operator's approval of the earlier request would then materialize the
+    // later call's fingerprint (a wrong grant). Records match by callId when
+    // the request carries one, else FIFO (asks decide in order). WeakMap:
+    // the records live exactly as long as the asking agent does.
     asks: new WeakMap(),
     fingerprint: (tool, args) => fingerprint(tool, args),
     grantSession: ({ pattern, root, session, ttlMs = 60 * 60 * 1000, maxUses = null, now = Date.now() }) =>
@@ -99,13 +104,24 @@ export function createApproval(opts = {}) {
     recordAsk: (agent, tool, rec) => {
       let m = approval.asks.get(agent);
       if (!m) { m = new Map(); approval.asks.set(agent, m); }
-      m.set(tool, rec);
+      const q = m.get(tool) ?? [];
+      q.push({ ...rec, at: rec.at ?? Date.now() });
+      m.set(tool, q);
     },
-    /** Claim the pending ask record (removes it; null when the ask is not ours). */
-    takeAsk: (agent, tool) => {
-      const rec = approval.asks.get(agent)?.get(tool);
-      if (rec) approval.asks.get(agent).delete(tool);
-      return rec ?? null;
+    /**
+     * Claim the pending ask record (removes it; null when the ask is not ours).
+     * Matches by callId when the request carries one, else the oldest record
+     * (FIFO); records older than the pending TTL are dropped while searching.
+     */
+    takeAsk: (agent, tool, callId) => {
+      const q = approval.asks.get(agent)?.get(tool);
+      if (!q || q.length === 0) return null;
+      const cutoff = Date.now() - approval.pendingTtlMs;
+      for (let i = q.length - 1; i >= 0; i--) if (q[i].at < cutoff) q.splice(i, 1);
+      if (q.length === 0) return null;
+      let idx = callId != null ? q.findIndex(r => r.callId != null && r.callId === callId) : -1;
+      if (idx < 0) idx = 0;
+      return q.splice(idx, 1)[0];
     },
   };
   return approval;
@@ -119,7 +135,7 @@ export function createApproval(opts = {}) {
  */
 async function answerRequest(approval, req, next) {
   const { toolName, agent } = req;
-  const rec = approval.takeAsk(agent, toolName);
+  const rec = approval.takeAsk(agent, toolName, req.callId);
   if (!rec) return next(); // not our gate's ask — stay out of the chain
   try {
     const outcome = await next();
@@ -165,8 +181,9 @@ export function approvalPlugin(opts = {}) {
       }
       // pending-approval / dedup-pending → the human gate. Record the ask for
       // the answerer's decision correlation (needs the agent object: the host
-      // denies asks without one before any approval dispatch).
-      if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args });
+      // denies asks without one before any approval dispatch). callId lets the
+      // correlation survive concurrent asks for the same tool.
+      if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args, callId: exec.callId });
       report('ask');
       const env = buildEnvelope({ gate: 'AG', ruleId: v.ruleId,
         reason: `"${tool}" is not covered by this runtime's grant layers`,

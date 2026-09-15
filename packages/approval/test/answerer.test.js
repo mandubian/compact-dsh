@@ -85,3 +85,29 @@ test('takeAsk correlates the agent+tool ask record exactly once', () => {
   assert.equal(a.takeAsk(agent('sess-b'), 'net.fetch'), null); // other agent: nothing
   assert.equal(a.takeAsk(ag, 'other.tool'), null);
 });
+
+test('concurrent asks for one tool never overwrite: approval of A cannot cache B (wrong-grant regression)', () => {
+  const a = createApproval({});
+  const ag = agent('sess-a');
+  // two different uncovered calls queue up before the operator answers
+  a.recordAsk(ag, 'net.fetch', { fp: 'fp_A', callId: 'call-1', root: 'sess-a', session: 'sess-a', args: { host: 'a.example' } });
+  a.recordAsk(ag, 'net.fetch', { fp: 'fp_B', callId: 'call-2', root: 'sess-a', session: 'sess-a', args: { host: 'b.example' } });
+  // the operator decides the FIRST request: its own record must be claimed,
+  // never the later one — callId matches exactly, FIFO falls back in order
+  const first = a.takeAsk(ag, 'net.fetch', 'call-1');
+  assert.equal(first.fp, 'fp_A', 'the decided request claims its own fingerprint');
+  const second = a.takeAsk(ag, 'net.fetch', 'call-2');
+  assert.equal(second.fp, 'fp_B');
+  // without a callId the queue drains FIFO, matching ask order to decision order
+  a.recordAsk(ag, 'net.fetch', { fp: 'fp_C', root: 'sess-a', session: 'sess-a', args: {} });
+  a.recordAsk(ag, 'net.fetch', { fp: 'fp_D', root: 'sess-a', session: 'sess-a', args: {} });
+  assert.equal(a.takeAsk(ag, 'net.fetch').fp, 'fp_C');
+  assert.equal(a.takeAsk(ag, 'net.fetch').fp, 'fp_D');
+});
+
+test('a stale ask record (decision that never arrived) is dropped on the next take', () => {
+  const a = createApproval({ pendingTtlMs: 1_000 });
+  const ag = agent('sess-a');
+  a.recordAsk(ag, 'net.fetch', { fp: 'fp_old', root: 'sess-a', session: 'sess-a', args: {}, at: Date.now() - 10_000 });
+  assert.equal(a.takeAsk(ag, 'net.fetch'), null, 'a stale record never materializes a grant');
+});

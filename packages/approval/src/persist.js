@@ -14,7 +14,7 @@
 //     ask is turn-scoped interactive state; a restart that lost the ask is
 //     recovered by the host as an unknown-outcome tool result ("park, don't
 //     checkpoint"). Grants, budgets, revocations, and cache entries persist.
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { GrantStore } from './grants.js';
 
@@ -70,12 +70,13 @@ export class PersistentGrantStore extends GrantStore {
       const fd = openSync(tmp, 'w');
       try {
         writeSync(fd, payload);
-        // fsync rides the close on most platforms; an explicit flush keeps
-        // the contract honest where it matters
+        fsyncSync(fd);            // the data must be on disk BEFORE the rename
       } finally {
         closeSync(fd);
       }
       renameSync(tmp, this.path);              // atomic over the target
+      // best-effort directory fsync so the rename itself is durable
+      try { const d = openSync(dirname(this.path), 'r'); fsyncSync(d); closeSync(d); } catch { /* platforms that refuse dir fsync still have the data fsync */ }
     } catch (e) {
       try { unlinkSync(tmp); } catch { /* nothing to clean */ }
       throw new Error(`compact-dsh-approval: could not persist grant store ${this.path}: ${e.message}`);
@@ -84,6 +85,8 @@ export class PersistentGrantStore extends GrantStore {
 }
 
 // Durable-state mutators flush; read paths and pending bookkeeping do not.
+// consumeUse is here: a spent budget is durable state — a restart that
+// resurrected uses would over-grant.
 function flushed(method) {
   const base = GrantStore.prototype[method];
   return function (...args) {
@@ -97,3 +100,4 @@ PersistentGrantStore.prototype.revokeSessionGrant = flushed('revokeSessionGrant'
 PersistentGrantStore.prototype.addPlanGrant = flushed('addPlanGrant');
 PersistentGrantStore.prototype.cacheSet = flushed('cacheSet');
 PersistentGrantStore.prototype.revokeFingerprint = flushed('revokeFingerprint');
+PersistentGrantStore.prototype.consumeUse = flushed('consumeUse');

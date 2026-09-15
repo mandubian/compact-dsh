@@ -1,7 +1,7 @@
 // The ordered five-layer evaluation (docs/concept-approval-layers.md).
 // Pure logic over (call, store, now): no host, no I/O, fully testable.
 import { fingerprint } from './fingerprint.js';
-import { coveringGrants, consumeUse } from './grants.js';
+import { coveringGrants } from './grants.js';
 
 export const DEFAULTS = {
   execCacheTtlMs: 24 * 60 * 60 * 1000, // 24h; 0 disables
@@ -29,22 +29,26 @@ export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs
 
   // 2. plan grants — the answering grant's budget is consumed here
   if (planHits.length) {
-    consumeUse(planHits[0]);
+    store.consumeUse(planHits[0]);
     return { verdict: 'allowed', layer: 'plan-grant', ruleId: planHits[0].id, fingerprint: fp };
   }
 
-  // 3. session grants — scoped: a session-scoped grant covers its own session
-  //    and every session under its root; root-scoped covers the whole root.
+  // 3. session grants — scoped: a session-scoped grant covers its own
+  //    session; a root-scoped grant covers exactly the root session and its
+  //    '/'-descendants. The prefix is separator-anchored: a grant on
+  //    'sess-1' must NEVER cover 'sess-10' (bare startsWith would be a
+  //    fail-open collision). Non-hierarchical session ids (dsh uuids) simply
+  //    match exactly — documented under-grant, never over.
   //    The FIRST scope-ok hit is the answering grant: it is both the reported
   //    rule and the budgeted one (reporting hits[0] while consuming a later
   //    hit would spend a grant the record never names).
   const scopeOk = g =>
     (g.session != null) ? g.session === session
-    : (g.root != null) ? (session ?? '').startsWith(g.root)
+    : (g.root != null) ? (session === g.root || (session ?? '').startsWith(g.root + '/'))
     : true;
   const answering = sessionHits.find(scopeOk);
   if (answering) {
-    consumeUse(answering);
+    store.consumeUse(answering);
     return { verdict: 'allowed', layer: 'session-grant', ruleId: answering.id, fingerprint: fp };
   }
 

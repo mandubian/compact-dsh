@@ -70,6 +70,26 @@ test('revocation kills a live grant', () => {
   assert.notEqual(v.verdict, 'allowed');
 });
 
+test('root scope is separator-anchored: a grant on sess-1 never covers sess-10', () => {
+  const a = createApproval({});
+  a.grantSession({ pattern: 'api.example.com', root: 'sess-1' });
+  assert.equal(a.evaluate({ tool: 'net.fetch', args: { host: 'api.example.com' }, root: 'sess-1', session: 'sess-1', now: NOW }).verdict, 'allowed');
+  assert.equal(a.evaluate({ tool: 'net.fetch', args: { host: 'api.example.com' }, root: 'sess-1', session: 'sess-1/child', now: NOW }).verdict, 'allowed');
+  assert.equal(
+    a.evaluate({ tool: 'net.fetch', args: { host: 'api.example.com' }, root: 'sess-10', session: 'sess-10', now: NOW }).verdict,
+    'pending-approval',
+    'a bare startsWith would collide sess-1/sess-10 — the prefix must be separator-anchored',
+  );
+});
+
+test('grants are scoped and expiring: a falsy ttlMs is the default hour, never permanent', () => {
+  const a = createApproval({});
+  const g = a.grantSession({ pattern: 'api.example.com', root: 'root-1', ttlMs: 0, now: NOW });
+  assert.equal(g.expiresAt, NOW + 60 * 60 * 1000, 'concept invariant: no permanent session grants');
+  const v = a.evaluate({ tool: 'net.fetch', args: { host: 'api.example.com' }, root: 'root-1', session: 'root-1', now: NOW + 60 * 60 * 1000 + 1 });
+  assert.equal(v.verdict, 'pending-approval', 'the defaulted TTL still bites');
+});
+
 test('pending dedup: identical uncovered call does not re-ask', () => {
   const a = createApproval({});
   const v1 = a.evaluate(T('net.fetch', { host: 'unknown.example' }));

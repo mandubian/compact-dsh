@@ -20,11 +20,15 @@ export class GrantStore {
   // grant — widening requires a new grant through the gate). Uses are
   // consumed by the evaluator when a grant ANSWERS (layers 2–3), never by
   // exec-cache replays — the cache is its own fingerprint-level grant.
+  // ttlMs is MANDATORY in effect: "grants are scoped and expiring"
+  // (docs/concept-approval-layers.md — no blanket grants) — a falsy ttlMs is
+  // replaced by the default hour, never by a permanent grant. Plan grants
+  // below are the exception: their bound is the session itself.
   addSessionGrant({ pattern, root, session, ttlMs, maxUses = null, now }) {
     const grant = {
       id: 'sg_' + Math.random().toString(16).slice(2, 10),
       pattern, root: root ?? null, session: session ?? null,
-      createdAt: now, expiresAt: ttlMs ? now + ttlMs : null,
+      createdAt: now, expiresAt: now + (ttlMs || 60 * 60 * 1000),
       maxUses, uses: 0, revokedAt: null,
     };
     this.sessionGrants.push(grant);
@@ -100,6 +104,15 @@ export class GrantStore {
 
   /** Kill one fingerprint's cache entry directly (allowed-once undo). */
   revokeFingerprint(fp) { return this.cache.delete(fp); }
+
+  /**
+   * Consume one use of a budgeted grant (no-op for unlimited grants). A store
+   * METHOD, not a helper: durable stores flush it — a restart must never
+   * resurrect spent budget.
+   */
+  consumeUse(grant) {
+    if (grant && grant.maxUses != null) grant.uses += 1;
+  }
 }
 
 // -- pattern matching (same classes as the allowlist gate) --------------------
@@ -123,9 +136,4 @@ export function coveringGrants(store, target, now) {
     session: live(store.sessionGrants).filter(g => patternMatches(g.pattern, target)),
     plan: live(store.planGrants).filter(g => patternMatches(g.pattern, target)),
   };
-}
-
-/** Consume one use of a budgeted grant (no-op for unlimited grants). */
-export function consumeUse(grant) {
-  if (grant && grant.maxUses != null) grant.uses += 1;
 }
