@@ -3,8 +3,6 @@
 // bookkeeping. The in-memory class is the contract; persistence
 // (JSON+fsync, src/persist.js) decorates it without changing semantics.
 
-import { fingerprint } from './fingerprint.js';
-
 export class GrantStore {
   constructor() {
     this.sessionGrants = [];   // {id, pattern, root, session, expiresAt, createdAt, maxUses, uses, revokedAt}
