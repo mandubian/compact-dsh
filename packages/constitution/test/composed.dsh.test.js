@@ -15,6 +15,7 @@ import { promotionPlugin } from 'compact-dsh-promotion';
 import * as sandbox from 'compact-dsh-sandbox-docker';
 import * as remoteAccess from 'compact-dsh-remote-access';
 import * as allowlistGate from 'compact-dsh-allowlist-gate';
+import { specialistsPlugin } from 'compact-dsh-specialists';
 import { apply as constitutionApply } from '../src/index.js';
 
 class SystemPromptStub extends Service {
@@ -27,6 +28,40 @@ class SystemPromptStub extends Service {
   context() { return () => {}; }
 }
 
+// The specialists plugin rides the delegation-tool contract, whose inject is
+// tools/subagents/systemPrompt/sessionProjections — the two stubs below stand
+// in for the host registries the standard preset provides.
+class SessionProjectionsStub extends Service {
+  static inject = [];
+  constructor(ctx, config) { super(ctx, 'sessionProjections'); }
+  register() { return () => {}; }
+}
+
+class SubagentsStub extends Service {
+  static inject = [];
+  constructor(ctx, config) {
+    super(ctx, 'subagents');
+    this.providers = new Map();
+  }
+  registerProvider(provider) {
+    this.providers.set(provider.name, provider);
+    return () => this.providers.delete(provider.name);
+  }
+  getProvider(name) { return this.providers.get(name); }
+  list() { return [...this.providers.keys()]; }
+}
+
+function mountSpecialists(ctx) {
+  const subagents = ctx.get('subagents');
+  subagents.registerProvider({
+    name: 'spawn',
+    capabilities: { agentOptions: false, outputSchema: false, depthLimit: true, toolFilter: true, persona: true },
+    inheritsParentContext: false,
+    start: async () => ({ id: 'child', localAgent: undefined, result: Promise.resolve({ output: [], stopReason: 'completed' }), dispose: async () => {} }),
+  });
+  return specialistsPlugin({})(ctx, {});
+}
+
 // The blessed composition, in load order: enforcement plugins first, the
 // constitution LAST — after the boot settles and every enforcement service
 // (including the async sandbox mount) is present. In a dsh-loaded
@@ -35,8 +70,10 @@ class SystemPromptStub extends Service {
 async function bootBlessed(opts = {}) {
   const ctx = new Context();
   ctx.plugin(SystemPromptStub);
+  ctx.plugin(SessionProjectionsStub);
   ctx.plugin(ApprovalService);
   ctx.plugin(ToolRuntime);
+  ctx.plugin(SubagentsStub);
   loopguardPlugin({})(ctx, {});
   const promotion = promotionPlugin({});
   promotion(ctx, {});
@@ -48,6 +85,7 @@ async function bootBlessed(opts = {}) {
   for (let i = 0; i < 500 && (!ctx.tools || ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-allowlist-gate', 'compact-remote-access'].some(s => ctx.get(s) === undefined)); i++) {
     await new Promise(r => setImmediate(r));
   }
+  mountSpecialists(ctx);
   const constitution = constitutionApply(ctx, {});
   return { ctx, constitution };
 }
@@ -60,9 +98,10 @@ test('composed: the blessed composition boots under the constitution', async () 
   const att = constitution.attestation();
   assert.ok(att.registeredRules.includes('I-5'), 'the floor rules are registered');
   assert.ok(att.registeredRules.includes('CF-1'), 'the confinement trigger is awake (capability provided) and bound');
+  assert.ok(att.registeredRules.includes('MA-2'), 'bounded delegation is registered (the Phase 5 roster)');
   assert.ok(att.gaps.some(g => g.includes('NOT yet ratified')), 'the standing honesty is in every attestation');
   // every required enforcement service resolved
-  for (const s of ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox']) {
+  for (const s of ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists']) {
     assert.notEqual(ctx.get(s), undefined, `${s} present`);
   }
 });
@@ -81,8 +120,10 @@ test('composed: a composition missing an enforcement plugin REFUSES TO START (F-
 test('composed: applying the constitution before the async sandbox service mounts fails; after, it passes', async () => {
   const ctx = new Context();
   ctx.plugin(SystemPromptStub);
+  ctx.plugin(SessionProjectionsStub);
   ctx.plugin(ApprovalService);
   ctx.plugin(ToolRuntime);
+  ctx.plugin(SubagentsStub);
   loopguardPlugin({})(ctx, {});
   const promotion = promotionPlugin({});
   promotion(ctx, {});
@@ -98,6 +139,7 @@ test('composed: applying the constitution before the async sandbox service mount
     await new Promise(r => setImmediate(r));
   }
   for (let i = 0; i < 300 && ctx.get('compact-sandbox') === undefined; i++) await new Promise(r => setImmediate(r));
+  mountSpecialists(ctx);
   const constitution = constitutionApply(ctx, {});
   assert.ok(constitution.attestation().registeredRules.includes('CF-1'), 'once the enforcement service exists, the composition boots under the law');
 });

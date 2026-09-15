@@ -1,0 +1,74 @@
+{
+  "name": "sealed_evaluator",
+  "toolName": "specialist_sealed_evaluator",
+  "kind": "specialist",
+  "source": "agents/specialists/sealed_evaluator.default",
+  "description": "Validation and testing agent (operator-invokable sealed-network evaluation).",
+  "preset": "coding",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": [
+    "interrupt_agent",
+    "send_message",
+    "subagent",
+    "subagent_fork"
+  ],
+  "sourceExcludedTools": [],
+  "unmappedExclusions": {
+    "*": "home excluded_tools is empty — the deny list derives from home capabilities: no AgentSpawn/AgentMessage, so the spawn tools and messaging are denied on every specialist; web tools and promotion_record stay granted (the sealed network is a sandbox property, and home allows promotion_)"
+  },
+  "includes": [
+    "gate-refusals",
+    "resumption",
+    "structured-handoff",
+    "recording-promotion",
+    "first-turn-discipline"
+  ],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": [
+        "status",
+        "evaluator_pass",
+        "summary"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "partial",
+            "unable_to_evaluate",
+            "clarification_needed"
+          ]
+        },
+        "evaluator_pass": {
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "tests_run": {
+          "type": "integer"
+        },
+        "tests_passed": {
+          "type": "integer"
+        },
+        "tests_failed": {
+          "type": "integer"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "recommendation": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

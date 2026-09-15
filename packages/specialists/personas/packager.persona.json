@@ -1,0 +1,28 @@
+{
+  "name": "packager",
+  "toolName": "specialist_packager",
+  "kind": "specialist",
+  "source": "agents/specialists/packager.default",
+  "description": "Build-time dependency resolution agent: installs dependencies in a confined sandbox and captures them so consumers run network-isolated; artifact layering proper lands with the Phase 6 artifact store.",
+  "preset": "agentic",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": ["web_search", "web_fetch", "subagent", "subagent_fork", "interrupt_agent", "send_message"],
+  "sourceExcludedTools": [],
+  "unmappedExclusions": {
+    "*": "home excluded_tools is empty — the deny list is a pure dsh design decision: no AgentSpawn/AgentMessage at home (subagent/subagent_fork/send_message/interrupt_agent denied). Home holds NetworkAccess hosts *, but on dsh install egress is sandbox+approval-gated through the confined bash tool, so web_search/web_fetch stay denied and bash remains the install path — network-carrying installs ride the approval waterfall, not a browser tool."
+  },
+  "includes": ["resumption"],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string" },
+        "artifact_ref": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    }
+  }
+}

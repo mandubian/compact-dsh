@@ -1,0 +1,117 @@
+{
+  "name": "auditor",
+  "toolName": "specialist_auditor",
+  "kind": "specialist",
+  "source": "agents/specialists/auditor.default",
+  "description": "Audit, review, and promotion gate agent.",
+  "preset": "coding",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": [
+    "web_search",
+    "web_fetch",
+    "interrupt_agent",
+    "send_message",
+    "subagent",
+    "subagent_fork"
+  ],
+  "sourceExcludedTools": [
+    "planframe_*",
+    "scheduler_*",
+    "workflow_*",
+    "eval_run*",
+    "eval_compare*",
+    "eval_report*",
+    "user_profile_*",
+    "credential_*",
+    "web_*",
+    "observability_*",
+    "wiki_*",
+    "capsule_*",
+    "admin_proposal_*",
+    "security_redteam_*",
+    "github_issue_*",
+    "ab_replay",
+    "session_*",
+    "federation_*",
+    "sentinel_*",
+    "constitution_*",
+    "sandbox_exec",
+    "agent_spawn",
+    "agent_discover",
+    "agent_list",
+    "agent_message",
+    "tool_discover",
+    "self_describe"
+  ],
+  "unmappedExclusions": {
+    "planframe_*": "no dsh analog (durable workflow plans are not a tool surface)",
+    "scheduler_*": "schedule_create/delete/list are not mounted in the standard composition",
+    "workflow_*": "no dsh analog (durable workflow state/query tools are not a dsh surface)",
+    "eval_run*": "no dsh analog",
+    "eval_compare*": "no dsh analog",
+    "eval_report*": "no dsh analog",
+    "user_profile_*": "no dsh analog",
+    "credential_*": "dsh resolves credentials per-operation (CredentialRef), no model-facing tool",
+    "observability_*": "no dsh analog",
+    "wiki_*": "no dsh analog (knowledge plane deferred by the port plan)",
+    "capsule_*": "Phase 7 machinery — no dsh tool yet",
+    "admin_proposal_*": "Phase 8 amendment machinery — no dsh tool yet",
+    "security_redteam_*": "no dsh analog",
+    "github_issue_*": "no dsh analog",
+    "ab_replay": "no dsh analog",
+    "session_*": "session query is host-side, not a model-facing tool",
+    "federation_*": "no dsh analog",
+    "sentinel_*": "ported as CI-side gates, not model-facing tools",
+    "constitution_*": "the constitution is a service, not a tool",
+    "sandbox_exec": "on dsh the sandboxed bash tool IS the confined executor; mount cures ride sandbox_request_mount, which stays granted",
+    "agent_spawn": "denied: subagent + subagent_fork",
+    "agent_discover": "denied: subagent + subagent_fork",
+    "agent_list": "no dsh analog (roster inspection is host-side, not a model-facing tool)",
+    "agent_message": "denied: send_message",
+    "tool_discover": "no dsh analog",
+    "self_describe": "no dsh analog"
+  },
+  "includes": [
+    "clarification-protocol",
+    "recording-promotion",
+    "first-turn-discipline"
+  ],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": [
+        "status",
+        "auditor_pass",
+        "findings"
+      ],
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "auditor_pass": {
+          "type": "boolean"
+        },
+        "security_risk": {
+          "type": "string"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "reproducibility": {
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

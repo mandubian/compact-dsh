@@ -1,0 +1,16 @@
+{
+  "name": "compact-dsh-specialists",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — Specialist bundles: the autonoetic specialist roster (port plan Phase 5) as dsh subagent personas with per-persona tool surfaces (deny filters), bounded delegation, and the trim-dedup lint.",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
+  "dependencies": {
+    "@deepseek-ai/dsh-tool-subagent": "^0.1.5-rc.1"
+  },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" }
+  }
+}

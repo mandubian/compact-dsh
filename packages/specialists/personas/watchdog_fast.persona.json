@@ -1,0 +1,34 @@
+{
+  "name": "watchdog_fast",
+  "toolName": "specialist_watchdog_fast",
+  "kind": "specialist",
+  "source": "agents/specialists/watchdog-fast.default",
+  "description": "Tool-free single-completion divergence judge used by the composition's sentinel validation loop.",
+  "preset": "haiku",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": ["bash", "pwsh", "write", "edit", "web_search", "web_fetch", "subagent", "subagent_fork", "interrupt_agent", "send_message", "ralph", "present", "job_kill", "create_goal", "update_goal"],
+  "sourceExcludedTools": [],
+  "unmappedExclusions": {
+    "*": "home declares no excluded_tools and empty capabilities — the deny list is a pure dsh design decision for a single-completion judge; home's true tool-free guarantee is harness-side (an empty tool registry), on dsh the single-completion doctrine carries it"
+  },
+  "includes": ["structured-handoff"],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": ["verdict", "justification"],
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": ["healthy", "watching", "diverging", "critical"],
+          "description": "Divergence assessment for the target session."
+        },
+        "justification": {
+          "type": "string",
+          "description": "One-paragraph explanation citing concrete evidence."
+        }
+      }
+    }
+  }
+}

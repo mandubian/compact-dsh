@@ -1,0 +1,44 @@
+{
+  "name": "improvement_orchestrator",
+  "toolName": "specialist_improvement_orchestrator",
+  "kind": "specialist",
+  "source": "agents/specialists/improvement-orchestrator.default",
+  "description": "A/B replay orchestrator: runs a set of tasks against two agent revisions and returns a statistical comparison report.",
+  "preset": "agentic",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": ["web_search", "web_fetch", "subagent", "subagent_fork", "interrupt_agent", "send_message"],
+  "sourceExcludedTools": [],
+  "unmappedExclusions": {
+    "*": "home excluded_tools is empty — the deny list is a pure dsh design decision from home capabilities: no NetworkAccess (web_search/web_fetch denied; the replay runner, not this persona, would reach the network) and no AgentSpawn/AgentMessage (subagent/subagent_fork/send_message/interrupt_agent denied). Home grants WriteAccess self.* — kept as write/edit since dsh cannot scope write paths per persona (recorded fidelity loss)."
+  },
+  "includes": [],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": ["ok", "status"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["queued", "completed", "cost_exceeded"] },
+        "suite_id": { "type": "string" },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "baseline_passed": { "type": "integer" },
+            "baseline_total": { "type": "integer" },
+            "candidate_passed": { "type": "integer" },
+            "candidate_total": { "type": "integer" },
+            "delta_passed": { "type": "integer" },
+            "regression_count": { "type": "integer" },
+            "improvement_count": { "type": "integer" }
+          }
+        },
+        "holdout": { "type": "object" },
+        "regressions": { "type": "array" },
+        "improvements": { "type": "array" },
+        "stats": { "type": "object" }
+      }
+    }
+  }
+}

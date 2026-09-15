@@ -1,0 +1,114 @@
+{
+  "name": "executor",
+  "toolName": "specialist_executor",
+  "kind": "specialist",
+  "source": "agents/specialists/executor.default",
+  "description": "Lightweight execution agent for basic bash and dependency-free scripts.",
+  "preset": "coding",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": [
+    "web_search",
+    "web_fetch",
+    "subagent",
+    "subagent_fork",
+    "interrupt_agent",
+    "send_message",
+    "promotion_record",
+    "ralph"
+  ],
+  "sourceExcludedTools": [
+    "planframe_*",
+    "scheduler_*",
+    "eval_*",
+    "user_profile_*",
+    "credential_setup",
+    "credential_check",
+    "credential_refresh",
+    "web_*",
+    "observability_*",
+    "wiki_*",
+    "capsule_*",
+    "admin_proposal_*",
+    "security_redteam_*",
+    "github_issue_*",
+    "ab_replay",
+    "session_*",
+    "federation_*",
+    "sentinel_*",
+    "constitution_*",
+    "tool_discover",
+    "quality_trend_*",
+    "agent_revision_*",
+    "artifact_build",
+    "promotion_*",
+    "approval_*",
+    "digest_*",
+    "anomaly_*"
+  ],
+  "unmappedExclusions": {
+    "planframe_*": "no dsh analog (durable workflow plans are not a tool surface)",
+    "scheduler_*": "schedule_create/delete/list are not mounted in the standard composition",
+    "eval_*": "no dsh analog (eval runs are persona work, not tools)",
+    "user_profile_*": "no dsh analog",
+    "credential_setup": "dsh resolves credentials per-operation (CredentialRef), no model-facing tool",
+    "credential_check": "dsh resolves credentials per-operation (CredentialRef), no model-facing tool",
+    "credential_refresh": "dsh resolves credentials per-operation (CredentialRef), no model-facing tool",
+    "observability_*": "no dsh analog",
+    "wiki_*": "no dsh analog (knowledge plane deferred by the port plan)",
+    "capsule_*": "Phase 7 machinery — no dsh tool yet",
+    "admin_proposal_*": "Phase 8 amendment machinery — no dsh tool yet",
+    "security_redteam_*": "no dsh analog",
+    "github_issue_*": "no dsh analog",
+    "ab_replay": "no dsh analog",
+    "session_*": "session query is host-side, not a model-facing tool",
+    "federation_*": "dropped by the port plan (OFP)",
+    "sentinel_*": "ported as CI-side gates, not model-facing tools",
+    "constitution_*": "the constitution is a service, not a tool",
+    "tool_discover": "no dsh analog",
+    "quality_trend_*": "no dsh analog",
+    "agent_revision_*": "Phase 7 machinery — no dsh tool yet",
+    "artifact_build": "Phase 6 machinery — no dsh tool yet",
+    "promotion_*": "denied: promotion_record",
+    "approval_*": "approval rides the tool waterfall, not a callable tool",
+    "digest_*": "no dsh analog",
+    "anomaly_*": "no dsh analog"
+  },
+  "includes": [
+    "gate-refusals",
+    "clarification-protocol"
+  ],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "partial",
+            "failed",
+            "clarification_needed"
+          ],
+          "description": "Execution outcome."
+        },
+        "stdout_summary": {
+          "type": "string",
+          "description": "Key result extracted from command output."
+        },
+        "error": {
+          "type": "string",
+          "description": "Error detail when status is failed."
+        },
+        "follow_up": {
+          "type": "string",
+          "description": "Routing recommendation when the task exceeded executor scope."
+        }
+      }
+    }
+  }
+}

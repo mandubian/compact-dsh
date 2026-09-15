@@ -1,0 +1,27 @@
+{
+  "name": "outcome_grader",
+  "toolName": "specialist_outcome_grader",
+  "kind": "specialist",
+  "source": "agents/specialists/outcome-grader.default",
+  "description": "Independent post-session judge that grades a finished session's completion from the overview supplied with its task; observer-only, returns a single verdict (achieved | partially_achieved | failed | aborted).",
+  "preset": "coding",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": ["bash", "pwsh", "write", "edit", "web_search", "web_fetch", "subagent", "subagent_fork", "interrupt_agent", "send_message", "ralph", "present", "job_kill", "create_goal", "update_goal"],
+  "sourceExcludedTools": [],
+  "unmappedExclusions": {
+    "*": "home excluded_tools is empty — the deny list is a pure dsh design decision from home capabilities: capabilities [] means no CodeExecution, no NetworkAccess, no AgentSpawn/AgentMessage. The grader judges only the overview injected with its task, so execution (bash/pwsh), mutation (write/edit), network, messaging, spawn, present, job_kill, and goal-management tools are denied; read-only inspection stays granted but the verdict never needs it."
+  },
+  "includes": ["structured-handoff"],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": ["completion", "evidence"],
+      "properties": {
+        "completion": { "type": "string", "description": "One of: achieved | partially_achieved | failed | aborted" },
+        "evidence": { "type": "string", "description": "One-paragraph evidence summary." }
+      }
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "name": "architect",
+  "toolName": "specialist_architect",
+  "kind": "specialist",
+  "source": "agents/specialists/architect.default",
+  "description": "Design, structure, and task decomposition agent.",
+  "preset": "coding",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": [
+    "web_search",
+    "web_fetch",
+    "subagent",
+    "subagent_fork",
+    "interrupt_agent",
+    "send_message"
+  ],
+  "sourceExcludedTools": [
+    "planframe_*",
+    "scheduler_*",
+    "workflow_*",
+    "eval_*",
+    "user_profile_*",
+    "credential_*",
+    "web_*",
+    "observability_*",
+    "wiki_*",
+    "capsule_*",
+    "admin_proposal_*",
+    "security_redteam_*",
+    "github_issue_*",
+    "ab_replay",
+    "session_*",
+    "federation_*",
+    "sentinel_*",
+    "constitution_*",
+    "sandbox_exec",
+    "agent_spawn",
+    "agent_discover",
+    "agent_list",
+    "agent_message",
+    "tool_discover",
+    "self_describe",
+    "artifact_exec",
+    "artifact_build"
+  ],
+  "unmappedExclusions": {
+    "planframe_*": "no dsh analog (durable workflow plans are not a tool surface)",
+    "scheduler_*": "schedule_create/delete/list are not mounted in the standard composition",
+    "workflow_*": "no dsh analog",
+    "eval_*": "no dsh analog (eval runs are persona work, not tools)",
+    "user_profile_*": "no dsh analog",
+    "credential_*": "dsh resolves credentials per-operation (CredentialRef), no model-facing tool",
+    "observability_*": "no dsh analog",
+    "wiki_*": "no dsh analog (knowledge plane deferred by the port plan)",
+    "capsule_*": "Phase 7 machinery — no dsh tool yet",
+    "admin_proposal_*": "Phase 8 amendment machinery — no dsh tool yet",
+    "security_redteam_*": "no dsh analog",
+    "github_issue_*": "no dsh analog",
+    "ab_replay": "no dsh analog",
+    "session_*": "session query is host-side, not a model-facing tool",
+    "federation_*": "dropped by the port plan (OFP)",
+    "sentinel_*": "ported as CI-side gates, not model-facing tools",
+    "constitution_*": "the constitution is a service, not a tool",
+    "sandbox_exec": "on dsh the sandboxed bash tool IS the confined executor; mount cures ride sandbox_request_mount, which stays granted",
+    "agent_spawn": "denied: subagent + subagent_fork",
+    "agent_discover": "denied: subagent + subagent_fork",
+    "agent_list": "no dsh analog",
+    "agent_message": "denied: send_message",
+    "tool_discover": "no dsh analog",
+    "self_describe": "no dsh analog",
+    "artifact_exec": "Phase 6 machinery — no dsh tool yet",
+    "artifact_build": "Phase 6 machinery — no dsh tool yet"
+  },
+  "includes": [
+    "clarification-protocol"
+  ],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": [
+        "design_summary"
+      ],
+      "properties": {
+        "design_summary": {
+          "type": "string"
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "sub_tasks": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "data_flow": {
+          "type": "string"
+        },
+        "trade_offs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "execution_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "name": "researcher",
+  "toolName": "specialist_researcher",
+  "kind": "specialist",
+  "source": "agents/specialists/researcher.default",
+  "description": "Research-focused autonomous agent for evidence collection.",
+  "preset": "research",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": [
+    "subagent",
+    "subagent_fork",
+    "interrupt_agent",
+    "send_message"
+  ],
+  "sourceExcludedTools": [
+    "planframe_*",
+    "scheduler_*",
+    "workflow_*",
+    "eval_*",
+    "user_profile_*",
+    "credential_*",
+    "observability_*",
+    "wiki_*",
+    "capsule_*",
+    "admin_proposal_*",
+    "security_redteam_*",
+    "github_issue_*",
+    "ab_replay",
+    "session_*",
+    "federation_*",
+    "sentinel_*",
+    "constitution_*",
+    "agent_spawn",
+    "agent_discover",
+    "agent_list",
+    "agent_message",
+    "tool_discover",
+    "self_describe",
+    "artifact_exec",
+    "artifact_build",
+    "artifact_prepare"
+  ],
+  "unmappedExclusions": {
+    "planframe_*": "no dsh analog (durable workflow plans are not a tool surface)",
+    "scheduler_*": "schedule_create/delete/list are not mounted in the standard composition",
+    "workflow_*": "no dsh analog",
+    "eval_*": "no dsh analog (eval runs are persona work, not tools)",
+    "user_profile_*": "no dsh analog",
+    "credential_*": "dsh resolves credentials per-operation (CredentialRef), no model-facing tool",
+    "observability_*": "no dsh analog",
+    "wiki_*": "no dsh analog (knowledge plane deferred by the port plan)",
+    "capsule_*": "Phase 7 machinery — no dsh tool yet",
+    "admin_proposal_*": "Phase 8 amendment machinery — no dsh tool yet",
+    "security_redteam_*": "no dsh analog",
+    "github_issue_*": "no dsh analog",
+    "ab_replay": "no dsh analog",
+    "session_*": "session query is host-side, not a model-facing tool",
+    "federation_*": "dropped by the port plan (OFP)",
+    "sentinel_*": "ported as CI-side gates, not model-facing tools",
+    "constitution_*": "the constitution is a service, not a tool",
+    "agent_spawn": "denied: subagent + subagent_fork",
+    "agent_discover": "denied: subagent + subagent_fork",
+    "agent_list": "no dsh analog",
+    "agent_message": "denied: send_message",
+    "tool_discover": "no dsh analog",
+    "self_describe": "no dsh analog",
+    "artifact_exec": "Phase 6 machinery — no dsh tool yet",
+    "artifact_build": "Phase 6 machinery — no dsh tool yet",
+    "artifact_prepare": "Phase 6 machinery — no dsh tool yet"
+  },
+  "includes": [
+    "clarification-protocol"
+  ],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "description": "Flexible research result object. Include only the fields that are actually available for this task; all listed properties are optional unless a caller explicitly requested a stricter shape.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "partial",
+            "clarification_needed"
+          ],
+          "description": "High-level status of the research result."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Optional compact synthesis of the research result."
+        },
+        "content_handle": {
+          "type": "string",
+          "description": "Optional session content handle for stored fetched material."
+        },
+        "fetch_record_id": {
+          "type": "string",
+          "description": "Optional session-visible knowledge record id indexing a stored fetch."
+        },
+        "sources": {
+          "type": "array",
+          "description": "Optional list of cited sources or source descriptors."
+        },
+        "clarification_request": {
+          "type": "object",
+          "description": "Required when status is clarification_needed; asks for missing user input needed to proceed.",
+          "properties": {
+            "question": {
+              "type": "string",
+              "description": "The exact question the user should answer."
+            },
+            "context": {
+              "type": "string",
+              "description": "Brief reason why this clarification is needed."
+            }
+          },
+          "required": [
+            "question",
+            "context"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -678,21 +678,32 @@
     },
     {
       "clause": "MA-1",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "spawn under law: the host provides spawning; MA enforcement is ungated — debt declared",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-dsh-specialists",
+      "service": "compact-specialists",
+      "evidence": "spawn under law: every specialist spawn is a recorded tool call on the real ToolRuntime naming the persona tool, and the child is session-backed with a durable subagent/descriptor — attribution rides the host session log (MA-1/D-7)",
+      "enforcedBy": [
+        "packages/specialists/src/index.js",
+        "packages/specialists/src/roster.js"
+      ],
+      "verifiers": [
+        "packages/specialists/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "MA-2",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "bounded delegation: depth limits are host-native; the declared-finite-resource gate is ungated — debt declared",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-dsh-specialists",
+      "service": "compact-specialists",
+      "evidence": "bounded delegation: per-persona maxDepth enforced by the provider at every start — leaves 0 with the spawn tools denied on the surface (no-recursive-spawn), leads capped (default 3); the roster is the declared finite surface (MA-2/R-4)",
+      "enforcedBy": [
+        "packages/specialists/src/index.js",
+        "packages/specialists/src/roster.js"
+      ],
+      "verifiers": [
+        "packages/specialists/test/composed.dsh.test.js",
+        "packages/specialists/test/lint.test.js"
+      ]
     },
     {
       "clause": "MA-3",

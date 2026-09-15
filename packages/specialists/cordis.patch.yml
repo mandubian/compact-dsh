@@ -1,0 +1,20 @@
+# The specialist roster bundle (port plan Phase 5) — one profile line composes
+# the whole roster. Each persona is a delegation-tool row on the verified
+# @deepseek-ai/dsh-tool-subagent contract with its composed persona prose,
+# its deny filter (the excluded_tools port), and its depth cap.
+#
+# The row requires the host composition to provide: tools, subagents (with
+# the 'spawn' provider), systemPrompt, sessionProjections — the standard
+# preset provides all four. The provider and the lead depth cap are
+# configuration, not code:
+#
+#   - id: specialists
+#     name: 'compact-dsh-specialists'
+#     config:
+#       provider: spawn            # the ctx.subagents provider name
+#       backgroundMode: one-shot   # or continuable where the continuation
+#                                  # manager is mounted
+#       leadMaxDepth: 3            # lead delegation bound (MA-2)
+
+- id: specialists
+  name: 'compact-dsh-specialists'

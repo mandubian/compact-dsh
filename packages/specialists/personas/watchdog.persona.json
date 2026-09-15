@@ -1,0 +1,29 @@
+{
+  "name": "watchdog",
+  "toolName": "specialist_watchdog",
+  "kind": "specialist",
+  "source": "agents/specialists/watchdog.default",
+  "description": "Observer agent that reviews agent sessions for trajectory divergence patterns.",
+  "preset": "budget",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": ["bash", "pwsh", "write", "edit", "web_search", "web_fetch", "subagent", "subagent_fork", "interrupt_agent", "create_goal", "update_goal", "ralph", "present"],
+  "sourceExcludedTools": [],
+  "unmappedExclusions": {
+    "*": "home declares no excluded_tools — the deny list derives from home capabilities: ReadAccess * + AgentMessage patterns * grant reading and send_message; no execution (bash, pwsh), no write access (write, edit), no NetworkAccess (web_search, web_fetch), no AgentSpawn (subagent, subagent_fork); interrupt_agent, create_goal, update_goal, ralph and present are observer-role denials"
+  },
+  "includes": [],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": ["judgment"],
+      "properties": {
+        "judgment": {
+          "type": "string",
+          "description": "Assessment of trajectory health for the target session."
+        }
+      }
+    }
+  }
+}

@@ -28,8 +28,12 @@ applies from the first enforced phase onward).
   |---|---|---|
   | I-4 denial envelope (partial) | `dsh-allowlist-gate` v0.1.0 + `dsh-approval` v0.4.0 | envelope lint over every refusal path |
   | I-5 gates (partial — network targets) | `dsh-approval` v0.4.0 (five layers, grants, budgets, persistence, revocation, LoopGuard refusal seam) | composed deny→ask→approve→replay-hit cycle + audit-pair test |
-- **[C] capabilities provided**: none yet (confinement, multi-agent,
-  scheduling, memory, federation — wake their parts when provided).
+- **[C] capabilities provided**: multi-agent — **partially provided as of
+  Phase 5**: the specialist roster (17 specialists + 2 leads) spawns through
+  the delegation-tool contract with per-persona tool surfaces and depth caps
+  (MA-1/MA-2 enforced; MA-3 remains host-native declared, MA-4 lands with the
+  Phase 8 rights layer). Confinement, scheduling, memory, federation remain
+  unprovided (scheduling/jobs gating stays `planned`, SCH-1).
 - **[O] optional clauses adopted**: none yet.
 - **Standing sought**: basic (floor) → full as capability parts land.
 
@@ -62,13 +66,16 @@ Highlights (full board in the register file):
 | I-7 (offline verification) | `auditor/audit.mjs` | `tools/register.test.mjs` |
 | I-8 (degradation honesty) | the boot attestation's declared gaps | constitution.test.js |
 | F-5 (refuse-to-start) | the constitution coupling | constitution + composed tests |
+| MA-1 (spawn under law) | `compact-dsh-specialists` — every spawn a recorded tool call naming the persona; session-backed children with durable descriptors | `packages/specialists/test/composed.dsh.test.js` |
+| MA-2 (bounded delegation) | `compact-dsh-specialists` — per-persona maxDepth (leaves 0, spawn tools denied; leads capped), provider-enforced at every start | `packages/specialists/test/composed.dsh.test.js`, `…/lint.test.js` |
 
 Declared gaps (in every boot attestation): the Compact is draft v0.5 and
 **not yet ratified** (no standing claimed); signature verification is
 unimplemented (no amendment keys published — the digest is pinned, not
 signed, I-1 debt); the record is complete but not tamper-evident (I-2
-debt, Phase 8). MA/SCH capability debts are `planned` entries in the
-register.
+debt, Phase 8). MA-1/MA-2 are `enforced` since Phase 5 (the specialist
+roster); MA-3 stays host-native declared, MA-4 and SCH capability debts
+remain `planned` entries in the register.
 
 The conventions recorded below remain in force.
 
@@ -92,6 +99,7 @@ traceability — verified against installed dsh `~0.1.5-rc.1` types):
 | D-1 (a goal never defeats the gate — LoopGuard) | `packages/loopguard/src/trips.js` (12 trip conditions, pure machine) + `src/index.js` (pre-execute denial, refusal-seam + agent/error feeds, turn-boundary latch clearing, repair budget 3, deterministic deny-all) | `packages/loopguard/test/trips.test.js` (each trip in isolation), `packages/loopguard/test/composed.dsh.test.js` |
 | D-4/D-7 (promotion evidence rule) | `packages/promotion/src/index.js::evaluatePromotionRecord` — enforced in tools/pre-execute before the tool body; no waiver boolean | `packages/promotion/test/truth-table.test.js`, `packages/promotion/test/composed.dsh.test.js` |
 | D-7 (response validation) | `packages/loopguard/src/index.js` post-execute block on success-without-value, feeding the failure budgets | `packages/loopguard/test/response-validation.test.js` |
+| MA-1/MA-2 (spawn under law, bounded delegation) | `packages/specialists/src/index.js::specialistsPlugin` — one delegation-tool row per persona on the verified `@deepseek-ai/dsh-tool-subagent` contract (composed persona prose, deny filter, depth cap) + `src/roster.js` (loader/composer) + `src/lint.js` (trim-dedup boot gate) | `packages/specialists/test/composed.dsh.test.js` (every persona spawnable with exactly its declared surface), `packages/specialists/test/roster.test.js`, `packages/specialists/test/lint.test.js` |
 
 Conventions recorded against installed dsh `~0.1.5-rc.1` types:
 the plan's dotted `grants.*` command names are not legal in the host

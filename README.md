@@ -4,7 +4,7 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 4 (the constitution layer) — COMPLETE.** The law lives in
+> **Status: Phase 5 (specialist bundles) — COMPLETE.** The law lives in
 > [compact.md](https://github.com/mandubian/compact/blob/main/compact.md)
 > (draft v0.5, **not yet ratified** — no standing is claimed, F-5);
 > this repository builds the machines that make it real on dsh.
@@ -102,7 +102,7 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > declares the owed gaps loudly (I-8): unratified draft, pinned-not-signed
 > digest (no amendment keys published yet), I-2 chain debt. The
 > **enforcement register** is now a full board — 66 entries over all 62
-> clauses of the body (20 enforced, the rest planned or declared
+> clauses of the body (22 enforced as of Phase 5, the rest planned or declared
 > convention; [O] MEM/FED declared unadopted) — with `verify-register` as a
 > CI gate that fails on broken citations, unresolvable enforced entries,
 > uncovered clauses, and register/body divergence (A-4). The **offline
@@ -111,6 +111,29 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > trust basis it relies on. The declaration `packages/allowlist-gate/src/index.js`
 > and every other enforcement plugin now provides a service the constitution
 > can couple on.
+>
+> **Phase 5 done:** the **specialist roster** (`packages/specialists`) — the
+> 17 autonoetic specialist bundles + 2 leads as dsh subagent personas on the
+> verified `@deepseek-ai/dsh-tool-subagent` contract (the host idiom the
+> standard preset uses for per-provider delegation tools): each persona is one
+> delegation-tool row carrying its **composed persona prompt** (unique prose +
+> canonical sections + the taught output contract + marked phase gates),
+> its **deny filter** (the `excluded_tools` port over real dsh tool names —
+> a denied tool is invisible AND refuses), and its **depth cap** — leaves 0
+> with the spawn tools denied (**no-recursive-spawn is a surface property**),
+> leads capped (default 3). Spawning rides the real ToolRuntime: every spawn
+> is a recorded tool call naming the persona, the child is session-backed
+> with a durable descriptor (MA-1), and the provider enforces the depth cap
+> at every start (MA-2) — both now `enforced` in the register, and the
+> constitution couples on `compact-specialists` like any enforcement
+> service. The **trim-dedup lint** (the #1329–#1331 doctrine as a boot gate)
+> fails on verbatim restatement of canonical sections, undocumented dropped
+> exclusions, deny-list rot, and unresolved gates — drift is a build failure.
+> The Phase 1 probe-gate decision (continue) is recorded at
+> [docs/decision-phase1-probe-gate.md](docs/decision-phase1-probe-gate.md).
+> Counted fidelity losses carried in the concept page: no per-persona write
+> scoping (fs policy is host-plane), depth bounded but not breadth, phase
+> gates rendered marked rather than enforced by prompt machinery.
 
 ## The plan
 
@@ -135,12 +158,14 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/loopguard/` | **Phase 3**: the 12-trip LoopGuard state machine (progress/failure accounting, command-aware fingerprints, refusal-seam + agent/error feeds; behavioral latches with repair budget 3, deterministic deny-all) + response validation (`tools/post-execute` block on invalid results) |
 | `packages/promotion/` | **Phase 3**: the promotion evidence gate — `pass=true` mechanically rejected with any error/critical finding or unevidenced warning, enforced in the waterfall before the tool body; no waiver boolean |
 | `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
+| `packages/specialists/` | **Phase 5**: the specialist roster — 17 specialists + 2 leads as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
 | `docs/register/register.json` | **Phase 4**: the enforcement register — every clause of the body registered, planned, declared convention, or declared unadopted; `tools/verify-register.mjs` is the CI gate (also `npm run verify-register`) |
 | `auditor/` | **Phase 4**: the offline verification CLI (I-7) — replays session logs, checks the approval pair discipline, turn enclosure, outcome vocabulary; attests its trust basis |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
-| `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling) |
+| `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
+| `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
 
 ## dsh version policy
 

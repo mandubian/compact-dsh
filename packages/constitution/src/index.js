@@ -36,7 +36,9 @@ export const name = 'compact-constitution';
 // defer the constitution's apply until the enforcement services exist — the
 // load-order discipline the coupling check below enforces for manual
 // composition is then guaranteed by the framework itself.
-export const inject = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox'];
+// The roster (compact-specialists) joined the blessed composition in
+// Phase 5: MA-1/MA-2 are enforced capabilities on the same terms as the floor.
+export const inject = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists'];
 
 const REGISTER = JSON.parse(readFileSync(new URL('../register.json', import.meta.url), 'utf8'));
 
@@ -48,7 +50,7 @@ export const DECLARED_GAPS = [
   'the record is complete but not tamper-evident: the hash-chained SessionPersistence decorator is Phase 8 (I-2 debt, declared)',
 ];
 
-export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox'];
+export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists'];
 
 export function apply(ctx, config) {
   // 1. boot verification (F-5)

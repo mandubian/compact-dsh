@@ -1,0 +1,56 @@
+{
+  "name": "debugger",
+  "toolName": "specialist_debugger",
+  "kind": "specialist",
+  "source": "agents/specialists/debugger.default",
+  "description": "Debugging and root cause analysis agent.",
+  "preset": "coding",
+  "spawns": false,
+  "maxDepth": 0,
+  "deny": [
+    "subagent",
+    "subagent_fork",
+    "interrupt_agent",
+    "send_message"
+  ],
+  "sourceExcludedTools": [],
+  "unmappedExclusions": {
+    "*": "home excluded_tools is empty — the deny list is a pure dsh design decision from home capabilities: no AgentSpawn/AgentMessage capabilities (subagent, subagent_fork, send_message, interrupt_agent denied) and no gated-refusal or network surface beyond the confined bash tool"
+  },
+  "includes": [
+    "clarification-protocol"
+  ],
+  "gated": [],
+  "io": {
+    "returns": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "partial",
+            "clarification_needed",
+            "failed"
+          ],
+          "description": "Debugging outcome."
+        },
+        "root_cause": {
+          "type": "string",
+          "description": "Identified root cause."
+        },
+        "fix": {
+          "type": "string",
+          "description": "Proposed or applied fix."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Compact summary of the debugging session."
+        }
+      }
+    }
+  }
+}
