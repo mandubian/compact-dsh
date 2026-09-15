@@ -1,38 +1,39 @@
-// The grant store: session grants (pattern targets, scope, TTL, revocation),
-// plan grants, exec-cache entries, and pending-approval bookkeeping.
-// Phase 1 slice 1: in-memory store. Persistence (chained/decorated) lands
-// with the port plan's later phases — the interface here is the contract.
+// The grant store: session grants (pattern targets, scope, TTL, budget,
+// revocation), plan grants, exec-cache entries, and pending-approval
+// bookkeeping. The in-memory class is the contract; persistence
+// (JSON+fsync, src/persist.js) decorates it without changing semantics.
 
 import { fingerprint } from './fingerprint.js';
 
 export class GrantStore {
   constructor() {
-    this.sessionGrants = [];   // {id, pattern, scope:{root,session}, expiresAt, createdAt, revokedAt}
-    this.planGrants = [];      // {id, pattern, planRef, expiresAt, revokedAt}
-    this.cache = new Map();    // fingerprint -> {grantedAt, expiresAt}
-    this.pending = new Map();  // fingerprint -> {count, firstAt, sessions:Set}
+    this.sessionGrants = [];   // {id, pattern, root, session, expiresAt, createdAt, maxUses, uses, revokedAt}
+    this.planGrants = [];      // {id, pattern, planRef, expiresAt, createdAt, maxUses, uses, revokedAt}
+    this.cache = new Map();    // fingerprint -> {grantedAt, expiresAt, target}
+    this.pending = new Map();  // fingerprint -> {count, firstAt, root}
     this.floodByRoot = new Map(); // root -> count
   }
 
   // -- session grants -------------------------------------------------------
-  addSessionGrant({ pattern, root, session, ttlMs, now }) {
+  // maxUses (budget): null = unlimited; otherwise the grant covers exactly
+  // that many executions, then stops covering (a spent grant is an expired
+  // grant — widening requires a new grant through the gate). Uses are
+  // consumed by the evaluator when a grant ANSWERS (layers 2–3), never by
+  // exec-cache replays — the cache is its own fingerprint-level grant.
+  addSessionGrant({ pattern, root, session, ttlMs, maxUses = null, now }) {
     const grant = {
       id: 'sg_' + Math.random().toString(16).slice(2, 10),
       pattern, root: root ?? null, session: session ?? null,
-      createdAt: now, expiresAt: ttlMs ? now + ttlMs : null, revokedAt: null,
+      createdAt: now, expiresAt: ttlMs ? now + ttlMs : null,
+      maxUses, uses: 0, revokedAt: null,
     };
     this.sessionGrants.push(grant);
     return grant;
   }
-  revokeSessionGrant(id, now) {
-    const g = this.sessionGrants.find(x => x.id === id);
-    if (g && !g.revokedAt) g.revokedAt = now;
-    return g ?? null;
-  }
 
   // -- plan grants ----------------------------------------------------------
-  addPlanGrant({ pattern, planRef, ttlMs, now }) {
-    const g = { id: 'pg_' + Math.random().toString(16).slice(2, 10), pattern, planRef, createdAt: now, expiresAt: ttlMs ? now + ttlMs : null, revokedAt: null };
+  addPlanGrant({ pattern, planRef, ttlMs, maxUses = null, now }) {
+    const g = { id: 'pg_' + Math.random().toString(16).slice(2, 10), pattern, planRef, createdAt: now, expiresAt: ttlMs ? now + ttlMs : null, maxUses, uses: 0, revokedAt: null };
     this.planGrants.push(g); return g;
   }
 
@@ -113,11 +114,18 @@ export function patternMatches(pattern, target) {
   }
 }
 
-/** Which live grants cover this target? (never expired, never revoked) */
+/** Which live grants cover this target? (never expired, never revoked, never spent) */
 export function coveringGrants(store, target, now) {
-  const live = list => list.filter(g => (!g.expiresAt || g.expiresAt > now) && !g.revokedAt);
+  const live = list => list.filter(g =>
+    (!g.expiresAt || g.expiresAt > now) && !g.revokedAt &&
+    (g.maxUses == null || g.uses < g.maxUses));
   return {
     session: live(store.sessionGrants).filter(g => patternMatches(g.pattern, target)),
     plan: live(store.planGrants).filter(g => patternMatches(g.pattern, target)),
   };
+}
+
+/** Consume one use of a budgeted grant (no-op for unlimited grants). */
+export function consumeUse(grant) {
+  if (grant && grant.maxUses != null) grant.uses += 1;
 }

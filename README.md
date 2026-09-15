@@ -15,7 +15,7 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > contract from the installed `@deepseek-ai/dsh-tools` types (waterfall
 > pass/deny, cordis exports), pin gate, concept pages.
 >
-> **Phase 1, slices 1–2 done:** the five-layer approval evaluator (exec
+> **Phase 1, slices 1–3 done:** the five-layer approval evaluator (exec
 > cache → plan grants → session grants → pending dedup → flood cap) rides
 > the real `tools/pre-execute` waterfall, and the **full
 > deny→ask→approve→replay-hit cycle is composed**: a real dsh
@@ -26,9 +26,14 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > rejection releases the pending record (no sticky dedup, flood capacity
 > returns); `/grants-grant`, `/grants-list`, `/grants-revoke` ride the real
 > `CommandRuntime` (auto-logged `command/run`+`command/done` = the causal
-> note), and revocation kills the covered exec-cache entries. Fingerprint
-> golden vectors pin the canonicalization. **Pending:** persistence for the
-> grant store (later phases), LoopGuard cooperation (Phase 3).
+> note), and revocation kills the covered exec-cache entries. Grants carry
+> **budgets** (`maxUses` — a spent grant stops covering); the store
+> **persists** (JSON+fsync, atomic rename; grants/budgets/revocations/cache
+> survive a restart, pending asks deliberately do not; a corrupt store file
+> fails the boot loudly — never a silent grant reset); fingerprint golden
+> vectors pin the canonicalization; an **envelope lint** walks every refusal
+> path asserting rule ID + lawful next moves. **Pending:** LoopGuard
+> cooperation (Phase 3 seam).
 
 ## The plan
 
@@ -47,7 +52,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | Path | What |
 |---|---|
 | `packages/allowlist-gate/` | First plugin: a `tools/pre-execute` deny-by-allowlist gate issuing Compact-shaped denial envelopes (rule ID + lawful next moves, R-3) |
-| `packages/approval/` | **Phase 1, slices 1–2**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, revocable grants; the `approval/request` answerer materializes `allowed-once` as exec-cache entries (replay hits); `grants-grant`/`grants-list`/`grants-revoke` commands; revocation kills covered cache entries; fingerprint golden vectors |
+| `packages/approval/` | **Phase 1, slices 1–3**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, budgeted (`maxUses`), revocable grants; the `approval/request` answerer materializes `allowed-once` as exec-cache entries (replay hits); `grants-grant`/`grants-list`/`grants-revoke` commands; JSON+fsync persistence (corrupt store = loud boot failure); revocation kills covered cache entries; fingerprint golden vectors; denial-envelope lint |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |

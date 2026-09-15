@@ -34,12 +34,13 @@
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 import { GrantStore, patternMatches } from './grants.js';
+import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget } from './fingerprint.js';
 import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope } from 'compact-envelope';
 
-export { GrantStore, evaluate, fingerprint, canonicalTarget, parseAllowlistLikePattern, DEFAULTS };
+export { GrantStore, PersistentGrantStore, evaluate, fingerprint, canonicalTarget, parseAllowlistLikePattern, DEFAULTS };
 
 export const name = 'compact-approval';
 export const inject = ['approval'];
@@ -58,7 +59,10 @@ export function identityOf(agent) {
 
 export function createApproval(opts = {}) {
   const approval = {
-    store: new GrantStore(),
+    // persistPath: the grant store survives restarts (grants, budgets,
+    // revocations, cache entries); pending bookkeeping never does. Corrupt
+    // store files fail the boot loudly — never a silent reset.
+    store: opts.persistPath ? new PersistentGrantStore(opts.persistPath) : new GrantStore(),
     execCacheTtlMs: opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs,
     maxPendingPerRoot: opts.maxPendingPerRoot ?? DEFAULTS.maxPendingPerRoot,
     pendingTtlMs: opts.pendingTtlMs ?? DEFAULTS.pendingTtlMs,
@@ -66,10 +70,10 @@ export function createApproval(opts = {}) {
     // WeakMap: the ask record lives exactly as long as the asking agent does.
     asks: new WeakMap(),
     fingerprint: (tool, args) => fingerprint(tool, args),
-    grantSession: ({ pattern, root, session, ttlMs = 60 * 60 * 1000, now = Date.now() }) =>
-      approval.store.addSessionGrant({ pattern: parseAllowlistLikePattern(pattern), root, session, ttlMs, now }),
-    grantPlan: ({ pattern, planRef, now = Date.now() }) =>
-      approval.store.addPlanGrant({ pattern: parseAllowlistLikePattern(pattern), planRef, now }),
+    grantSession: ({ pattern, root, session, ttlMs = 60 * 60 * 1000, maxUses = null, now = Date.now() }) =>
+      approval.store.addSessionGrant({ pattern: parseAllowlistLikePattern(pattern), root, session, ttlMs, maxUses, now }),
+    grantPlan: ({ pattern, planRef, ttlMs, maxUses = null, now = Date.now() }) =>
+      approval.store.addPlanGrant({ pattern: parseAllowlistLikePattern(pattern), planRef, ttlMs, maxUses, now }),
     revoke: (id, now = Date.now()) => approval.store.revokeSessionGrant(id, now),
     evaluate: (call) => evaluate(approval.store, {
       execCacheTtlMs: approval.execCacheTtlMs,
@@ -177,15 +181,17 @@ function registerGrantCommands(ctx, approval) {
   });
   ctx.commands?.register({
     name: 'grants-grant',
-    description: 'compact-dsh: grant a target pattern for this session — /grants-grant <pattern> [ttlMinutes]',
+    description: 'compact-dsh: grant a target pattern for this session — /grants-grant <pattern> [ttlMinutes] [maxUses]',
     handler: (inv) => {
-      const [pattern, ttlMin] = (inv.rawInput ?? '').trim().split(/\s+/);
-      if (!pattern) return { kind: 'error', text: 'usage: /grants-grant <pattern> [ttlMinutes] — pattern like api.example.com, *.example.org, host:443, https://host/path/' };
+      const [pattern, ttlMin, uses] = (inv.rawInput ?? '').trim().split(/\s+/);
+      if (!pattern) return { kind: 'error', text: 'usage: /grants-grant <pattern> [ttlMinutes] [maxUses] — pattern like api.example.com, *.example.org, host:443, https://host/path/' };
       const { root, session } = identityOf(inv.agent);
       const ttlMs = ttlMin != null ? Math.max(1, Number(ttlMin)) * 60_000 : 60 * 60_000;
       if (!Number.isFinite(ttlMs)) return { kind: 'error', text: `ttl must be a number of minutes, got "${ttlMin}"` };
-      const g = approval.grantSession({ pattern, root, session, ttlMs });
-      return { kind: 'success', text: `grant ${g.id} covers ${pattern} for session ${session} for ${Math.round(ttlMs / 60_000)}min (recorded: command/run + command/done)` };
+      const maxUses = uses != null ? Math.max(1, Math.floor(Number(uses))) : null;
+      if (maxUses !== null && !Number.isFinite(maxUses)) return { kind: 'error', text: `maxUses must be a number, got "${uses}"` };
+      const g = approval.grantSession({ pattern, root, session, ttlMs, maxUses });
+      return { kind: 'success', text: `grant ${g.id} covers ${pattern} for session ${session} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''} (recorded: command/run + command/done)` };
     },
   });
   ctx.commands?.register({

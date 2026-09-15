@@ -39,7 +39,9 @@ package — partial floor only):
 | R-3 (envelope shape, partial — first slice) | `packages/allowlist-gate/src/allowlist.js::envelope` | `test/allowlist.test.js::denial envelope carries rule ID, reason, lawful next moves` |
 | I-5 (gates — layered approval, partial) | `packages/approval/src/evaluate.js::evaluate` (five ordered layers over `GrantStore`) | `packages/approval/test/evaluation.test.js`, `packages/approval/test/answerer.test.js` |
 | I-5 (gates — the human gate composed, partial) | `packages/approval/src/index.js::approvalPlugin` — ask via `tools/pre-execute`, decision materialized by the `approval/request` answerer, flood cap enforced pre-dispatch | `packages/approval/test/composed.dsh.test.js::deny→ask→approve→replay-hit cycle in the real runtime` |
-| I-4 (denial envelope — ask/deny paths, partial) | `packages/approval/src/index.js` (envelopes carry rule ID + lawful next moves into the ask `reason`) | `packages/approval/test/composed.dsh.test.js::the ask envelope lists lawful next moves` |
+| I-4 (denial envelope — ask/deny paths, partial) | `packages/approval/src/index.js` (envelopes carry rule ID + lawful next moves into the ask `reason`) | `packages/approval/test/composed.dsh.test.js::the ask envelope lists lawful next moves`; envelope lint over every refusal path: `packages/approval/test/envelope-lint.test.js` |
+| D-7 (fail-closed, decisions from recorded state — grant durability) | `packages/approval/src/persist.js::PersistentGrantStore` — grants/budgets/revocations survive restart; corrupt store refuses the boot (no silent reset → no privilege resurrection); pending asks deliberately do not persist (park, not checkpoint) | `packages/approval/test/persist.test.js::a corrupt store file fails the boot loudly`; `::pending-approval bookkeeping never survives a restart` |
+| I-5 (gates — budgets) | `packages/approval/src/grants.js` (`maxUses`/`uses`) + `evaluate.js` (consumption at the answering layer) | `packages/approval/test/budget.test.js` |
 
 Conventions recorded (verified against installed dsh `~0.1.5-rc.1` types):
 the plan's dotted `grants.*` command names are not legal in the host

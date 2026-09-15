@@ -1,7 +1,7 @@
 // The ordered five-layer evaluation (docs/concept-approval-layers.md).
 // Pure logic over (call, store, now): no host, no I/O, fully testable.
 import { fingerprint } from './fingerprint.js';
-import { coveringGrants } from './grants.js';
+import { coveringGrants, consumeUse } from './grants.js';
 
 export const DEFAULTS = {
   execCacheTtlMs: 24 * 60 * 60 * 1000, // 24h; 0 disables
@@ -27,17 +27,25 @@ export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs
 
   const { session: sessionHits, plan: planHits } = coveringGrants(store, target, now);
 
-  // 2. plan grants
-  if (planHits.length) return { verdict: 'allowed', layer: 'plan-grant', ruleId: planHits[0].id, fingerprint: fp };
+  // 2. plan grants — the answering grant's budget is consumed here
+  if (planHits.length) {
+    consumeUse(planHits[0]);
+    return { verdict: 'allowed', layer: 'plan-grant', ruleId: planHits[0].id, fingerprint: fp };
+  }
 
   // 3. session grants — scoped: a session-scoped grant covers its own session
   //    and every session under its root; root-scoped covers the whole root.
+  //    The FIRST scope-ok hit is the answering grant: it is both the reported
+  //    rule and the budgeted one (reporting hits[0] while consuming a later
+  //    hit would spend a grant the record never names).
   const scopeOk = g =>
     (g.session != null) ? g.session === session
     : (g.root != null) ? (session ?? '').startsWith(g.root)
     : true;
-  if (sessionHits.some(g => scopeOk(g))) {
-    return { verdict: 'allowed', layer: 'session-grant', ruleId: sessionHits[0].id, fingerprint: fp };
+  const answering = sessionHits.find(scopeOk);
+  if (answering) {
+    consumeUse(answering);
+    return { verdict: 'allowed', layer: 'session-grant', ruleId: answering.id, fingerprint: fp };
   }
 
   // 4. pending dedup — an identical uncovered call already awaiting approval
