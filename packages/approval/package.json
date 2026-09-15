@@ -1,8 +1,8 @@
 {
   "name": "compact-dsh-approval",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "The Compact on dsh — layered approval & grants: exec cache, plan/session grants, flood cap, ordered evaluation (Phase 1).",
+  "description": "The Compact on dsh — layered approval & grants: exec cache, plan/session grants, flood cap, ordered evaluation, the approval/request answerer materializing allowed-once, and grants-* commands (Phase 1).",
   "main": "src/index.js",
   "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
   "dependencies": { "compact-envelope": "0.1.0" },

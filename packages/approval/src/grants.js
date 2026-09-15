@@ -37,9 +37,11 @@ export class GrantStore {
   }
 
   // -- exec cache -----------------------------------------------------------
-  cacheSet(fp, now, ttlMs) {
+  // Entries carry the canonical target so a revocation can find and kill the
+  // fingerprints a grant covered (the fingerprint itself is one-way).
+  cacheSet(fp, now, ttlMs, target) {
     if (ttlMs === 0) return; // 0 disables
-    this.cache.set(fp, { grantedAt: now, expiresAt: ttlMs ? now + ttlMs : null });
+    this.cache.set(fp, { grantedAt: now, expiresAt: ttlMs ? now + ttlMs : null, target: target ?? null });
   }
   cacheHit(fp, now) {
     const e = this.cache.get(fp);
@@ -51,6 +53,52 @@ export class GrantStore {
   // -- flood bookkeeping ----------------------------------------------------
   countPending(root) { return this.floodByRoot.get(root) ?? 0; }
   recordPending(root) { this.floodByRoot.set(root, this.countPending(root) + 1); }
+
+  /**
+   * A pending request was decided (approved, rejected, cancelled, or failed
+   * closed): drop the dedup record and return the flood-capacity slot. The
+   * next identical call re-asks as a fresh request.
+   */
+  resolvePending(root, fp) {
+    this.pending.delete(fp);
+    const left = this.countPending(root) - 1;
+    if (left > 0) this.floodByRoot.set(root, left);
+    else this.floodByRoot.delete(root);
+  }
+
+  /**
+   * Forget pending requests older than maxAgeMs (a decision that never
+   * reached us — e.g. answered by policy before dispatch — must not consume
+   * flood capacity forever). Returns the number of forgotten requests.
+   */
+  sweepPending(now, maxAgeMs) {
+    let n = 0;
+    for (const [fp, p] of this.pending) {
+      if (now - p.firstAt > maxAgeMs) {
+        this.resolvePending(p.root, fp);
+        n++;
+      }
+    }
+    return n;
+  }
+
+  /**
+   * Revoke a grant AND kill every exec-cache entry its pattern covered —
+   * approval must not outlive its grant (port plan Phase 1 item 6).
+   * Returns the grant, or null for an unknown id.
+   */
+  revokeSessionGrant(id, now) {
+    const g = this.sessionGrants.find(x => x.id === id);
+    if (!g) return null;
+    if (!g.revokedAt) g.revokedAt = now;
+    for (const [fp, e] of this.cache) {
+      if (!e.target || patternMatches(g.pattern, e.target)) this.cache.delete(fp);
+    }
+    return g;
+  }
+
+  /** Kill one fingerprint's cache entry directly (allowed-once undo). */
+  revokeFingerprint(fp) { return this.cache.delete(fp); }
 }
 
 // -- pattern matching (same classes as the allowlist gate) --------------------

@@ -31,11 +31,25 @@ applies from the first enforced phase onward).
 ## 2. Enforcement register
 
 To be generated per phase: `clause ID → enforcing package → verifying test`.
-Registered so far (v0.1.0 of the gate package, partial floor only):
+Registered so far (v0.1.0 of the gate package, v0.2.0 of the approval
+package — partial floor only):
 
 | Clause | Enforced by | Verifier |
 |---|---|---|
 | R-3 (envelope shape, partial — first slice) | `packages/allowlist-gate/src/allowlist.js::envelope` | `test/allowlist.test.js::denial envelope carries rule ID, reason, lawful next moves` |
+| I-5 (gates — layered approval, partial) | `packages/approval/src/evaluate.js::evaluate` (five ordered layers over `GrantStore`) | `packages/approval/test/evaluation.test.js`, `packages/approval/test/answerer.test.js` |
+| I-5 (gates — the human gate composed, partial) | `packages/approval/src/index.js::approvalPlugin` — ask via `tools/pre-execute`, decision materialized by the `approval/request` answerer, flood cap enforced pre-dispatch | `packages/approval/test/composed.dsh.test.js::deny→ask→approve→replay-hit cycle in the real runtime` |
+| I-4 (denial envelope — ask/deny paths, partial) | `packages/approval/src/index.js` (envelopes carry rule ID + lawful next moves into the ask `reason`) | `packages/approval/test/composed.dsh.test.js::the ask envelope lists lawful next moves` |
+
+Conventions recorded (verified against installed dsh `~0.1.5-rc.1` types):
+the plan's dotted `grants.*` command names are not legal in the host
+command grammar (`/^[a-z][a-z0-9_-]*$/`) — the faithful adaptation is
+`grants-grant` / `grants-list` / `grants-revoke`. dsh has no native
+`allowed-always`: the only native grant is `allowed-once`, so this plugin's
+grant store IS the runtime's grant layer; `allowed-once` decisions
+materialize exec-cache entries (fingerprint-level, TTL, cross-session).
+The host `ApprovalService` owns the `approval/asked`/`approval/decided`
+audit pair; this composition never appends it.
 
 ## 3. Role mapping (draft)
 

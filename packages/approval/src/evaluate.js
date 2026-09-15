@@ -6,6 +6,7 @@ import { coveringGrants } from './grants.js';
 export const DEFAULTS = {
   execCacheTtlMs: 24 * 60 * 60 * 1000, // 24h; 0 disables
   maxPendingPerRoot: 50,               // flood cap
+  pendingTtlMs: 5 * 60 * 1000,         // a pending ask older than this is forgotten (flood capacity self-heals)
 };
 
 /**
@@ -14,9 +15,12 @@ export const DEFAULTS = {
  *   5 flood cap. Uncovered = {verdict:'uncovered'} → caller asks the human
  *   (approval/request) and records the pending request.
  */
-export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs, maxPendingPerRoot }) {
+export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs, maxPendingPerRoot, pendingTtlMs }) {
   const fp = fingerprint(tool, args);
   const target = { ...args };
+
+  // decisions that never reached the store must not hold flood capacity forever
+  store.sweepPending(now, pendingTtlMs ?? DEFAULTS.pendingTtlMs);
 
   // 1. exec cache
   if (store.cacheHit(fp, now)) return { verdict: 'allowed', layer: 'exec-cache', ruleId: fp, fingerprint: fp };
@@ -46,6 +50,6 @@ export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs
     return { verdict: 'refused-flood', ruleId: 'I-5/flood-cap', fingerprint: fp };
   }
   store.recordPending(root);
-  store.pending.set(fp, { count: 1, firstAt: now });
+  store.pending.set(fp, { count: 1, firstAt: now, root });
   return { verdict: 'pending-approval', ruleId: fp, fingerprint: fp };
 }
