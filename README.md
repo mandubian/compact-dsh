@@ -4,9 +4,8 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 1 (layered approval & grants) — COMPLETE at the
-> enforcement altitude available today.** The law lives in
-> [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
+> **Status: Phase 2 (sandbox policy & remote access) — in progress.** The
+> law lives in [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
 > this repository builds the machines that make it real on dsh.
 >
 > **Phase 0 done — including the composed check:** the allowlist gate runs
@@ -41,6 +40,26 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > profile run (needs a model provider key — enforcement is proven at the
 > tool-runtime altitude); the guard plugin that consumes the refusal seam
 > (Phase 3).
+>
+> **Phase 2, slice 1 done:** the **docker SandboxProvider** confines every
+> call it wraps (per-call container, no-network default, read-only rootfs,
+> workspace ro/rw per policy, tmpfs temp area in `workspace-write`), reports
+> enforcement honestly (`full` only after the daemon probe confirms the
+> backend; unavailability throws `SANDBOX_UNAVAILABLE` — fail closed, never
+> passthrough), and over-mounts the sensitive-path deny-list (`.ssh`, `.aws`,
+> `~/.netrc`, …) over every bound root. **Mount grants cure on retry**: a
+> confined command failing on an unmounted path is cured through the lawful
+> channel — `sandbox_request_mount` canonicalizes (realpath), refuses
+> protected/missing paths terminally, rides the human gate, and materializes
+> a scoped `PathPrefix` grant row (ro ceiling, TTL, revocable, persisted)
+> that the provider binds at confine time; revocation un-mounts. Verified
+> against the real daemon: confinement matrix, deny-list masking, the full
+> denied→request→approve→grant→retry→revoke cycle, ro-ceiling holding.
+> One Phase 1 doctrine sharpened in passing: the approval gate now gates
+> **identifiable targets only** — a targetless tool call (opaque command
+> string) collapses to one fingerprint per tool, and approving it would be
+> a hidden blanket grant; opaque strings belong to the remote-access
+> analyzer (slice 2). **Pending:** remote-access static analysis.
 
 ## The plan
 
@@ -59,7 +78,8 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | Path | What |
 |---|---|
 | `packages/allowlist-gate/` | First plugin: a `tools/pre-execute` deny-by-allowlist gate issuing Compact-shaped denial envelopes (rule ID + lawful next moves, R-3) |
-| `packages/approval/` | **Phase 1, slices 1–3**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, budgeted (`maxUses`), revocable grants; the `approval/request` answerer materializes `allowed-once` as exec-cache entries (replay hits); `grants-grant`/`grants-list`/`grants-revoke` commands; JSON+fsync persistence (corrupt store = loud boot failure); revocation kills covered cache entries; fingerprint golden vectors; denial-envelope lint |
+| `packages/approval/` | **Phase 1, slices 1–3**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, budgeted (`maxUses`), revocable grants; the `approval/request` answerer materializes `allowed-once` as exec-cache entries (replay hits); `grants-grant`/`grants-list`/`grants-revoke` commands; JSON+fsync persistence (corrupt store = loud boot failure); revocation kills covered cache entries; fingerprint golden vectors; denial-envelope lint; `PathPrefix` mount-grant patterns; provides the `compact-approval` service; gates identifiable targets only |
+| `packages/sandbox-docker/` | **Phase 2, slice 1**: docker `SandboxProvider` (per-call confinement, no-network default, masked-path deny-list, honest enforcement, fail-closed) + `sandbox_request_mount` tool — mount grants (canonical `PathPrefix`, ro ceiling, TTL, revocable) cured through the Phase 1 approval store |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |

@@ -88,3 +88,23 @@ test('grant pattern classes', () => {
   assert.equal(patternMatches(hp, { host: 'api.example.com', port: '8443' }), true);
   assert.equal(patternMatches(hp, { host: 'api.example.com' }), false);
 });
+
+test('mount path patterns: canonical prefix coverage with a ro ceiling', () => {
+  const ro = { kind: 'PathPrefix', value: { path: '/data', ceiling: 'ro' } };
+  const rw = { kind: 'PathPrefix', value: { path: '/data', ceiling: 'rw' } };
+  // prefix coverage is separator-anchored: /data/x yes, /database no
+  assert.equal(patternMatches(ro, { path: '/data' }), true);
+  assert.equal(patternMatches(ro, { path: '/data/secrets/key' }), true);
+  assert.equal(patternMatches(ro, { path: '/data/' }), true);              // trailing slash tolerated
+  assert.equal(patternMatches(ro, { path: '/database' }), false);          // no lookalike prefixes
+  assert.equal(patternMatches(ro, { path: '/dat' }), false);
+  // root prefix covers everything
+  assert.equal(patternMatches({ kind: 'PathPrefix', value: { path: '/', ceiling: 'ro' } }, { path: '/anything/deep' }), true);
+  // the ceiling holds: a ro grant never upgrades to rw; absent mode reads ro
+  assert.equal(patternMatches(ro, { path: '/data/x', mode: 'ro' }), true);
+  assert.equal(patternMatches(ro, { path: '/data/x', mode: 'rw' }), false);
+  assert.equal(patternMatches(rw, { path: '/data/x', mode: 'rw' }), true);
+  assert.equal(patternMatches(rw, { path: '/data/x' }), true);
+  // non-path targets never match a path pattern
+  assert.equal(patternMatches(ro, { host: 'data.example' }), false);
+});

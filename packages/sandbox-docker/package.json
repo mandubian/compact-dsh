@@ -1,0 +1,14 @@
+{
+  "name": "compact-dsh-sandbox-docker",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — docker SandboxProvider (per-call confinement, no-network default, masked-path deny-list) with Phase 2 mount grants cured through the Phase 1 approval store.",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
+  "dependencies": {
+    "compact-envelope": "0.1.0",
+    "compact-dsh-approval": "0.4.1"
+  },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" }
+}

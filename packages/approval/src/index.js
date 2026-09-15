@@ -33,14 +33,14 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
-import { GrantStore } from './grants.js';
+import { GrantStore, coveringGrants } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget } from './fingerprint.js';
 import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope } from 'compact-envelope';
 
-export { GrantStore, PersistentGrantStore, evaluate, fingerprint, canonicalTarget, parseAllowlistLikePattern, DEFAULTS };
+export { GrantStore, PersistentGrantStore, coveringGrants, evaluate, fingerprint, canonicalTarget, parseAllowlistLikePattern, DEFAULTS };
 
 export const name = 'compact-approval';
 export const inject = ['approval'];
@@ -164,6 +164,14 @@ export function approvalPlugin(opts = {}) {
       const tool = exec?.name ?? 'unknown-tool';
       const args = exec?.arguments ?? {};
       const { root, session } = identityOf(exec?.agent);
+      // This gate gates IDENTIFIABLE targets only. A call with no canonical
+      // target (an opaque command string, a path argument) would collapse to
+      // one fingerprint per tool — approving it once would be a hidden
+      // blanket grant over every future call of that tool (the concept's
+      // "no blanket grants" invariant, D-8). Opaque command strings are the
+      // remote-access analyzer's domain (Phase 2 item 3); mount requests
+      // carry their own gate.
+      if (Object.keys(canonicalTarget(args)).length === 0) return next();
       const v = approval.evaluate({ tool, args, root, session, now: Date.now() });
       if (v.verdict === 'allowed') return next();
       const report = (kind) => {
@@ -193,6 +201,13 @@ export function approvalPlugin(opts = {}) {
 
     ctx.on('approval/request', (req, next) => answerRequest(approval, req, next));
 
+    // Cross-plugin consumption (Phase 2): the sandbox provider lists mount
+    // grants and the remote-access analyzer routes findings through the same
+    // grant layers — both reach this runtime's grant store through the
+    // 'compact-approval' service (Cordis inject ordering makes a composition
+    // without the approval plugin fail loudly rather than degrade silently).
+    ctx.provide?.('compact-approval', approval);
+
     // Revocation + grant materialization via the commands seam — optional:
     // absent dsh-commands, the enforcement core above is intact and only the
     // operator surface degrades (noted in the annex, never silent at boot).
@@ -204,13 +219,21 @@ export function approvalPlugin(opts = {}) {
   return apply;
 }
 
+function patternText(pattern) {
+  switch (pattern.kind) {
+    case 'HostAndPort': return `HostAndPort:${pattern.value.host}:${pattern.value.port}`;
+    case 'PathPrefix': return `PathPrefix:${pattern.value.path}(${pattern.value.ceiling})`;
+    default: return `${pattern.kind}:${pattern.value}`;
+  }
+}
+
 function registerGrantCommands(ctx, approval) {
   const live = () => approval.store.sessionGrants.filter(g => !g.revokedAt && (!g.expiresAt || g.expiresAt > Date.now()));
   ctx.commands?.register({
     name: 'grants-list',
     description: 'compact-dsh: list live approval grants and cached approvals',
     handler: () => {
-      const grants = live().map(g => `${g.id}  ${g.pattern.kind}${g.pattern.kind === 'HostAndPort' ? ':' + g.pattern.value.host + ':' + g.pattern.value.port : ':' + g.pattern.value}  root=${g.root ?? '-'} session=${g.session ?? '-'}${g.expiresAt ? ' expires=' + new Date(g.expiresAt).toISOString() : ''}`);
+      const grants = live().map(g => `${g.id}  ${patternText(g.pattern)}  root=${g.root ?? '-'} session=${g.session ?? '-'}${g.expiresAt ? ' expires=' + new Date(g.expiresAt).toISOString() : ''}${g.maxUses ? ` uses=${g.uses}/${g.maxUses}` : ''}`);
       return { kind: 'success', text: grants.length
         ? `${grants.length} live grant(s):\n${grants.join('\n')}\n${approval.store.cache.size} cached approval(s)`
         : `no live grants\n${approval.store.cache.size} cached approval(s)` };

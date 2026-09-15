@@ -48,6 +48,9 @@ package — partial floor only):
 | D-7 (fail-closed, decisions from recorded state — grant durability) | `packages/approval/src/persist.js::PersistentGrantStore` — grants/budgets/revocations survive restart; corrupt store refuses the boot (no silent reset → no privilege resurrection); pending asks deliberately do not persist (park, not checkpoint) | `packages/approval/test/persist.test.js::a corrupt store file fails the boot loudly`; `::pending-approval bookkeeping never survives a restart` |
 | I-5 (gates — budgets) | `packages/approval/src/grants.js` (`maxUses`/`uses`) + `evaluate.js` (consumption at the answering layer) | `packages/approval/test/budget.test.js` |
 | I-5→D-1 (gate refusals are on the record for the Phase 3 guard) | `packages/approval/src/index.js::REFUSAL_EVENT` — every ask/deny emitted on the Cordis bus; decision outcomes are NOT re-emitted (the host audit pair is the record, D-7) | `packages/approval/test/loopguard-seam.test.js` |
+| I-5 (gates — confinement) | `packages/sandbox-docker/src/provider.js::DockerSandboxProvider` — per-call container; fail-closed unavailability; honest enforcement reporting | `packages/sandbox-docker/test/composed.docker.test.js` (confinement matrix, real daemon) |
+| I-5 (gates — mount grants, the #1002 analog) | `packages/sandbox-docker/src/mount-tool.js` — canonical (realpath) request; protected/missing paths terminal; approval materializes the PathPrefix grant row; provider binds at ceiling; revocation un-mounts | `packages/sandbox-docker/test/composed.docker.test.js::composed cure` |
+| D-8 (no undeclared capability — the host-fs deny-list) | `packages/sandbox-docker/src/mounts.js::DEFAULT_SENSITIVE_PATHS` + provider over-mounts | `packages/sandbox-docker/test/composed.docker.test.js::the deny-list hides secrets` |
 
 Conventions recorded (verified against installed dsh `~0.1.5-rc.1` types):
 the plan's dotted `grants.*` command names are not legal in the host
@@ -82,6 +85,20 @@ Semantics decisions (reviewed, each with a regression test):
   (fsync before rename, best-effort directory fsync after) on every
   durable-state mutation — including budget consumption; a restart must
   never resurrect spent uses or revoked grants.
+- **The approval gate gates identifiable targets only.** A call with no
+  canonical target (opaque command string) would collapse to one
+  fingerprint per tool — approving it once would be a hidden blanket grant
+  (D-8). Opaque strings are the remote-access analyzer's domain (Phase 2).
+- **The docker backend confines the network; the host vocabulary does not.**
+  dsh's sandbox vocabulary excludes network/process visibility — so on this
+  backend a Phase 1 network grant is necessary but never sufficient;
+  `network: 'host'` is the composition-level escape hatch, recorded here.
+- **Mount requests are explicit tool calls, not denial-carried fields.**
+  dsh's tool schemas carry no mount declaration, so the machine-readable
+  grant request of the mount-grant concept rides `sandbox_request_mount`
+  (canonical path, mode ceiling, justification) — the concept's invariants
+  (protected/missing terminal, recorded cure, ro ceiling, canonical prefix)
+  are unchanged.
 
 ## 3. Role mapping (draft)
 

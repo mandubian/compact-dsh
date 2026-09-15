@@ -113,9 +113,24 @@ export class GrantStore {
   }
 }
 
-// -- pattern matching (same classes as the allowlist gate) --------------------
+// -- pattern matching (host/url classes as the allowlist gate, plus mount paths)
 export function patternMatches(pattern, target) {
   if (pattern.kind === 'UrlPrefix') return typeof target.url === 'string' && target.url.startsWith(pattern.value);
+  if (pattern.kind === 'PathPrefix') {
+    // Mount grants (port plan Phase 2): canonical-path prefix coverage with a
+    // per-grant ro ceiling. Inputs are canonicalized at grant-materialization
+    // time (realpath); matching is separator-anchored string prefix — never
+    // by symlink or path trickery (docs/concept-mount-grants.md).
+    // pattern.value: {path, ceiling:'ro'|'rw'}; target: {path, mode?:'ro'|'rw'}
+    const v = pattern.value ?? {};
+    if (typeof target.path !== 'string' || typeof v.path !== 'string') return false;
+    const prefix = v.path === '/' ? '/' : v.path.replace(/\/+$/, '');
+    const t = target.path === '/' ? '/' : target.path.replace(/\/+$/, '');
+    const within = prefix === '/' || t === prefix || t.startsWith(prefix + '/');
+    if (!within) return false;
+    // ceiling holds: a ro grant never upgrades to rw
+    return (target.mode ?? 'ro') === 'ro' || v.ceiling === 'rw';
+  }
   if (target.host == null) return false;
   switch (pattern.kind) {
     case 'ExactHost': return target.host === pattern.value && target.port == null;

