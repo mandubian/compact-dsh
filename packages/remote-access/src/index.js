@@ -30,6 +30,9 @@ export function apply(ctx, config) {
   const analyzer = createAnalyzer(config ?? {});
   ctx.inject(['compact-approval'], (scope) => {
     const approval = scope['compact-approval'];
+    // composition coupling (Phase 4): the constitution checks this service's
+    // presence — a composition without the analyzer refuses to start
+    scope.provide?.('compact-remote-access', { name: 'compact-remote-access', analyzer });
     scope.on('tools/pre-execute', async (exec, next) => {
       const findings = analyzer.findings(exec);
       if (findings.length === 0) return next();

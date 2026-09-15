@@ -35,9 +35,45 @@ applies from the first enforced phase onward).
 
 ## 2. Enforcement register
 
-To be generated per phase: `clause ID → enforcing package → verifying test`.
-Registered so far (v0.1.0 of the gate package, v0.4.0 of the approval
-package — partial floor only):
+**The register is now a machine-checkable artifact**: `docs/register/register.json`
+(the bundled copy in `packages/constitution/register.json` is verified
+identical by `npm run verify-register`). It covers **every clause of the
+adopted Compact body** (62 clauses, 66 entries): `kind: 'enforced'` entries
+name their enforcing plugin, the service whose presence the constitution
+couples on at boot, the source files, and the verifying tests;
+`planned` entries carry the debt; `convention` entries are declared,
+never mistaken for enforcement; [O] clauses MEM-1/FED-1 are declared
+unadopted. The gate fails on broken citations, unresolvable enforced
+entries, uncovered clauses, and divergence between the two copies (A-4).
+
+Highlights (full board in the register file):
+
+| Clause | Enforced by | Verifier |
+|---|---|---|
+| I-4 / R-3 (envelopes) | allowlist-gate, approval, loopguard, remote-access, sandbox mount tool, promotion | envelope lint + per-package tests |
+| I-5 (gates) | approval (five layers), sandbox-docker (mount grants), remote-access (per-host routing) | composed cycles |
+| CF-1 (fail-closed confinement) | sandbox-docker provider | real-daemon matrix |
+| D-1 (law over task) | loopguard trips | trips.test.js |
+| D-4 (no instrumental shortcuts) | promotion evidence gate | truth table |
+| D-7 (fail-closed, recorded reasons) | approval persist, loopguard, promotion | persist/response-validation tests |
+| D-8 (no rogue enforcement) | target-only gating, deny-list, register-traces-to-body | envelope-lint, sandbox, constitution tests |
+| R-4 (truthful budgets) | approval grant budgets | budget/persist tests |
+| R-6 (access to the law) | the constitution service exposes the body by digest | constitution.test.js |
+| I-7 (offline verification) | `auditor/audit.mjs` | `tools/register.test.mjs` |
+| I-8 (degradation honesty) | the boot attestation's declared gaps | constitution.test.js |
+| F-5 (refuse-to-start) | the constitution coupling | constitution + composed tests |
+
+Declared gaps (in every boot attestation): the Compact is draft v0.5 and
+**not yet ratified** (no standing claimed); signature verification is
+unimplemented (no amendment keys published — the digest is pinned, not
+signed, I-1 debt); the record is complete but not tamper-evident (I-2
+debt, Phase 8). MA/SCH capability debts are `planned` entries in the
+register.
+
+The conventions recorded below remain in force.
+
+The per-slice detailed record (superseded by the register file; kept for
+traceability — verified against installed dsh `~0.1.5-rc.1` types):
 
 | Clause | Enforced by | Verifier |
 |---|---|---|
@@ -57,7 +93,7 @@ package — partial floor only):
 | D-4/D-7 (promotion evidence rule) | `packages/promotion/src/index.js::evaluatePromotionRecord` — enforced in tools/pre-execute before the tool body; no waiver boolean | `packages/promotion/test/truth-table.test.js`, `packages/promotion/test/composed.dsh.test.js` |
 | D-7 (response validation) | `packages/loopguard/src/index.js` post-execute block on success-without-value, feeding the failure budgets | `packages/loopguard/test/response-validation.test.js` |
 
-Conventions recorded (verified against installed dsh `~0.1.5-rc.1` types):
+Conventions recorded against installed dsh `~0.1.5-rc.1` types:
 the plan's dotted `grants.*` command names are not legal in the host
 command grammar (`/^[a-z][a-z0-9_-]*$/`) — the faithful adaptation is
 `grants-grant` / `grants-list` / `grants-revoke`. dsh has no native
@@ -122,6 +158,16 @@ Semantics decisions (reviewed, each with a regression test):
   alone would give every targetless call of a tool the same identity, making
   "no new fingerprint" meaningless — the loopguard extends it with the
   command-text hash, so every distinct command is distinct work.
+- **The composition coupling is apply-time service presence.** The blessed
+  composition loads enforcement plugins before the constitution; the
+  constitution's module-level `inject` gives that ordering in dsh-loaded
+  compositions, and manual compositions must apply it after the services
+  resolve. A missing enforcement service at apply time is a boot FAILURE,
+  never a degraded mode (F-5).
+- **The register derives its clause vocabulary from the bundled body's own
+  headers** — the clause list cannot drift from the law. The digest is
+  pinned (sha256), not signed: the Compact has published no amendment keys,
+  and the gap is declared in every boot attestation (I-8), not silent.
 
 ## 3. Role mapping (draft)
 

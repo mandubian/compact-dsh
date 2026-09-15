@@ -113,6 +113,9 @@ export function promotionPlugin(opts = {}) {
     });
     ctx.inject?.(['tools'], (scope) => scope.tools.register(tool));
     apply.promotion = { tool, recorded };
+    // composition coupling (Phase 4): the constitution checks this service's
+    // presence — a composition without the promotion gate refuses to start
+    ctx.provide?.('compact-promotion', apply.promotion);
     return apply.promotion;
   }
   return apply;

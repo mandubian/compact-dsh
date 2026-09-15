@@ -43,5 +43,8 @@ export function apply(ctx, config) {
       protectedPaths: [...DEFAULT_SENSITIVE_PATHS, ...(config?.protectedPaths ?? [])],
       grantTtlMs,
     }));
+    // composition coupling (Phase 4): the constitution checks this service's
+    // presence — a composition without the sandbox refuses to start
+    scope.provide?.('compact-sandbox', { name: 'compact-sandbox-docker', image: config?.image ?? 'ubuntu:24.04' });
   });
 }

@@ -2,10 +2,11 @@
   "name": "compact-dsh",
   "private": true,
   "type": "module",
-  "description": "The Compact on DeepSeek Harness \u2014 plugin composition, annex, and ratification work.",
+  "description": "The Compact on DeepSeek Harness — plugin composition, annex, and ratification work.",
   "scripts": {
-    "test": "node --test \"packages/*/test/*.test.js\"",
-    "verify-pin": "node tools/verify-pin.mjs"
+    "test": "node --test \"packages/*/test/*.test.js\" \"tools/*.test.mjs\"",
+    "verify-pin": "node tools/verify-pin.mjs",
+    "verify-register": "node tools/verify-register.mjs"
   },
   "engines": {
     "node": ">=22.19"

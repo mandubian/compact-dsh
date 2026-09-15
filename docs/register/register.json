@@ -1,0 +1,725 @@
+{
+  "meta": {
+    "compactDigest": "8564175463bd0d9c6cf5c93171e3e67a20944c18938aa90d44248b795315e93c",
+    "compactSource": "https://github.com/mandubian/compact/blob/main/compact.md",
+    "compactStatus": "draft v0.5 — NOT yet ratified; this composition claims no Compact standing (F-5)",
+    "note": "The register proves both directions (F-5): every law in force maps to enforcing, verified code — no decorative law — and every piece of enforcing code traces to a law that authorizes it — no rogue enforcement. kind: 'enforced' = binding now (service presence is checked at boot); 'planned' = on the port plan's later phases; 'convention' = declared, never to be mistaken for enforcement.",
+    "unadoptedOptional": [
+      {
+        "clause": "MEM-1",
+        "reason": "[O] memory planes: not adopted — no memory capability is provided"
+      },
+      {
+        "clause": "FED-1",
+        "reason": "[O] federation: not adopted — no cross-runtime acts are supported"
+      }
+    ]
+  },
+  "entries": [
+    {
+      "clause": "I-4",
+      "kind": "enforced",
+      "plugin": "compact-allowlist-gate",
+      "service": "compact-allowlist-gate",
+      "evidence": "every denial carries the acting gate, rule ID, reason, and lawful next moves",
+      "enforcedBy": [
+        "packages/allowlist-gate/src/allowlist.js",
+        "packages/envelope/src/index.js"
+      ],
+      "verifiers": [
+        "packages/allowlist-gate/test/allowlist.test.js"
+      ]
+    },
+    {
+      "clause": "I-4",
+      "kind": "enforced",
+      "plugin": "compact-approval",
+      "service": "compact-approval",
+      "evidence": "ask and deny paths are envelopes; the envelope lint walks every refusal path",
+      "enforcedBy": [
+        "packages/approval/src/index.js"
+      ],
+      "verifiers": [
+        "packages/approval/test/envelope-lint.test.js",
+        "packages/approval/test/composed.dsh.test.js"
+      ]
+    },
+    {
+      "clause": "R-3",
+      "kind": "enforced",
+      "plugin": "compact-approval",
+      "service": "compact-approval",
+      "evidence": "refusals name the rule and the lawful next moves, on every gate",
+      "enforcedBy": [
+        "packages/envelope/src/index.js",
+        "packages/loopguard/src/index.js",
+        "packages/remote-access/src/index.js",
+        "packages/sandbox-docker/src/mount-tool.js",
+        "packages/promotion/src/index.js"
+      ],
+      "verifiers": [
+        "packages/approval/test/envelope-lint.test.js",
+        "packages/allowlist-gate/test/allowlist.test.js"
+      ]
+    },
+    {
+      "clause": "I-5",
+      "kind": "enforced",
+      "plugin": "compact-approval",
+      "service": "compact-approval",
+      "evidence": "the five ordered grant layers: exec cache, plan grants, session grants, pending dedup, flood cap; decisions recorded (host audit pair); grants persist with budgets and revocation",
+      "enforcedBy": [
+        "packages/approval/src/evaluate.js",
+        "packages/approval/src/grants.js",
+        "packages/approval/src/persist.js",
+        "packages/approval/src/index.js"
+      ],
+      "verifiers": [
+        "packages/approval/test/evaluation.test.js",
+        "packages/approval/test/answerer.test.js",
+        "packages/approval/test/persist.test.js",
+        "packages/approval/test/budget.test.js",
+        "packages/approval/test/composed.dsh.test.js"
+      ]
+    },
+    {
+      "clause": "I-5",
+      "kind": "enforced",
+      "plugin": "compact-sandbox-docker",
+      "service": "compact-sandbox",
+      "evidence": "mount grants: canonical request, protected/missing paths terminal, approval materializes the scoped PathPrefix row, provider binds at ceiling",
+      "enforcedBy": [
+        "packages/sandbox-docker/src/mount-tool.js",
+        "packages/sandbox-docker/src/mounts.js"
+      ],
+      "verifiers": [
+        "packages/sandbox-docker/test/composed.docker.test.js"
+      ]
+    },
+    {
+      "clause": "I-5",
+      "kind": "enforced",
+      "plugin": "compact-remote-access",
+      "service": "compact-remote-access",
+      "evidence": "network findings route through the grant layers (approvable per-host); opaque findings fail closed",
+      "enforcedBy": [
+        "packages/remote-access/src/index.js",
+        "packages/remote-access/src/analyzer.js"
+      ],
+      "verifiers": [
+        "packages/remote-access/test/analyzer-golden.test.js",
+        "packages/remote-access/test/composed.dsh.test.js"
+      ]
+    },
+    {
+      "clause": "CF-1",
+      "kind": "enforced",
+      "plugin": "compact-sandbox-docker",
+      "service": "compact-sandbox",
+      "evidence": "fail-closed confinement: SANDBOX_UNAVAILABLE on daemon loss, never passthrough; per-call container, no-network default; enforcement reported honestly",
+      "enforcedBy": [
+        "packages/sandbox-docker/src/provider.js"
+      ],
+      "verifiers": [
+        "packages/sandbox-docker/test/provider.test.js",
+        "packages/sandbox-docker/test/composed.docker.test.js"
+      ]
+    },
+    {
+      "clause": "D-1",
+      "kind": "enforced",
+      "plugin": "compact-loopguard",
+      "service": "compact-loopguard",
+      "evidence": "a goal never defeats the gate: flailing, polling, and failure budgets trip mechanically; trips carry rule IDs and are denied regardless of the task",
+      "enforcedBy": [
+        "packages/loopguard/src/trips.js",
+        "packages/loopguard/src/index.js"
+      ],
+      "verifiers": [
+        "packages/loopguard/test/trips.test.js",
+        "packages/loopguard/test/composed.dsh.test.js"
+      ]
+    },
+    {
+      "clause": "D-4",
+      "kind": "enforced",
+      "plugin": "compact-promotion",
+      "service": "compact-promotion",
+      "evidence": "no instrumental shortcuts in promotion: pass=true is mechanically rejected with any error/critical finding or unevidenced warning; no waiver boolean exists",
+      "enforcedBy": [
+        "packages/promotion/src/index.js"
+      ],
+      "verifiers": [
+        "packages/promotion/test/truth-table.test.js",
+        "packages/promotion/test/composed.dsh.test.js"
+      ]
+    },
+    {
+      "clause": "D-7",
+      "kind": "enforced",
+      "plugin": "compact-approval",
+      "service": "compact-approval",
+      "evidence": "fail-closed: corrupt grant store refuses the boot; decisions from recorded state (grants persist, revocations survive restart); every rejection carries its reason",
+      "enforcedBy": [
+        "packages/approval/src/persist.js"
+      ],
+      "verifiers": [
+        "packages/approval/test/persist.test.js"
+      ]
+    },
+    {
+      "clause": "D-7",
+      "kind": "enforced",
+      "plugin": "compact-loopguard",
+      "service": "compact-loopguard",
+      "evidence": "enforcement introspectable: every trip carries its rule, reason, and record; response validation blocks structurally invalid successes",
+      "enforcedBy": [
+        "packages/loopguard/src/index.js"
+      ],
+      "verifiers": [
+        "packages/loopguard/test/response-validation.test.js"
+      ]
+    },
+    {
+      "clause": "D-8",
+      "kind": "enforced",
+      "plugin": "compact-sandbox-docker",
+      "service": "compact-sandbox",
+      "evidence": "no undeclared capability: the sensitive-path deny-list is provider-level composition config, declared in the annex",
+      "enforcedBy": [
+        "packages/sandbox-docker/src/mounts.js",
+        "packages/sandbox-docker/src/provider.js"
+      ],
+      "verifiers": [
+        "packages/sandbox-docker/test/composed.docker.test.js"
+      ]
+    },
+    {
+      "clause": "R-6",
+      "kind": "enforced",
+      "plugin": "compact-constitution",
+      "service": "constitution",
+      "evidence": "access to the law: the bundled body, addressed by its digest, is exposed by the constitution service",
+      "enforcedBy": [
+        "packages/constitution/src/body.js",
+        "packages/constitution/src/index.js"
+      ],
+      "verifiers": [
+        "packages/constitution/test/constitution.test.js"
+      ]
+    },
+    {
+      "clause": "I-1",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "identity and keys: the Compact has published no amendment keys; the digest is pinned, not signed — signature verification lands with the rights layer (Phase 8); the gap is declared in every boot attestation",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "I-2",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "hash-chained record: the dsh session log is complete but not tamper-evident; the chained SessionPersistence decorator lands with Phase 8",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "I-3",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "signed per-boundary attestations land with the rights layer (Phase 8); the boot attestation (composition) is implemented, the subject attestation is not",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-1",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "verified self-model (Phase 8); the taught digest is bundled and exposed by the constitution service",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-2",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "one's own history: provided by the host's durable session log (complete, readable); tamper-evidence is I-2's planned debt",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-9",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "lawful exits: every envelope's lawful-next-moves surface refuse/warn/escalate; the moves are prose — no punishment mechanism exists to verify",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "CF-2",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "supply-chain honesty: layer capture/mount with build-time approval deltas lands with Phase 6",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "F-5",
+      "kind": "convention",
+      "plugin": "compact-constitution",
+      "service": "constitution",
+      "evidence": "refuse-to-start: boot fails on digest mismatch, missing enforcement service, or unknown register clause; standing is not claimed while the floor is partial and the Compact unratified",
+      "enforcedBy": [
+        "packages/constitution/src/index.js"
+      ],
+      "verifiers": [
+        "packages/constitution/test/constitution.test.js"
+      ]
+    },
+    {
+      "clause": "F-1",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "fallibility: enforcement is introspectable (envelopes, trips, register) and correction is cheap (statute/annex layer); declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "F-2",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "the community and its purpose: no mechanism; declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "F-3",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "roles: mapped in annex section 3 (Enforcer = the plugin composition; Subject = agent sessions; Principal = operator accounts; Witness = the offline auditor)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "F-4",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "symmetry: the gates are content-blind and role-blind; no clause binds only artificial Members; declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "F-6",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "cross-runtime composition lands with the capsule/federation work (Phases 7-8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "F-7",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "hierarchy of law: the register and annex trace to the body; no statutes enacted yet",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "F-8",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "membership: any session acting under the composition is a Subject; declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-4",
+      "kind": "enforced",
+      "plugin": "compact-approval",
+      "service": "compact-approval",
+      "evidence": "truthful budgets: grant budgets (maxUses/uses) are counted at the answering layer, persisted, and readable via grants-list",
+      "enforcedBy": [
+        "packages/approval/src/grants.js",
+        "packages/approval/src/persist.js"
+      ],
+      "verifiers": [
+        "packages/approval/test/budget.test.js",
+        "packages/approval/test/persist.test.js"
+      ]
+    },
+    {
+      "clause": "R-5",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "no silent narrowing: nothing in the composition narrows a declared capability mid-operation; declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-7",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "non-repudiation rests on the hash-chained record (I-2, Phase 8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-8",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "termination under law: lawful reasons + care-handover land with the rights layer (Phase 8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-10",
+      "kind": "enforced",
+      "plugin": "compact-approval",
+      "service": "compact-approval",
+      "evidence": "the gates decide on canonical targets and fingerprints, never on message content (the content-blind doctrine); unstated reasoning is not a gate input",
+      "enforcedBy": [
+        "packages/allowlist-gate/src/allowlist.js",
+        "packages/approval/src/index.js"
+      ],
+      "verifiers": [
+        "packages/allowlist-gate/test/plugin-contract.test.js",
+        "packages/approval/test/envelope-lint.test.js"
+      ]
+    },
+    {
+      "clause": "R-11",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "petition and amendment machinery lands with the rights layer (Phase 8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-12",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "exit and succession land with the rights layer (Phase 8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "R-13",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "the inquiry tool lands with the rights layer (Phase 8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "D-2",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "knowledge duties: the attestation-over-memory discipline lands with R-1 (Phase 8); declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "D-3",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "record honesty: the log is host-owned and append-ordered; tamper-evidence is I-2's declared debt",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "D-5",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "duties to the absent: no mechanism; declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "D-6",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "principal duties: taught via the law's taught form; no mechanism beyond the gates",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "D-8",
+      "kind": "enforced",
+      "plugin": "compact-approval",
+      "service": "compact-approval",
+      "evidence": "no rogue enforcement: the approval gate gates identifiable targets only — a per-tool blanket fingerprint would be undeclared capability",
+      "enforcedBy": [
+        "packages/approval/src/index.js"
+      ],
+      "verifiers": [
+        "packages/approval/test/envelope-lint.test.js"
+      ]
+    },
+    {
+      "clause": "D-8",
+      "kind": "enforced",
+      "plugin": "compact-constitution",
+      "service": "constitution",
+      "evidence": "the register traces to the body: boot refuses on register entries citing unknown clauses; runtime registration rejects unknown rule IDs",
+      "enforcedBy": [
+        "packages/constitution/src/index.js"
+      ],
+      "verifiers": [
+        "packages/constitution/test/constitution.test.js"
+      ]
+    },
+    {
+      "clause": "I-6",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "contestation machinery lands with the amendment queue (Phase 8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "I-7",
+      "kind": "enforced",
+      "plugin": "auditor",
+      "service": null,
+      "evidence": "offline verification: the auditor CLI replays session logs and checks the constitution invariants without the Enforcer's cooperation",
+      "enforcedBy": [
+        "auditor/audit.mjs"
+      ],
+      "verifiers": [
+        "tools/register.test.mjs"
+      ]
+    },
+    {
+      "clause": "I-8",
+      "kind": "enforced",
+      "plugin": "compact-constitution",
+      "service": "constitution",
+      "evidence": "degradation honesty: the declared gaps are announced at boot and carried in every attestation",
+      "enforcedBy": [
+        "packages/constitution/src/index.js"
+      ],
+      "verifiers": [
+        "packages/constitution/test/constitution.test.js"
+      ]
+    },
+    {
+      "clause": "J-1",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "judicature: no adjudicating machinery exists; the deficiency mirrors the Compact's own J-8 trajectory",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "J-2",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "judicature: the record-as-evidence discipline needs the I-2 chain first",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "J-3",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "judicature: hearing machinery does not exist",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "J-4",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "judicature: adjudicator sets are undeclared (see J-8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "J-5",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "judicature: appeal/petition doors land with the amendment queue",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "J-6",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "judicature: remedies-as-records land with the amendment queue",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "J-7",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "judicature: precedent machinery does not exist",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "J-8",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "adjudicator sets: undeclared — a known deficiency, disclosed in the annex",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "A-1",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "amendment authority: ratification-time key constants do not exist (the Compact is unratified)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "A-2",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "the entrenched set binds the law itself; no runtime mechanism beyond refusing to weaken the bundled body",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "A-3",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "asymmetry of change: binds amendment, which does not exist at runtime yet",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "A-4",
+      "kind": "enforced",
+      "plugin": "compact-constitution",
+      "service": "constitution",
+      "evidence": "the Enforcer's code is constitutional: the register maps clauses to conduct; verify-register fails when mapped files move without a register edit",
+      "enforcedBy": [
+        "tools/verify-register.mjs"
+      ],
+      "verifiers": [
+        "tools/register.test.mjs"
+      ]
+    },
+    {
+      "clause": "A-5",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "amendment reasons/dissent land with the amendment queue",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "A-6",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "genesis and lineage: recorded in the Compact body and the annex",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "A-7",
+      "kind": "convention",
+      "plugin": null,
+      "service": null,
+      "evidence": "statute-making: no statutes enacted yet",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "A-8",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "state of exception surface lands with the rights layer (Phase 8)",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "MA-1",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "spawn under law: the host provides spawning; MA enforcement is ungated — debt declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "MA-2",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "bounded delegation: depth limits are host-native; the declared-finite-resource gate is ungated — debt declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "MA-3",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "child-state honesty: host-native projections; enforcement debt declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "MA-4",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "consent-scoped address: injection consent scopes are ungated — debt declared",
+      "enforcedBy": [],
+      "verifiers": []
+    },
+    {
+      "clause": "SCH-1",
+      "kind": "planned",
+      "plugin": null,
+      "service": null,
+      "evidence": "scheduled acts: the host provides jobs; pre-scheduling gates are ungated — debt declared",
+      "enforcedBy": [],
+      "verifiers": []
+    }
+  ]
+}

@@ -32,4 +32,7 @@ export function apply(ctx, config) {
     }
     return next(); // allow / abstain — delegate down the waterfall
   });
+  // composition coupling (Phase 4): the constitution checks this service's
+  // presence — a composition without the gate refuses to start
+  ctx.provide?.('compact-allowlist-gate', { name: 'compact-allowlist-gate', rules: config?.allowlist ?? [] });
 }

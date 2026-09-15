@@ -4,9 +4,9 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 3 (LoopGuard, promotion gate, response validation) —
-> COMPLETE.** The law lives in
-> [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
+> **Status: Phase 4 (the constitution layer) — COMPLETE.** The law lives in
+> [compact.md](https://github.com/mandubian/compact/blob/main/compact.md)
+> (draft v0.5, **not yet ratified** — no standing is claimed, F-5);
 > this repository builds the machines that make it real on dsh.
 >
 > **Phase 0 done — including the composed check:** the allowlist gate runs
@@ -89,6 +89,28 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > waterfall *before the tool body dispatches* — no waiver boolean exists
 > (truth table + composed proof). **Response validation** blocks
 > success-without-value results and feeds the failure budget.
+>
+> **Phase 4 done:** the **constitution meta-layer** (`packages/constitution`)
+> bundles the adopted Compact body (digest-pinned) and binds the composition
+> three ways per F-5: **boot verification** (tampered body or a mismatched
+> operator-pinned digest refuses to start), **composition coupling** (every
+> enforcement service must exist when the constitution applies — a
+> composition missing one REFUSES TO START; the module-level `inject` gives
+> that ordering in real dsh loads), and the **rule registry** materialized
+> from the enforcement register (register entries citing unknown clauses are
+> rogue enforcement, D-8, and refuse the boot). The boot **attestation**
+> declares the owed gaps loudly (I-8): unratified draft, pinned-not-signed
+> digest (no amendment keys published yet), I-2 chain debt. The
+> **enforcement register** is now a full board — 66 entries over all 62
+> clauses of the body (20 enforced, the rest planned or declared
+> convention; [O] MEM/FED declared unadopted) — with `verify-register` as a
+> CI gate that fails on broken citations, unresolvable enforced entries,
+> uncovered clauses, and register/body divergence (A-4). The **offline
+> auditor** (`auditor/`) replays session logs and checks the constitution
+> invariants without the Enforcer's cooperation (I-7), attesting which
+> trust basis it relies on. The declaration `packages/allowlist-gate/src/index.js`
+> and every other enforcement plugin now provides a service the constitution
+> can couple on.
 
 ## The plan
 
@@ -112,6 +134,9 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/remote-access/` | **Phase 2, slice 2**: static network-access analysis of shell args — findings (URL, remote, package-registry, IP) route through the Phase 1 grant layers (approvable per-host); opaque findings fail closed with an envelope |
 | `packages/loopguard/` | **Phase 3**: the 12-trip LoopGuard state machine (progress/failure accounting, command-aware fingerprints, refusal-seam + agent/error feeds; behavioral latches with repair budget 3, deterministic deny-all) + response validation (`tools/post-execute` block on invalid results) |
 | `packages/promotion/` | **Phase 3**: the promotion evidence gate — `pass=true` mechanically rejected with any error/critical finding or unevidenced warning, enforced in the waterfall before the tool body; no waiver boolean |
+| `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
+| `docs/register/register.json` | **Phase 4**: the enforcement register — every clause of the body registered, planned, declared convention, or declared unadopted; `tools/verify-register.mjs` is the CI gate (also `npm run verify-register`) |
+| `auditor/` | **Phase 4**: the offline verification CLI (I-7) — replays session logs, checks the approval pair discipline, turn enclosure, outcome vocabulary; attests its trust basis |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
@@ -129,4 +154,5 @@ upgrades are a reviewed, re-blessed event — never silent drift.
 npm install            # workspace install (no build step in Phase 0)
 npm test               # node --test across packages
 npm run verify-pin     # dsh pin gate
+npm run verify-register  # enforcement register gate (Phase 4)
 ```

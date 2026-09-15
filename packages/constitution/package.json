@@ -1,0 +1,27 @@
+{
+  "name": "compact-dsh-constitution",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — the constitution meta-layer (port plan Phase 4): boot verification against the bundled body's pinned digest, the rule registry materialized from the enforcement register, composition coupling (missing enforcement refuses to start, F-5), and the boot attestation.",
+  "main": "src/index.js",
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+  },
+  "dependencies": {
+    "compact-envelope": "0.1.0"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "devDependencies": {
+    "compact-dsh-allowlist-gate": "0.1.0",
+    "compact-dsh-approval": "0.4.1",
+    "compact-dsh-loopguard": "0.1.0",
+    "compact-dsh-promotion": "0.1.0",
+    "compact-dsh-remote-access": "0.1.0",
+    "compact-dsh-sandbox-docker": "0.1.0"
+  }
+}

@@ -180,6 +180,10 @@ export function loopguardPlugin(opts = {}) {
       if (event?.type === 'turn/start') loopguard.guardFor(session?.id != null ? String(session.id) : null).clearOnUserSignal();
     });
 
+    // composition coupling (Phase 4): the constitution checks this service's
+    // presence — a composition without the loopguard refuses to start
+    ctx.provide?.('compact-loopguard', loopguard);
+
     return loopguard;
   }
   return apply;
