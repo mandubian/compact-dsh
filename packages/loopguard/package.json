@@ -1,0 +1,14 @@
+{
+  "name": "compact-dsh-loopguard",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — LoopGuard: progress/failure accounting with mechanical trips (port plan Phase 3); the consumer of the approval refusal seam.",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
+  "dependencies": {
+    "compact-envelope": "0.1.0",
+    "compact-dsh-approval": "0.4.1"
+  },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" }
+}

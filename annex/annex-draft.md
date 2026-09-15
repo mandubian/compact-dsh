@@ -53,6 +53,9 @@ package — partial floor only):
 | D-8 (no undeclared capability — the host-fs deny-list) | `packages/sandbox-docker/src/mounts.js::DEFAULT_SENSITIVE_PATHS` + provider over-mounts | `packages/sandbox-docker/test/composed.docker.test.js::the deny-list hides secrets` |
 | I-5 (gates — remote-access findings route through the grant layers) | `packages/remote-access/src/analyzer.js` (static detection) + `src/index.js` (routing through `compact-approval.gate`) | `packages/remote-access/test/analyzer-golden.test.js`, `packages/remote-access/test/composed.dsh.test.js` |
 | D-7 (fail-closed — opaque network access) | `packages/remote-access/src/index.js` — unresolvable targets denied with an envelope, never asked forever | `packages/remote-access/test/composed.dsh.test.js::opaque network access is refused` |
+| D-1 (a goal never defeats the gate — LoopGuard) | `packages/loopguard/src/trips.js` (12 trip conditions, pure machine) + `src/index.js` (pre-execute denial, refusal-seam + agent/error feeds, turn-boundary latch clearing, repair budget 3, deterministic deny-all) | `packages/loopguard/test/trips.test.js` (each trip in isolation), `packages/loopguard/test/composed.dsh.test.js` |
+| D-4/D-7 (promotion evidence rule) | `packages/promotion/src/index.js::evaluatePromotionRecord` — enforced in tools/pre-execute before the tool body; no waiver boolean | `packages/promotion/test/truth-table.test.js`, `packages/promotion/test/composed.dsh.test.js` |
+| D-7 (response validation) | `packages/loopguard/src/index.js` post-execute block on success-without-value, feeding the failure budgets | `packages/loopguard/test/response-validation.test.js` |
 
 Conventions recorded (verified against installed dsh `~0.1.5-rc.1` types):
 the plan's dotted `grants.*` command names are not legal in the host
@@ -108,6 +111,17 @@ Semantics decisions (reviewed, each with a regression test):
   and refused, not granted); package-manager findings resolve through the
   DEFAULT registry map, and compositions overriding registries MUST override
   `packageHosts` too.
+- **LoopGuard trips are abort-with-explanation, not suspend** (fidelity
+  loss, inherited from the port plan): dsh's loop has no suspend latch, so a
+  deterministic trip is deny-all + explanatory injection with no auto-resume,
+  and a behavioral trip is a denial latch + corrective injection cleared on
+  the inbound user signal (a `turn/start` after the latch, read from the
+  session log; the `session/event` firehose is the earlier path on wired
+  hosts). The repair budget is 3 per trip class; exhaustion is deny-all.
+- **Loopguard fingerprints are command-aware.** The approval fingerprint
+  alone would give every targetless call of a tool the same identity, making
+  "no new fingerprint" meaningless — the loopguard extends it with the
+  command-text hash, so every distinct command is distinct work.
 
 ## 3. Role mapping (draft)
 

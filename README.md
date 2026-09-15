@@ -4,8 +4,9 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 2 (sandbox policy & remote access) — COMPLETE.** The law
-> lives in [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
+> **Status: Phase 3 (LoopGuard, promotion gate, response validation) —
+> COMPLETE.** The law lives in
+> [compact.md](https://github.com/mandubian/compact/blob/main/compact.md);
 > this repository builds the machines that make it real on dsh.
 >
 > **Phase 0 done — including the composed check:** the allowlist gate runs
@@ -72,6 +73,22 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > target — `curl $URL`, `git push origin`) fail closed with an envelope
 > naming the repair, never asked forever. Golden vectors pin the detection;
 > the refusal rides the LoopGuard seam.
+>
+> **Phase 3 done:** the **LoopGuard** ports all 12 trip conditions as a pure
+> trip-state machine (each tested in isolation with synthetic streams):
+> accounting rides `tools/pre-execute` (command-aware fingerprints — every
+> distinct command is distinct work) and the frozen `tools/result` outcome;
+> the Phase 1 **refusal seam feeds gate-flailing (LG-12)** and the host's
+> `agent/error` feeds the LLM budget. Behavioral trips latch denials +
+> corrective `agent.inject` prose, clear on the inbound user signal (a
+> `turn/start` after the latch, read from the session log itself), within a
+> repair budget of 3; the deterministic trip (LG-7 WorkflowTerminal) denies
+> all with **no auto-resume** — abort-with-explanation, not suspend (the
+> documented fidelity loss). The **promotion evidence gate** rejects
+> `pass=true` with any error/critical finding or unevidenced warning in the
+> waterfall *before the tool body dispatches* — no waiver boolean exists
+> (truth table + composed proof). **Response validation** blocks
+> success-without-value results and feeds the failure budget.
 
 ## The plan
 
@@ -93,6 +110,8 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/approval/` | **Phase 1, slices 1–3**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, budgeted (`maxUses`), revocable grants; the `approval/request` answerer materializes `allowed-once` as exec-cache entries (replay hits); `grants-grant`/`grants-list`/`grants-revoke` commands; JSON+fsync persistence (corrupt store = loud boot failure); revocation kills covered cache entries; fingerprint golden vectors; denial-envelope lint; `PathPrefix` mount-grant patterns; provides the `compact-approval` service; gates identifiable targets only |
 | `packages/sandbox-docker/` | **Phase 2, slice 1**: docker `SandboxProvider` (per-call confinement, no-network default, masked-path deny-list, honest enforcement, fail-closed) + `sandbox_request_mount` tool — mount grants (canonical `PathPrefix`, ro ceiling, TTL, revocable) cured through the Phase 1 approval store |
 | `packages/remote-access/` | **Phase 2, slice 2**: static network-access analysis of shell args — findings (URL, remote, package-registry, IP) route through the Phase 1 grant layers (approvable per-host); opaque findings fail closed with an envelope |
+| `packages/loopguard/` | **Phase 3**: the 12-trip LoopGuard state machine (progress/failure accounting, command-aware fingerprints, refusal-seam + agent/error feeds; behavioral latches with repair budget 3, deterministic deny-all) + response validation (`tools/post-execute` block on invalid results) |
+| `packages/promotion/` | **Phase 3**: the promotion evidence gate — `pass=true` mechanically rejected with any error/critical finding or unevidenced warning, enforced in the waterfall before the tool body; no waiver boolean |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
