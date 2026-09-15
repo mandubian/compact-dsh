@@ -113,7 +113,7 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > can couple on.
 >
 > **Phase 5 done:** the **specialist roster** (`packages/specialists`) — the
-> 17 autonoetic specialist bundles + 2 leads as dsh subagent personas on the
+> autonoetic specialist bundles as dsh subagent personas on the
 > verified `@deepseek-ai/dsh-tool-subagent` contract (the host idiom the
 > standard preset uses for per-provider delegation tools): each persona is one
 > delegation-tool row carrying its **composed persona prompt** (unique prose +
@@ -129,6 +129,24 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > service. The **trim-dedup lint** (the #1329–#1331 doctrine as a boot gate)
 > fails on verbatim restatement of canonical sections, undocumented dropped
 > exclusions, deny-list rot, and unresolved gates — drift is a build failure.
+> Because the host contract derives every tool description from the provider
+> type (no per-persona description exists), the plugin also registers a
+> **roster card** — one line per persona, from the descriptors — as a scoped
+> `systemPrompt` section beside the host's delegation guidance, so the parent
+> routes by role instead of guessing from tool names.
+>
+> **The active roster is the basic five** — `architect`, `auditor`, `coder`,
+> `debugger`, `researcher` — the personas that earn their keep on dsh today.
+> The other thirteen are **archived, not deleted**
+> (`personas/archived/`, loader reads top level only): the five Phase 6–7
+> personas revive with their artifact/eval substrate, the two leads revive
+> when specialist-to-specialist delegation is wanted (the parent session is
+> the orchestrator for a flat roster), and the routing-and-judging set —
+> discovery, the watchdog pair, outcome-grader, credential-onboarding,
+> executor — each carry their reason in
+> [personas/archived/README.md](packages/specialists/personas/archived/README.md).
+> Rationale: every mounted persona costs the parent a delegation-tool row,
+> and rows are description-identical — surface stays where it pays.
 > The Phase 1 probe-gate decision (continue) is recorded at
 > [docs/decision-phase1-probe-gate.md](docs/decision-phase1-probe-gate.md).
 > Counted fidelity losses carried in the concept page: no per-persona write
@@ -158,7 +176,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/loopguard/` | **Phase 3**: the 12-trip LoopGuard state machine (progress/failure accounting, command-aware fingerprints, refusal-seam + agent/error feeds; behavioral latches with repair budget 3, deterministic deny-all) + response validation (`tools/post-execute` block on invalid results) |
 | `packages/promotion/` | **Phase 3**: the promotion evidence gate — `pass=true` mechanically rejected with any error/critical finding or unevidenced warning, enforced in the waterfall before the tool body; no waiver boolean |
 | `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
-| `packages/specialists/` | **Phase 5**: the specialist roster — 17 specialists + 2 leads as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
+| `packages/specialists/` | **Phase 5**: the specialist roster — active: the **basic five** (`architect`, `auditor`, `coder`, `debugger`, `researcher`) as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap) + a roster-card prompt section for parent routing; 13 more personas **archived** in `personas/archived/` (revive = move back); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
 | `docs/register/register.json` | **Phase 4**: the enforcement register — every clause of the body registered, planned, declared convention, or declared unadopted; `tools/verify-register.mjs` is the CI gate (also `npm run verify-register`) |
 | `auditor/` | **Phase 4**: the offline verification CLI (I-7) — replays session logs, checks the approval pair discipline, turn enclosure, outcome vocabulary; attests its trust basis |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
@@ -167,11 +185,49 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
 | `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
 
-## dsh version policy
+## dsh version policy — following the release rhythm
 
 All packages pin `@deepseek-ai/dsh` to `~0.1.5-rc.1` (npm `latest` at
 adoption; the audited line). `tools/verify-pin.mjs` refuses any other range;
-upgrades are a reviewed, re-blessed event — never silent drift.
+an upgrade is a reviewed, re-blessed event — never silent drift. The pin is
+not a wish to stand still, though: upstream is pre-1.0, breaks
+compatibility on purpose, and accepts no external PRs, so the real tail
+risk is *drift* — waiting so long that the next upgrade becomes a rewrite.
+Following the release rhythm is therefore scheduled maintenance, with three
+rules:
+
+1. **Review every upstream release — promptly, but without hurry.** Read
+   the release notes' plugin-authored-surface list (upstream publishes
+   one) and check it against the seams this composition rides
+   (`tools/*` waterfall, `approval/request`, `SandboxProvider.confine`,
+   the `dsh-tool-subagent` delegation contract, `systemPrompt`, session
+   persistence). A release whose new features we do not use and whose
+   plugin surface is unchanged costs one line of record and no action —
+   the pin holds.
+2. **Recon before adopting.** When a release changes a seam we ride, bump
+   a scratch checkout to it and run the composed suites first; itemize
+   the breakage, then decide — migrate now, or schedule the migration for
+   the next beta/rc if the line is still early alpha. A pin never moves
+   onto a new line on release day.
+3. **A re-blessing is evidence, not an edit.** Moving the pin means the
+   full composed suite, `verify-pin`, and `verify-register` pass on the
+   new line and the review is recorded (what changed, what it touched,
+   what the migration did) — the same discipline as the Phase 1
+   probe-gate record. The blessed composition attests exactly what was
+   audited (F-5).
+
+**Applied — v0.1.6-alpha.1 (reviewed 2026-09-16, rule 1):** the new
+features (browser/computer use, PTC-runtime renames, team mode) do not
+concern this composition; **no action taken, the pin holds.** Three
+plugin-surface items touch seams we ride and are on file for the 0.1.6
+migration: `SandboxProvider.confine` became async + cancellable (our
+docker provider implements it synchronously); the synchronous session
+history APIs (`eventAt`, …) are deprecated (the loopguard latch reads the
+log through `eventAt`); and optional-plugin startup failures no longer
+block the boot (the constitution's refuse-to-start coupling must be
+re-verified as *required* on the new line). None of the three breaks the
+current pin. Recon is scheduled for the 0.1.6 beta/rc — or earlier, if a
+release ships something this composition actually needs.
 
 ## Verify locally
 

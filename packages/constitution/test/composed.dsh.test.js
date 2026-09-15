@@ -20,10 +20,19 @@ import { apply as constitutionApply } from '../src/index.js';
 
 class SystemPromptStub extends Service {
   static inject = [];
-  constructor(ctx, config) { super(ctx, 'systemPrompt'); }
-  getSectionOrder() { return []; }
+  constructor(ctx, config) {
+    super(ctx, 'systemPrompt');
+    this.sections = [];
+  }
+  getSectionOrder(name) {
+    if (name === 'TOOL_SUBAGENT') return 2800;
+    throw new Error(`SystemPromptStub: unknown section order '${name}'`);
+  }
   getContextOrder() { return 50; }
-  section() { return undefined; }
+  section(section) {
+    this.sections.push(section);
+    return () => { this.sections = this.sections.filter(s => s !== section); };
+  }
   tools() { return undefined; }
   context() { return () => {}; }
 }

@@ -29,7 +29,9 @@ applies from the first enforced phase onward).
   | I-4 denial envelope (partial) | `dsh-allowlist-gate` v0.1.0 + `dsh-approval` v0.4.0 | envelope lint over every refusal path |
   | I-5 gates (partial — network targets) | `dsh-approval` v0.4.0 (five layers, grants, budgets, persistence, revocation, LoopGuard refusal seam) | composed deny→ask→approve→replay-hit cycle + audit-pair test |
 - **[C] capabilities provided**: multi-agent — **partially provided as of
-  Phase 5**: the specialist roster (17 specialists + 2 leads) spawns through
+  Phase 5**: the specialist roster (active: the basic five — architect,
+  auditor, coder, debugger, researcher; 13 further ported personas archived
+  in `personas/archived/`, mounted on revival) spawns through
   the delegation-tool contract with per-persona tool surfaces and depth caps
   (MA-1/MA-2 enforced; MA-3 remains host-native declared, MA-4 lands with the
   Phase 8 rights layer). Confinement, scheduling, memory, federation remain

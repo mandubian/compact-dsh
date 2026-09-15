@@ -1,5 +1,12 @@
 # Specialist census — port guidance for the swarm
 
+> **Archive note (2026-09-15):** the active roster is the **basic five** —
+> `architect`, `auditor`, `coder`, `debugger`, `researcher`. The other
+> thirteen personas live in `archived/` (out of the loader, the lint, and the
+> mount; revive = move back up); see `archived/README.md` for per-persona
+> reasons. This census remains the canonical port guidance for every persona,
+> active or archived.
+
 Canonical-section census of the autonoetic roster (`~/workspaces/mandubian/autonoetic/agents/specialists/`),
 for the specialists porting pass. `coder.default` is already ported (the exemplar) and is skipped.
 Frontmatter `sections:` (phase gates) are `null` for **every** specialist except coder — coder carries three

@@ -15,10 +15,19 @@ import { loadRoster } from '../src/roster.js';
 
 class SystemPromptStub extends Service {
   static inject = [];
-  constructor(ctx, config) { super(ctx, 'systemPrompt'); }
-  getSectionOrder() { return []; }
+  constructor(ctx, config) {
+    super(ctx, 'systemPrompt');
+    this.sections = [];
+  }
+  getSectionOrder(name) {
+    if (name === 'TOOL_SUBAGENT') return 2800;
+    throw new Error(`SystemPromptStub: unknown section order '${name}'`);
+  }
   getContextOrder() { return 50; }
-  section() { return undefined; }
+  section(section) {
+    this.sections.push(section);
+    return () => { this.sections = this.sections.filter(s => s !== section); };
+  }
   tools() { return undefined; }
   context() { return () => {}; }
 }
@@ -114,17 +123,32 @@ test('composed: every persona is spawnable with exactly its declared surface', a
   }
 });
 
-test('composed: leaves cannot spawn (no-recursive-spawn is a surface property), leads carry the cap', async () => {
-  const { service } = await boot();
-  const leaves = service.personas.filter(p => !p.spawns);
-  const leads = service.personas.filter(p => p.spawns);
-  assert.ok(leaves.length > 0 && leads.length > 0, 'the roster has both kinds');
-  for (const leaf of leaves) {
-    assert.equal(leaf.maxDepth, 0, `${leaf.name}: leaves never delegate`);
-    assert.ok(leaf.deny.includes('subagent') && leaf.deny.includes('subagent_fork'), `${leaf.name}: spawn tools denied`);
+test('composed: the active roster is all leaves; archived personas are not mounted', async () => {
+  const { tools, service, ctx } = await boot();
+  assert.equal(service.personas.length, 5, 'the active roster is the basic five');
+  for (const p of service.personas) {
+    assert.equal(p.kind, 'specialist', `${p.name}: the active roster carries no leads`);
+    assert.equal(p.maxDepth, 0, `${p.name}: leaves never delegate`);
+    assert.ok(p.deny.includes('subagent') && p.deny.includes('subagent_fork'), `${p.name}: spawn tools denied`);
   }
-  for (const lead of leads) {
-    assert.ok(lead.maxDepth > 0, `${lead.name}: leads delegate within a declared bound`);
-    assert.ok(!lead.deny.includes('subagent'), `${lead.name}: leads keep the spawn tool`);
+  // the archive is data, not mount surface: no delegation row exists for it
+  for (const archived of ['planner', 'planner_collaborative', 'packager', 'discovery', 'watchdog_fast']) {
+    assert.equal(service.personas.find(p => p.name === archived), undefined, `${archived} stays archived`);
+    assert.equal(tools.get(`lead_${archived}`), undefined);
+    assert.equal(tools.get(`specialist_${archived}`), undefined);
   }
+  assert.ok(ctx.systemPrompt, 'the systemPrompt service resolved at apply time');
+});
+
+test('composed: the roster card is registered as a scoped prompt section', async () => {
+  const { ctx, service } = await boot();
+  const sections = ctx.systemPrompt.sections;
+  const card = sections.find(s => s.name === 'compact:roster-card');
+  assert.ok(card, 'the roster-card section is registered');
+  assert.equal(card.order, 2801, 'it rides directly after the host TOOL_SUBAGENT guidance (2800)');
+  for (const p of service.personas) {
+    assert.ok(card.text.includes(`\`${p.toolName}\``), `${p.toolName} named in the card`);
+    assert.ok(card.text.includes(p.description), `${p.name}: its descriptor description is the routing signal`);
+  }
+  assert.ok(!card.text.includes('planner'), 'archived personas are not taught');
 });

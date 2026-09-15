@@ -32,6 +32,30 @@ The roster is the set of specialists + leads a composition offers. One
 profile line composes the whole roster; each member is individually
 spawnable by name.
 
+## Roster composition: active vs archived
+
+The roster is **data**, and a deployment mounts a *composition* of it — not
+everything ported must be mounted. A persona can be **archived**: kept as
+data (descriptor, prose, gates) but out of the loader, the lint, and the
+tool surface. The archive is honest about why each member is out (substrate
+not yet built, orchestrator role subsumed by the parent session, routing
+replaced by the roster card) and revival is a file move, not a rewrite.
+
+Mounting has a cost the home gateway did not price: on dsh every mounted
+persona is a delegation-tool row on the **parent's** model-facing surface,
+and the host contract derives every row's description from the provider
+type — rows are description-identical, so each extra persona is surface cost
+with name-only routing signal. Hence the companion rule:
+
+- **The roster card.** The parent is taught the mounted roster — one line
+  per persona (tool name, role, description), rendered from the descriptors —
+  as a scoped system-prompt section beside the host's delegation guidance.
+  Routing is a prompt-space decision backed by surface enforcement, never a
+  guess from tool names.
+- **Surface stays where it pays.** The default composition mounts the
+  personas whose substrate exists; the rest wait in the archive until the
+  phases that make them true land.
+
 ## The trimming doctrine
 
 Skill content drifts by restatement: two copies of the same rule evolve into

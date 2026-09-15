@@ -14,6 +14,10 @@
 // law, attributed (MA-1); the depth cap is enforced by the provider at every
 // start (MA-2). The roster itself is exposed as the `compact-specialists`
 // service so the constitution can couple on it and callers can enumerate it.
+// The host contract derives every delegation-tool description from the
+// provider type, so the parent also gets a **roster card** — one line per
+// persona — as a scoped `systemPrompt` section right after the host's own
+// delegation guidance; without it, routing among the rows is name-guessing.
 //
 // The trim-dedup lint runs at boot: a roster that restates canonical doctrine
 // or drops a source exclusion undocumented refuses to load — drift is a
@@ -28,6 +32,28 @@ import { assertLintClean, lintRoster } from './lint.js';
 export { loadRoster, composePersona, lintRoster, DSH_TOOL_VOCABULARY };
 
 export const name = 'compact-specialists';
+export const ROSTER_CARD_SECTION = 'compact:roster-card';
+
+/**
+ * The parent-facing roster card — the routing signal the delegation-tool rows
+ * cannot carry: the host contract derives every tool description from the
+ * provider type, so without this section the parent picks among
+ * identically-described tools by name alone. One line per persona, rendered
+ * from the descriptors (single source of truth).
+ */
+export function rosterCardText(roster) {
+  const lines = [
+    '## Specialist roster',
+    '',
+    'Delegate focused work to a specialist child — it works in its own context, under its own doctrine and restricted tool surface. Pick by role, and give the child a complete, standalone prompt:',
+    '',
+  ];
+  for (const p of roster.personas) {
+    lines.push(`- \`${p.descriptor.toolName}\` — ${p.descriptor.name}: ${p.descriptor.description}`);
+  }
+  return lines.join('\n');
+}
+
 // The delegation rows we mount ride the verified @deepseek-ai/dsh-tool-subagent
 // contract, whose inject is ['tools','subagents','systemPrompt','sessionProjections']
 // — the same four must exist when we load or the mount cannot register its
@@ -80,6 +106,15 @@ export function specialistsPlugin(opts = {}) {
         maxDepth: p.descriptor.kind === 'lead' ? leadMaxDepth : 0,
       });
     }
+
+    // The roster card rides the host prompt registry as a scoped section,
+    // directly after the host's own subagent-tool guidance (fail loud if the
+    // registry or the placement name is absent — never a silent skip).
+    ctx.systemPrompt.section({
+      name: ROSTER_CARD_SECTION,
+      order: ctx.systemPrompt.getSectionOrder('TOOL_SUBAGENT') + 1,
+      text: rosterCardText(roster),
+    });
 
     ctx.provide?.('compact-specialists', service);
     return service;
