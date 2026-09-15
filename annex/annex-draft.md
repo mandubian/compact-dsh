@@ -184,3 +184,9 @@ The dsh host is unaudited, pre-1.0, and in-process; the enforcement here is
 compositional, not physical. The five fidelity losses of the port plan §5
 apply to this annex and are inherited by every standing claim made under
 it.
+
+The sentinel baseline guard is in force (`.github/workflows/ci.yml`): a PR
+that touches enforcement code and the register in the same change must
+declare itself with the `[baseline-update]` prefix — edits to mapped
+conduct without register edits are enforcement fraud (D-8, A-4), and the
+guard makes the undeclared version unmergeable.

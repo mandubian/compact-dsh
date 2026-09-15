@@ -1,12 +1,45 @@
 name: ci
-on: [push, pull_request]
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
 jobs:
-  test:
+  gates:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with:
+          node-version: 22
       - run: npm install
-      - run: node tools/verify-pin.mjs
-      - run: node --test "packages/*/test/*.test.js"
+      - run: npm run verify-pin
+      - run: npm run verify-register
+      - run: npm test
+
+  # Sentinel baseline guard (port plan Phase 4 item 5, A-4 discipline):
+  # a PR that touches BOTH enforcement code and the register is a change to
+  # what the clauses mean in practice — it must declare itself.
+  baseline-guard:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: enforcement code + register in one PR requires [baseline-update]
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          files="$(git diff --name-only "$BASE" "$HEAD")"
+          echo "$files"
+          touches_enforcement=$(echo "$files" | grep -E '^packages/(allowlist-gate|approval|sandbox-docker|remote-access|loopguard|promotion|constitution)/(src|test)/' | wc -l)
+          touches_register=$(echo "$files" | grep -E '^docs/register/register\.json$' | wc -l)
+          if [ "$touches_enforcement" -gt 0 ] && [ "$touches_register" -gt 0 ]; then
+            title="${{ github.event.pull_request.title }}"
+            case "$title" in
+              "[baseline-update]"*) echo "baseline-update declared: ok" ;;
+              *) echo "::error::this PR changes enforcement code AND the register — a change to what the clauses mean in practice is an amendment of conduct (A-4). Retitle with the [baseline-update] prefix."; exit 1 ;;
+            esac
+          fi
