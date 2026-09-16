@@ -11,10 +11,24 @@ import { DockerSandboxProvider, DENIAL_SIGNATURES, RUNNER_FAILURE_RULES, SANDBOX
 import { mountGrantsFor } from '../src/mounts.js';
 import { GrantStore } from 'compact-dsh-approval';
 
+// CF-2: every provider needs a declared, digest-keyed acquisition history for
+// the image it runs, so these fixtures ride along with every construction. The
+// digest resolver is injected exactly like the probe — no daemon is touched.
+const TEST_DIGEST = 'sha256:' + 'a'.repeat(64);
+const TEST_PROVENANCE = [{
+  ref: 'ubuntu:24.04', digest: TEST_DIGEST, attestation: 'build-recorded',
+  buildApprovals: { hosts: ['archive.ubuntu.com'], paths: [] },
+}];
+
 // The provider is a Cordis Service: construct it against a bare real Context
 // (no plugins needed — the service base only registers the instance).
 function makeProvider(config = {}) {
-  return new DockerSandboxProvider(new Context(), { probe: () => ({ ok: true }), ...config });
+  return new DockerSandboxProvider(new Context(), {
+    probe: () => ({ ok: true }),
+    imageProvenance: TEST_PROVENANCE,
+    digestResolver: () => ({ ok: true, digest: TEST_DIGEST }),
+    ...config,
+  });
 }
 
 const POLICY = (mode, root, sessionId) => ({ mode, workspaceRoot: root, sessionId });
@@ -86,7 +100,7 @@ test('masked paths outside every bound root are skipped (invisible by constructi
 });
 
 test('fail-closed: daemon unavailable throws SANDBOX_UNAVAILABLE, never passthrough', () => {
-  const p = new DockerSandboxProvider(new Context(), { probe: () => ({ ok: false, detail: 'docker info exited 1: boom' }) });
+  const p = new DockerSandboxProvider(new Context(), { imageProvenance: TEST_PROVENANCE, digestResolver: () => ({ ok: true, digest: TEST_DIGEST }), probe: () => ({ ok: false, detail: 'docker info exited 1: boom' }) });
   assert.throws(() => p.confine(['bash', '-c', 'ls'], POLICY('read-only', '/ws')), (e) => {
     assert.ok(e instanceof Error);
     assert.ok(String(e.message).includes('boom') || String(e.code ?? '').includes('SANDBOX') || String(e).includes('SANDBOX'),
@@ -95,7 +109,7 @@ test('fail-closed: daemon unavailable throws SANDBOX_UNAVAILABLE, never passthro
   });
   // the probe verdict is cached: one probe per provider lifetime
   let probed = 0;
-  const p2 = new DockerSandboxProvider(new Context(), { probe: () => { probed += 1; return { ok: true }; } });
+  const p2 = new DockerSandboxProvider(new Context(), { imageProvenance: TEST_PROVENANCE, digestResolver: () => ({ ok: true, digest: TEST_DIGEST }), probe: () => { probed += 1; return { ok: true }; } });
   p2.confine(['true'], POLICY('read-only', '/ws'));
   p2.confine(['true'], POLICY('read-only', '/ws'));
   assert.equal(probed, 1);

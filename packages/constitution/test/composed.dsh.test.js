@@ -13,8 +13,26 @@ import { approvalPlugin } from 'compact-dsh-approval';
 import { loopguardPlugin } from 'compact-dsh-loopguard';
 import { promotionPlugin } from 'compact-dsh-promotion';
 import * as sandbox from 'compact-dsh-sandbox-docker';
+
+// CF-2 (Phase 6): the sandbox plugin refuses to start on an image with no
+// declared acquisition history, so the blessed composition declares one. The
+// digest is fixed here because this suite never reaches a daemon — the CF-2
+// behaviour itself is proven in the sandbox package's own suites.
+const SANDBOX_PROVENANCE = {
+  image: 'ubuntu:24.04',
+  imageProvenance: [{
+    ref: 'ubuntu:24.04', digest: 'sha256:' + 'b'.repeat(64), attestation: 'operator-declared',
+    buildApprovals: { hosts: ['archive.ubuntu.com'], paths: [] },
+  }],
+};
 import * as remoteAccess from 'compact-dsh-remote-access';
 import * as allowlistGate from 'compact-dsh-allowlist-gate';
+import * as capabilityGate from 'compact-dsh-capability-gate';
+import * as recordPlugin from 'compact-dsh-record';
+import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { specialistsPlugin } from 'compact-dsh-specialists';
 import { apply as constitutionApply } from '../src/index.js';
 
@@ -89,7 +107,10 @@ async function bootBlessed(opts = {}) {
   allowlistGate.apply(ctx, { allowlist: ['api.example.com'] });
   approvalPlugin({})(ctx, {});
   remoteAccess.apply(ctx, {});
-  sandbox.apply(ctx, opts);
+  sandbox.apply(ctx, { ...SANDBOX_PROVENANCE, ...opts });
+  capabilityGate.apply(ctx, {});
+  ctx.plugin(JsonlSessionPersistence, { root: mkdtempSync(join(tmpdir(), 'compact-const-sessions-')), compression: 'none' });
+  recordPlugin.apply(ctx, { store: new recordPlugin.MemoryChainStore() });
   if (typeof ctx.start === 'function') await ctx.start();
   for (let i = 0; i < 500 && (!ctx.tools || ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-allowlist-gate', 'compact-remote-access'].some(s => ctx.get(s) === undefined)); i++) {
     await new Promise(r => setImmediate(r));
@@ -110,7 +131,7 @@ test('composed: the blessed composition boots under the constitution', async () 
   assert.ok(att.registeredRules.includes('MA-2'), 'bounded delegation is registered (the Phase 5 roster)');
   assert.ok(att.gaps.some(g => g.includes('NOT yet ratified')), 'the standing honesty is in every attestation');
   // every required enforcement service resolved
-  for (const s of ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists']) {
+  for (const s of ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record']) {
     assert.notEqual(ctx.get(s), undefined, `${s} present`);
   }
 });
@@ -139,7 +160,10 @@ test('composed: applying the constitution before the async sandbox service mount
   allowlistGate.apply(ctx, { allowlist: ['api.example.com'] });
   approvalPlugin({})(ctx, {});
   remoteAccess.apply(ctx, {});
-  sandbox.apply(ctx, {});
+  sandbox.apply(ctx, { ...SANDBOX_PROVENANCE });
+  capabilityGate.apply(ctx, {});
+  ctx.plugin(JsonlSessionPersistence, { root: mkdtempSync(join(tmpdir(), 'compact-const-sessions-')), compression: 'none' });
+  recordPlugin.apply(ctx, { store: new recordPlugin.MemoryChainStore() });
   // before start, the sandbox provider has not mounted (its ctx.inject waits
   // for the tools service) — the composition does not enforce the floor yet
   assert.throws(() => constitutionApply(ctx, {}), /compact-sandbox.*refuses to start/);

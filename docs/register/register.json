@@ -219,12 +219,19 @@
     },
     {
       "clause": "I-2",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "hash-chained record: the dsh session log is complete but not tamper-evident; the chained SessionPersistence decorator lands with Phase 8",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-record",
+      "service": "compact-record",
+      "evidence": "the record, made tamper-evident: a SessionPersistence decorator commits a hash chain beside every session log on append (entryHash = H(prev, seq, canonical(event)), genesis seeded from the SESSION ID so a chain cannot vouch for another Member's history) and verifies it on read. A slice that does not verify REJECTS rather than returning unverified history as history (D-7). Links are committed BEFORE the log accepts the event, so a crash can only leave a link with no event — never an event with no link. The chain lives in a sidecar, declaring no new session event vocabulary (D-8). Proven against the real JSONL backend, including a rewrite applied to the stored artifact",
+      "enforcedBy": [
+        "packages/record/src/chain.js",
+        "packages/record/src/store.js",
+        "packages/record/src/index.js"
+      ],
+      "verifiers": [
+        "packages/record/test/chain.test.js",
+        "packages/record/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "I-3",
@@ -264,12 +271,19 @@
     },
     {
       "clause": "CF-2",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "supply-chain honesty: layer capture/mount with build-time approval deltas lands with Phase 6",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-sandbox-docker",
+      "service": "compact-sandbox",
+      "evidence": "supply-chain honesty: the docker image is the reused execution environment — it must carry a declared, digest-keyed acquisition history (undeclared image refuses the boot, D-8/F-5), the digest is re-resolved from the daemon at every confine (a tag that re-points off its record refuses the confinement), and build-time approvals are recorded and surfaced but never consulted to permit a run-time demand: an open network posture is answered only by a live run-time grant — excess is a new gate, not an inheritance",
+      "enforcedBy": [
+        "packages/sandbox-docker/src/provenance.js",
+        "packages/sandbox-docker/src/provider.js",
+        "packages/sandbox-docker/src/index.js"
+      ],
+      "verifiers": [
+        "packages/sandbox-docker/test/provenance.test.js",
+        "packages/sandbox-docker/test/composed.docker.test.js"
+      ]
     },
     {
       "clause": "F-5",
@@ -373,12 +387,18 @@
     },
     {
       "clause": "R-7",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "non-repudiation rests on the hash-chained record (I-2, Phase 8)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-record",
+      "service": "compact-record",
+      "evidence": "non-repudiation: every act is attributed on a tamper-evident record (I-2) whose genesis link is derived from the session identity, so an act cannot be retroactively reattributed by moving its record to another Member — a chain presented for a different session fails at its first link. The head link is the value a verifier keeps to detect a later rewrite. DECLARED LIMIT: the record is tamper-EVIDENT, not tamper-proof, and its links are unsigned because the Compact has published no identity keys (I-1 debt, declared in the boot record)",
+      "enforcedBy": [
+        "packages/record/src/chain.js",
+        "packages/record/src/index.js"
+      ],
+      "verifiers": [
+        "packages/record/test/chain.test.js",
+        "packages/record/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "R-8",
@@ -542,7 +562,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: the record-as-evidence discipline needs the I-2 chain first",
+      "evidence": "judicature: the record is now tamper-evident (I-2, compact-record), so evidence exists — but no adjudicating machinery consumes it; the hearing/panel layer is still absent (see J-8)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -707,30 +727,45 @@
     },
     {
       "clause": "MA-3",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "child-state honesty: host-native projections; enforcement debt declared",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-specialists",
+      "service": "compact-specialists",
+      "evidence": "child-state honesty: the host's own subagent/start and subagent/end lifecycle edges are folded into the Enforcer's picture of every delegation (the delegating parent recovered from the child's durable session header, not from a payload), and each transition is PUSHED to the parent with agent.inject() — informed without any polling obligation. SubagentRunEndInfo.lastAssistantMessage is the child's self-report and is deliberately read nowhere: the notice carries Enforcer-held facts only and tells the parent which of the two is authoritative (MA-3, D-2)",
+      "enforcedBy": [
+        "packages/specialists/src/child-state.js",
+        "packages/specialists/src/index.js"
+      ],
+      "verifiers": [
+        "packages/specialists/test/child-state.test.js"
+      ]
     },
     {
       "clause": "MA-4",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "consent-scoped address: injection consent scopes are ungated — debt declared",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-specialists",
+      "service": "compact-specialists",
+      "evidence": "consent-scoped address: on dsh a Member reaches another Subject's attention through exactly one surface — a tool call — so send_message and interrupt_agent are gated in the pre-execute waterfall against the recipient's live consent scopes. The delegation edge declares the reciprocal parent-child scope (its basis is the MA-1 spawn record, not an assumption); unconsented address is denied with an attributed envelope naming the refusal as lawful and unpunished (R-9); an address act that cannot be attributed fails closed (D-7); only the RECIPIENT may narrow or withdraw a scope over its own attention, through consent_scopes/consent_withdraw, and withdrawn scopes stay on the record. Declaring a WIDER scope is deliberately unimplemented: no sibling-address channel exists on dsh, so it could enable nothing lawful",
+      "enforcedBy": [
+        "packages/specialists/src/consent.js",
+        "packages/specialists/src/index.js"
+      ],
+      "verifiers": [
+        "packages/specialists/test/consent.test.js"
+      ]
     },
     {
       "clause": "SCH-1",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "scheduled acts: the host provides jobs; pre-scheduling gates are ungated — debt declared",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-capability-gate",
+      "service": "compact-capability-gate",
+      "evidence": "no unsupervised escalation, discharged by declared absence rather than by a gate: this composition adopts no scheduling capability, and the absence is MECHANICALLY ENFORCED rather than merely intended — composing a host schedule provider refuses the boot, a provider that mounts after boot latches a breach that denies every tool call (D-7), and schedule_create is denied in the waterfall with an envelope naming SCH-1 and the lawful next moves. 'No scheduled act may be armed at all' is a stronger guarantee than 'a scheduled act requires its gate before scheduling', and unlike a declared debt it is a fact a verifier can check. The trigger is read narrowly — the clock (dsh-schedule), not attended background work (ctx.jobs) — because over-declaring a trigger is its own D-8 problem",
+      "enforcedBy": [
+        "packages/capability-gate/src/parts.js",
+        "packages/capability-gate/src/index.js"
+      ],
+      "verifiers": [
+        "packages/capability-gate/test/capability-gate.test.js"
+      ]
     }
   ]
 }

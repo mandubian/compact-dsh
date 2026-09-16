@@ -16,7 +16,7 @@ applies from the first enforced phase onward).
   | Clause | Planned enforcement | Verifier (planned) |
   |---|---|---|
   | I-1 identity & keys | `dsh-identity` (undrafted) | signature checks over attestations |
-  | I-2 the record | chained SessionPersistence decorator (port plan Phase 8) | continuity check at read |
+  | I-2 the record | ENFORCED as of Phase 6 — see §2 | the offline auditor's `--chain` verification |
   | I-3 attestation | `dsh-rights` (undrafted) | attestation signature + freshness |
   | I-6 contestation | `dsh-rights` amendment queue | petition-lifecycle audit |
   | I-7 verification | `auditor/` CLI (port plan Phase 4) | the auditor itself |
@@ -28,14 +28,21 @@ applies from the first enforced phase onward).
   |---|---|---|
   | I-4 denial envelope (partial) | `dsh-allowlist-gate` v0.1.0 + `dsh-approval` v0.4.0 | envelope lint over every refusal path |
   | I-5 gates (partial — network targets) | `dsh-approval` v0.4.0 (five layers, grants, budgets, persistence, revocation, LoopGuard refusal seam) | composed deny→ask→approve→replay-hit cycle + audit-pair test |
-- **[C] capabilities provided**: multi-agent — **partially provided as of
-  Phase 5**: the specialist roster (active: the basic five — architect,
-  auditor, coder, debugger, researcher; 13 further ported personas archived
-  in `personas/archived/`, mounted on revival) spawns through
-  the delegation-tool contract with per-persona tool surfaces and depth caps
-  (MA-1/MA-2 enforced; MA-3 remains host-native declared, MA-4 lands with the
-  Phase 8 rights layer). Confinement, scheduling, memory, federation remain
-  unprovided (scheduling/jobs gating stays `planned`, SCH-1).
+- **[C] capabilities — every trigger accounted for, as of Phase 6.** D-8
+  leaves two lawful postures for a capability-stratified part: BIND its
+  clauses, or make the capability genuinely ABSENT and enforce the absence.
+  "Present but unbound" is the gravest class of violation, and "we hold it but
+  do not use it" is not a third posture.
+  | Part | Trigger | Posture |
+  |---|---|---|
+  | MA | the Enforcer provides Subject-spawning | **BOUND** — `compact-specialists`: MA-1, MA-2 (Phase 5), MA-3, MA-4 (Phase 6) all enforced |
+  | CF | the Enforcer confines execution | **BOUND** — `compact-sandbox`: CF-1 (Phase 2), CF-2 (Phase 6) enforced |
+  | SCH | the Enforcer acts unattended on a clock | **ABSENT, enforced** — `compact-capability-gate` refuses the boot on a composed scheduler and denies `schedule_create` |
+  | MEM, FED | `[O]` | unadopted, declared |
+  The specialist roster's active set is the basic five (architect, auditor,
+  coder, debugger, researcher); 13 further ported personas are archived in
+  `personas/archived/` and mount on revival. Memory and federation remain
+  unprovided and unadopted.
 - **[O] optional clauses adopted**: none yet.
 - **Standing sought**: basic (floor) → full as capability parts land.
 
@@ -70,14 +77,25 @@ Highlights (full board in the register file):
 | F-5 (refuse-to-start) | the constitution coupling | constitution + composed tests |
 | MA-1 (spawn under law) | `compact-dsh-specialists` — every spawn a recorded tool call naming the persona; session-backed children with durable descriptors | `packages/specialists/test/composed.dsh.test.js` |
 | MA-2 (bounded delegation) | `compact-dsh-specialists` — per-persona maxDepth (leaves 0, spawn tools denied; leads capped), provider-enforced at every start | `packages/specialists/test/composed.dsh.test.js`, `…/lint.test.js` |
+| MA-3 (child-state honesty) | `compact-specialists` — the host's own `subagent/start`/`subagent/end` edges pushed to the parent with `agent.inject()`; the child's `lastAssistantMessage` read nowhere | `packages/specialists/test/child-state.test.js` |
+| MA-4 (consent-scoped address) | `compact-specialists` — `send_message`/`interrupt_agent` gated against the recipient's declared scopes; only the recipient narrows | `packages/specialists/test/consent.test.js` |
+| CF-2 (supply-chain honesty) | `compact-sandbox-docker` — digest-keyed acquisition history, undeclared image refuses the boot, build approvals never a run-time entitlement | `packages/sandbox-docker/test/provenance.test.js`, `…/composed.docker.test.js` |
+| SCH-1 (no unsupervised escalation) | `compact-capability-gate` — the capability is declared ABSENT and the absence is enforced (boot refusal, breach latch, `schedule_create` denied) | `packages/capability-gate/test/capability-gate.test.js` |
+| I-2 / R-7 (the record) | `compact-record` — a hash chain committed beside the log on append and verified on read; genesis seeded from the session identity | `packages/record/test/chain.test.js`, `…/composed.dsh.test.js` |
 
 Declared gaps (in every boot attestation): the Compact is draft v0.5 and
 **not yet ratified** (no standing claimed); signature verification is
 unimplemented (no amendment keys published — the digest is pinned, not
-signed, I-1 debt); the record is complete but not tamper-evident (I-2
-debt, Phase 8). MA-1/MA-2 are `enforced` since Phase 5 (the specialist
-roster); MA-3 stays host-native declared, MA-4 and SCH capability debts
-remain `planned` entries in the register.
+signed, I-1 debt); the record is tamper-**evident** but not tamper-**proof**
+and its links are unsigned (I-1 debt — I-2 and R-7 themselves are enforced by
+`compact-record` since Phase 6); where an image's acquisition history is
+`operator-declared` rather than `build-recorded`, the sandbox service declares
+that the history was asserted and not verified (CF-2/I-8).
+
+**Part VI is fully bound as of Phase 6** (MA-1…MA-4, CF-1, CF-2 enforced;
+SCH-1 discharged by enforced absence). The judicature (Part V) remains the
+largest declared deficiency: no adjudicating machinery exists, and J-8's own
+trajectory language is the disclosure.
 
 The conventions recorded below remain in force.
 

@@ -17,8 +17,8 @@
 //      register can never drift from the law.
 //
 // The boot attestation records what was verified and what is owed — the
-// declared gaps (draft-not-ratified, pinned-not-signed digest, I-2 chain
-// debt) are degradation honesty (I-8): loud, never silent.
+// declared gaps (draft-not-ratified, pinned-not-signed digest, unsigned
+// chain links) are degradation honesty (I-8): loud, never silent.
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
@@ -38,7 +38,10 @@ export const name = 'compact-constitution';
 // composition is then guaranteed by the framework itself.
 // The roster (compact-specialists) joined the blessed composition in
 // Phase 5: MA-1/MA-2 are enforced capabilities on the same terms as the floor.
-export const inject = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists'];
+// The capability gate (compact-capability-gate) joined in Phase 6: it is what
+// binds SCH-1 by enforcing the capability's ABSENCE, and it is the general
+// mechanism for Part VI's "cannot be dodged by undeclared use" (D-8).
+export const inject = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record'];
 
 const REGISTER = JSON.parse(readFileSync(new URL('../register.json', import.meta.url), 'utf8'));
 
@@ -47,10 +50,10 @@ const REGISTER = JSON.parse(readFileSync(new URL('../register.json', import.meta
 export const DECLARED_GAPS = [
   'the Compact is draft v0.5 and NOT yet ratified: this composition claims no Compact standing (F-5)',
   'signature verification unimplemented: the Compact has published no amendment keys — the digest is pinned, not signed (I-1 debt, declared)',
-  'the record is complete but not tamper-evident: the hash-chained SessionPersistence decorator is Phase 8 (I-2 debt, declared)',
+  'the record is tamper-EVIDENT but not tamper-proof, and its links are unsigned: the chain detects a rewrite, it cannot prevent one, and no identity key signs it (I-1 debt, declared — I-2/R-7 themselves are enforced by compact-record)',
 ];
 
-export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists'];
+export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record'];
 
 export function apply(ctx, config) {
   // 1. boot verification (F-5)

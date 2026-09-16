@@ -4,7 +4,7 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 5 (specialist bundles) — COMPLETE.** The law lives in
+> **Status: Phase 6 (Part VI closure + the record) — COMPLETE.** The law lives in
 > [compact.md](https://github.com/mandubian/compact/blob/main/compact.md)
 > (draft v0.5, **not yet ratified** — no standing is claimed, F-5);
 > this repository builds the machines that make it real on dsh.
@@ -134,7 +134,73 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > **roster card** — one line per persona, from the descriptors — as a scoped
 > `systemPrompt` section beside the host's delegation guidance, so the parent
 > routes by role instead of guessing from tool names.
+>>
+> **Phase 6 done — Part VI closure + the record.** Five items, all clause-driven:
 >
+> **CF-2 (supply-chain honesty).** The docker image IS the reused execution
+> environment, so the composition was in breach with one config field. Every
+> image the provider may run must now carry a **declared, digest-keyed
+> acquisition history** — an undeclared image refuses the boot (D-8: the clause
+> wakes with the capability), the digest is re-resolved from the daemon at
+> every confine (a tag that re-points off its record refuses the confinement),
+> and `buildApprovals` is recorded and surfaced but **never consulted to permit
+> anything at run time**: an open network posture is answered only by a live
+> run-time grant. "Excess is a new gate, not an inheritance" is testable as an
+> absence, and it is tested that way. The attestation basis is itself declared
+> — an `operator-declared` history produces a declared gap (I-8).
+>
+> **MA-3 (child-state honesty).** The host's own `subagent/start`/`subagent/end`
+> edges are folded into the Enforcer's picture of every delegation (the parent
+> recovered from the child's durable session header), and each transition is
+> **pushed** to the parent with `agent.inject()` — informed without any polling
+> obligation. `SubagentRunEndInfo.lastAssistantMessage` is the child's
+> self-report and is read **nowhere**: that omission is the clause, and the
+> notice tells the parent which of the two is authoritative (MA-3, D-2).
+>
+> **MA-4 (consent-scoped address).** On dsh a Member reaches another Subject's
+> attention through exactly one surface — a tool call — so `send_message` and
+> `interrupt_agent` are gated against the recipient's live consent scopes. The
+> delegation edge declares the reciprocal scope (its basis is the MA-1 spawn
+> record, not an assumption); unconsented address is denied with an attributed
+> envelope naming the refusal as **lawful and unpunished (R-9)**; only the
+> **recipient** may narrow or withdraw a scope over its own attention. Widening
+> is deliberately unimplemented — no sibling-address channel exists, so it
+> could enable nothing lawful.
+>
+> **SCH-1 (no unsupervised escalation), discharged by declared absence.** The
+> new `packages/capability-gate/` is Part VI's own enforcement: every
+> capability trigger present in the composition must have a binding service or
+> the composition **refuses to start**; a trigger that mounts *later* latches a
+> breach that denies every tool call (D-7, because a boot-only check would make
+> the clause depend on load order); and once the constitution's rule registry
+> exists, every clause of every triggered part must be registered `enforced` —
+> a part bound in name only is still a breach. For SCH the lawful posture is
+> **absence**, mechanically enforced: `schedule_create` is denied with an
+> envelope. The trigger is read narrowly — the clock (`dsh-schedule`), not
+> attended background work (`ctx.jobs`) — because over-declaring a trigger is
+> its own D-8 problem.
+>
+> **I-2 / R-7 (the record), pulled forward from Phase 8.** Both are `(core)`
+> and both sit in A-2's entrenched set; A-2's own gloss is the argument
+> ("non-repudiation without a tamper-evident record is a promise, not a
+> right"). `packages/record/` decorates the deployment's `SessionPersistence`
+> backend: it commits a hash chain **beside** the log on append (declaring no
+> new event vocabulary, D-8) and verifies it on read. Genesis is seeded from
+> the **session identity**, so a chain cannot vouch for another Member's
+> history — an act cannot be retroactively reattributed by moving its record.
+> Links commit **before** the log accepts the event, so a crash can only leave
+> a link with no event, never an event with no link. A slice that does not
+> verify **rejects** rather than returning unverified history as history.
+> Proven against the real JSONL backend with a rewrite applied to the stored
+> artifact. The offline auditor now takes `--chain` and verifies integrity
+> itself (I-7), instead of attesting that it cannot. **Declared limit:** the
+> record is tamper-EVIDENT, not tamper-proof, and its links are unsigned — the
+> Compact has published no identity keys, so a signature would attest to a key
+> no verifier could check (I-1 debt, declared).
+>
+> The enforcement register moved with the conduct in the same changes (A-4):
+> **28 clauses enforced, up from 22**; Part VI is now fully bound.
+
 > **The active roster is the basic five** — `architect`, `auditor`, `coder`,
 > `debugger`, `researcher` — the personas that earn their keep on dsh today.
 > The other thirteen are **archived, not deleted**
@@ -157,8 +223,20 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
 The full port plan lives at
 [`annexes/dsh/plan.md` in the compact repository](https://github.com/mandubian/compact/blob/main/annexes/dsh/plan.md):
-nine phases, 21–30 estimated weeks, five counted fidelity losses, two
+eight phases (0–8), 21–30 estimated weeks, five counted fidelity losses, two
 recorded capture compositions for round-2 testing.
+
+**Phase 6 was re-scoped from the plan**, and the reasons are recorded at
+[docs/decision-phase6-scope.md](docs/decision-phase6-scope.md). The plan's
+"Artifacts & layers" was autonoetic's substrate carried in as a port target;
+re-derived against the question *which clause fails to be enforced if we do not
+build this?*, most of it answers to no clause. The artifact store and layer
+machinery are **dropped, not deferred**. What the re-derivation found instead
+was that **Part VI was the unfinished business**: three capability triggers
+were live in this composition with unbound mandatory clauses, which D-8 calls
+the gravest class of violation. Phase 6 closes them, and pulls the entrenched
+record (I-2/R-7) forward from Phase 8 because everything already built rests
+on it.
 
 This repository hosts the plugin packages and the **dsh annex** — the signed
 binding contract (conformance declaration, enforcement register, role
@@ -171,19 +249,22 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 |---|---|
 | `packages/allowlist-gate/` | First plugin: a `tools/pre-execute` deny-by-allowlist gate issuing Compact-shaped denial envelopes (rule ID + lawful next moves, R-3) |
 | `packages/approval/` | **Phase 1, slices 1–3**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, budgeted (`maxUses`), revocable grants; the `approval/request` answerer materializes `allowed-once` as exec-cache entries (replay hits); `grants-grant`/`grants-list`/`grants-revoke` commands; JSON+fsync persistence (corrupt store = loud boot failure); revocation kills covered cache entries; fingerprint golden vectors; denial-envelope lint; `PathPrefix` mount-grant patterns; provides the `compact-approval` service; gates identifiable targets only |
-| `packages/sandbox-docker/` | **Phase 2, slice 1**: docker `SandboxProvider` (per-call confinement, no-network default, masked-path deny-list, honest enforcement, fail-closed) + `sandbox_request_mount` tool — mount grants (canonical `PathPrefix`, ro ceiling, TTL, revocable) cured through the Phase 1 approval store |
+| `packages/sandbox-docker/` | **Phase 2, slice 1** + **Phase 6 (CF-2)**: docker `SandboxProvider` (per-call confinement, no-network default, masked-path deny-list, honest enforcement, fail-closed) + `sandbox_request_mount` tool — mount grants (canonical `PathPrefix`, ro ceiling, TTL, revocable) cured through the Phase 1 approval store; **image provenance** (digest-keyed acquisition history, undeclared image refuses the boot, digest re-resolved per confine, build approvals never a run-time entitlement) |
 | `packages/remote-access/` | **Phase 2, slice 2**: static network-access analysis of shell args — findings (URL, remote, package-registry, IP) route through the Phase 1 grant layers (approvable per-host); opaque findings fail closed with an envelope |
 | `packages/loopguard/` | **Phase 3**: the 12-trip LoopGuard state machine (progress/failure accounting, command-aware fingerprints, refusal-seam + agent/error feeds; behavioral latches with repair budget 3, deterministic deny-all) + response validation (`tools/post-execute` block on invalid results) |
 | `packages/promotion/` | **Phase 3**: the promotion evidence gate — `pass=true` mechanically rejected with any error/critical finding or unevidenced warning, enforced in the waterfall before the tool body; no waiver boolean |
 | `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
 | `packages/specialists/` | **Phase 5**: the specialist roster — active: the **basic five** (`architect`, `auditor`, `coder`, `debugger`, `researcher`) as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap) + a roster-card prompt section for parent routing; 13 more personas **archived** in `personas/archived/` (revive = move back); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
+| `packages/capability-gate/` | **Phase 6**: Part VI's own enforcement — every capability trigger present in the composition must have a binding service (refuse-to-start; a late trigger latches a breach denying every tool call; clause-granularity check against the constitution's registry), and a capability declared absent is mechanically refused (`schedule_create`, SCH-1) rather than merely intended |
+| `packages/record/` | **Phase 6**: the tamper-evident record — a hash-chain decorator over the session-persistence backend, committing links beside the log on append and verifying them on read; genesis seeded from the session identity so a history cannot be reattributed (I-2, R-7, both entrenched under A-2) |
 | `docs/register/register.json` | **Phase 4**: the enforcement register — every clause of the body registered, planned, declared convention, or declared unadopted; `tools/verify-register.mjs` is the CI gate (also `npm run verify-register`) |
-| `auditor/` | **Phase 4**: the offline verification CLI (I-7) — replays session logs, checks the approval pair discipline, turn enclosure, outcome vocabulary; attests its trust basis |
+| `auditor/` | **Phase 4** + **Phase 6**: the offline verification CLI (I-7) — replays session logs, checks the approval pair discipline, turn enclosure, outcome vocabulary; with `--chain <id>.chain` it verifies the record's integrity itself, without the Enforcer's cooperation; always attests which trust basis it used |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
 | `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
+| `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
 
 ## dsh version policy — following the release rhythm
 

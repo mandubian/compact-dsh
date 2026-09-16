@@ -13,6 +13,14 @@
 // runnerFailureRules}; SandboxPolicy = {mode:'read-only'|'workspace-write',
 // workspaceRoot, sessionId?}; the abstract provider registers as ctx.sandbox.
 //
+// CF-2 (supply-chain honesty, Phase 6): the image is a reused execution
+// environment, so every confine re-resolves its content digest and checks it
+// against the composition's declared acquisition history. An undeclared image,
+// an unresolvable digest, or a tag that has drifted off its record refuses the
+// confinement (SupplyChainRefusal, a Compact envelope). Build-time approvals
+// are recorded and surfaced but never permit anything at run time — see
+// src/provenance.js.
+//
 // Honest degradation (documented in the annex): the host's sandbox vocabulary
 // does not govern network ("network and process visibility are outside this
 // vocabulary") — the docker backend confines it anyway (no-network default),
@@ -24,6 +32,7 @@
 import { spawnSync } from 'node:child_process';
 import SandboxProvider, { SANDBOX_UNAVAILABLE, SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox';
 import { canonicalizeBestEffort, statSafe, within, DEFAULT_SENSITIVE_PATHS } from './mounts.js';
+import { normalizeProvenanceRecords, defaultDigestResolver, checkSupplyChain } from './provenance.js';
 
 /** The docker backend's denial dialect (what THIS backend's confinement produces). */
 export const DENIAL_SIGNATURES = ['read-only file system', 'permission denied'];
@@ -47,6 +56,11 @@ export class DockerSandboxProvider extends SandboxProvider {
   constructor(ctx, config = {}) {
     super(ctx);
     this.image = config.image ?? 'ubuntu:24.04';
+    // CF-2: the declared acquisition history of every image this provider may
+    // run. Malformed records throw HERE — a composition that cannot state its
+    // supply chain does not start claiming the clause (F-5).
+    this.imageProvenance = normalizeProvenanceRecords(config.imageProvenance);
+    this.digestResolver = config.digestResolver ?? defaultDigestResolver;
     this.dockerCommand = config.dockerCommand ?? 'docker';
     this.network = config.network ?? 'none';
     this.probeTimeoutMs = config.probeTimeoutMs ?? 5_000;
@@ -56,7 +70,11 @@ export class DockerSandboxProvider extends SandboxProvider {
     this.maskedPaths = [...DEFAULT_SENSITIVE_PATHS, ...(config.maskedPaths ?? [])].map(canonicalizeBestEffort);
     // (sessionId) => [{path, ceiling, id}] — live PathPrefix grants, wired from the composition
     this.grantsFor = config.grantsFor ?? (() => []);
+    // (sessionId) => [grant] — live RUN-TIME network grants. CF-2 answers a
+    // run-time demand from these only; build approvals never reach this path.
+    this.networkGrantsFor = config.networkGrantsFor ?? (() => []);
     this._probeResult = undefined;
+    this._digestByRef = new Map();
   }
 
   /** One bounded probe, cached for the provider's lifetime (mirrors sandbox-local). */
@@ -65,8 +83,37 @@ export class DockerSandboxProvider extends SandboxProvider {
     if (!this._probeResult.ok) throw new SandboxUnavailableError(mode, this._probeResult.detail);
   }
 
+  /** The daemon's content digest for a ref, resolved once per provider lifetime. */
+  resolveDigest(ref) {
+    if (!this._digestByRef.has(ref)) {
+      this._digestByRef.set(ref, this.digestResolver({ dockerCommand: this.dockerCommand, ref, timeoutMs: this.probeTimeoutMs }));
+    }
+    return this._digestByRef.get(ref);
+  }
+
+  /** The declared acquisition history of the image this provider runs, if any. */
+  provenance() { return this.imageProvenance.get(this.image); }
+
+  /**
+   * CF-2 at confine time: the image carries its acquisition history, that
+   * history describes the content that will actually run, and no build-time
+   * approval is inherited as run-time reach.
+   * @throws {SupplyChainRefusal} carrying the Compact envelope.
+   */
+  ensureSupplyChain(policy) {
+    const refusal = checkSupplyChain({
+      ref: this.image,
+      record: this.imageProvenance.get(this.image),
+      resolved: this.resolveDigest(this.image),
+      network: this.network,
+      networkGrants: this.networkGrantsFor(policy?.sessionId),
+    });
+    if (refusal) throw refusal;
+  }
+
   confine(argv, policy) {
     this.ensureAvailable(policy.mode);
+    this.ensureSupplyChain(policy);
     const root = canonicalizeBestEffort(policy.workspaceRoot);
     const run = [this.dockerCommand, 'run', '--rm',
       '--network', this.network, '--read-only',

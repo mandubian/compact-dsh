@@ -65,9 +65,9 @@
     "agent_message": "denied: send_message",
     "tool_discover": "no dsh analog",
     "self_describe": "no dsh analog",
-    "artifact_exec": "Phase 6 machinery — no dsh tool yet",
-    "artifact_build": "Phase 6 machinery — no dsh tool yet",
-    "artifact_prepare": "Phase 6 machinery — no dsh tool yet"
+    "artifact_exec": "no dsh tool, and none is coming: the artifact store was dropped in the Phase 6 re-scope (docs/decision-phase6-scope.md) because no clause of the Compact asks for it",
+    "artifact_build": "no dsh tool, and none is coming: the artifact store was dropped in the Phase 6 re-scope (docs/decision-phase6-scope.md) because no clause of the Compact asks for it",
+    "artifact_prepare": "no dsh tool, and none is coming: the artifact store was dropped in the Phase 6 re-scope (docs/decision-phase6-scope.md) because no clause of the Compact asks for it"
   },
   "includes": [
     "clarification-protocol"

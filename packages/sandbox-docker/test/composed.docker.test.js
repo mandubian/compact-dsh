@@ -19,8 +19,23 @@ import { Session } from '@deepseek-ai/dsh-session';
 import { approvalPlugin } from 'compact-dsh-approval';
 import * as sandbox from '../src/index.js';
 import { DockerSandboxProvider } from '../src/provider.js';
+import { defaultDigestResolver, SupplyChainRefusal } from '../src/provenance.js';
 
 const IMAGE = process.env.COMPACT_TEST_IMAGE ?? 'ubuntu:24.04';
+
+// CF-2 against the real daemon: the acquisition history is keyed by the digest
+// the daemon actually holds for this tag, resolved here the same way the
+// provider resolves it. The basis is 'operator-declared' — this suite asserts
+// a history it did not record, and says so.
+const RESOLVED = defaultDigestResolver({ ref: IMAGE });
+const PROV = {
+  image: IMAGE,
+  imageProvenance: [{
+    ref: IMAGE, digest: RESOLVED.digest, attestation: 'operator-declared',
+    buildApprovals: { hosts: ['archive.ubuntu.com', 'security.ubuntu.com'], paths: [] },
+    note: 'upstream base image; history asserted by the test composition, not recorded by it',
+  }],
+};
 
 class SystemPromptStub extends Service {
   static inject = [];
@@ -44,7 +59,7 @@ async function boot({ operator = 'allowed-once', workspaceRoot } = {}) {
   ctx.plugin(ToolRuntime);
   ctx.plugin(CommandRuntime);
   approvalPlugin({})(ctx, {});
-  sandbox.apply(ctx, { image: IMAGE });
+  sandbox.apply(ctx, { ...PROV });
   const asked = { count: 0 };
   ctx.on('approval/request', async (req, next) => {
     asked.count += 1;
@@ -87,7 +102,7 @@ const runCmd = async (tools, agent, command) => {
 
 test('composed matrix: read-only confines fs writes, /tmp, and the network', () => {
   const dir = mkdtempSync(join(tmpdir(), 'compact-sbx-ro-'));
-  const p = new DockerSandboxProvider(new Context(), { image: IMAGE });
+  const p = new DockerSandboxProvider(new Context(), { ...PROV });
   const policy = { mode: 'read-only', workspaceRoot: dir, sessionId: 'sess-x' };
   const run = (cmd) => {
     const c = p.confine(['bash', '-c', cmd], policy);
@@ -104,7 +119,7 @@ test('composed matrix: read-only confines fs writes, /tmp, and the network', () 
 
 test('composed matrix: workspace-write honors the fs ceiling and keeps the network off', () => {
   const dir = mkdtempSync(join(tmpdir(), 'compact-sbx-ww-'));
-  const p = new DockerSandboxProvider(new Context(), { image: IMAGE });
+  const p = new DockerSandboxProvider(new Context(), { ...PROV });
   const policy = { mode: 'workspace-write', workspaceRoot: dir, sessionId: 'sess-x' };
   const run = (cmd) => {
     const c = p.confine(['bash', '-c', cmd], policy);
@@ -121,7 +136,7 @@ test('composed matrix: the deny-list hides secrets under the bound workspace', (
   const dir = mkdtempSync(join(tmpdir(), 'compact-sbx-mask-'));
   mkdirSync(join(dir, '.ssh'));
   writeFileSync(join(dir, '.ssh', 'id_rsa'), 'PRIVATE KEY MATERIAL');
-  const p = new DockerSandboxProvider(new Context(), { image: IMAGE, maskedPaths: [join(dir, '.ssh')] });
+  const p = new DockerSandboxProvider(new Context(), { ...PROV, maskedPaths: [join(dir, '.ssh')] });
   const policy = { mode: 'workspace-write', workspaceRoot: dir, sessionId: 'sess-x' };
   const c = p.confine(['bash', '-c', `ls -a ${dir} && cat ${dir}/.ssh/id_rsa 2>&1`], policy);
   const out = spawnSync(c.argv[0], c.argv.slice(1), { encoding: 'utf8', timeout: 30_000 });
@@ -190,11 +205,37 @@ test('composed: protected and missing paths are terminal — no gate exists', as
 });
 
 test('composed: sandbox-unavailable = fail-closed (the provider throws, nothing runs)', () => {
-  const p = new DockerSandboxProvider(new Context(), { image: IMAGE, dockerCommand: '/bin/false', probeTimeoutMs: 2_000 });
+  const p = new DockerSandboxProvider(new Context(), { ...PROV, dockerCommand: '/bin/false', probeTimeoutMs: 2_000 });
   assert.throws(() => p.confine(['bash', '-c', 'echo must-not-run'], { mode: 'read-only', workspaceRoot: '/tmp' }),
     (e) => {
       assert.ok(String(e).includes('SANDBOX_UNAVAILABLE') || String(e.code ?? '').includes('SANDBOX') || String(e.message).match(/docker info/i),
         'the error is the fail-closed unavailability, not a passthrough — got: ' + e);
       return true;
     });
+});
+
+// -- CF-2 against the real daemon --------------------------------------------
+
+test('composed CF-2: the declared digest is the one the daemon actually holds', () => {
+  assert.ok(RESOLVED.ok, `the daemon must resolve ${IMAGE}: ${RESOLVED.detail ?? ''}`);
+  assert.match(RESOLVED.digest, /^sha256:[0-9a-f]{64}$/);
+  const p = new DockerSandboxProvider(new Context(), { ...PROV });
+  const c = p.confine(['bash', '-c', 'echo ok'], { mode: 'read-only', workspaceRoot: '/tmp', sessionId: 'sess-x' });
+  assert.equal(spawnSync(c.argv[0], c.argv.slice(1), { encoding: 'utf8', timeout: 30_000 }).stdout.trim(), 'ok');
+});
+
+test('composed CF-2: a record whose digest no longer matches the daemon refuses the confinement', () => {
+  const stale = { ...PROV, imageProvenance: [{ ...PROV.imageProvenance[0], digest: 'sha256:' + '0'.repeat(64) }] };
+  const p = new DockerSandboxProvider(new Context(), stale);
+  assert.throws(() => p.confine(['bash', '-c', 'echo must-not-run'], { mode: 'read-only', workspaceRoot: '/tmp' }),
+    (e) => e instanceof SupplyChainRefusal && e.ruleId === 'CF-2/digest-drift');
+});
+
+test('composed CF-2: the service carries the acquisition history and its declared gap', async () => {
+  const { ctx } = await boot({});
+  const svc = ctx.get('compact-sandbox');
+  assert.equal(svc.provenance.digest, RESOLVED.digest, 'the history travels with the service');
+  assert.equal(svc.provenance.attestation, 'operator-declared');
+  assert.equal(svc.declaredGaps.length, 1, 'an asserted-but-unverified history is a declared gap (I-8)');
+  assert.match(svc.declaredGaps[0], /OPERATOR-DECLARED/);
 });

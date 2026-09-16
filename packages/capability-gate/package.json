@@ -1,0 +1,13 @@
+{
+  "name": "compact-dsh-capability-gate",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — Part VI's own enforcement: every capability-stratified trigger present in the composition must have a binding service (D-8), and a capability declared absent is mechanically refused rather than merely intended (SCH-1).",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
+  "dependencies": {
+    "compact-envelope": "0.1.0"
+  },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" }
+}

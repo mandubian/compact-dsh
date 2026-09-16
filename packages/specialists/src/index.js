@@ -25,11 +25,16 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
+import { defineTool } from '@deepseek-ai/dsh-tools';
 import { apply as applySubagentTool } from '@deepseek-ai/dsh-tool-subagent';
 import { loadRoster, composePersona, DSH_TOOL_VOCABULARY } from './roster.js';
 import { assertLintClean, lintRoster } from './lint.js';
+import { bindChildState, ChildStateRegistry, transitionProse, childStateLine, resolveParent } from './child-state.js';
+import { bindConsentScopes, ConsentScopeRegistry, consentTools, gateAddress, ADDRESS_TOOLS } from './consent.js';
 
 export { loadRoster, composePersona, lintRoster, DSH_TOOL_VOCABULARY };
+export { bindChildState, ChildStateRegistry, transitionProse, childStateLine };
+export { bindConsentScopes, ConsentScopeRegistry, consentTools, gateAddress, ADDRESS_TOOLS };
 
 export const name = 'compact-specialists';
 export const ROSTER_CARD_SECTION = 'compact:roster-card';
@@ -70,6 +75,17 @@ export function specialistsPlugin(opts = {}) {
     const backgroundMode = config.backgroundMode ?? opts.backgroundMode ?? 'one-shot';
     const leadMaxDepth = config.leadMaxDepth ?? opts.leadMaxDepth ?? 3;
 
+    // MA-3: the Enforcer's picture of every delegation, written from the host
+    // lifecycle edges and pushed to the parent on each transition (never
+    // polled, never taken from the child's own account) — see child-state.js.
+    const childState = bindChildState(ctx);
+
+    // MA-4: one Subject's context is not a commons. The delegation edge
+    // declares the reciprocal scope; every address act is gated against the
+    // recipient's live scopes; the recipient narrows or withdraws its own.
+    const consent = bindConsentScopes(ctx, { resolveParent });
+    for (const tool of consentTools(consent, { defineTool })) ctx.tools.register(tool);
+
     const service = {
       provider,
       backgroundMode,
@@ -94,6 +110,14 @@ export function specialistsPlugin(opts = {}) {
         const p = roster.byId.get(name);
         return p ? composePersona(p) : undefined;
       },
+      /**
+       * MA-3: a parent's children as the ENFORCER has them recorded. Offered
+       * as a convenience for an operator or auditor, never as an obligation —
+       * the parent is informed by injection whether or not it ever asks.
+       */
+      childrenOf: (parentSessionId) => childState.childrenOf(String(parentSessionId)),
+      /** MA-4: the consent scopes over one Subject's attention. */
+      consentScopesOver: (sessionId) => consent.scopesOver(String(sessionId)),
     };
 
     for (const p of roster.personas) {

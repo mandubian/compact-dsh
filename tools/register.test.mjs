@@ -40,7 +40,41 @@ test('the auditor attests a conforming synthetic session', () => {
   const att = audit(log);
   assert.equal(att.verdict, 'conforming', JSON.stringify(att.findings));
   assert.equal(att.checked.asks, 1);
-  assert.ok(att.reliesOn.includes('NOT tamper-evident'), 'the attestation names its trust basis (I-8)');
+  assert.ok(att.reliesOn.includes('no chain sidecar was given'), 'the attestation names its trust basis (I-8)');
+  assert.equal(att.checked.chain, 'not checked', 'an unverified integrity claim is never implied');
+});
+
+test('the auditor verifies the record offline when given the chain, and refuses a rewritten one (I-2/I-7)', async () => {
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { extendChain, genesisHash } = await import('../packages/record/src/chain.js');
+
+  const log = [
+    { seq: 0, type: 'turn/start', time: 1, data: { turn: 1 } },
+    { seq: 1, type: 'approval/asked', time: 2, data: { id: 'a1' } },
+    { seq: 2, type: 'approval/decided', time: 3, data: { id: 'a1', outcome: 'allowed-once' } },
+    { seq: 3, type: 'turn/end', time: 4, data: { turn: 1 } },
+  ];
+  const dir = mkdtempSync(join(tmpdir(), 'compact-audit-chain-'));
+  const chainFile = join(dir, 'sess-audit.chain');
+  writeFileSync(chainFile, extendChain(genesisHash('sess-audit'), 0, log).map(l => JSON.stringify({ seq: l.seq, h: l.h })).join('\n') + '\n');
+
+  const good = audit(log, chainFile);
+  assert.equal(good.verdict, 'conforming', JSON.stringify(good.findings));
+  assert.equal(good.checked.chain, 'verified');
+  assert.match(good.reliesOn, /verified here/);
+  assert.match(good.chainHead, /^[0-9a-f]{64}$/);
+
+  // the same log with one decision rewritten — the shape the log-only auditor
+  // cannot distinguish from the truth
+  const rewritten = log.map(e => e.seq === 2 ? { ...e, data: { id: 'a1', outcome: 'rejected' } } : e);
+  const bad = audit(rewritten, chainFile);
+  assert.equal(bad.verdict, 'violations');
+  assert.equal(bad.checked.chain, 'BROKEN');
+  const finding = bad.findings.find(f => f.rule === 'I-2');
+  assert.equal(finding.severity, 'error');
+  assert.match(finding.detail, /broken-link/);
 });
 
 test('the auditor detects a seeded violation: a decision from nowhere', () => {

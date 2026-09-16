@@ -10,14 +10,19 @@
 //   - the approval pair is turn-enclosed (the host's own discipline)
 //   - command/run / command/done are paired
 //
-// Honesty (declared, I-8): the dsh session log is complete but NOT
-// tamper-evident — this auditor verifies continuity and conformance of what
-// it is given; integrity verification waits for the Phase 8 hash-chained
-// decorator. The attestation says which it is relying on.
+// INTEGRITY (I-2/R-7, Phase 6). Given the session's chain sidecar
+// (`--chain <id>.chain`), the auditor verifies the log against its committed
+// links here, offline, with no cooperation from the Enforcer — which is the
+// whole point of I-7: a verifier that had to ask the Enforcer whether the
+// Enforcer had behaved would verify nothing. Without a chain the auditor
+// still runs, and says plainly that it is relying on log completeness alone.
+// The attestation always names which basis it used.
 //
-// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--quiet]
+// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--quiet]
 // Exit 0 with a per-session attestation on stdout, exit 1 with findings.
 import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
+import { genesisHash, verifySlice, RecordIntegrityError } from '../packages/record/src/chain.js';
 
 const OUTCOMES = new Set(['allowed-once', 'rejected', 'cancelled', 'unavailable']);
 
@@ -27,7 +32,8 @@ function parseLog(file) {
   return text.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
 }
 
-export function audit(events) {
+export function audit(events, chainFile) {
+  const chain = chainFile ? checkChain(chainFile, events) : null;
   const findings = [];
   const askedIds = new Map();   // approval id -> seq
   const openTurns = [];
@@ -98,20 +104,55 @@ export function audit(events) {
     findings.push({ seq: lastSeq, type: 'turn/end', severity: 'warning', rule: 'D-3', detail: 'the log ends inside an open turn (a crash tail — legal mid-session, a finding in an export)' });
   }
 
+  if (chain?.finding) findings.push(chain.finding);
+
   const errors = findings.filter(f => f.severity === 'error');
   return {
     verdict: errors.length === 0 ? 'conforming' : 'violations',
-    checked: { events: events.length, asks: askedIds.size },
-    reliesOn: 'log completeness only — the dsh session log is NOT tamper-evident; integrity verification waits for the Phase 8 hash-chained decorator (I-2 declared debt)',
+    checked: { events: events.length, asks: askedIds.size, chain: chain ? (chain.ok ? 'verified' : 'BROKEN') : 'not checked' },
+    ...(chain?.ok ? { chainHead: chain.head } : {}),
+    reliesOn: chain
+      ? `the hash chain in ${chain.file} (session ${chain.sessionId}), verified here — the log's integrity was checked ` +
+        `offline, without the Enforcer's cooperation (I-2/R-7); the links themselves are unsigned (I-1 declared debt)`
+      : 'log completeness only — no chain sidecar was given, so this run verifies continuity and conformance but NOT ' +
+        'integrity; pass --chain <id>.chain to verify the record has not been rewritten (I-2)',
     findings,
   };
+}
+
+/**
+ * Verify a log against its committed chain. A break is an ERROR finding, not a
+ * warning: a record that cannot be verified is not evidence (I-2, R-7).
+ */
+function checkChain(file, events) {
+  const sessionId = basename(file).replace(/\.chain$/, '');
+  const links = new Map();
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (line === '') continue;
+    try {
+      const rec = JSON.parse(line);
+      if (typeof rec?.seq === 'number' && typeof rec?.h === 'string') links.set(rec.seq, rec.h);
+    } catch { /* a torn tail line commits to nothing */ }
+  }
+  try {
+    verifySlice({ sessionId, firstSeq: 0, events, links });
+    return { file, sessionId, ok: true, head: links.get(events.length - 1) ?? genesisHash(sessionId), finding: null };
+  } catch (e) {
+    if (!(e instanceof RecordIntegrityError)) throw e;
+    return {
+      file, sessionId, ok: false, head: null,
+      finding: { seq: e.seq, type: 'chain', severity: 'error', rule: 'I-2', detail: `${e.kind}: ${e.message}` },
+    };
+  }
 }
 
 function main() {
   const file = process.argv[2];
   const quiet = process.argv.includes('--quiet');
-  if (!file) {
-    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--quiet]');
+  const chainIdx = process.argv.indexOf('--chain');
+  const chainFile = chainIdx > 0 ? process.argv[chainIdx + 1] : undefined;
+  if (!file || (chainIdx > 0 && !chainFile)) {
+    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--quiet]');
     process.exit(2);
   }
   let events;
@@ -121,7 +162,7 @@ function main() {
     console.error(`auditor: cannot read ${file}: ${e.message}`);
     process.exit(2);
   }
-  const attestation = { session: file, ...audit(events) };
+  const attestation = { session: file, ...audit(events, chainFile) };
   if (!quiet) console.log(JSON.stringify(attestation, null, 2));
   const errors = attestation.findings.filter(f => f.severity === 'error');
   if (errors.length > 0) {

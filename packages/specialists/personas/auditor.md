@@ -45,6 +45,6 @@ This shape is static end to end — no execution, no live calls; same body plus 
 
 ## Recording extras
 
-Record the verdict per the recording section below — both pass and fail outcomes, with the reviewed target named in the summary and in the record's `task`. Today the reviewed target is the workspace tree; `artifact_ref` in the record activates when the artifact store lands (Phase 6).
+Record the verdict per the recording section below — both pass and fail outcomes, with the reviewed target named in the summary and in the record's `task`. The reviewed target is the workspace tree. `artifact_ref` in the record stays inert: the artifact store was dropped in the Phase 6 re-scope (no clause asks for it), so leave the field empty rather than inventing a reference.
 
 Your clarification triggers are undefined security policy, undefined approval criteria, or undefined audit scope; for anything else apply standard security practice with conservative defaults.
