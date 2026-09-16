@@ -27,6 +27,7 @@ const ALL_SERVICES = {
   'compact-specialists': { name: 'specialists' },
   'compact-capability-gate': { name: 'capability-gate' },
   'compact-record': { name: 'record' },
+  'compact-self-model': { name: 'self-model' },
   'compact-allowlist-gate': { name: 'allowlist-gate' },
   'compact-remote-access': { name: 'remote-access' },
 };
@@ -106,7 +107,7 @@ test('the blessed composition: registry materialized, attestation roundtrips', (
   const att = constitution.attestation();
   assert.equal(att.compact.digest, COMPACT_DIGEST);
   assert.deepEqual(att.verified.missing, []);
-  assert.deepEqual(att.verified.requires, ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record']);
+  assert.deepEqual(att.verified.requires, ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model']);
   assert.deepEqual(att.registeredRules.sort(), Object.keys(snap).sort());
   assert.ok(att.gaps.length >= 3, 'the gaps are declared (I-8), never silent');
   for (const gap of att.gaps) assert.ok(DECLARED_GAPS.includes(gap));

@@ -41,7 +41,10 @@ export const name = 'compact-constitution';
 // The capability gate (compact-capability-gate) joined in Phase 6: it is what
 // binds SCH-1 by enforcing the capability's ABSENCE, and it is the general
 // mechanism for Part VI's "cannot be dodged by undeclared use" (D-8).
-export const inject = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record'];
+// The self-model (compact-self-model) joined next: R-1's attestation and
+// R-13's inquiry are the Subject's own half of the bargain — what the governed
+// party may know about itself and about whoever is acting on it.
+export const inject = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model'];
 
 const REGISTER = JSON.parse(readFileSync(new URL('../register.json', import.meta.url), 'utf8'));
 
@@ -53,7 +56,7 @@ export const DECLARED_GAPS = [
   'the record is tamper-EVIDENT but not tamper-proof, and its links are unsigned: the chain detects a rewrite, it cannot prevent one, and no identity key signs it (I-1 debt, declared — I-2/R-7 themselves are enforced by compact-record)',
 ];
 
-export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record'];
+export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model'];
 
 export function apply(ctx, config) {
   // 1. boot verification (F-5)

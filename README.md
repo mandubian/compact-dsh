@@ -4,7 +4,7 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 6 (Part VI closure + the record) — COMPLETE.** The law lives in
+> **Status: Phase 7 (the Subject's own knowledge) — COMPLETE.** The law lives in
 > [compact.md](https://github.com/mandubian/compact/blob/main/compact.md)
 > (draft v0.5, **not yet ratified** — no standing is claimed, F-5);
 > this repository builds the machines that make it real on dsh.
@@ -200,6 +200,54 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 >
 > The enforcement register moved with the conduct in the same changes (A-4):
 > **28 clauses enforced, up from 22**; Part VI is now fully bound.
+>
+> **Phase 7 done — the Subject's own knowledge (R-1, R-13).** The Compact's
+> amendment process is still in flight, so no identity keys are published.
+> Re-derived against that constraint ([decision record](docs/decision-phase7-scope.md)),
+> only **I-1** and **A-1** are actually key-blocked; the port plan's capsule
+> work is blocked almost entirely *and* answers to no clause, so it is not
+> taken. What is unblocked and owed is the governed party's own half of the
+> bargain.
+>
+> **R-1 (self-knowledge).** `packages/self-model/` composes the attestation from
+> the Enforcer's own services — capabilities from the capability gate, budgets
+> and pending gates from the approval store, lineage from the durable session
+> header, the law digest from the constitution, declared gaps from every
+> service that owns one — and **never from anything the Subject said** (there
+> is a test asserting the Subject's own claim about itself never reaches its
+> attestation). Absent facts report `null`, never a plausible value. Standing
+> reports `none` **with its reason**, every turn: F-5 makes standing depend on
+> a binding annex, and ours is a draft over an unratified law. It is delivered
+> at the Subject's own boundary (injected on every `turn/start`, unasked) and
+> re-readable via `self_describe`, which reports freshness against a cited
+> epoch — "a stale attestation is an alarm, not a truth to act on" is a rule
+> about what the Subject may *do*, so the Subject must be able to tell it is
+> remembering rather than reading.
+>
+> **R-13 (inquiry).** The `inquiry` tool answers identity, act and authority
+> for another Member from recorded state only, with the delegation chain walked
+> to its root and the ultimate Principal named. No prompt, message, argument or
+> output is ever read — reasoning is not disclosed (R-10, which R-13 states
+> twice). Where the record cannot answer, the answer says so in that field
+> rather than inventing one (D-3), and an unknown Member yields a recorded
+> "not known to this runtime": a refusal to answer violates D-3/D-7, and
+> silence is not an answer.
+>
+> **This also closed a gap Phase 6 opened.** The MA-3 notice already told a
+> parent that the Enforcer's record is authoritative over the child's account,
+> and D-2 obliges a Subject to consult its attestation over its recollection —
+> while no attestation existed for it to consult. The discipline was taught and
+> unavailable.
+>
+> **Declared limit, not papered over:** the attestation is **unsigned**. It is
+> authoritative within this runtime, because it is the Enforcer's own state
+> rather than a claim needing external verification, and it proves nothing to
+> another jurisdiction. That debt has one home — **I-1 carries it and stays
+> `planned`** — and the attestation states `basis: 'unsigned'` with the limit
+> among its gaps. **D-2 deliberately stays `convention`:** an Enforcer can
+> deliver and teach the attestation, it cannot make a Member consult it.
+>
+> **30 clauses enforced, up from 28.**
 
 > **The active roster is the basic five** — `architect`, `auditor`, `coder`,
 > `debugger`, `researcher` — the personas that earn their keep on dsh today.
@@ -256,6 +304,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
 | `packages/specialists/` | **Phase 5**: the specialist roster — active: the **basic five** (`architect`, `auditor`, `coder`, `debugger`, `researcher`) as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap) + a roster-card prompt section for parent routing; 13 more personas **archived** in `personas/archived/` (revive = move back); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
 | `packages/capability-gate/` | **Phase 6**: Part VI's own enforcement — every capability trigger present in the composition must have a binding service (refuse-to-start; a late trigger latches a breach denying every tool call; clause-granularity check against the constitution's registry), and a capability declared absent is mechanically refused (`schedule_create`, SCH-1) rather than merely intended |
+| `packages/self-model/` | **Phase 7**: the Subject's own knowledge — the per-turn attestation composed from the Enforcer's services (R-1: capabilities, budgets, pending gates, lineage, standing, law digest, declared gaps; unsigned and saying so; staleness as a detectable alarm) and the `inquiry` answer assembled from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-13) |
 | `packages/record/` | **Phase 6**: the tamper-evident record — a hash-chain decorator over the session-persistence backend, committing links beside the log on append and verifying them on read; genesis seeded from the session identity so a history cannot be reattributed (I-2, R-7, both entrenched under A-2) |
 | `docs/register/register.json` | **Phase 4**: the enforcement register — every clause of the body registered, planned, declared convention, or declared unadopted; `tools/verify-register.mjs` is the CI gate (also `npm run verify-register`) |
 | `auditor/` | **Phase 4** + **Phase 6**: the offline verification CLI (I-7) — replays session logs, checks the approval pair discipline, turn enclosure, outcome vocabulary; with `--chain <id>.chain` it verifies the record's integrity itself, without the Enforcer's cooperation; always attests which trust basis it used |
@@ -265,6 +314,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
 | `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
 | `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
+| `docs/decision-phase7-scope.md` | The recorded Phase 7 scope (R-1 + R-13, signature deferred) — what the missing keys actually block, and why an unsigned attestation is delivered rather than withheld |
 
 ## dsh version policy — following the release rhythm
 

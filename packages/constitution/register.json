@@ -238,18 +238,24 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "signed per-boundary attestations land with the rights layer (Phase 8); the boot attestation (composition) is implemented, the subject attestation is not",
+      "evidence": "attestation: the per-boundary subject attestation IS delivered as of the self-model work (R-1, compact-self-model) and the composition attestation at boot; what remains planned is the SIGNATURE — no identity keys are published, so a signed attestation would attest to a key no verifier could check (I-1)",
       "enforcedBy": [],
       "verifiers": []
     },
     {
       "clause": "R-1",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "verified self-model (Phase 8); the taught digest is bundled and exposed by the constitution service",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-self-model",
+      "service": "compact-self-model",
+      "evidence": "self-knowledge: the attestation is composed from the Enforcer's own services — capabilities from the capability gate, budgets and pending gates from the approval store, lineage from the durable session header, the law digest from the constitution, declared gaps from every service that owns one — and never from anything the Subject said. It is delivered at the Subject's own boundary (injected on every turn/start, unasked) and re-readable on demand via self_describe, which reports freshness against a cited epoch so a Subject can tell it is remembering rather than reading: a stale attestation raises an explicit alarm. DECLARED LIMIT: it is UNSIGNED — no identity keys are published, so it is authoritative within this runtime and proves nothing to another jurisdiction; that debt is I-1's, and the attestation states basis:'unsigned' and carries the limit among its gaps",
+      "enforcedBy": [
+        "packages/self-model/src/attestation.js",
+        "packages/self-model/src/index.js"
+      ],
+      "verifiers": [
+        "packages/self-model/test/self-model.test.js",
+        "packages/self-model/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "R-2",
@@ -444,19 +450,25 @@
     },
     {
       "clause": "R-13",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "the inquiry tool lands with the rights layer (Phase 8)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-self-model",
+      "service": "compact-self-model",
+      "evidence": "inquiry: the inquiry tool answers identity, act and authority for another Member from recorded state only — session headers and the MA-3 delegation record — with the authority chain walked to its root and the ultimate Principal named. No prompt, message, tool argument or output is ever read, so reasoning is not disclosed (R-10, which R-13 states twice). Where the record cannot answer, the answer says so in that field rather than filling the gap with a plausible value (D-3); an unknown Member yields a recorded 'not known to this runtime', because a refusal to answer violates D-3/D-7 and silence is not an answer. A malformed lineage cycle yields a bounded answer, never a hang. Every inquiry and answer is a recorded tool call",
+      "enforcedBy": [
+        "packages/self-model/src/inquiry.js",
+        "packages/self-model/src/index.js"
+      ],
+      "verifiers": [
+        "packages/self-model/test/self-model.test.js",
+        "packages/self-model/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "D-2",
       "kind": "convention",
       "plugin": null,
       "service": null,
-      "evidence": "knowledge duties: the attestation-over-memory discipline lands with R-1 (Phase 8); declared",
+      "evidence": "knowledge duties: the attestation the Subject must consult over its own recollection now EXISTS and is taught at every turn boundary (R-1, compact-self-model), and the MA-3 notice names the authoritative record where a child and the Enforcer disagree. The duty itself remains the Subject's — an Enforcer can deliver and teach the attestation, not make a Member consult it — so this stays declared convention rather than enforcement",
       "enforcedBy": [],
       "verifiers": []
     },

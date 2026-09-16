@@ -29,6 +29,7 @@ import * as remoteAccess from 'compact-dsh-remote-access';
 import * as allowlistGate from 'compact-dsh-allowlist-gate';
 import * as capabilityGate from 'compact-dsh-capability-gate';
 import * as recordPlugin from 'compact-dsh-record';
+import * as selfModelPlugin from 'compact-dsh-self-model';
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -111,6 +112,7 @@ async function bootBlessed(opts = {}) {
   capabilityGate.apply(ctx, {});
   ctx.plugin(JsonlSessionPersistence, { root: mkdtempSync(join(tmpdir(), 'compact-const-sessions-')), compression: 'none' });
   recordPlugin.apply(ctx, { store: new recordPlugin.MemoryChainStore() });
+  selfModelPlugin.apply(ctx, {});
   if (typeof ctx.start === 'function') await ctx.start();
   for (let i = 0; i < 500 && (!ctx.tools || ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-allowlist-gate', 'compact-remote-access'].some(s => ctx.get(s) === undefined)); i++) {
     await new Promise(r => setImmediate(r));
@@ -131,7 +133,7 @@ test('composed: the blessed composition boots under the constitution', async () 
   assert.ok(att.registeredRules.includes('MA-2'), 'bounded delegation is registered (the Phase 5 roster)');
   assert.ok(att.gaps.some(g => g.includes('NOT yet ratified')), 'the standing honesty is in every attestation');
   // every required enforcement service resolved
-  for (const s of ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record']) {
+  for (const s of ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model']) {
     assert.notEqual(ctx.get(s), undefined, `${s} present`);
   }
 });
@@ -164,6 +166,7 @@ test('composed: applying the constitution before the async sandbox service mount
   capabilityGate.apply(ctx, {});
   ctx.plugin(JsonlSessionPersistence, { root: mkdtempSync(join(tmpdir(), 'compact-const-sessions-')), compression: 'none' });
   recordPlugin.apply(ctx, { store: new recordPlugin.MemoryChainStore() });
+  selfModelPlugin.apply(ctx, {});
   // before start, the sandbox provider has not mounted (its ctx.inject waits
   // for the tools service) — the composition does not enforce the floor yet
   assert.throws(() => constitutionApply(ctx, {}), /compact-sandbox.*refuses to start/);

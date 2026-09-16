@@ -15,13 +15,13 @@ applies from the first enforced phase onward).
   *planned*, not yet implemented:
   | Clause | Planned enforcement | Verifier (planned) |
   |---|---|---|
-  | I-1 identity & keys | `dsh-identity` (undrafted) | signature checks over attestations |
+  | I-1 identity & keys | blocked: the Compact has published no identity keys | signature checks over attestations, once keys exist |
   | I-2 the record | ENFORCED as of Phase 6 — see §2 | the offline auditor's `--chain` verification |
-  | I-3 attestation | `dsh-rights` (undrafted) | attestation signature + freshness |
+  | I-3 attestation | the per-boundary attestation IS delivered (R-1, `compact-self-model`); only the SIGNATURE is planned | attestation signature, once keys exist |
   | I-6 contestation | `dsh-rights` amendment queue | petition-lifecycle audit |
   | I-7 verification | `auditor/` CLI (port plan Phase 4) | the auditor itself |
   | I-8 degradation honesty | constitution service surface | degradation notices in log |
-  | R-1–R-13 rights | the plugins above + `dsh-rights` | auditor invariants |
+  | R-1–R-13 rights | R-1 and R-13 enforced by `compact-self-model`; R-8/R-11/R-12 remain planned | auditor invariants |
   | D-1/D-5–D-8 duties | gates + attestation teaching + register | auditor invariants |
   Enforced (see §2 for the register):
   | Clause | Enforced by | Verifier |
@@ -82,6 +82,8 @@ Highlights (full board in the register file):
 | CF-2 (supply-chain honesty) | `compact-sandbox-docker` — digest-keyed acquisition history, undeclared image refuses the boot, build approvals never a run-time entitlement | `packages/sandbox-docker/test/provenance.test.js`, `…/composed.docker.test.js` |
 | SCH-1 (no unsupervised escalation) | `compact-capability-gate` — the capability is declared ABSENT and the absence is enforced (boot refusal, breach latch, `schedule_create` denied) | `packages/capability-gate/test/capability-gate.test.js` |
 | I-2 / R-7 (the record) | `compact-record` — a hash chain committed beside the log on append and verified on read; genesis seeded from the session identity | `packages/record/test/chain.test.js`, `…/composed.dsh.test.js` |
+| R-1 (self-knowledge) | `compact-self-model` — the attestation composed from the Enforcer's services, delivered at every turn boundary, with staleness as a detectable alarm; UNSIGNED and declared so | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
+| R-13 (inquiry) | `compact-self-model` — identity/act/authority from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-10) | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
 
 Declared gaps (in every boot attestation): the Compact is draft v0.5 and
 **not yet ratified** (no standing claimed); signature verification is

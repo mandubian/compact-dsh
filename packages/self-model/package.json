@@ -1,0 +1,19 @@
+{
+  "name": "compact-dsh-self-model",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — the Subject's own knowledge: the per-turn attestation composed from the Enforcer's services (R-1) and the inquiry answer assembled from recorded state (R-13).",
+  "main": "src/index.js",
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "devDependencies": {
+    "compact-dsh-approval": "0.4.1"
+  }
+}
