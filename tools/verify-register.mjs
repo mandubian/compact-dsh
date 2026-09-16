@@ -18,7 +18,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CLAUSES, clauseOf, clauseIds, verifyBody } from '../packages/constitution/src/body.js';
+import { CLAUSES, clauseOf, clauseIds, verifyBody, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const argRegister = process.argv.find((a, i) => process.argv[i - 1] === '--register');
@@ -27,7 +27,8 @@ const registerPath = argRegister ?? new URL('../docs/register/register.json', im
 const failures = [];
 const fail = (msg) => failures.push(msg);
 
-// 0. the bundled body is intact
+// 0. the bundled body is intact — verified against the LITERAL pin in body.js,
+// not against itself (a digest derived from the file it pins verifies nothing)
 try {
   verifyBody(readFileSync(new URL('../packages/constitution/compact/compact.md', import.meta.url), 'utf8'));
 } catch (e) {
@@ -52,6 +53,14 @@ try {
   register = JSON.parse(canonical);
 } catch (e) {
   fail(`docs/register/register.json does not parse: ${e.message}`);
+}
+
+// 1b. the register's declared pin is the body's digest — two pins that can
+// drift apart are one pin fewer than they look (A-4)
+if (register && register.meta?.compactDigest !== COMPACT_DIGEST) {
+  fail(
+    `the register declares Compact digest ${register.meta?.compactDigest ?? '(none)'} but the adopted body is ` +
+    `${COMPACT_DIGEST} — the register maps clauses of a different law; re-pin both together or revert the body`);
 }
 
 const byClause = new Map();

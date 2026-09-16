@@ -1,7 +1,23 @@
-// The adopted Compact body, mechanically: loaded, hashed, and parsed from
-// the bundled text — the clause list derives from the law itself, so the
+// The adopted Compact body, mechanically: loaded, VERIFIED AGAINST A PINNED
+// DIGEST, and parsed — the clause list derives from the law itself, so the
 // registry can never drift from it (F-7: nothing is law that does not trace
 // to the body; the register traces to the body's own clause headers).
+//
+// WHY THE DIGEST IS A LITERAL. It was previously computed from the bundled
+// file (`sha256(COMPACT_BODY)`), which made every check a tautology: each call
+// site compared sha256(file) against sha256(the same file), so a body swapped
+// on disk verified perfectly against itself and the law changed silently. A
+// pin that is derived from the thing it pins is not a pin. The constant below
+// is the independent commitment, and the bundled text must match it.
+//
+// Changing it is a deliberate, reviewed act: a new body means a new law, and
+// the composition refuses to start until someone re-pins here and in the
+// register's `meta.compactDigest` (which `verify-register` cross-checks). That
+// refusal IS the re-blessing event — the alternative is silent drift.
+//
+// This also has to hold before signatures can mean anything (I-1): a signature
+// is over a digest, and a signature check built on a self-derived digest would
+// verify the signature of whatever file it was handed.
 //
 // Honesty (recorded in the attestation's gaps, never silent): the bundled
 // text is Compact draft v0.5 — NOT YET RATIFIED — and the Compact has
@@ -14,8 +30,13 @@ import { readFileSync } from 'node:fs';
 export const COMPACT_SOURCE_URL = 'https://github.com/mandubian/compact/blob/main/compact.md';
 export const COMPACT_SOURCE_REVISION = 'main @ 2026-09 adoption (sha256 pinned below)';
 
+/**
+ * The pinned digest of the adopted body. A LITERAL, never derived — see above.
+ * Compact draft v0.5, adopted 2026-09.
+ */
+export const COMPACT_DIGEST = '8564175463bd0d9c6cf5c93171e3e67a20944c18938aa90d44248b795315e93c';
+
 export const COMPACT_BODY = readFileSync(new URL('../compact/compact.md', import.meta.url), 'utf8');
-export const COMPACT_DIGEST = createHash('sha256').update(COMPACT_BODY).digest('hex');
 
 /** The boot-verification predicate, exported pure for the tests. */
 export function verifyBody(text, expectedDigest = COMPACT_DIGEST) {

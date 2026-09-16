@@ -77,8 +77,20 @@ export function apply(ctx, config) {
     );
   }
 
-  // 3. the rule registry, materialized from the bundled register
+  // 2b. the register's own declared pin must be the body's digest. The register
+  // is the map from clauses to conduct (A-4); a register that describes a
+  // different law than the one loaded maps nothing, and two pins that can drift
+  // apart are one pin fewer than they look.
   const register = config?.register ?? REGISTER;
+  const declaredPin = register?.meta?.compactDigest;
+  if (declaredPin !== COMPACT_DIGEST) {
+    throw new Error(
+      `constitution: the enforcement register declares Compact digest ${declaredPin ?? '(none)'} but the adopted body is ` +
+      `${COMPACT_DIGEST} — the register maps clauses of a law this composition is not running; refusing to start (A-4, F-5)`,
+    );
+  }
+
+  // 3. the rule registry, materialized from the bundled register
   const ids = clauseIds();
   const registry = new Map(); // clause -> [entries]
   for (const entry of register.entries) {

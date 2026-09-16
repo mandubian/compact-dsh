@@ -36,6 +36,41 @@ test('the bundled body hashes to the pinned digest, and tampering is detected', 
   assert.throws(() => verifyBody(COMPACT_BODY + '\n<!-- one added line -->'), /does not match its pinned digest.*refusing to start/);
 });
 
+test('the pin is an INDEPENDENT literal, not a digest derived from the body it pins', () => {
+  // A pin computed as sha256(COMPACT_BODY) makes every check a tautology: a
+  // body swapped on disk verifies perfectly against itself. The constant must
+  // therefore be a literal in the source, and it must agree with the register.
+  const source = readFileSync(new URL('../src/body.js', import.meta.url), 'utf8');
+  assert.match(source, new RegExp(`COMPACT_DIGEST\\s*=\\s*'${COMPACT_DIGEST}'`),
+    'COMPACT_DIGEST must be a literal in body.js — a derived pin pins nothing');
+  assert.ok(!/COMPACT_DIGEST\s*=\s*createHash/.test(source), 'the pin must not be computed from the body');
+
+  const register = JSON.parse(readFileSync(new URL('../register.json', import.meta.url), 'utf8'));
+  assert.equal(register.meta.compactDigest, COMPACT_DIGEST, 'the register declares the same law the body is');
+});
+
+test('a clause whose TEXT changed while every header stays put is still refused', () => {
+  // The case nothing caught before: the clause list is identical, so the
+  // register's coverage check sees nothing, and only the digest can tell.
+  const altered = COMPACT_BODY.replace(
+    "The sole exception is this clause's own closed class of declarable",
+    "Exceptions are permitted whenever an Enforcer judges them warranted, including this clause's own closed class of declarable");
+  assert.notEqual(altered, COMPACT_BODY, 'the fixture must actually alter D-4');
+  const headers = (text) => (text.match(/^\*\*[A-Z]{1,4}-\d+ · \[/gm) ?? []).length;
+  assert.equal(headers(altered), headers(COMPACT_BODY), 'the clause list is unchanged — coverage checks are blind here');
+  assert.throws(() => verifyBody(altered), /does not match its pinned digest.*refusing to start/);
+});
+
+test('boot refuses when the register declares a different law than the body (A-4)', () => {
+  const ctx = fakeCtx({ services: ALL_SERVICES });
+  const register = JSON.parse(readFileSync(new URL('../register.json', import.meta.url), 'utf8'));
+  register.meta.compactDigest = 'f'.repeat(64);
+  assert.throws(() => apply(ctx, { register }),
+    /register declares Compact digest f{64} but the adopted body is .*refusing to start \(A-4, F-5\)/);
+  delete register.meta.compactDigest;
+  assert.throws(() => apply(ctx, { register }), /declares Compact digest \(none\)/);
+});
+
 test('the clause list derives from the body: 60+ clauses, forces parsed, cores flagged', () => {
   assert.ok(CLAUSES.length >= 55, `got ${CLAUSES.length}`);
   const ids = clauseIds();
