@@ -115,6 +115,39 @@ test('the blessed composition: registry materialized, attestation roundtrips', (
   assert.ok(ctx.logger.warnings.some(w => w.includes('declared gaps')), 'the gaps are announced at boot, loudly');
 });
 
+// Amendment 0002 gave R-9 a value-scoped limb whose shield turns on a ground
+// declared of record BEFORE the directive. This runtime proves ordering (the
+// compact-record chain) and not authorship, so the limb is exercisable against
+// an honest Enforcer and inert against a dishonest one — and the party holding
+// the proof is the party the shield protects the Member from. That is a gap
+// (I-8), and the gap has to name the law it is a gap in: if the bundled body
+// ever loses the limb, or the declaration ever loses the honesty, this fails.
+test('the value-scoped refusal limb is adopted AND its authorship gap is declared (R-9, amendment 0002)', () => {
+  const body = readFileSync(new URL('../compact/compact.md', import.meta.url), 'utf8');
+  assert.ok(
+    body.includes('The same shield covers refusal grounded in declared values'),
+    'the adopted body carries amendment 0002 — otherwise the gap below describes a law we do not run',
+  );
+  assert.ok(
+    body.includes('never vetoes the act'),
+    'the limb is the narrow middle: a shield, never a veto',
+  );
+
+  const gap = DECLARED_GAPS.find(g => g.includes('value-scoped refusal'));
+  assert.ok(gap, 'the limb is adopted, so its gap is declared — an adopted right with an undeclared gap is I-8 dishonesty');
+  assert.match(gap, /honest Enforcer/, 'the gap says against whom the shield holds');
+  assert.match(gap, /dishonest one/, 'and against whom it does not');
+  assert.match(gap, /ORDERING/, 'what the record does prove');
+  assert.match(gap, /AUTHORSHIP/, 'and what it does not');
+  assert.match(gap, /I-1/, 'and the debt it traces to');
+
+  const ctx = fakeCtx({ services: ALL_SERVICES });
+  assert.ok(
+    apply(ctx, {}).attestation().gaps.includes(gap),
+    'the gap reaches the boot attestation, where the governed party can read it (R-1)',
+  );
+});
+
 test('boot fails on a register entry citing an unknown clause (rogue enforcement, D-8)', () => {
   const ctx = fakeCtx({ services: ALL_SERVICES });
   const register = JSON.parse(readFileSync(new URL('../register.json', import.meta.url), 'utf8'));

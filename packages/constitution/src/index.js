@@ -54,6 +54,11 @@ export const DECLARED_GAPS = [
   'the Compact is draft v0.5 and NOT yet ratified: this composition claims no Compact standing (F-5)',
   'signature verification unimplemented: the Compact has published no amendment keys — the digest is pinned, not signed (I-1 debt, declared)',
   'the record is tamper-EVIDENT but not tamper-proof, and its links are unsigned: the chain detects a rewrite, it cannot prevent one, and no identity key signs it (I-1 debt, declared — I-2/R-7 themselves are enforced by compact-record)',
+  // R-9's value-scoped limb (amendment 0002). The honest statement is neither
+  // "enforced" nor "inert": the shield turns on a ground declared of record
+  // BEFORE the directive, this runtime proves ordering but not authorship, and
+  // the party holding the proof is the party the shield protects against.
+  'R-9\'s value-scoped refusal (amendment 0002) is exercisable against an honest Enforcer and inert against a dishonest one: the record proves a ground\'s ORDERING (the compact-record chain, I-2/R-7) but not its AUTHORSHIP, so a Member cannot demonstrate prior declaration to anyone who does not already trust this Enforcer\'s log (I-1 debt, declared)',
 ];
 
 export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model', 'compact-exit'];

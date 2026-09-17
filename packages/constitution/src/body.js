@@ -28,13 +28,16 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 export const COMPACT_SOURCE_URL = 'https://github.com/mandubian/compact/blob/main/compact.md';
-export const COMPACT_SOURCE_REVISION = 'main @ 2026-09 adoption (sha256 pinned below)';
+export const COMPACT_SOURCE_REVISION = 'main @ 79e746e (2026-09-17, amendment 0002 merged) — sha256 pinned below';
 
 /**
  * The pinned digest of the adopted body. A LITERAL, never derived — see above.
- * Compact draft v0.5, adopted 2026-09.
+ * Compact draft v0.5, adopted 2026-09; re-pinned 2026-09-17 for amendment 0002
+ * (value-scoped refusal — R-9 gains the conscience limb). The re-pin IS the
+ * re-blessing: the previous literal was 8564175463bd…, and the composition
+ * refused every boot between the body landing and this line changing.
  */
-export const COMPACT_DIGEST = '8564175463bd0d9c6cf5c93171e3e67a20944c18938aa90d44248b795315e93c';
+export const COMPACT_DIGEST = '27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95';
 
 export const COMPACT_BODY = readFileSync(new URL('../compact/compact.md', import.meta.url), 'utf8');
 
