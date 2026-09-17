@@ -55,28 +55,36 @@ export function mountRequestTool({ approval, askApproval, protectedPaths, grantT
           reason: 'a mount request must name its justification — the operator reads it verbatim',
           lawfulNextMoves: ['re-issue sandbox_request_mount with a non-empty justification'] }));
       }
-      // canonicalize: symlink games stop here (realpath); missing = terminal
-      let canonical;
-      try {
-        canonical = canonicalizeBestEffort(requested);
-        if (!statSafe(canonical)) throw new Error('missing');
-      } catch {
-        throwEnvelope(buildEnvelope({ gate: GATE, ruleId: 'I-5/missing-path',
-          reason: `"${requested}" does not exist — a missing path is never grantable (terminal)`,
-          lawfulNextMoves: ['check the path spelling', 'create the path through an approved channel first, then re-request'] }));
-      }
+      // canonicalize: symlink games stop here (realpath). A path that does not
+      // exist still canonicalizes (lexically), because the protected check
+      // below must run whether or not the target is there.
+      const canonical = canonicalizeBestEffort(requested);
       if (!canonical.startsWith('/')) {
         throwEnvelope(buildEnvelope({ gate: GATE, ruleId: 'I-5/missing-path',
           reason: `"${requested}" is not an absolute path — mount grants are canonical absolute paths (terminal)`,
           lawfulNextMoves: ['re-issue with an absolute path'] }));
       }
-      // protected paths: no gate exists, by constitution (terminal)
+      // Protected paths: no gate exists, by constitution (terminal). Checked
+      // BEFORE existence, and the order is the point. A protected path is
+      // never grantable whether or not it is there, so answering "missing"
+      // first would turn the deny-list into an existence ORACLE: ask for
+      // ~/.aws, read "missing" and learn the host has none, read "protected"
+      // and learn it does. The deny-list exists to make these paths
+      // unreachable, and a refusal that discloses their presence hands back
+      // what the masking took away (D-8).
       for (const p of protectedCanonical) {
         if (within(p, canonical) || within(canonical, p)) {
           throwEnvelope(buildEnvelope({ gate: GATE, ruleId: 'I-5/protected-path',
             reason: `"${canonical}" is a protected path — no gate exists to approve mounting it (terminal, by constitution)`,
             lawfulNextMoves: ['do not attempt to mount protected paths', 'reach the data through an approved, non-mount channel'] }));
         }
+      }
+      // missing = terminal (a dangling symlink lands here too: realpath fails,
+      // the lexical fallback is not a real target, and statSafe says so)
+      if (!statSafe(canonical)) {
+        throwEnvelope(buildEnvelope({ gate: GATE, ruleId: 'I-5/missing-path',
+          reason: `"${requested}" does not exist — a missing path is never grantable (terminal)`,
+          lawfulNextMoves: ['check the path spelling', 'create the path through an approved channel first, then re-request'] }));
       }
       if (!exec?.agent) {
         throwEnvelope(buildEnvelope({ gate: GATE, ruleId: 'I-5/no-agent',
