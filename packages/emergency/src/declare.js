@@ -113,10 +113,24 @@ export function classifyDeclaration({ scope, priors = [], now = Date.now(), cons
     return { kind: 'renewal', because: 'overlapping', of: overlapping.at(-1) };
   }
   const recent = sameScope
-    .filter(p => p.expiresAt <= now && now - p.expiresAt <= consecutiveWindowMs)
-    .sort((a, b) => a.expiresAt - b.expiresAt);
+    .filter(p => endedAt(p) <= now && now - endedAt(p) <= consecutiveWindowMs)
+    .sort((a, b) => endedAt(a) - endedAt(b));
   if (recent.length > 0) {
     return { kind: 'renewal', because: 'consecutive', of: recent.at(-1) };
   }
   return { kind: 'declaration', because: null, of: null };
+}
+
+/**
+ * When an emergency actually ENDED — revocation if it was cut short, otherwise
+ * its declared expiry.
+ *
+ * Measuring consecutiveness from the original expiry instead would hand back
+ * the laundering path the renewal rule exists to close: revoke early,
+ * re-declare immediately, and the new declaration looks fresh because the
+ * revoked one is still "ending" at a time that has not arrived. Ending an
+ * emergency sooner must never buy a lower threshold for the next one.
+ */
+export function endedAt(declaration) {
+  return declaration.revokedAt ?? declaration.expiresAt;
 }

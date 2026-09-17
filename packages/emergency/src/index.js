@@ -38,10 +38,21 @@
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import {
   ENTRENCHED, NEVER_SUSPENDABLE, FLOOR, mayYield,
-  validateDeclaration, classifyDeclaration,
+  validateDeclaration, classifyDeclaration, endedAt,
 } from './declare.js';
 
-export { ENTRENCHED, NEVER_SUSPENDABLE, FLOOR, mayYield, validateDeclaration, classifyDeclaration };
+export { ENTRENCHED, NEVER_SUSPENDABLE, FLOOR, mayYield, validateDeclaration, classifyDeclaration, endedAt };
+
+/**
+ * Hand callers a detached copy of a record, never the stored object.
+ *
+ * This is not hygiene here, it is the floor check. `suspends` is validated
+ * once at declaration time; a caller holding the live array could push a
+ * floor clause into it afterwards and the emergency would suspend something
+ * that never passed validation. A record that can be edited after it is made
+ * is not a record (D-3).
+ */
+const snapshot = (d) => (d == null ? d : structuredClone(d));
 
 export const name = 'compact-emergency';
 
@@ -80,10 +91,11 @@ export function apply(ctx, config = {}) {
         refused: true, at: now, by: by ?? null, scope: scope ?? null,
         refusals: check.refusals,
       };
-      declarations.push({ ...refused, id: `em_refused_${++n}` });
+      const entry = { ...refused, id: `em_refused_${++n}`, refusals: check.refusals.map(r => ({ ...r })) };
+      declarations.push(entry);
       ctx.logger?.error?.(
         `emergency: [A-8] declaration REFUSED — ${check.refusals.map(r => `${r.rule}: ${r.detail}`).join(' | ')}`);
-      return refused;
+      return snapshot(entry);
     }
 
     const classification = classifyDeclaration({ scope, priors: declarations.filter(d => !d.refused), now, consecutiveWindowMs });
@@ -107,24 +119,27 @@ export function apply(ctx, config = {}) {
       `expires ${new Date(d.expiresAt).toISOString()}` +
       (d.kind === 'renewal' ? ` (RENEWAL of ${d.renewalOf}, ${d.renewalBecause} — A-8 requires a higher threshold than a declaration; this jurisdiction can record that requirement but cannot measure it)` : '') +
       (d.noticeImpractical ? ` [notice claimed impractical: ${d.noticeImpractical.reason} — flagged for review at expiry]` : ''));
-    return { declaration: d };
+    return { declaration: snapshot(d) };
   };
 
   // Every act under a declared emergency is marked on the record (A-8).
   ctx.on?.('tools/pre-execute', async (exec, next) => {
-    const live = active();
-    if (live.length > 0) {
-      try {
-        const d = live.at(-1);
+    try {
+      // A-8 marks "the declaration and every act under IT". An act taken while
+      // two declarations are live is an act under both, so it is marked
+      // against each — attributing it to one would lose which emergency the
+      // act actually ran beneath, which is the fidelity the review depends on.
+      const at = Date.now();
+      for (const d of active(at)) {
         d.acts += 1;
         emergencyActs.push({
           emergency: d.id, scope: d.scope,
           tool: exec?.name ?? 'unknown-tool',
           agent: exec?.agent?.id != null ? String(exec.agent.id) : null,
-          at: Date.now(),
+          at,
         });
-      } catch { /* marking must never block the act */ }
-    }
+      }
+    } catch { /* marking must never block the act */ }
     return next();
   });
 
@@ -157,19 +172,19 @@ export function apply(ctx, config = {}) {
       const d = declarations.find(x => x.id === id && !x.refused);
       if (!d) return { error: `no declaration ${id}` };
       if (d.revokedAt == null) d.revokedAt = now;
-      return { declaration: d };
+      return { declaration: snapshot(d) };
     },
     /** Live emergencies, computed from the clock. */
-    active,
+    active: (now) => active(now).map(snapshot),
     /** May this clause yield to any declaration at all? */
     mayYield,
     /** Is a given clause currently yielded? Floor clauses answer false always. */
     isYielded: (clauseId, now = Date.now()) =>
       mayYield(clauseId) && active(now).some(d => d.suspends.includes(clauseId)),
     /** Every declaration, including refused attempts — refusals are evidence too. */
-    declarations: () => declarations.map(d => ({ ...d })),
+    declarations: () => declarations.map(snapshot),
     /** Acts taken while an emergency was live, marked as such (A-8). */
-    acts: () => emergencyActs.map(a => ({ ...a })),
+    acts: () => emergencyActs.map(snapshot),
     /**
      * Expired emergencies owed a Part V review. A-8 makes the review mandatory
      * and Part V does not exist here, so this queue is surfaced, never drained.
@@ -178,7 +193,7 @@ export function apply(ctx, config = {}) {
       declarations.filter(d => !d.refused && d.reviewedAt == null && !isActive(d, now))
         .map(d => ({
           id: d.id, scope: d.scope, cause: d.cause, kind: d.kind,
-          expiredAt: d.revokedAt ?? d.expiresAt, acts: d.acts,
+          expiredAt: endedAt(d), acts: d.acts,
           noticeImpractical: d.noticeImpractical,
           owed: 'mandatory Part V review of an expired emergency (A-8) — no forum exists in this composition (J-8)',
         })),

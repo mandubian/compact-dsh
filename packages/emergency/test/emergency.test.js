@@ -259,3 +259,75 @@ test('the declared gaps name the unmeasured threshold and the missing forum', as
   assert.ok(service.declaredGaps.some(g => /recorded but not MEASURED/.test(g)));
   assert.equal(DEFAULT_CONSECUTIVE_WINDOW_MS, 24 * 60 * 60 * 1000);
 });
+
+// -- the record cannot be edited after it is made ---------------------------
+
+test('a returned declaration is detached — mutating it cannot smuggle a clause past validation', async () => {
+  const { service } = await boot();
+  const { declaration } = service.declare(OK({ expiresAt: 10_000, now: 0 }));
+
+  // The floor check runs ONCE, at declaration. A caller holding the live array
+  // could push a floor clause in afterwards and suspend something that never
+  // passed validation.
+  declaration.suspends.push('R-12');
+  declaration.expiresAt = 9_999_999;
+  declaration.scope = 'everything';
+
+  const stored = service.declarations().find(d => d.id === declaration.id);
+  assert.deepEqual(stored.suspends, ['I-5'], 'the stored record is untouched');
+  assert.equal(stored.expiresAt, 10_000);
+  assert.equal(stored.scope, 'inbound webhook flood');
+  assert.equal(service.isYielded('R-12', 500), false, 'and the floor still holds');
+});
+
+test('every reader gets its own copy — active, declarations, acts, revoke', async () => {
+  const { service } = await boot();
+  service.declare(OK({ expiresAt: 10_000, now: 0 }));
+  assert.notEqual(service.active(500)[0], service.active(500)[0], 'two reads are two objects');
+  service.active(500)[0].suspends.push('D-1');
+  assert.deepEqual(service.declarations()[0].suspends, ['I-5']);
+
+  const revoked = service.revoke('em_1', 600);
+  revoked.declaration.revokedAt = null;
+  assert.equal(service.declarations()[0].revokedAt, 600, 'a revocation cannot be undone by editing a copy');
+});
+
+// -- ending early must not buy a lower threshold ----------------------------
+
+test('revoke-then-redeclare is a RENEWAL — ending early never resets the threshold', async () => {
+  const { service } = await boot({ consecutiveWindowMs: 1000 });
+  service.declare(OK({ expiresAt: 10_000, now: 0 }));
+  service.revoke('em_1', 100);
+
+  // Measuring consecutiveness from the original expiry would classify this as
+  // fresh, which is the laundering path the renewal rule exists to close.
+  const next = service.declare(OK({ expiresAt: 20_000, now: 200 }));
+  assert.equal(next.declaration.kind, 'renewal');
+  assert.equal(next.declaration.renewalBecause, 'consecutive');
+  assert.equal(next.declaration.renewalOf, 'em_1');
+});
+
+test('a revocation long past the window is still a fresh declaration', async () => {
+  const { service } = await boot({ consecutiveWindowMs: 1000 });
+  service.declare(OK({ expiresAt: 10_000, now: 0 }));
+  service.revoke('em_1', 100);
+  const next = service.declare(OK({ expiresAt: 20_000, now: 5000 }));
+  assert.equal(next.declaration.kind, 'declaration');
+});
+
+// -- an act under two emergencies is an act under both ----------------------
+
+test('concurrent declarations each mark the act — attribution is not lost', async () => {
+  const { ctx, service } = await boot();
+  const now = Date.now();
+  service.declare(OK({ scope: 'webhook flood', expiresAt: now + 60_000, now }));
+  service.declare(OK({ scope: 'upstream outage', expiresAt: now + 60_000, now }));
+  assert.equal(service.active().length, 2);
+
+  await ctx.waterfall('tools/pre-execute', { name: 'bash', arguments: {}, agent: { id: 's1' } }, () => ({ kind: 'pass' }));
+
+  const acts = service.acts();
+  assert.equal(acts.length, 2, 'the act ran beneath both, so it is marked against both');
+  assert.deepEqual(acts.map(a => a.scope).sort(), ['upstream outage', 'webhook flood']);
+  for (const d of service.active()) assert.equal(d.acts, 1);
+});
