@@ -9,6 +9,8 @@ import {
   normalizeProvenanceRecords, checkSupplyChain, networkGrantsFor,
   declaredGapsFor, SupplyChainRefusal, GATE,
 } from '../src/provenance.js';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import { DockerSandboxProvider } from '../src/provider.js';
 import { GrantStore } from 'compact-dsh-approval';
 import * as sandbox from '../src/index.js';
@@ -177,4 +179,56 @@ test('build-approved PATHS never become run-time binds — approval describes th
   });
   const argv = p.confine(['ls'], { mode: 'read-only', workspaceRoot: '/ws' }).argv.join(' ');
   assert.ok(!argv.includes('/opt/toolchain'), 'a build-time path approval is not a mount');
+});
+
+// -- the deny-list is not an existence oracle (ordering, D-8) -----------------
+
+test('a protected path is refused AS PROTECTED whether or not it exists', async () => {
+  const { mountRequestTool } = await import('../src/index.js');
+  const { GrantStore } = await import('compact-dsh-approval');
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+
+  const dir = mkdtempSync(join(tmpdir(), 'compact-protected-'));
+  const present = join(dir, 'present');
+  require('node:fs').mkdirSync(present);
+  const absent = join(dir, 'absent-never-created');
+
+  let asked = 0;
+  const tool = mountRequestTool({
+    approval: { store: new GrantStore() },
+    askApproval: async () => { asked += 1; return 'rejected'; },
+    protectedPaths: [present, absent],
+    grantTtlMs: 60_000,
+  });
+  const agent = { id: 'sess-1', session: { id: 'sess-1' } };
+  const call = (path) => tool.execute({ path, mode: 'ro', justification: 'probing' }, { agent, name: 'sandbox_request_mount', callId: 'c1' })
+    .then(() => null, (e) => String(e.message));
+
+  const onPresent = await call(present);
+  const onAbsent = await call(absent);
+  assert.match(onPresent, /is a protected path/);
+  assert.match(onAbsent, /is a protected path/,
+    'a protected path that does not exist must NOT answer "missing" — that answer is an existence oracle for exactly the paths the deny-list hides');
+  assert.ok(!/does not exist/.test(onAbsent));
+  assert.equal(asked, 0, 'neither reaches the operator');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('an ordinary missing path is still terminally refused as missing', async () => {
+  const { mountRequestTool } = await import('../src/index.js');
+  const { GrantStore } = await import('compact-dsh-approval');
+  const tool = mountRequestTool({
+    approval: { store: new GrantStore() },
+    askApproval: async () => 'rejected',
+    protectedPaths: [],
+    grantTtlMs: 60_000,
+  });
+  const err = await tool.execute(
+    { path: '/definitely/not/a/real/path/xyz', mode: 'ro', justification: 'j' },
+    { agent: { id: 's', session: { id: 's' } }, name: 'sandbox_request_mount', callId: 'c1' },
+  ).then(() => null, (e) => String(e.message));
+  assert.match(err, /does not exist/);
+  assert.match(err, /never grantable/);
 });
