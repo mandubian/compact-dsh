@@ -1,0 +1,19 @@
+{
+  "name": "compact-dsh-exit",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — termination under law and exit: the closed list of lawful grounds (R-8), the obligation ledger discharged or assumed at departure, and departure never blocked by what it owes (R-12).",
+  "main": "src/index.js",
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "devDependencies": {
+    "compact-dsh-approval": "0.4.1"
+  }
+}

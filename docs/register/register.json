@@ -408,12 +408,18 @@
     },
     {
       "clause": "R-8",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "termination under law: lawful reasons + care-handover land with the rights layer (Phase 8)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-exit",
+      "service": "compact-exit",
+      "evidence": "termination under law: request_termination is NEVER refused — it has no denial path at all, because R-8 makes the request unrefusable. Sessions end only through a closed list of five lawful grounds with no escape entry (an 'other' entry would make every termination lawful by construction); a ground outside the list, or a disposal with no declaration on file at all, is recorded as a violation BY THE ENFORCER, attributed to the Enforcer rather than to the Subject that happened to be running. The host's AgentCancelCause is MAPPED rather than adopted — it is a vocabulary about mechanism (who called cancel), where R-8 asks about authority (under what ground) — and 'hook'/'disposed' map to nothing rather than guessing a ground nobody declared. Obligations are not laundered: the R-12 set is settled or recorded at closure",
+      "enforcedBy": [
+        "packages/exit/src/reasons.js",
+        "packages/exit/src/index.js"
+      ],
+      "verifiers": [
+        "packages/exit/test/exit.test.js",
+        "packages/exit/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "R-10",
@@ -441,12 +447,18 @@
     },
     {
       "clause": "R-12",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "exit and succession land with the rights layer (Phase 8)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-exit",
+      "service": "compact-exit",
+      "evidence": "exit and succession: the obligation ledger is READ from the services that hold it — pending gate commitments from the approval store, in-flight delegations from the MA-3 child-state registry — so a departing Member cannot under-report what it owes because it is not asked. Each obligation must leave the ledger discharged or formally assumed by a NAMED successor (an assumption nobody is named for is not an assumption); anything else is an orphan, which is the failure R-8 names when it says in-flight children are transitioned, not orphaned. A departing parent with running children has recorded dependents (continuity of care, D-5). CRUCIALLY, an unsettled ledger does NOT block departure: R-12 forbids making exit impossible or punishable, so the debt is recorded, not charged as a toll — the record is the sanction and the door is not locked. DECLARED GAPS: restitution is an UNREADABLE ledger line (no Part V adjudication exists, so 'nothing recorded' is never reported as 'nothing owed'), and successor jurisdictions are unimplemented (F-6 debt)",
+      "enforcedBy": [
+        "packages/exit/src/ledger.js",
+        "packages/exit/src/index.js"
+      ],
+      "verifiers": [
+        "packages/exit/test/exit.test.js",
+        "packages/exit/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "R-13",
