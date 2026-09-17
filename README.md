@@ -4,7 +4,7 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 8, slice 2 (petition and contestation) — COMPLETE.** The law lives in
+> **Status: Phase 8, slice 3 (the state of exception) — COMPLETE.** The law lives in
 > [compact.md](https://github.com/mandubian/compact/blob/main/compact.md)
 > (draft v0.5, **not yet ratified** — no standing is claimed, F-5);
 > this repository builds the machines that make it real on dsh.
@@ -331,7 +331,49 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > reference design, **not enacted**, so every collision counts alike here rather
 > than being approximated.
 >
-> **At this slice: 35 clauses enforced, up from 32 — the current total.**
+> **At this slice: 35 clauses enforced, up from 32.**
+>
+> **Phase 8, slice 3 done — the state of exception (A-8), and R-5 with it.**
+> The clause opens with the sentence the whole layer defends: *"No emergency
+> suspends this Compact generally."* `packages/emergency/` makes a **bounded**
+> emergency the only kind declarable — scope, recorded cause and fixed expiry
+> are each required, and a declaration missing any one is refused, because an
+> emergency without a scope is general, without a cause cannot be reviewed
+> against its own justification, and without an expiry is what A-8 calls **rule
+> by declaration**.
+>
+> **The floor is wider than entrenchment.** A-8 protects four rights "even
+> temporarily" — exit, refusal, record access, independent verification — and
+> **only R-2 is entrenched**; R-9, R-12 and I-7 are ordinary `[M]` clauses. So
+> the never-yields set is the union, and a composition treating entrenchment as
+> the limit would leave three of the four exposed. Entrenchment itself is
+> **derived from the body's own `(core)` markers** rather than restating A-2's
+> list, so it cannot drift from the law (F-7). A declaration naming any floor
+> clause is refused **whole** — partial admission would let the floor be probed
+> a clause at a time.
+>
+> **Expiry is derived from the clock, never stored** (a state someone must
+> remember to clear outlives its term by neglect). **Consecutive and
+> overlapping declarations are classified mechanically as renewal** — the
+> anti-laundering rule without which a permanent emergency could be held by
+> re-declaring at the first-declaration threshold. Every act under a live
+> declaration is marked on the record, and marking never blocks the act.
+> **There is deliberately no declaration tool on the agent surface**: a Subject
+> that could declare its own emergency could suspend what binds it.
+>
+> **R-5 moves to enforced with it.** An emergency is the one mechanism here
+> that narrows a Subject's capabilities mid-operation, and R-5 requires a
+> narrowing to be *recorded where the Subject can see it* — so it is surfaced
+> in the R-1 attestation the Subject already reads every turn, naming the rule,
+> scope, cause, what yields, when it expires, and the floor nothing reaches.
+>
+> **Two declared gaps:** the mandatory Part V review of expired emergencies has
+> no forum (J-8), so the queue is **surfaced rather than drained** — an
+> unreviewed emergency must look unreviewed; and the heightened renewal
+> threshold is recorded but **not measured**, since no voting or quorum
+> substrate exists (A-1, A-7).
+>
+> **At this slice: 37 clauses enforced, up from 35 — the current total.**
 
 > **The active roster is the basic five** — `architect`, `auditor`, `coder`,
 > `debugger`, `researcher` — the personas that earn their keep on dsh today.
@@ -388,6 +430,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
 | `packages/specialists/` | **Phase 5**: the specialist roster — active: the **basic five** (`architect`, `auditor`, `coder`, `debugger`, `researcher`) as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap) + a roster-card prompt section for parent routing; 13 more personas **archived** in `personas/archived/` (revive = move back); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
 | `packages/capability-gate/` | **Phase 6**: Part VI's own enforcement — every capability trigger present in the composition must have a binding service (refuse-to-start; a late trigger latches a breach denying every tool call; clause-granularity check against the constitution's registry), and a capability declared absent is mechanically refused (`schedule_create`, SCH-1) rather than merely intended |
+| `packages/emergency/` | **Phase 8**: the state of exception — bounded declarations only (scope, cause, fixed expiry), a floor no declaration reaches (entrenchment derived from the body, plus exit/refusal/record/verification), derived expiry, mechanical renewal classification, every act marked, no declaration tool on the agent surface (A-8); the narrowing surfaced in the attestation (R-5) |
 | `packages/petition/` | **Phase 8**: the ungated petition channel, adjudication states with a derived (never stored) term, responses refused unless they carry the I-4 fields plus a motivation, dissent bound to its decision and unremovable (R-11, I-6, A-5), and amendment invitations firing mechanically off the refusal seam at a declared-convention threshold |
 | `packages/exit/` | **Phase 8**: termination under law and exit — five lawful grounds with no escape entry, a disposal with no declared ground recorded as a violation by the Enforcer (R-8); the obligation ledger read from the approval store and the MA-3 registry, each line discharged or assumed by a named successor, and departure **never blocked** by what it owes (R-12) |
 | `packages/self-model/` | **Phase 7**: the Subject's own knowledge — the per-turn attestation composed from the Enforcer's services (R-1: capabilities, budgets, pending gates, lineage, standing, law digest, declared gaps; unsigned and saying so; staleness as a detectable alarm) and the `inquiry` answer assembled from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-13) |

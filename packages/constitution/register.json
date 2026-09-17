@@ -385,12 +385,18 @@
     },
     {
       "clause": "R-5",
-      "kind": "convention",
-      "plugin": null,
-      "service": null,
-      "evidence": "no silent narrowing: nothing in the composition narrows a declared capability mid-operation; declared",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-self-model",
+      "service": "compact-self-model",
+      "evidence": "no silent narrowing: the one mechanism in this composition that narrows a Subject's capabilities mid-operation is a declared state of exception (A-8), and it is surfaced in the R-1 attestation the Subject already reads at every turn boundary — the narrowing names the rule that caused it, its scope, its cause, what yields, when it expires, and the floor no declaration reaches. R-5 requires a narrowing to be 'a declared effect of a named rule of this Compact ... recorded where the Subject can see it', and the attestation is where the Subject can see it; nothing else in the composition reduces a declared capability without passing through a gate whose refusal carries its own envelope",
+      "enforcedBy": [
+        "packages/self-model/src/attestation.js",
+        "packages/emergency/src/index.js"
+      ],
+      "verifiers": [
+        "packages/self-model/test/self-model.test.js",
+        "packages/emergency/test/emergency.test.js"
+      ]
     },
     {
       "clause": "R-7",
@@ -732,12 +738,17 @@
     },
     {
       "clause": "A-8",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "state of exception surface lands with the rights layer (Phase 8)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-emergency",
+      "service": "compact-emergency",
+      "evidence": "state of exception: only a BOUNDED emergency can be declared — scope, recorded cause and fixed expiry are each required, and a declaration missing any of them is refused as the general suspension A-8's first sentence forbids. The never-yields floor is the UNION of two sets, because A-8's four named rights are wider than entrenchment: only R-2 is entrenched, while R-9, R-12 and I-7 are ordinary [M] clauses an emergency still cannot reach even temporarily. The entrenched set itself is DERIVED from the body's own (core) markers rather than restating A-2's list, so it cannot drift from the law (F-7). A declaration naming any floor clause is refused whole, never partially admitted, so the floor cannot be probed. Expiry is DERIVED from the clock, never stored — a state someone must remember to clear outlives its term by neglect, which A-8 calls rule by declaration. Consecutive and overlapping declarations on a scope are classified mechanically as RENEWAL, the anti-laundering rule without which a permanent emergency could be held by re-declaring at the first-declaration threshold. Every act taken while a declaration is live is marked on the record, and marking never blocks the act. There is deliberately NO declaration tool on the agent surface: a Subject that could declare its own emergency could suspend what binds it. 'Where practical' notice is a recorded flag that travels into the expiry review, not an excuse. DECLARED: Part V review of expired emergencies has no forum (J-8) and the queue is surfaced rather than drained; the heightened renewal threshold is recorded but not measured, as no voting or quorum substrate exists (A-1, A-7)",
+      "enforcedBy": [
+        "packages/emergency/src/declare.js",
+        "packages/emergency/src/index.js"
+      ],
+      "verifiers": [
+        "packages/emergency/test/emergency.test.js"
+      ]
     },
     {
       "clause": "MA-1",
