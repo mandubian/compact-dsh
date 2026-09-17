@@ -174,3 +174,31 @@ test('composed: the declared gaps name what this layer is not', async () => {
   assert.ok(service.declaredGaps.some(g => /petition door only, which J-5 distinguishes from the appeal door/.test(g)));
   assert.ok(service.declaredGaps.some(g => /three-series collision split/.test(g) && /NOT enacted/.test(g)));
 });
+
+// -- a refusal must name the rule that actually caused it (R-3, I-4) --------
+
+test('composed: only a NON-CONFORMANCE refusal carries the vacuous-response envelope', async () => {
+  const { tools, agents, service } = await boot();
+  const m = agents.add('m1');
+  await call(tools, 'petition', { target: 'compact', proposal: 'p', reasons: 'r' }, m);
+  const GOOD = { ruleId: 'A-7', reason: 'r', motivation: 'm', lawfulNextMoves: ['x'], outcome: 'rejected' };
+
+  // the non-conformance path: the envelope belongs, and its remedy comes from
+  // the recorded attempt rather than being recomputed
+  const vacuous = service.respond({ id: 'pt_1', response: { ruleId: 'A-7' }, by: 'op' });
+  assert.equal(vacuous.envelope.ruleId, 'R-11/vacuous-response');
+  assert.deepEqual(vacuous.attempt.missing, ['reason', 'lawfulNextMoves', 'motivation']);
+  assert.match(vacuous.envelope.reason, /omits reason, lawfulNextMoves, motivation/);
+
+  // an unknown petition is a different failure and must NOT be stamped with a
+  // clause it never violated
+  const unknown = service.respond({ id: 'pt_999', response: GOOD, by: 'op' });
+  assert.match(unknown.error, /no petition pt_999/);
+  assert.equal(unknown.envelope, undefined, 'naming R-11/vacuous-response here would put the wrong rule on the record');
+
+  // nor is an already-answered petition
+  service.respond({ id: 'pt_1', response: GOOD, by: 'op' });
+  const again = service.respond({ id: 'pt_1', response: GOOD, by: 'op' });
+  assert.match(again.error, /already answered/);
+  assert.equal(again.envelope, undefined);
+});

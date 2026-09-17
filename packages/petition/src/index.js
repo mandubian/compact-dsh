@@ -36,7 +36,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import {
   PetitionRegister, PETITION_TARGETS, PETITION_STATES, DEFAULT_TERM_MS,
-  responseConformance, nonConformingEnvelope, GATE,
+  responseConformance, nonConformingEnvelope, GATE, REQUIRED_RESPONSE_FIELDS,
 } from './petition.js';
 import {
   CollisionCounter, bindRefusalSeam, REFUSAL_EVENT, DEFAULT_INVITATION_THRESHOLD,
@@ -44,7 +44,7 @@ import {
 
 export {
   PetitionRegister, PETITION_TARGETS, PETITION_STATES, DEFAULT_TERM_MS,
-  responseConformance, nonConformingEnvelope, GATE,
+  responseConformance, nonConformingEnvelope, GATE, REQUIRED_RESPONSE_FIELDS,
   CollisionCounter, bindRefusalSeam, REFUSAL_EVENT, DEFAULT_INVITATION_THRESHOLD,
 };
 
@@ -161,7 +161,16 @@ export function apply(ctx, config = {}) {
     /** Answer a petition. Refuses a vacuous response rather than recording one (R-11). */
     respond: ({ id, response, by }) => {
       const result = register.respond({ id, response, by });
-      if (result.error) return { ...result, envelope: nonConformingEnvelope(responseConformance(response).missing) };
+      if (result.error) {
+        // ONLY a non-conformance refusal carries the R-11/vacuous-response
+        // envelope. `register.respond` also refuses an unknown petition and an
+        // already-answered one, and stamping those with this rule would name a
+        // clause that was never violated — which is the precise failure R-3
+        // and I-4 exist to prevent. `attempt` is set on the non-conformance
+        // path alone, and its own `missing` list is the single source of the
+        // remedy the responder is handed.
+        return result.attempt ? { ...result, envelope: nonConformingEnvelope(result.attempt.missing) } : result;
+      }
       // the petitioner is TOLD, rather than left to poll for an answer it is owed
       try {
         const agent = ctx.get?.('agents')?.get?.(result.petition.by);

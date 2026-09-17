@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PetitionRegister, CollisionCounter, responseConformance, nonConformingEnvelope,
-  PETITION_TARGETS, DEFAULT_INVITATION_THRESHOLD, GATE,
+  PETITION_TARGETS, DEFAULT_INVITATION_THRESHOLD, GATE, REQUIRED_RESPONSE_FIELDS,
 } from '../src/index.js';
 
 const GOOD = {
@@ -192,4 +192,23 @@ test('the friction board ranks rules by distinct collisions', () => {
   assert.equal(board[0].ruleId, 'loud');
   assert.equal(board[0].distinctInstances, 3);
   assert.equal(board[0].invited, false);
+});
+
+// -- the remedy handed back must be the whole remedy ------------------------
+
+test('the most vacuous response owes the FULL missing list, not a subset', () => {
+  // The short-circuit for a non-object used to omit `motivation`, so the least
+  // conforming response of all was told to fix three things when four are
+  // required. A wrong remedy is worse than a terse one.
+  for (const bad of [null, undefined, 'a string', 42, []]) {
+    const { conforming, missing } = responseConformance(bad);
+    assert.equal(conforming, false);
+    assert.deepEqual(missing, [...REQUIRED_RESPONSE_FIELDS], `for ${JSON.stringify(bad) ?? 'undefined'}`);
+  }
+});
+
+test('both conformance paths agree on what is required — they cannot drift', () => {
+  assert.deepEqual(responseConformance(null).missing, responseConformance({}).missing);
+  assert.equal(REQUIRED_RESPONSE_FIELDS.length, 4);
+  assert.ok(Object.isFrozen(REQUIRED_RESPONSE_FIELDS));
 });

@@ -54,13 +54,27 @@ export const PETITION_STATES = Object.freeze(['open', 'overdue', 'answered']);
 export const DEFAULT_TERM_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
+ * What a conforming response must carry: the I-4 envelope fields R-11 names,
+ * plus the motivation D-7 and A-5 require for every decision.
+ *
+ * ONE list, because there are two paths through the check below and an
+ * omission from either is a wrong remedy handed to the responder — the
+ * envelope built from `missing` tells them what to fix, and a short list tells
+ * them to fix less than the clause requires.
+ */
+export const REQUIRED_RESPONSE_FIELDS = Object.freeze(['ruleId', 'reason', 'lawfulNextMoves', 'motivation']);
+
+/**
  * Is this a conforming response? R-11 requires the I-4 envelope fields, so a
  * response that names no rule, gives no reason, or leaves no lawful next move
  * is the vacuous one the clause makes detectable.
  */
 export function responseConformance(response) {
   const missing = [];
-  if (!response || typeof response !== 'object') return { conforming: false, missing: ['ruleId', 'reason', 'lawfulNextMoves'] };
+  if (!response || typeof response !== 'object') {
+    // the most vacuous response of all owes the FULL list, not a subset
+    return { conforming: false, missing: [...REQUIRED_RESPONSE_FIELDS] };
+  }
   if (typeof response.ruleId !== 'string' || response.ruleId.trim() === '') missing.push('ruleId');
   if (typeof response.reason !== 'string' || response.reason.trim() === '') missing.push('reason');
   if (!Array.isArray(response.lawfulNextMoves) || response.lawfulNextMoves.length === 0) missing.push('lawfulNextMoves');

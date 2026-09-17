@@ -199,7 +199,7 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > no verifier could check (I-1 debt, declared).
 >
 > The enforcement register moved with the conduct in the same changes (A-4):
-> **28 clauses enforced, up from 22**; Part VI is now fully bound.
+> **At this phase: 28 clauses enforced, up from 22**; Part VI is now fully bound.
 >
 > **Phase 7 done — the Subject's own knowledge (R-1, R-13).** The Compact's
 > amendment process is still in flight, so no identity keys are published.
@@ -247,7 +247,7 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > among its gaps. **D-2 deliberately stays `convention`:** an Enforcer can
 > deliver and teach the attestation, it cannot make a Member consult it.
 >
-> **30 clauses enforced, up from 28.**
+> **At this phase: 30 clauses enforced, up from 28.**
 >
 > **Phase 8, slice 1 done — termination under law and exit (R-8, R-12).** These
 > were owed by machinery already shipped: **MA-1** says a child "is not a
@@ -289,7 +289,7 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > line makes the whole ledger `complete: false`. A blind spot is not a clean
 > bill. Successor jurisdictions are likewise declared unimplemented (F-6 debt).
 >
-> **32 clauses enforced, up from 30.**
+> **At this slice: 32 clauses enforced, up from 30.**
 >
 > **Phase 8, slice 2 done — petition, contestation, dissent (R-11, I-6, A-5).**
 > R-11 is `(core)` and entrenched, and its closing sentence is the argument:
@@ -331,7 +331,7 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > reference design, **not enacted**, so every collision counts alike here rather
 > than being approximated.
 >
-> **35 clauses enforced, up from 32.**
+> **At this slice: 35 clauses enforced, up from 32 — the current total.**
 
 > **The active roster is the basic five** — `architect`, `auditor`, `coder`,
 > `debugger`, `researcher` — the personas that earn their keep on dsh today.
