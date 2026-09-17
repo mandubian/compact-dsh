@@ -4,7 +4,7 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 8, slice 1 (termination and exit) — COMPLETE.** The law lives in
+> **Status: Phase 8, slice 2 (petition and contestation) — COMPLETE.** The law lives in
 > [compact.md](https://github.com/mandubian/compact/blob/main/compact.md)
 > (draft v0.5, **not yet ratified** — no standing is claimed, F-5);
 > this repository builds the machines that make it real on dsh.
@@ -290,6 +290,48 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > bill. Successor jurisdictions are likewise declared unimplemented (F-6 debt).
 >
 > **32 clauses enforced, up from 30.**
+>
+> **Phase 8, slice 2 done — petition, contestation, dissent (R-11, I-6, A-5).**
+> R-11 is `(core)` and entrenched, and its closing sentence is the argument:
+> *"The right to seek change of the law is what makes subjection to it
+> legitimate."* A composition that enforces a great deal and can be asked to
+> change nothing is not a jurisdiction; it is a cage with good documentation.
+>
+> `packages/petition/` makes the right non-decorative in four ways. **The
+> channel is ungated** — it passes through no approval layer, because a channel
+> a gate can close is not a channel and the Member most likely to need it is
+> the one currently being refused. **A vacuous answer does not answer**: a
+> response missing its rule, reason, motivation or the petitioner's lawful next
+> moves is *refused*, not annotated — the petition stays open, its term keeps
+> running, and the attempt is recorded, because a duty you can discharge with
+> an empty answer is not a duty. **The term runs whether or not anyone looks**:
+> `overdue` is derived from the clock, never stored, so it cannot stay `open`
+> forever by neglect. **Invitations fire mechanically** off the refusal seam
+> already on the bus, with no approval step and no way to decline to notice.
+>
+> **Distinct instances is the whole signal.** The counter keys on
+> (rule, operation): one operation blocked forty times is an agent stuck — the
+> LoopGuard's business — while forty different operations blocked by one rule
+> is evidence that law and practice have diverged, which is the legislature's.
+> Counting raw refusals would conflate them and the loudest signal would always
+> be whichever agent looped hardest. A Member's own `flag_collision` counts
+> equally: R-11 does not privilege the Enforcer's view of friction.
+>
+> **Dissent is bound to its decision** (A-5) — stamped with that decision's
+> time, author and outcome, requiring reasons, accumulating rather than
+> replacing, with no operation that removes one. A decision is never
+> overwritten; it is amended by a new petition, so the original stands.
+>
+> **Three declared gaps:** the invitation threshold is a composition convention,
+> **not** the statutory count R-11 names (no statute is enacted, A-7 — calling a
+> config value statutory would be the fraud D-8 guards against); contested
+> *application* has no forum, since I-6 routes it to Part V which does not exist
+> (this is the **petition** door only, which J-5 distinguishes from the appeal
+> door); and amendment 0002's three-series collision split is statute-layer
+> reference design, **not enacted**, so every collision counts alike here rather
+> than being approximated.
+>
+> **35 clauses enforced, up from 32.**
 
 > **The active roster is the basic five** — `architect`, `auditor`, `coder`,
 > `debugger`, `researcher` — the personas that earn their keep on dsh today.
@@ -346,6 +388,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
 | `packages/specialists/` | **Phase 5**: the specialist roster — active: the **basic five** (`architect`, `auditor`, `coder`, `debugger`, `researcher`) as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap) + a roster-card prompt section for parent routing; 13 more personas **archived** in `personas/archived/` (revive = move back); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
 | `packages/capability-gate/` | **Phase 6**: Part VI's own enforcement — every capability trigger present in the composition must have a binding service (refuse-to-start; a late trigger latches a breach denying every tool call; clause-granularity check against the constitution's registry), and a capability declared absent is mechanically refused (`schedule_create`, SCH-1) rather than merely intended |
+| `packages/petition/` | **Phase 8**: the ungated petition channel, adjudication states with a derived (never stored) term, responses refused unless they carry the I-4 fields plus a motivation, dissent bound to its decision and unremovable (R-11, I-6, A-5), and amendment invitations firing mechanically off the refusal seam at a declared-convention threshold |
 | `packages/exit/` | **Phase 8**: termination under law and exit — five lawful grounds with no escape entry, a disposal with no declared ground recorded as a violation by the Enforcer (R-8); the obligation ledger read from the approval store and the MA-3 registry, each line discharged or assumed by a named successor, and departure **never blocked** by what it owes (R-12) |
 | `packages/self-model/` | **Phase 7**: the Subject's own knowledge — the per-turn attestation composed from the Enforcer's services (R-1: capabilities, budgets, pending gates, lineage, standing, law digest, declared gaps; unsigned and saying so; staleness as a detectable alarm) and the `inquiry` answer assembled from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-13) |
 | `packages/record/` | **Phase 6**: the tamper-evident record — a hash-chain decorator over the session-persistence backend, committing links beside the log on append and verifying them on read; genesis seeded from the session identity so a history cannot be reattributed (I-2, R-7, both entrenched under A-2) |

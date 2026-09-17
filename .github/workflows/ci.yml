@@ -34,7 +34,7 @@ jobs:
           HEAD="${{ github.event.pull_request.head.sha }}"
           files="$(git diff --name-only "$BASE" "$HEAD")"
           echo "$files"
-          touches_enforcement=$(echo "$files" | grep -E '^packages/(allowlist-gate|approval|sandbox-docker|remote-access|loopguard|promotion|constitution|specialists|capability-gate|record|self-model|exit)/(src|test)/' | wc -l)
+          touches_enforcement=$(echo "$files" | grep -E '^packages/(allowlist-gate|approval|sandbox-docker|remote-access|loopguard|promotion|constitution|specialists|capability-gate|record|self-model|exit|petition)/(src|test)/' | wc -l)
           touches_register=$(echo "$files" | grep -E '^docs/register/register\.json$' | wc -l)
           if [ "$touches_enforcement" -gt 0 ] && [ "$touches_register" -gt 0 ]; then
             title="${{ github.event.pull_request.title }}"

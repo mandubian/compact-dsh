@@ -438,12 +438,19 @@
     },
     {
       "clause": "R-11",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "petition and amendment machinery lands with the rights layer (Phase 8)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-petition",
+      "service": "compact-petition",
+      "evidence": "petition and amendment (core, entrenched): the channel is UNGATED — the petition tool passes through no approval layer, because a channel a gate can close is not a channel and the Member most likely to need it is the one currently being refused. Both targets R-11 names are available (the Compact itself, and the Enforcer's governing conduct). Every response must carry the I-4 envelope fields plus its motivation; one that does not is REFUSED rather than annotated, so a vacuous response does not discharge the duty — the petition stays open, its term keeps running, and the attempt is recorded. Amendment invitations fire MECHANICALLY off the refusal seam already on the bus: distinct instances are counted per (rule, operation) so one stuck operation retried fifty times is one collision (the LoopGuard's business) while fifty different operations hitting one rule is a legislative signal; there is no approval step to decline. A Member's own flag counts equally — the clause does not privilege the Enforcer's view of friction. DECLARED: the threshold is a composition convention, NOT the statutory count the clause names, because no statute has been enacted (A-7)",
+      "enforcedBy": [
+        "packages/petition/src/petition.js",
+        "packages/petition/src/collisions.js",
+        "packages/petition/src/index.js"
+      ],
+      "verifiers": [
+        "packages/petition/test/petition.test.js",
+        "packages/petition/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "R-12",
@@ -539,12 +546,18 @@
     },
     {
       "clause": "I-6",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "contestation machinery lands with the amendment queue (Phase 8)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-petition",
+      "service": "compact-petition",
+      "evidence": "contestation machinery: a petition channel open to every Member; adjudication states with a stated term where OVERDUE IS DERIVED from the clock rather than stored — a state someone must remember to set is one that stays open forever by neglect, which is how a stated term becomes decorative; decisions carrying a recorded motivation (D-7), refused if they do not; dissent recorded with the decision it dissents from and never removable (A-5); and friction measured and surfaced as amendment invitations (R-11). DECLARED GAP: I-6's last sentence routes contested APPLICATION of the law to Part V, and no adjudicating machinery exists here (J-8) — this builds the petition door only, which J-5 distinguishes from the appeal door",
+      "enforcedBy": [
+        "packages/petition/src/petition.js",
+        "packages/petition/src/index.js"
+      ],
+      "verifiers": [
+        "packages/petition/test/petition.test.js",
+        "packages/petition/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "I-7",
@@ -613,7 +626,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: appeal/petition doors land with the amendment queue",
+      "evidence": "judicature: the PETITION door is built and enforced (R-11, compact-petition); the APPEAL door is not — J-5 distinguishes them and appeal is heard under Part V, which does not exist here (J-8)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -686,12 +699,17 @@
     },
     {
       "clause": "A-5",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "amendment reasons/dissent land with the amendment queue",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-petition",
+      "service": "compact-petition",
+      "evidence": "reasons and dissent: every decision records its motivation as a required field — a response omitting it is refused as non-conforming, so an unmotivated decision cannot be made at all. Every dissent is bound to the decision it dissents from (stamped with that decision's time, author and outcome), requires reasons (a dissent without reasons preserves nothing, and A-5 keeps minority REASONS where fallibility can find them), accumulates rather than replaces, and the register exposes no operation that removes one. A decision is never overwritten — it is amended by a new petition, so the original stands on the record",
+      "enforcedBy": [
+        "packages/petition/src/petition.js"
+      ],
+      "verifiers": [
+        "packages/petition/test/petition.test.js",
+        "packages/petition/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "A-6",
