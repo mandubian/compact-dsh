@@ -1,0 +1,11 @@
+{
+  "name": "compact-dsh-petition",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — the petition channel, adjudication states and terms, recorded motivations and preserved dissent (R-11, I-6, A-5), with amendment invitations firing mechanically off the refusal seam.",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
+  "dependencies": { "compact-envelope": "0.1.0" },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" }
+}

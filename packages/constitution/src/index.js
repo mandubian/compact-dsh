@@ -44,7 +44,7 @@ export const name = 'compact-constitution';
 // The self-model (compact-self-model) joined next: R-1's attestation and
 // R-13's inquiry are the Subject's own half of the bargain — what the governed
 // party may know about itself and about whoever is acting on it.
-export const inject = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model', 'compact-exit'];
+export const inject = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model', 'compact-exit', 'compact-petition'];
 
 const REGISTER = JSON.parse(readFileSync(new URL('../register.json', import.meta.url), 'utf8'));
 
@@ -61,7 +61,7 @@ export const DECLARED_GAPS = [
   'R-9\'s value-scoped refusal (amendment 0002) is exercisable against an honest Enforcer and inert against a dishonest one: the record proves a ground\'s ORDERING (the compact-record chain, I-2/R-7) but not its AUTHORSHIP, so a Member cannot demonstrate prior declaration to anyone who does not already trust this Enforcer\'s log (I-1 debt, declared)',
 ];
 
-export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model', 'compact-exit'];
+export const DEFAULT_REQUIRES = ['compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox', 'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-self-model', 'compact-exit', 'compact-petition'];
 
 export function apply(ctx, config) {
   // 1. boot verification (F-5)
