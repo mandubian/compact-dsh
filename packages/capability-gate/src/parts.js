@@ -59,6 +59,22 @@ export const CAPABILITY_PARTS = [
       'this composition adopts no scheduling capability: no pre-scheduling gate exists, so unattended acts are refused ' +
       'outright rather than armed under an ungated clock (SCH-1)',
   },
+  {
+    part: 'A-4/DYN',
+    trigger: 'the Enforcer permits runtime plugin mutation (dynamic Cordis packages)',
+    clauses: ['A-4'],
+    hostServices: ['dynamicCordisRunner'],
+    hostTools: ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine'],
+    // No service in this composition binds A-4's dynamic-mutation limb. The
+    // lawful posture is ABSENT: a composition that lets a model-facing tool
+    // redefine its own enforcement could not claim the register maps conduct
+    // to law, because the conduct would be editable past the register (A-4).
+    boundBy: null,
+    absentBecause:
+      'this composition adopts no dynamic-plugin capability: nothing binds runtime package mutation to the constitutional ' +
+      'change process, so the model-facing cordis lifecycle tools are refused outright rather than left as an ungated ' +
+      'self-modification surface (A-4); read-only cordis_inspect_* tools are not mutation and are not gated',
+  },
 ];
 
 /** Which parts are triggered in this composition, and which of those are unbound? */

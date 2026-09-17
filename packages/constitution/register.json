@@ -214,7 +214,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "identity and keys: the Compact has published no amendment keys; the digest is pinned, not signed — signature verification lands with the rights layer (Phase 8); the gap is declared in every boot attestation",
+      "evidence": "identity and keys: the Compact has published no amendment keys; the digest is pinned, not signed — signature verification lands with the rights layer (Phase 8); the gap is declared in every boot attestation. PENDING: I-1 identity keys (a ratification-time constant, not a permanent debt — activation is mechanical when the distinct-keyholder set reaches the distributed threshold A-1 requires; a founder-only key set would be the self-judgment J-1 forbids, so keys arrive with external Witnesses, not before)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -696,12 +696,14 @@
       "kind": "enforced",
       "plugin": "compact-constitution",
       "service": "constitution",
-      "evidence": "the Enforcer's code is constitutional: the register maps clauses to conduct; verify-register fails when mapped files move without a register edit",
+      "evidence": "the Enforcer's code is constitutional: the register maps clauses to conduct; verify-register fails when mapped files move without a register edit. The runtime self-modification surface is covered by the same clause, discharged by declared absence: a mounted dynamicCordisRunner refuses the boot, a late-mounted one latches a breach denying every tool call, and the model-facing cordis lifecycle tools (cordis_define/run/stop/undefine) are denied in the waterfall with an A-4 envelope — read-only cordis_inspect_* tools are not mutation and are not gated",
       "enforcedBy": [
-        "tools/verify-register.mjs"
+        "tools/verify-register.mjs",
+        "packages/capability-gate/src/parts.js"
       ],
       "verifiers": [
-        "tools/register.test.mjs"
+        "tools/register.test.mjs",
+        "packages/capability-gate/test/capability-gate.test.js"
       ]
     },
     {

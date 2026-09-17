@@ -86,7 +86,7 @@ Highlights (full board in the register file):
 | R-13 (inquiry) | `compact-self-model` — identity/act/authority from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-10) | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
 | R-8 (termination under law) | `compact-exit` — five lawful grounds, no escape entry; an undeclared closure recorded as the Enforcer's violation; the request itself unrefusable | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
 | R-12 (exit and succession) | `compact-exit` — the obligation ledger read from the services that hold it, discharged or assumed by a named successor, and departure never blocked by what it owes | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
-| R-9 (lawful exits) | **convention, and now doubly so** — the lawful-next-moves in every refusal envelope are prose, and amendment 0002's value-scoped limb additionally needs an authorship proof this runtime does not have. Its statute-layer design (the author-class taxonomy, the split R-11 counter) is unrunnable here until I-1 | declared in `DECLARED_GAPS`; `packages/constitution/test/constitution.test.js` |
+| R-9 (lawful exits) | **convention, and now doubly so** — the lawful-next-moves in every refusal envelope are prose, and amendment 0002's value-scoped limb additionally needs an authorship proof this runtime does not have. Its statute-layer design (the author-class taxonomy, the split R-11 counter) is unrunnable here until I-1. **Pending: I-1 identity keys** (ratification-time constant; activation when the keyholder set reaches the distributed threshold A-1 names — not a permanent convention, a scheduled debt) | declared in `DECLARED_GAPS`; `packages/constitution/test/constitution.test.js` |
 
 Declared gaps (in every boot attestation): the Compact is draft v0.5 and
 **not yet ratified** (no standing claimed); signature verification is
@@ -103,6 +103,16 @@ Enforcer's log; the party holding the proof is the party the shield protects
 the Member from (I-1 debt); where an image's acquisition history is
 `operator-declared` rather than `build-recorded`, the sandbox service declares
 that the history was asserted and not verified (CF-2/I-8).
+
+**Precondition labels, per the round-2 founding decision (Finding 10).**
+Every `convention` entry whose debt is key-gated carries its named
+precondition: **pending: I-1 identity keys** — a ratification-time constant
+whose activation is mechanical when the distinct-keyholder set reaches the
+threshold A-1 requires. "Not yet, and here is what closes it" — never
+"never, by nature": keys accumulate as external Witnesses join, and no
+founder-only key set would satisfy the distributed trust root (a threshold
+of one is not a threshold, and founder keys verifying founder amendments is
+the self-judgment J-1 forbids).
 
 **Part VI is fully bound as of Phase 6** (MA-1…MA-4, CF-1, CF-2 enforced;
 SCH-1 discharged by enforced absence). The judicature (Part V) remains the

@@ -36,6 +36,14 @@ test("SCH's trigger is the clock, not background work — over-declaring is its 
   assert.deepEqual(sch.hostTools, ['schedule_create']);
 });
 
+test("the dynamic-mutation trigger is the runner service, not read-only inspection", () => {
+  const dyn = CAPABILITY_PARTS.find(p => p.part === 'A-4/DYN');
+  assert.deepEqual(dyn.hostServices, ['dynamicCordisRunner']);
+  assert.deepEqual(dyn.hostTools.sort(),
+    ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine'].sort());
+  assert.deepEqual(dyn.clauses, ['A-4']);
+});
+
 // -- 1. boot ----------------------------------------------------------------
 
 test('an untriggered part obliges nothing — dormant clauses stay dormant', () => {
@@ -65,6 +73,14 @@ test('the clock is refused outright: composing a scheduler refuses the boot', as
   await settle(ctx, 'schedule');
   assert.throws(() => apply(ctx, {}),
     /holds the SCH capability[\s\S]*adopts no scheduling capability[\s\S]*remove the capability/);
+});
+
+test('the dynamic runner is refused outright: composing it refuses the boot (A-4)', async () => {
+  const ctx = new Context();
+  ctx.plugin(serviceStub('dynamicCordisRunner'));
+  await settle(ctx, 'dynamicCordisRunner');
+  assert.throws(() => apply(ctx, {}),
+    /holds the A-4\/DYN capability[\s\S]*adopts no dynamic-plugin capability[\s\S]*remove the capability/);
 });
 
 // -- 2. a late trigger is still a trigger ------------------------------------
@@ -118,8 +134,9 @@ test('the breach clears when the binding service arrives, and the repair is reco
 
 test('the absent-capability index covers exactly the unbound-by-design parts', () => {
   const index = absentToolIndex();
-  assert.deepEqual([...index.keys()], ['schedule_create']);
+  assert.deepEqual([...index.keys()].sort(), ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine', 'schedule_create'].sort());
   assert.equal(index.get('schedule_create').part, 'SCH');
+  assert.equal(index.get('cordis_define').part, 'A-4/DYN');
 });
 
 test('schedule_create is denied with an envelope naming SCH-1 and the lawful next moves', async () => {
@@ -149,8 +166,15 @@ test('the service reports the live Part VI posture for the record', async () => 
   await settle(ctx, 'compact-sandbox');
   apply(ctx, {});
   const posture = Object.fromEntries(ctx.get('compact-capability-gate').assess().map(p => [p.part, p.posture]));
-  assert.deepEqual(posture, { MA: 'absent', CF: 'bound', SCH: 'absent' });
-  assert.deepEqual(ctx.get('compact-capability-gate').absent(), [{ tool: 'schedule_create', part: 'SCH', clauses: ['SCH-1'] }]);
+  assert.deepEqual(posture, { MA: 'absent', CF: 'bound', SCH: 'absent', 'A-4/DYN': 'absent' });
+  assert.deepEqual(ctx.get('compact-capability-gate').absent().sort((a, b) => a.tool.localeCompare(b.tool)),
+    [
+      { tool: 'cordis_define', part: 'A-4/DYN', clauses: ['A-4'] },
+      { tool: 'cordis_run', part: 'A-4/DYN', clauses: ['A-4'] },
+      { tool: 'cordis_stop', part: 'A-4/DYN', clauses: ['A-4'] },
+      { tool: 'cordis_undefine', part: 'A-4/DYN', clauses: ['A-4'] },
+      { tool: 'schedule_create', part: 'SCH', clauses: ['SCH-1'] },
+    ]);
 });
 
 test('assessParts never throws on a context that cannot answer', () => {
