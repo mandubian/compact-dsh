@@ -31,11 +31,13 @@ jobs:
       # `docker image inspect`, which does not pull.
       - name: docker for the composed confinement suite (CF-1, CF-2)
         run: |
-          echo "--- daemon ---"
-          docker info --format 'server {{.ServerVersion}}' || echo "NO DAEMON"
-          echo "--- image ---"
-          docker pull "${COMPACT_TEST_IMAGE:-ubuntu:24.04}"
-          docker image inspect --format '{{.Id}}' "${COMPACT_TEST_IMAGE:-ubuntu:24.04}"
+          IMAGE="${COMPACT_TEST_IMAGE:-ubuntu:24.04}"
+          if ! docker info --format 'daemon {{.ServerVersion}}'; then
+            echo "::error::no reachable docker daemon on this runner — the composed confinement suite is the real-daemon evidence the register cites as the verifier for CF-1 and CF-2, so it cannot be skipped silently"
+            exit 1
+          fi
+          docker pull "$IMAGE"
+          docker image inspect --format "$IMAGE is {{.Id}}" "$IMAGE"
       - run: npm test
 
   # Sentinel baseline guard (port plan Phase 4 item 5, A-4 discipline):
