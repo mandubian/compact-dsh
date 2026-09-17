@@ -1,7 +1,13 @@
 name: ci
 
 on:
+  # `edited` matters: the baseline guard reads the PR TITLE, and its own remedy
+  # is "retitle with the [baseline-update] prefix". Without this activity type
+  # a retitle triggers nothing and a re-run replays the stale payload, so the
+  # only way to satisfy the guard would be an unrelated push. A check that
+  # cannot see its own remedy is a check that teaches people to bypass it.
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
