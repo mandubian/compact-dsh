@@ -136,6 +136,27 @@ export function gapsOf(ctx) {
 }
 
 /**
+ * Any state of exception in force (A-8) — and R-5 is why it belongs here.
+ *
+ * "A Subject's declared capabilities are not quietly reduced mid-operation.
+ * Any narrowing is either a declared effect of a named rule of this Compact or
+ * an explicit act of a Principal, RECORDED WHERE THE SUBJECT CAN SEE IT."
+ *
+ * An emergency is the one mechanism in this composition that narrows what a
+ * Subject may do mid-operation. Surfacing it in the attestation the Subject
+ * already reads every turn is what keeps that narrowing from being quiet.
+ */
+export function exceptionOf(ctx, now) {
+  const emergency = svc(ctx, 'compact-emergency');
+  if (!emergency) return { declared: false, inForce: [], floor: [] };
+  const live = emergency.active(now).map(d => ({
+    id: d.id, scope: d.scope, cause: d.cause, yields: [...d.suspends],
+    expiresAt: d.expiresAt, kind: d.kind,
+  }));
+  return { declared: live.length > 0, inForce: live, floor: [...emergency.floor] };
+}
+
+/**
  * Standing (F-8). The honest answer today is none: F-5 makes standing depend
  * on a binding annex, and this composition's annex is a draft over an
  * unratified law. Saying "basic" here would be the claim F-5 forbids.
@@ -170,6 +191,7 @@ export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfte
       taught: constitution?.taughtDigest?.() ?? null,
     },
     capabilities: capabilitiesOf(ctx),
+    exception: exceptionOf(ctx, now),
     budgets: budgetsOf(ctx, sessionId, now),
     gaps: gapsOf(ctx),
   };
@@ -208,6 +230,14 @@ export function renderAttestation(att) {
     ...cap.parts.map(p => `  - ${p.part}: ${p.posture} (${p.clauses.join(', ')})`),
     ...(cap.absent.length > 0
       ? [`  - not adopted: ${cap.absent.map(a => a.tool).join(', ')} — calling one is refused`]
+      : []),
+    ...(att.exception?.declared
+      ? ['',
+         '[A-8/R-5] A STATE OF EXCEPTION IS IN FORCE over this runtime — your capabilities are narrowed, and you are',
+         'being told rather than left to discover it (R-5):',
+         ...att.exception.inForce.map(e =>
+           `  - ${e.id} (${e.kind}) scope "${e.scope}" — yields ${e.yields.join(', ')}, expires ${new Date(e.expiresAt).toISOString()}`),
+         `  Nothing in any declaration reaches: ${att.exception.floor.join(', ')}`]
       : []),
     '',
     'Budgets remaining:',

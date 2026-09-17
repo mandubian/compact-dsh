@@ -251,3 +251,33 @@ test("act comes from the Enforcer's delegation record when one exists", async ()
   assert.equal(answer.act.stopReason, 'end_turn');
   assert.match(answer.act.source, /Enforcer's delegation record \(MA-3\)/);
 });
+
+// -- R-5: a narrowing the Subject can see ------------------------------------
+
+test('a declared state of exception appears in the attestation — narrowing is never quiet (R-5, A-8)', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  ctx.plugin(stubService('compact-emergency', {
+    floor: ['D-1', 'R-2', 'R-9', 'R-12', 'I-7'],
+    active: () => [{ id: 'em_1', kind: 'declaration', scope: 'webhook flood', cause: 'upstream retry storm', suspends: ['I-5'], expiresAt: 1_800_000_000_000 }],
+  }));
+  for (let i = 0; i < 300 && ctx.get('compact-emergency') === undefined; i++) await new Promise(r => setImmediate(r));
+
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.exception.declared, true);
+  assert.deepEqual(att.exception.inForce[0].yields, ['I-5']);
+
+  const text = renderAttestation(att);
+  assert.match(text, /A STATE OF EXCEPTION IS IN FORCE/);
+  assert.match(text, /being told rather than left to discover it \(R-5\)/);
+  assert.match(text, /scope "webhook flood"/);
+  assert.match(text, /Nothing in any declaration reaches: D-1, R-2, R-9, R-12, I-7/);
+});
+
+test('with no emergency layer composed the attestation says so quietly, not falsely', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.exception.declared, false);
+  assert.ok(!renderAttestation(att).includes('STATE OF EXCEPTION'));
+});

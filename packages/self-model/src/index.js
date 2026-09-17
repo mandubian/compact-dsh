@@ -36,13 +36,13 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import {
   composeAttestation, renderAttestation, freshnessOf, DEFAULT_STALE_AFTER_MS,
-  lineageOf, capabilitiesOf, budgetsOf, gapsOf, standingOf,
+  lineageOf, capabilitiesOf, budgetsOf, gapsOf, standingOf, exceptionOf,
 } from './attestation.js';
 import { answerInquiry, renderInquiry, authorityChain, ULTIMATE_PRINCIPAL } from './inquiry.js';
 
 export {
   composeAttestation, renderAttestation, freshnessOf, DEFAULT_STALE_AFTER_MS,
-  lineageOf, capabilitiesOf, budgetsOf, gapsOf, standingOf,
+  lineageOf, capabilitiesOf, budgetsOf, gapsOf, standingOf, exceptionOf,
   answerInquiry, renderInquiry, authorityChain, ULTIMATE_PRINCIPAL,
 };
 
