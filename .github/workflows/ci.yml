@@ -16,6 +16,20 @@ jobs:
       - run: npm install
       - run: npm run verify-pin
       - run: npm run verify-register
+      # The composed confinement suite is the REAL-DAEMON evidence the register
+      # cites for CF-1 and CF-2. `verify-register` can only check that a cited
+      # verifier file exists — it cannot check that the verifier runs — so a
+      # suite skipped here would leave those citations unbacked in the one
+      # place that is supposed to be authoritative. The image is pulled rather
+      # than left to `docker run`, because the CF-2 digest resolver uses
+      # `docker image inspect`, which does not pull.
+      - name: docker for the composed confinement suite (CF-1, CF-2)
+        run: |
+          echo "--- daemon ---"
+          docker info --format 'server {{.ServerVersion}}' || echo "NO DAEMON"
+          echo "--- image ---"
+          docker pull "${COMPACT_TEST_IMAGE:-ubuntu:24.04}"
+          docker image inspect --format '{{.Id}}' "${COMPACT_TEST_IMAGE:-ubuntu:24.04}"
       - run: npm test
 
   # Sentinel baseline guard (port plan Phase 4 item 5, A-4 discipline):
