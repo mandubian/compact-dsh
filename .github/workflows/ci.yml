@@ -1,7 +1,13 @@
 name: ci
 
 on:
+  # `edited` matters: the baseline guard reads the PR TITLE, and its own remedy
+  # is "retitle with the [baseline-update] prefix". Without this activity type
+  # a retitle triggers nothing and a re-run replays the stale payload, so the
+  # only way to satisfy the guard would be an unrelated push. A check that
+  # cannot see its own remedy is a check that teaches people to bypass it.
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
@@ -16,6 +22,22 @@ jobs:
       - run: npm install
       - run: npm run verify-pin
       - run: npm run verify-register
+      # The composed confinement suite is the REAL-DAEMON evidence the register
+      # cites for CF-1 and CF-2. `verify-register` can only check that a cited
+      # verifier file exists — it cannot check that the verifier runs — so a
+      # suite skipped here would leave those citations unbacked in the one
+      # place that is supposed to be authoritative. The image is pulled rather
+      # than left to `docker run`, because the CF-2 digest resolver uses
+      # `docker image inspect`, which does not pull.
+      - name: docker for the composed confinement suite (CF-1, CF-2)
+        run: |
+          IMAGE="${COMPACT_TEST_IMAGE:-ubuntu:24.04}"
+          if ! docker info --format 'daemon {{.ServerVersion}}'; then
+            echo "::error::no reachable docker daemon on this runner — the composed confinement suite is the real-daemon evidence the register cites as the verifier for CF-1 and CF-2, so it cannot be skipped silently"
+            exit 1
+          fi
+          docker pull "$IMAGE"
+          docker image inspect --format "$IMAGE is {{.Id}}" "$IMAGE"
       - run: npm test
 
   # Sentinel baseline guard (port plan Phase 4 item 5, A-4 discipline):

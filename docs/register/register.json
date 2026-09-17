@@ -185,13 +185,14 @@
       "kind": "enforced",
       "plugin": "compact-sandbox-docker",
       "service": "compact-sandbox",
-      "evidence": "no undeclared capability: the sensitive-path deny-list is provider-level composition config, declared in the annex",
+      "evidence": "no undeclared capability: the sensitive-path deny-list is provider-level composition config, declared in the annex; the mount tool checks PROTECTED before MISSING, so a protected path is refused as protected whether or not it exists — answering \"missing\" first would turn the deny-list into an existence oracle for exactly the paths the masking hides",
       "enforcedBy": [
         "packages/sandbox-docker/src/mounts.js",
         "packages/sandbox-docker/src/provider.js"
       ],
       "verifiers": [
-        "packages/sandbox-docker/test/composed.docker.test.js"
+        "packages/sandbox-docker/test/composed.docker.test.js",
+        "packages/sandbox-docker/test/provenance.test.js"
       ]
     },
     {
