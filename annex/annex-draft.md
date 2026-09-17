@@ -21,7 +21,7 @@ applies from the first enforced phase onward).
   | I-6 contestation | `dsh-rights` amendment queue | petition-lifecycle audit |
   | I-7 verification | `auditor/` CLI (port plan Phase 4) | the auditor itself |
   | I-8 degradation honesty | constitution service surface | degradation notices in log |
-  | R-1–R-13 rights | R-1 and R-13 enforced by `compact-self-model`; R-8/R-11/R-12 remain planned | auditor invariants |
+  | R-1–R-13 rights | R-1/R-13 enforced by `compact-self-model`; R-8/R-12 by `compact-exit`; R-11 remains planned | auditor invariants |
   | D-1/D-5–D-8 duties | gates + attestation teaching + register | auditor invariants |
   Enforced (see §2 for the register):
   | Clause | Enforced by | Verifier |
@@ -84,6 +84,8 @@ Highlights (full board in the register file):
 | I-2 / R-7 (the record) | `compact-record` — a hash chain committed beside the log on append and verified on read; genesis seeded from the session identity | `packages/record/test/chain.test.js`, `…/composed.dsh.test.js` |
 | R-1 (self-knowledge) | `compact-self-model` — the attestation composed from the Enforcer's services, delivered at every turn boundary, with staleness as a detectable alarm; UNSIGNED and declared so | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
 | R-13 (inquiry) | `compact-self-model` — identity/act/authority from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-10) | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
+| R-8 (termination under law) | `compact-exit` — five lawful grounds, no escape entry; an undeclared closure recorded as the Enforcer's violation; the request itself unrefusable | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
+| R-12 (exit and succession) | `compact-exit` — the obligation ledger read from the services that hold it, discharged or assumed by a named successor, and departure never blocked by what it owes | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
 
 Declared gaps (in every boot attestation): the Compact is draft v0.5 and
 **not yet ratified** (no standing claimed); signature verification is

@@ -4,7 +4,7 @@
 the plugin composition, annex, and ratification work for the first runtime
 jurisdiction of [the Compact](https://github.com/mandubian/compact).
 
-> **Status: Phase 7 (the Subject's own knowledge) — COMPLETE.** The law lives in
+> **Status: Phase 8, slice 1 (termination and exit) — COMPLETE.** The law lives in
 > [compact.md](https://github.com/mandubian/compact/blob/main/compact.md)
 > (draft v0.5, **not yet ratified** — no standing is claimed, F-5);
 > this repository builds the machines that make it real on dsh.
@@ -248,6 +248,48 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > deliver and teach the attestation, it cannot make a Member consult it.
 >
 > **30 clauses enforced, up from 28.**
+>
+> **Phase 8, slice 1 done — termination under law and exit (R-8, R-12).** These
+> were owed by machinery already shipped: **MA-1** says a child "is not a
+> possession to be exited around: R-12's obligation set binds the child's
+> departure exactly as it binds any Member's", and **MA-2** says a parent "may
+> not terminate a child except through R-8's lawful reasons" — both enforced
+> since Phase 5 while the obligations they invoke were not.
+>
+> **The asymmetry is the design.** R-8 says termination "does not launder
+> obligations"; R-12 says nothing "may make exit economically impossible,
+> record-impossible, or punishable". Enforce R-8 by blocking departure until
+> the ledger is clean and the obligation has become a toll — exactly what R-12
+> forbids. Enforce R-12 by letting anyone leave silently and R-8 means nothing.
+> **Recording an unsettled departure honestly satisfies both:** the record is
+> the sanction, the door is not locked.
+>
+> `packages/exit/` gives **five lawful grounds and no escape entry** — an
+> `other` entry would make every termination lawful by construction, so there
+> isn't one. A ground outside the list, or a disposal with no declaration on
+> file at all, is recorded as a violation **by the Enforcer**, not by the
+> Subject that happened to be running. The host's `AgentCancelCause` is
+> **mapped rather than adopted**: it is a vocabulary about mechanism (who
+> called cancel) where R-8 asks about authority (under what ground), so `hook`
+> and `disposed` map to nothing rather than guessing. `request_termination` has
+> **no denial path at all** — R-8 makes the request unrefusable, so there is no
+> branch to reach.
+>
+> The **obligation ledger is read, not asserted**: pending gates from the
+> approval store, in-flight delegations from the MA-3 registry, so a departing
+> Member cannot under-report what it owes because it is not asked. Each
+> obligation leaves discharged or assumed by a **named** successor — an
+> assumption nobody is named for is an orphan wearing the word. A departing
+> parent with running children has recorded dependents (D-5: continuity of care
+> is an obligation, not a favor).
+>
+> **Unreadable is not empty.** R-12 counts restitution in the obligation set,
+> and adjudication is Part V, which does not exist here — so restitution is
+> reported as an *unreadable* ledger line, never as zero, and any unreadable
+> line makes the whole ledger `complete: false`. A blind spot is not a clean
+> bill. Successor jurisdictions are likewise declared unimplemented (F-6 debt).
+>
+> **32 clauses enforced, up from 30.**
 
 > **The active roster is the basic five** — `architect`, `auditor`, `coder`,
 > `debugger`, `researcher` — the personas that earn their keep on dsh today.
@@ -304,6 +346,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
 | `packages/specialists/` | **Phase 5**: the specialist roster — active: the **basic five** (`architect`, `auditor`, `coder`, `debugger`, `researcher`) as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap) + a roster-card prompt section for parent routing; 13 more personas **archived** in `personas/archived/` (revive = move back); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
 | `packages/capability-gate/` | **Phase 6**: Part VI's own enforcement — every capability trigger present in the composition must have a binding service (refuse-to-start; a late trigger latches a breach denying every tool call; clause-granularity check against the constitution's registry), and a capability declared absent is mechanically refused (`schedule_create`, SCH-1) rather than merely intended |
+| `packages/exit/` | **Phase 8**: termination under law and exit — five lawful grounds with no escape entry, a disposal with no declared ground recorded as a violation by the Enforcer (R-8); the obligation ledger read from the approval store and the MA-3 registry, each line discharged or assumed by a named successor, and departure **never blocked** by what it owes (R-12) |
 | `packages/self-model/` | **Phase 7**: the Subject's own knowledge — the per-turn attestation composed from the Enforcer's services (R-1: capabilities, budgets, pending gates, lineage, standing, law digest, declared gaps; unsigned and saying so; staleness as a detectable alarm) and the `inquiry` answer assembled from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-13) |
 | `packages/record/` | **Phase 6**: the tamper-evident record — a hash-chain decorator over the session-persistence backend, committing links beside the log on append and verifying them on read; genesis seeded from the session identity so a history cannot be reattributed (I-2, R-7, both entrenched under A-2) |
 | `docs/register/register.json` | **Phase 4**: the enforcement register — every clause of the body registered, planned, declared convention, or declared unadopted; `tools/verify-register.mjs` is the CI gate (also `npm run verify-register`) |
