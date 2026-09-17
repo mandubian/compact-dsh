@@ -189,6 +189,125 @@ test('the debt board surfaces every departure that left something owed', async (
   assert.deepEqual(debts.sort(), ['p1', 'p2']);
 });
 
+for (const query of ['declare', 'records', 'recordFor', 'outstandingDebts']) {
+  test(`${query} returns deeply detached departure snapshots`, async () => {
+    const { service } = await boot({
+      children: [
+        { parentId: 'p1', childId: 'c1', runId: { nested: ['run-1'] }, state: 'running', startedAt: new Date(5) },
+        { parentId: 'p1', childId: 'c2', runId: { nested: ['run-2'] }, state: 'running', startedAt: new Date(6) },
+      ],
+    });
+    const declared = service.declare({
+      subject: 'p1', reason: 'made-it-up', now: 10,
+      handover: { c1: { disposition: 'assumed', successor: { members: ['p2'] } } },
+    });
+    const expected = structuredClone(declared);
+    const snapshot = query === 'declare' ? declared
+      : query === 'recordFor' ? service.recordFor('p1') : service[query]()[0];
+    snapshot.settled[0].successor.members.push('changed');
+    snapshot.settled[0].runId.nested[0] = 'changed';
+    snapshot.settled[0].since.setTime(100);
+    snapshot.orphaned[0].runId.nested[0] = 'changed';
+    snapshot.orphaned[0].since.setTime(100);
+    snapshot.dependents[0].relies = 'changed';
+    snapshot.ledger.unreadable[0].why = 'changed';
+    snapshot.ledger.complete = true;
+    snapshot.violation.detail = 'changed';
+    snapshot.violation = null;
+    snapshot.orphaned.length = 0;
+    snapshot.departureBlocked = true;
+    assert.deepEqual(service.recordFor('p1'), expected);
+    assert.deepEqual(service.records(), [expected]);
+    assert.deepEqual(service.outstandingDebts(), [expected]);
+  });
+}
+
+test('retained declaration and disposal data is detached from its inputs', async () => {
+  const child = {
+    parentId: 'p1', childId: { id: ['c1'] }, runId: { ids: ['r1'] },
+    state: 'running', startedAt: new Date(5),
+  };
+  const since = { times: [10], metadata: new Map([['source', { value: 'original' }]]) };
+  const successor = { members: ['p2'] };
+  const now = new Date(20);
+  const { service, ctx } = await boot({
+    children: [child], pending: [{ fp: 'gate', root: 'p1', since }],
+  });
+  const handover = { gate: { disposition: 'assumed', successor } };
+  service.declare({ subject: 'p1', reason: 'subject-request', handover, now });
+  child.parentId = 'silent';
+  ctx.emit('agent/disposed', { agent: { id: 'silent' } });
+  const expected = service.records();
+  child.childId.id.push('changed');
+  child.runId.ids.push('changed');
+  child.startedAt.setTime(100);
+  since.times.push(100);
+  since.metadata.get('source').value = 'changed';
+  successor.members.push('changed');
+  handover.gate.disposition = 'discharged';
+  now.setTime(100);
+  assert.deepEqual(service.records(), expected);
+  assert.deepEqual(service.recordFor('p1'), expected[0]);
+  assert.deepEqual(service.outstandingDebts(), expected);
+});
+
+test('scalar grounds and dispositions are normalized without cloning unused handover data', async () => {
+  const { service } = await boot({
+    children: [{ parentId: 'p1', childId: 'c1', runId: 'r1', state: 'running', startedAt: 5 }],
+  });
+  const reason = { value: 'subject-request', toString() { return this.value; } };
+  const disposition = { value: 'assumed', toString() { return this.value; } };
+  const entry = service.declare({
+    subject: 'p1', reason,
+    handover: { c1: { disposition, successor: 'p2' }, unused: () => {} },
+  });
+  reason.value = 'invented';
+  disposition.value = 'discharged';
+  assert.equal(entry.reason, 'subject-request');
+  assert.equal(entry.declaredReason, 'subject-request');
+  assert.equal(entry.settled[0].disposition, 'assumed');
+  assert.equal(entry.violation, null);
+  assert.equal(entry.departureBlocked, false);
+  assert.deepEqual(service.recordFor('p1'), entry);
+  const unsettled = service.declare({ subject: 'p1', reason: Symbol('invalid'), handover: null });
+  assert.equal(unsettled.departureBlocked, false);
+  assert.equal(unsettled.violation.rule, 'R-8/unlawful-ground');
+  assert.equal(unsettled.orphaned.length, 1);
+});
+
+test('queries preserve history, latest declarations, missing lookups and debt selection', async () => {
+  const { service, ctx } = await boot({
+    children: [{ parentId: '7', childId: 'c1', runId: 'r1', state: 'running', startedAt: 5 }],
+  });
+  assert.equal(service.recordFor('missing'), null);
+  assert.deepEqual(service.records(), []);
+  assert.deepEqual(service.outstandingDebts(), []);
+  const first = service.declare({ subject: 7, reason: 'subject-request', now: 1 });
+  const latest = service.declare({
+    subject: '7', reason: 'subject-request', now: 2,
+    handover: { c1: { disposition: 'discharged' } },
+  });
+  const violation = service.declare({ subject: 'bad', reason: 'invented', now: 3 });
+  const unidentified = service.declare({ reason: 'subject-request', now: 4 });
+  ctx.emit('agent/disposed', { agent: { id: 'silent' } });
+  ctx.emit('agent/disposed', { agent: { id: '7' } });
+  const history = service.records();
+  const silent = history[4];
+  assert.deepEqual(history, [first, latest, violation, unidentified, silent]);
+  assert.equal(silent.violation.rule, 'R-8/undeclared-closure');
+  assert.equal(service.recordFor('silent'), null);
+  assert.equal(service.recordFor(null), null);
+  assert.deepEqual(service.recordFor(7), latest);
+  assert.deepEqual(service.recordFor('7'), latest);
+  assert.equal(latest.ledger.complete, false);
+  assert.deepEqual(service.outstandingDebts(), [first, violation, silent]);
+  history.reverse();
+  history.length = 0;
+  service.outstandingDebts().length = 0;
+  assert.equal(service.records().length, 5);
+  assert.deepEqual(service.outstandingDebts(), [first, violation, silent]);
+});
+
 // -- degradation honesty -----------------------------------------------------
 
 test('the declared gaps name what this layer cannot do', () => {

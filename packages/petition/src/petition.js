@@ -82,20 +82,25 @@ export function responseConformance(response) {
   return { conforming: missing.length === 0, missing };
 }
 
+const snapshot = (d) => (d == null ? d : structuredClone(d));
+
 export class PetitionRegister {
+  #petitions = [];
+  #n = 0;
+
   constructor({ termMs = DEFAULT_TERM_MS } = {}) {
     this.termMs = termMs;
-    this.petitions = [];
-    this._n = 0;
   }
+
+  get petitions() { return this.#petitions.map(snapshot); }
 
   /**
    * File a petition. Open to EVERY Member: there is no gate here, because a
    * petition channel a gate can close is not a channel (R-11, I-6).
    */
   file({ by, target, proposal, reasons, now = Date.now() }) {
-    const p = {
-      id: `pt_${++this._n}`,
+    const p = snapshot({
+      id: `pt_${++this.#n}`,
       by: by != null ? String(by) : null,
       target: Object.prototype.hasOwnProperty.call(PETITION_TARGETS, target) ? target : 'enforcer-conduct',
       declaredTarget: target ?? null,
@@ -107,12 +112,14 @@ export class PetitionRegister {
       answeredAt: null,
       dissents: [],
       nonConformingAttempts: [],
-    };
-    this.petitions.push(p);
-    return p;
+    });
+    this.#petitions.push(p);
+    return snapshot(p);
   }
 
-  get(id) { return this.petitions.find(p => p.id === id) ?? null; }
+  #find(id) { return this.#petitions.find(p => p.id === id) ?? null; }
+
+  get(id) { return snapshot(this.#find(id)); }
 
   /** The adjudication state, computed — never stored, never forgotten. */
   stateOf(petition, now = Date.now()) {
@@ -126,20 +133,20 @@ export class PetitionRegister {
    * response must not discharge the duty (R-11).
    */
   respond({ id, response, by, now = Date.now() }) {
-    const p = this.get(id);
+    const p = this.#find(id);
     if (!p) return { error: `no petition ${id}` };
     if (p.answeredAt != null) return { error: `petition ${id} is already answered — a decision is amended by a new petition, not by overwriting the record (A-5)` };
     const { conforming, missing } = responseConformance(response);
     if (!conforming) {
-      const attempt = { by: by != null ? String(by) : null, at: now, missing, detail: 'refused: a response missing the I-4 envelope fields is non-conforming and does not answer the petition' };
+      const attempt = snapshot({ by: by != null ? String(by) : null, at: now, missing, detail: 'refused: a response missing the I-4 envelope fields is non-conforming and does not answer the petition' });
       p.nonConformingAttempts.push(attempt);
       return {
         error: `the response omits ${missing.join(', ')} — R-11 requires every response to carry the I-4 envelope fields, ` +
           `so this one is detectably non-conforming and does not discharge the duty; petition ${id} remains ${this.stateOf(p, now)}`,
-        attempt,
+        attempt: snapshot(attempt),
       };
     }
-    p.response = {
+    p.response = snapshot({
       ruleId: response.ruleId,
       reason: response.reason,
       lawfulNextMoves: [...response.lawfulNextMoves],
@@ -147,9 +154,9 @@ export class PetitionRegister {
       outcome: response.outcome ?? 'considered',
       by: by != null ? String(by) : null,
       at: now,
-    };
-    p.answeredAt = now;
-    return { petition: p };
+    });
+    p.answeredAt = snapshot(now);
+    return { petition: snapshot(p) };
   }
 
   /**
@@ -157,29 +164,29 @@ export class PetitionRegister {
    * dissents from (A-5) and never removable.
    */
   dissent({ id, by, reasons, now = Date.now() }) {
-    const p = this.get(id);
+    const p = this.#find(id);
     if (!p) return { error: `no petition ${id}` };
     if (p.answeredAt == null) return { error: `petition ${id} has no decision yet — a dissent dissents from a decision (A-5)` };
     if (typeof reasons !== 'string' || reasons.trim() === '') {
       return { error: 'a dissent without reasons preserves nothing — A-5 keeps minority REASONS where fallibility can find them' };
     }
-    const d = { by: by != null ? String(by) : null, reasons, at: now, dissentsFrom: { at: p.response.at, by: p.response.by, outcome: p.response.outcome } };
+    const d = snapshot({ by: by != null ? String(by) : null, reasons, at: now, dissentsFrom: { at: p.response.at, by: p.response.by, outcome: p.response.outcome } });
     p.dissents.push(d);
-    return { dissent: d };
+    return { dissent: snapshot(d) };
   }
 
   /** Petitions past their stated term with no conforming answer (I-6). */
   overdue(now = Date.now()) {
-    return this.petitions.filter(p => this.stateOf(p, now) === 'overdue');
+    return snapshot(this.#petitions.filter(p => this.stateOf(p, now) === 'overdue'));
   }
 
   /** The board, as an operator or auditor reads it. */
   board(now = Date.now()) {
-    return this.petitions.map(p => ({
+    return snapshot(this.#petitions.map(p => ({
       id: p.id, by: p.by, target: p.target, state: this.stateOf(p, now),
       filedAt: p.filedAt, dueAt: p.dueAt, answeredAt: p.answeredAt,
       dissents: p.dissents.length, nonConformingAttempts: p.nonConformingAttempts.length,
-    }));
+    })));
   }
 }
 

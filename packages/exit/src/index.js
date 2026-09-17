@@ -68,16 +68,17 @@ export const DECLARED_GAPS = [
  * the departure (R-12) — they are recorded as owed.
  */
 export function settleLedger(ledger, handover = {}) {
+  const hand = handover != null && typeof handover === 'object' ? handover : {};
   const settled = [];
   const orphaned = [];
   for (const item of ledger.outstanding) {
-    const declared = handover[item.ref];
+    const declared = hand[item.ref];
     if (declared && isDisposition(declared.disposition)) {
-      if (declared.disposition === 'assumed' && !declared.successor) {
+      if (String(declared.disposition) === 'assumed' && !declared.successor) {
         orphaned.push({ ...item, why: 'declared assumed with no named successor — an assumption nobody is named for is not an assumption' });
         continue;
       }
-      settled.push({ ...item, disposition: declared.disposition, successor: declared.successor ?? null });
+      settled.push({ ...item, disposition: String(declared.disposition), successor: declared.successor ?? null });
       continue;
     }
     orphaned.push({ ...item, why: 'neither discharged nor formally assumed at departure' });
@@ -92,13 +93,14 @@ export function apply(ctx, config = {}) {
   const records = [];
 
   const record = (entry) => {
-    records.push(entry);
-    if (entry.violation) {
+    const stored = structuredClone(entry);
+    records.push(stored);
+    if (stored.violation) {
       ctx.logger?.error?.(
-        `exit: ${entry.subject} closed with no declared lawful ground — R-8 makes a termination outside the closed ` +
+        `exit: ${stored.subject} closed with no declared lawful ground — R-8 makes a termination outside the closed ` +
         `list a violation BY THE ENFORCER; recorded`);
     }
-    return entry;
+    return stored;
   };
 
   /**
@@ -107,6 +109,7 @@ export function apply(ctx, config = {}) {
    */
   const declare = ({ subject, reason, handover = {}, now = Date.now() }) => {
     const sid = subject != null ? String(subject) : null;
+    reason = reason != null ? String(reason) : null;
     const lawful = isLawfulReason(reason);
     const ledger = obligationLedger(ctx, sid);
     const { settled, orphaned } = settleLedger(ledger, handover);
@@ -127,8 +130,9 @@ export function apply(ctx, config = {}) {
       dependents: ledger.dependents,
       departureBlocked: false,   // R-12: never. Recorded, not blocked.
     };
-    if (sid != null) declarations.set(sid, entry);
-    return record(entry);
+    const stored = record(entry);
+    if (sid != null) declarations.set(sid, stored);
+    return structuredClone(stored);
   };
 
   // 2. closure needs a declared ground — the disposal edge is where that is checked
@@ -205,11 +209,11 @@ export function apply(ctx, config = {}) {
     /** What a Member owes right now, read from the services that hold it. */
     ledgerFor: (sessionId) => obligationLedger(ctx, sessionId),
     /** Every departure record, for the operator and the offline auditor (I-7). */
-    records: () => records.map(r => ({ ...r })),
+    records: () => structuredClone(records),
     /** The departure record for one Member, if any. */
-    recordFor: (sessionId) => declarations.get(String(sessionId)) ?? null,
+    recordFor: (sessionId) => structuredClone(declarations.get(String(sessionId)) ?? null),
     /** Departures that left something owed — the R-12 debt board. */
-    outstandingDebts: () => records.filter(r => r.orphaned.length > 0 || r.violation),
+    outstandingDebts: () => structuredClone(records.filter(r => r.orphaned.length > 0 || r.violation)),
   };
   for (const gap of DECLARED_GAPS) ctx.logger?.warn?.(`exit: ${gap}`);
   ctx.provide?.('compact-exit', service);
