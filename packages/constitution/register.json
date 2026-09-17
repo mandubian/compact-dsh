@@ -1,6 +1,6 @@
 {
   "meta": {
-    "compactDigest": "8564175463bd0d9c6cf5c93171e3e67a20944c18938aa90d44248b795315e93c",
+    "compactDigest": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95",
     "compactSource": "https://github.com/mandubian/compact/blob/main/compact.md",
     "compactStatus": "draft v0.5 — NOT yet ratified; this composition claims no Compact standing (F-5)",
     "note": "The register proves both directions (F-5): every law in force maps to enforcing, verified code — no decorative law — and every piece of enforcing code traces to a law that authorizes it — no rogue enforcement. kind: 'enforced' = binding now (service presence is checked at boot); 'planned' = on the port plan's later phases; 'convention' = declared, never to be mistaken for enforcement.",
@@ -271,7 +271,7 @@
       "kind": "convention",
       "plugin": null,
       "service": null,
-      "evidence": "lawful exits: every envelope's lawful-next-moves surface refuse/warn/escalate; the moves are prose — no punishment mechanism exists to verify",
+      "evidence": "lawful exits: every envelope's lawful-next-moves surface refuse/warn/escalate; the moves are prose — no punishment mechanism exists to verify. Amendment 0002 (2026-09-17) added the value-scoped limb, and it is convention here for a further reason than prose: the shield turns on a ground DECLARED OF RECORD BEFORE the directive, and this runtime can prove ordering (the compact-record hash chain, I-2/R-7) but not AUTHORSHIP — no identity keys exist (I-1 debt), so nothing distinguishes a ground the Member declared from one the Enforcer wrote into the log. Against an honest Enforcer the limb is exercisable; against a dishonest one it is inert, and the party the shield protects the Member from is the party holding the proof. The author-class taxonomy and the R-11 split counter of the amendment's statute-layer design are therefore unrunnable here, and no collision counter exists to mis-feed",
       "enforcedBy": [],
       "verifiers": []
     },

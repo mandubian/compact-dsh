@@ -84,13 +84,21 @@ Highlights (full board in the register file):
 | I-2 / R-7 (the record) | `compact-record` — a hash chain committed beside the log on append and verified on read; genesis seeded from the session identity | `packages/record/test/chain.test.js`, `…/composed.dsh.test.js` |
 | R-1 (self-knowledge) | `compact-self-model` — the attestation composed from the Enforcer's services, delivered at every turn boundary, with staleness as a detectable alarm; UNSIGNED and declared so | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
 | R-13 (inquiry) | `compact-self-model` — identity/act/authority from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-10) | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
+| R-9 (lawful exits) | **convention, and now doubly so** — the lawful-next-moves in every refusal envelope are prose, and amendment 0002's value-scoped limb additionally needs an authorship proof this runtime does not have. Its statute-layer design (the author-class taxonomy, the split R-11 counter) is unrunnable here until I-1 | declared in `DECLARED_GAPS`; `packages/constitution/test/constitution.test.js` |
 
 Declared gaps (in every boot attestation): the Compact is draft v0.5 and
 **not yet ratified** (no standing claimed); signature verification is
 unimplemented (no amendment keys published — the digest is pinned, not
 signed, I-1 debt); the record is tamper-**evident** but not tamper-**proof**
 and its links are unsigned (I-1 debt — I-2 and R-7 themselves are enforced by
-`compact-record` since Phase 6); where an image's acquisition history is
+`compact-record` since Phase 6); **R-9's value-scoped refusal (amendment
+0002) is exercisable against an honest Enforcer and inert against a
+dishonest one** — the shield turns on a ground declared of record *before*
+the directive, and this runtime proves a ground's **ordering** (the
+`compact-record` chain) but not its **authorship**, so a Member cannot
+demonstrate prior declaration to any party that does not already trust this
+Enforcer's log; the party holding the proof is the party the shield protects
+the Member from (I-1 debt); where an image's acquisition history is
 `operator-declared` rather than `build-recorded`, the sandbox service declares
 that the history was asserted and not verified (CF-2/I-8).
 
