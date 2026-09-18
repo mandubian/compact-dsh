@@ -106,6 +106,9 @@ test('verb mentions to read-only inspectors are not findings (issue #5)', () => 
   assert.deepEqual(findings('(which curl)'), []);
   assert.deepEqual(findings('ls -la && which curl'), []);
   assert.deepEqual(findings('man ssh | grep -i protocol'), []);
+  // the single & is a separator too (background operator)
+  assert.deepEqual(findings('sleep 1 & which curl'), []);
+  assert.deepEqual(targets('sleep 1 & curl $DEPLOY_URL'), ['opaque:curl']);
   // a mention does not hide a later invocation in the same line
   assert.deepEqual(targets('which curl && curl $DEPLOY_URL'), ['opaque:curl']);
 });

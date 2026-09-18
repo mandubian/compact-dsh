@@ -53,9 +53,11 @@ const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const SCP_LIKE_RE = /^[\w.-]+@([\w.-]+):/; // git@github.com:org/repo
 // shell-naive tokenization: separators are their own matches so command
 // position is decidable — a token opens a command when it is the first token
-// or follows && || ; | ( ) (hence also $( — substitution stays an invocation)
-const TOKEN_RE = /&&|\|\||[;|()]|[^\s;&|()]+/g;
-const SEPARATORS = new Set(['&&', '||', ';', '|', '(', ')']);
+// or follows && || ; | & ( ) (hence also $( — substitution stays an
+// invocation). The single & is a separator in its own right (background
+// operator): `sleep 1 & which curl` puts which in command position.
+const TOKEN_RE = /&&|\|\||[;|()]|&(?!&)|[^\s;&|()]+/g;
+const SEPARATORS = new Set(['&&', '||', ';', '|', '&', '(', ')']);
 
 function validIpv4(s) {
   return s.split('.').every(o => Number(o) <= 255);
