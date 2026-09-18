@@ -89,7 +89,7 @@ export function apply(ctx, config = {}) {
         description: 'the epoch of the attestation you currently hold, if any — the answer says whether it is still current',
       },
     },
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
       const sessionId = exec?.agent?.id != null ? String(exec.agent.id) : null;
       const prior = sessionId != null ? issued.get(sessionId) : undefined;
@@ -114,7 +114,7 @@ export function apply(ctx, config = {}) {
     parameters: {
       agent_id: { type: 'string', required: true, description: 'the Member you are asking about' },
     },
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, _exec) {
       const childState = ctx.get?.('compact-specialists') ?? null;
       return renderInquiry(answerInquiry(ctx, {

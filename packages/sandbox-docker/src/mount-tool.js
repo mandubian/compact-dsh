@@ -44,7 +44,7 @@ export function mountRequestTool({ approval, askApproval, protectedPaths, grantT
     },
     output: {
       schema: { type: 'string' },
-      render: (value) => [{ type: 'text', text: String(value) }],
+      render: (_args, value) => [{ type: 'text', text: String(value) }],
     },
     async execute(args, exec) {
       const requested = String(args?.path ?? '');

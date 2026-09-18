@@ -95,7 +95,7 @@ export function promotionPlugin(opts = {}) {
           description: 'the recorded findings of the gate set (severity, check, detail, evidence for warnings)',
         },
       },
-      output: { schema: { type: 'string' }, render: (v) => [{ type: 'text', text: String(v) }] },
+      output: { schema: { type: 'string' }, render: (_args, v) => [{ type: 'text', text: String(v) }] },
       async execute(args) {
         // defense in depth: the body re-checks even though the waterfall
         // already denies rejections before dispatch

@@ -183,7 +183,7 @@ export function apply(ctx, config = {}) {
           '{"disposition":"assumed","successor":"<member id>"}',
       },
     },
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
       const subject = exec?.agent?.id != null ? String(exec.agent.id) : null;
       let handover = {};

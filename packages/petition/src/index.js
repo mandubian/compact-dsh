@@ -91,7 +91,7 @@ export function apply(ctx, config = {}) {
       proposal: { type: 'string', required: true, description: 'the change you propose, stated as concretely as you can' },
       reasons: { type: 'string', required: true, description: 'why — the argument a decider must answer' },
     },
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
       const p = register.file({
         by: exec?.agent?.id, target: args?.target,
@@ -117,7 +117,7 @@ export function apply(ctx, config = {}) {
       rule_id: { type: 'string', required: true, description: 'the rule you collided with, e.g. "I-5/uncovered"' },
       detail: { type: 'string', required: true, description: 'what you were doing and how the rule did not fit it' },
     },
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
       const { invitation } = counter.flag({ ruleId: args?.rule_id, detail: args?.detail, by: exec?.agent?.id });
       if (invitation) announce(invitation);
@@ -134,7 +134,7 @@ export function apply(ctx, config = {}) {
     name: 'petition_status',
     description: 'Read the petitions on file, their adjudication state and term, the decisions, and any dissents recorded with them.',
     parameters: { petition_id: { type: 'string', description: 'one petition, or omit for the board' } },
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args) {
       if (args?.petition_id) {
         const p = register.get(args.petition_id);

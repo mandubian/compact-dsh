@@ -153,7 +153,7 @@ export function apply(ctx, config = {}) {
       'set, and your exit, refusal, record access and independent verification, which no emergency may restrict even ' +
       'temporarily (A-8).',
     parameters: {},
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute() { return renderStatus(active(), FLOOR); },
   });
 

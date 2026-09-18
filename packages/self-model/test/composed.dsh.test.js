@@ -75,6 +75,17 @@ test('composed: both rights are reachable as tools in the real registry', async 
   assert.ok(tools.get('inquiry'), 'R-13 is exercisable by the Subject');
 });
 
+test('composed: the rendered tool result carries the attestation VALUE, not the arguments object', async () => {
+  const { ctx, tools, agents } = await boot();
+  const agent = agents.add('s1');
+  ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+
+  const result = await call(tools, 'self_describe', { citing_epoch: ctx.get('compact-self-model').issuedTo('s1').epoch }, agent);
+  const rendered = result?.content?.map(c => c?.text ?? '').join('') ?? '';
+  assert.match(rendered, /\[R-1\] Attestation/, 'the model-facing text is the attestation block');
+  assert.ok(!rendered.includes('[object Object]'), 'render receives (args, value) — String(args) would leak the arguments object');
+});
+
 test('composed: the attestation arrives at the turn boundary, unasked (R-1)', async () => {
   const { ctx, agents } = await boot();
   const agent = agents.add('s1');

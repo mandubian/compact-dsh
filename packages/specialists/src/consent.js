@@ -232,7 +232,7 @@ export function consentTools(registry, { defineTool, now = () => Date.now() }) {
       'List the consent scopes over your own attention: who may address you, with which kinds of address, and on what basis. ' +
       'Another Subject may reach you only through a live scope here (MA-4).',
     parameters: {},
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(_args, exec) {
       const me = exec?.agent?.id;
       if (me == null) throw new Error('consent_scopes requires a calling agent');
@@ -254,7 +254,7 @@ export function consentTools(registry, { defineTool, now = () => Date.now() }) {
       scope_id: { type: 'string', required: true, description: 'the scope id from consent_scopes' },
       keep_kinds: { type: 'string', description: "optional comma-separated kinds to KEEP (e.g. 'message'); omit to withdraw entirely" },
     },
-    output: { schema: { type: 'string' }, render: (value) => [{ type: 'text', text: String(value) }] },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
       const me = exec?.agent?.id;
       if (me == null) throw new Error('consent_withdraw requires a calling agent');
