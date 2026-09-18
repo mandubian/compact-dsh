@@ -38,6 +38,9 @@ import {
   canonicalize, extendChain, genesisHash, linkHash, verifySlice, RecordIntegrityError,
 } from './chain.js';
 import { ChainStore, MemoryChainStore } from './store.js';
+import {
+  assertContiguous, materializeAppendBatch, SessionHandleClosedError, SessionReadOnlyError,
+} from '@deepseek-ai/dsh-session-persistence';
 
 export {
   canonicalize, extendChain, genesisHash, linkHash, verifySlice, RecordIntegrityError,
@@ -54,17 +57,27 @@ export const DECLARED_GAPS = [
 
 /**
  * Wrap one session handle so its appends commit and its reads verify.
- *
- * The handle keeps the running head hash in memory, and falls back to the
- * store when it has not seen the preceding link — a write handle opened on an
- * existing session starts mid-chain.
  */
 export function chainedHandle(inner, store) {
   const sessionId = String(inner.id);
-  let cached = null;   // {links, lastSeq}
+  let pending = Promise.resolve();
+  let closing;
+  let cursor;
 
-  const links = () => (cached ??= store.load(sessionId));
+  const run = (operation, callback) => {
+    if (closing) return Promise.reject(new SessionHandleClosedError(inner.id, operation));
+    const next = pending.then(callback);
+    pending = next.catch(() => {});
+    return next;
+  };
+  const close = () => (closing ??= pending.then(() => inner.close()));
+  const links = () => store.load(sessionId);
   const headAt = (seq) => (seq === 0 ? genesisHash(sessionId) : links().links.get(seq - 1));
+  const read = async (offset = 0, length, options) => {
+    const result = await inner.read(offset, length, options);
+    verifySlice({ sessionId, firstSeq: offset, events: result.events, links: links().links });
+    return result;
+  };
 
   const handle = {
     get id() { return inner.id; },
@@ -73,35 +86,45 @@ export function chainedHandle(inner, store) {
     get access() { return inner.access; },
 
     async read(offset = 0, length, options) {
-      const result = await inner.read(offset, length, options);
-      verifySlice({ sessionId, firstSeq: offset, events: result.events, links: links().links });
-      return result;
+      if (closing) throw new SessionHandleClosedError(inner.id, 'read');
+      return read(offset, length, options);
     },
 
     async append(events, options) {
-      if (events.length === 0) return inner.append(events, options);
-      const firstSeq = events[0]?.seq;
-      if (typeof firstSeq !== 'number') {
-        throw new Error(`record: refusing to commit a batch whose first event has no seq — an unordered act cannot be chained (I-2)`);
-      }
-      const prev = headAt(firstSeq);
-      if (prev === undefined) {
-        throw new RecordIntegrityError({
-          sessionId, seq: firstSeq, kind: 'no-anchor',
-          detail: `no committed link for seq ${firstSeq - 1}, so this batch cannot continue the session's chain`,
-        });
-      }
-      const fresh = extendChain(prev, firstSeq, events);
-      // commit first, then let the log follow (see store.js on the ordering)
-      store.append(sessionId, fresh);
-      for (const l of fresh) links().links.set(l.seq, l.h);
-      if (cached) cached.lastSeq = Math.max(cached.lastSeq, fresh.at(-1).seq);
-      return inner.append(events, options);
+      const batch = materializeAppendBatch(events);
+      return run('append', async () => {
+        options?.signal?.throwIfAborted();
+        if (inner.access !== 'write') throw new SessionReadOnlyError(inner.id, 'append');
+        if (batch.length === 0) return inner.append(batch, options);
+        const firstSeq = batch[0]?.seq;
+        if (typeof firstSeq !== 'number') {
+          throw new Error(`record: refusing to commit a batch whose first event has no seq — an unordered act cannot be chained (I-2)`);
+        }
+        const prev = headAt(firstSeq);
+        if (prev === undefined) {
+          throw new RecordIntegrityError({
+            sessionId, seq: firstSeq, kind: 'no-anchor',
+            detail: `no committed link for seq ${firstSeq - 1}, so this batch cannot continue the session's chain`,
+          });
+        }
+        cursor ??= (await read(0, undefined, options)).events.length;
+        assertContiguous(inner.id, batch, cursor);
+        options?.signal?.throwIfAborted();
+        const fresh = extendChain(prev, firstSeq, batch);
+        store.append(sessionId, fresh);
+        try {
+          await inner.append(batch, options);
+          cursor += batch.length;
+        } catch (error) {
+          cursor = undefined;
+          throw error;
+        }
+      });
     },
 
-    flush: (options) => inner.flush(options),
-    close: () => inner.close(),
-    [Symbol.asyncDispose]: () => inner.close(),
+    flush: (options) => run('flush', () => inner.flush(options)),
+    close,
+    [Symbol.asyncDispose]: close,
 
     /** The chain head: what a verifier records to detect a later rewrite. */
     chainHead() {
@@ -118,8 +141,6 @@ export function chainedHandle(inner, store) {
  */
 export function chainedPersistence(inner, store) {
   return {
-    inner,
-    store,
     async create(header, options) { return chainedHandle(await inner.create(header, options), store); },
     async open(id, access, options) { return chainedHandle(await inner.open(id, access, options), store); },
     stat: (...a) => inner.stat(...a),

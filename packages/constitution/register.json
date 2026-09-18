@@ -223,15 +223,18 @@
       "kind": "enforced",
       "plugin": "compact-record",
       "service": "compact-record",
-      "evidence": "the record, made tamper-evident: a SessionPersistence decorator commits a hash chain beside every session log on append (entryHash = H(prev, seq, canonical(event)), genesis seeded from the SESSION ID so a chain cannot vouch for another Member's history) and verifies it on read. A slice that does not verify REJECTS rather than returning unverified history as history (D-7). Links are committed BEFORE the log accepts the event, so a crash can only leave a link with no event — never an event with no link. The chain lives in a sidecar, declaring no new session event vocabulary (D-8). Proven against the real JSONL backend, including a rewrite applied to the stored artifact",
+      "evidence": "the record, made tamper-evident: a SessionPersistence decorator commits a hash chain beside every session log on append (entryHash = H(prev, seq, canonical(event)), genesis seeded from the SESSION ID so a chain cannot vouch for another Member's history) and verifies it on read. A slice that does not verify REJECTS rather than returning unverified history as history (D-7). Links are committed BEFORE the log accepts the event, so a crash can only leave a link with no event — never an event with no link. The chain lives in a sidecar, declaring no new session event vocabulary (D-8). Proven against the real JSONL backend, including a rewrite applied to the stored artifact. The public host sessionPersistence provider routes handle writes and live session events through the chain, including flush and teardown; provider restart and loader integration verify persisted history",
       "enforcedBy": [
         "packages/record/src/chain.js",
         "packages/record/src/store.js",
-        "packages/record/src/index.js"
+        "packages/record/src/index.js",
+        "packages/record/src/provider.js"
       ],
       "verifiers": [
         "packages/record/test/chain.test.js",
-        "packages/record/test/composed.dsh.test.js"
+        "packages/record/test/composed.dsh.test.js",
+        "packages/record/test/provider.dsh.test.js",
+        "packages/blessed/test/loader.dsh.test.js"
       ]
     },
     {
@@ -297,12 +300,15 @@
       "kind": "convention",
       "plugin": "compact-constitution",
       "service": "constitution",
-      "evidence": "refuse-to-start: boot fails on digest mismatch, missing enforcement service, or unknown register clause; standing is not claimed while the floor is partial and the Compact unratified",
+      "evidence": "refuse-to-start: boot fails on digest mismatch, missing enforcement service, or unknown register clause. The blessed loader replaces stock persistence with the chained provider and gates agent-loop on compact-ready; readiness requires settled enforcement services, public persistence identity, and constitution verification. Loader tests cover live chained sessions and refusal with a disabled required provider or missing approval path; readiness claims no Compact standing while the floor is partial and the Compact unratified",
       "enforcedBy": [
-        "packages/constitution/src/index.js"
+        "packages/constitution/src/index.js",
+        "packages/blessed/src/index.js",
+        "packages/blessed/cordis.patch.yml"
       ],
       "verifiers": [
-        "packages/constitution/test/constitution.test.js"
+        "packages/constitution/test/constitution.test.js",
+        "packages/blessed/test/loader.dsh.test.js"
       ]
     },
     {

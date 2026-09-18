@@ -1,0 +1,108 @@
+- id: sandbox
+  disabled: true
+
+- id: tool-fs
+  disabled: true
+
+- id: tool-fs-search
+  disabled: true
+
+- id: tool-jobs
+  disabled: true
+
+- id: tool-skill
+  disabled: true
+
+- id: skill-filesystem
+  disabled: true
+
+- id: session-persistence-jsonl
+  disabled: true
+
+- id: subagent-fork-in-process
+  disabled: true
+
+- id: tool-subagent
+  disabled: true
+
+- id: tool-subagent-fork
+  disabled: true
+
+- id: tool-subagent-control
+  disabled: true
+
+- id: tool-subagent-list-agents
+  disabled: true
+
+- id: workflow-worker-thread
+  disabled: true
+
+- id: tool-workflow
+  disabled: true
+
+- id: tool-ralph
+  disabled: true
+
+- id: web
+  disabled: true
+
+- id: web-search-deepseek
+  disabled: true
+
+- id: web-fetch-http
+  disabled: true
+
+- id: tool-web
+  disabled: true
+
+- id: session-title-llm
+  disabled: true
+
+- id: session-telemetry-otel
+  disabled: true
+
+- id: sandbox-policy
+  config:
+    mode: workspace-write
+    workspaceRoot: !!js process.env.COMPACT_WORKSPACE || process.cwd()
+
+- id: approval
+  config:
+    policy: ask
+
+- id: permission
+  config:
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: ask
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask
+
+- id: agent-loop
+  inject: [compact-ready]
+
+- insert:
+    - id: compact-record-provider
+      name: compact-dsh-record/provider
+      config:
+        root: !!js process.env.COMPACT_RECORD_ROOT
+        chainDir: !!js process.env.COMPACT_CHAIN_DIR
+        compression: none
+
+    - id: compact-blessed
+      name: compact-dsh-blessed
+      config:
+        allowlist: !!js JSON.parse(process.env.COMPACT_ALLOWLIST || '[]')
+        approval:
+          persistPath: !!js process.env.COMPACT_APPROVAL_PERSIST_PATH
+        sandbox:
+          image: !!js process.env.COMPACT_SANDBOX_IMAGE
+          network: none
+          imageProvenance:
+            - ref: !!js process.env.COMPACT_SANDBOX_IMAGE
+              digest: !!js process.env.COMPACT_SANDBOX_IMAGE_DIGEST
+              attestation: operator-declared
+              recordedBy: !!js process.env.COMPACT_SANDBOX_RECORDED_BY
+              note: !!js process.env.COMPACT_SANDBOX_PROVENANCE_NOTE

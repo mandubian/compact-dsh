@@ -489,6 +489,57 @@ re-verified as *required* on the new line). None of the three breaks the
 current pin. Recon is scheduled for the 0.1.6 beta/rc — or earlier, if a
 release ships something this composition actually needs.
 
+## Try Compact inside dsh
+
+This checkout provides a **headless pilot**, not a ratified jurisdiction or an
+interactive approval UI. Node >=22.19 and a working Docker daemon are required.
+Use the lockfile to reproduce the tested host dependency set.
+
+```bash
+npm ci
+docker pull ubuntu:24.04
+npm run compact:smoke
+npm run compact -- "Use self_describe to report your standing and declared gaps."
+```
+
+The last command makes real model requests and requires `DEEPSEEK_API_KEY` in
+your environment (configure it outside source control). The default route is
+`deepseek-official` / `deepseek-flash`. Smoke boots the real dsh loader and full
+Compact composition without calling a model; it does not test provider access.
+
+```bash
+npm run compact -- --workspace /absolute/project --state-dir /absolute/private-state "Inspect the project using bash and report what you find."
+```
+
+State defaults to `~/.compact-dsh`: session JSONL files under `sessions/`, hash
+chains under `chains/`, and persistent grants in `approvals.json`. Keep this
+operator-owned directory outside the agent workspace. The launcher isolates
+`DSH_HOME` there and disables telemetry; it does not modify your normal dsh
+profile or load its patches. `compact.generated.cordis.yml` must remain empty.
+
+The bundle replaces stock persistence with `compact-dsh-record/provider`, so
+host session writes actually pass through the chain. It replaces the stock
+sandbox with Docker and starts the agent loop only after `compact-ready`.
+Startup refuses missing enforcement or required configuration. Image provenance
+is explicitly **operator-declared**, not a verified build history.
+
+**Pilot boundaries:**
+- Bash executes inside Docker with networking off. Native host file/search,
+  jobs, skills, web, workflow and generic delegation tools are disabled;
+  use Bash for file work and the five Compact specialists for delegation.
+- Unrestricted `danger-full-access` mode is rejected. Headless has no human
+  approval answerer: operations needing a new approval fail closed, not auto-approve.
+- The allowlist defaults to empty. Allowlisting alone does not enable container
+  networking or replace the approval gate.
+- Container working directory follows the sandbox policy workspace root;
+  use an explicit `cd` inside Bash for subdirectories rather than its workdir option.
+- `ubuntu:24.04` is a minimal shell image, not a development environment. Set
+  `COMPACT_SANDBOX_IMAGE` to a locally prepared image containing your project's
+  tools. The launcher inspects its local `.Id` and never pulls/builds implicitly.
+- The no-key loader, confinement and persistence checks are tested; a live
+  model-backed task has not been verified here. Keys, Part V adjudication and
+  ratified standing remain declared gaps.
+
 ## Verify locally
 
 ```bash

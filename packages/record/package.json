@@ -4,6 +4,12 @@
   "type": "module",
   "description": "The Compact on dsh — the tamper-evident record: a hash-chain decorator over the session-persistence backend, committing links beside the log on append and verifying them on read (I-2, R-7, both entrenched under A-2).",
   "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./provider": "./src/provider.js",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
   "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
   "scripts": { "test": "node --test \"test/*.test.js\"" },
   "engines": { "node": ">=22.19" }

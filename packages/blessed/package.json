@@ -1,0 +1,38 @@
+{
+  "name": "compact-dsh-blessed",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — ordered runtime integration and readiness barrier.",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+  },
+  "dependencies": {
+    "compact-dsh-allowlist-gate": "0.1.0",
+    "compact-dsh-approval": "0.4.1",
+    "compact-dsh-capability-gate": "0.1.0",
+    "compact-dsh-constitution": "0.1.0",
+    "compact-dsh-emergency": "0.1.0",
+    "compact-dsh-exit": "0.1.0",
+    "compact-dsh-loopguard": "0.1.0",
+    "compact-dsh-petition": "0.1.0",
+    "compact-dsh-promotion": "0.1.0",
+    "compact-dsh-record": "0.1.0",
+    "compact-dsh-remote-access": "0.1.0",
+    "compact-dsh-sandbox-docker": "0.1.0",
+    "compact-dsh-self-model": "0.1.0",
+    "compact-dsh-specialists": "0.2.0"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

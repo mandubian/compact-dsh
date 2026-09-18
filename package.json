@@ -4,6 +4,8 @@
   "type": "module",
   "description": "The Compact on DeepSeek Harness — plugin composition, annex, and ratification work.",
   "scripts": {
+    "compact": "node tools/compact-dsh.mjs",
+    "compact:smoke": "node tools/compact-dsh.mjs --smoke",
     "test": "node --test \"packages/*/test/*.test.js\" \"tools/*.test.mjs\"",
     "verify-pin": "node tools/verify-pin.mjs",
     "verify-register": "node tools/verify-register.mjs"
