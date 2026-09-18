@@ -41,11 +41,23 @@ const PACKAGE_VERBS = {
   docker: ['pull', 'push'], podman: ['pull', 'push'], helm: ['install', 'pull', 'push'],
 };
 
+// read-only inspectors: a network verb as their bare ARGUMENT is a mention,
+// not an invocation (issue #5) — `command -v curl` proves a presence, it does
+// not open a socket. 'command' qualifies ONLY with -v: bare `command curl`
+// executes curl. The inspector must itself be in command position.
+const VERB_INSPECTORS = new Set(['command', 'which', 'type', 'whence', 'man', 'whatis', 'whereis', 'apropos']);
+
 const URL_RE = /https?:\/\/[^\s'"`<>()\[\]{}|\\;]+/gi;      // matchAll only (global = stateful)
 const URL_ONCE = /https?:\/\/[^\s'"`<>()\[\]{}|\\;]+/i;      // .test only
 const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const SCP_LIKE_RE = /^[\w.-]+@([\w.-]+):/; // git@github.com:org/repo
-const TOKEN_SPLIT = /[\s;&|()]+/;
+// shell-naive tokenization: separators are their own matches so command
+// position is decidable — a token opens a command when it is the first token
+// or follows && || ; | & ( ) (hence also $( — substitution stays an
+// invocation). The single & is a separator in its own right (background
+// operator): `sleep 1 & which curl` puts which in command position.
+const TOKEN_RE = /&&|\|\||[;|()]|&(?!&)|[^\s;&|()]+/g;
+const SEPARATORS = new Set(['&&', '||', ';', '|', '&', '(', ')']);
 
 function validIpv4(s) {
   return s.split('.').every(o => Number(o) <= 255);
@@ -95,11 +107,22 @@ export function createAnalyzer({ commandArgKeys = DEFAULT_COMMAND_ARG_KEYS, pack
         out.push({ arg: argKey, match: m[0], kind: 'url', target: null, verb: 'url' });
       }
     }
-    // 2. verb-led forms
-    const tokens = command.split(TOKEN_SPLIT).filter(Boolean);
+    // 2. verb-led forms — tokens carry their command-position flag; head is
+    // the bare name of the command whose argument list we are inside
+    const tokens = [];
+    const cmdPos = [];
+    let atCmd = true;
+    for (const m of command.matchAll(TOKEN_RE)) {
+      if (SEPARATORS.has(m[0])) { atCmd = true; continue; }
+      tokens.push(m[0]);
+      cmdPos.push(atCmd);
+      atCmd = false;
+    }
+    let head = null; // {name, index} of the current command's head token
     for (let i = 0; i < tokens.length; i++) {
       const tok = tokens[i];
       const bare = tok.replace(/^.*\//, ''); // /usr/bin/curl → curl
+      if (cmdPos[i]) head = { name: bare, index: i };
       if (bare === 'git') {
         const sub = tokens[i + 1];
         if (!GIT_NETWORK_SUB.has(sub)) continue;
@@ -121,6 +144,17 @@ export function createAnalyzer({ commandArgKeys = DEFAULT_COMMAND_ARG_KEYS, pack
         continue;
       }
       if (NETWORK_VERBS.has(bare)) {
+        // issue #5: a verb MENTIONED as a bare argument to a read-only
+        // inspector in command position never invokes — drop the finding.
+        // ONLY the inspector list suppresses, and only bare tokens (a path
+        // form like /usr/bin/curl is verb-recognised in command position
+        // only). Everything else — `echo curl`, `sudo curl`, `xargs curl`,
+        // `$(curl …)` — keeps the opaque fail-closed behavior: echo is
+        // benign, but the doctrine narrows only what is PROVABLY non-invoking.
+        if (!cmdPos[i] && tok === bare && head && VERB_INSPECTORS.has(head.name)
+            && (head.name !== 'command' || tokens.slice(head.index + 1, i).includes('-v'))) {
+          continue;
+        }
         const rest = tokens.slice(i + 1).filter(t => !isFlag(t));
         const positional = remoteOf(rest);
         if (!positional) {

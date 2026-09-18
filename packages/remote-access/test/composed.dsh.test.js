@@ -130,6 +130,21 @@ test('composed: non-network commands pass through untouched', async () => {
   assert.equal(refusals.length, 0);
 });
 
+test('composed: a presence check mentioning a verb is not network access (issue #5)', async () => {
+  const { tools, asked, refusals } = await boot({ operator: 'allowed-once' });
+  tools.register(bashProbe);
+  executed = 0;
+  const agent = makeAgent('sess-ra-4b');
+  await run(tools, agent, 'command -v curl');
+  await run(tools, agent, 'which wget && man ssh');
+  assert.equal(executed, 2, 'provably non-invoking mentions run ungated');
+  assert.equal(asked.count, 0);
+  assert.equal(refusals.length, 0);
+  const r = await run(tools, agent, 'sudo curl $DEPLOY_URL');
+  assert.equal(executed, 2, 'dangerous-adjacent forms still fail closed');
+  assert.ok(JSON.stringify(r).includes('D-7/opaque-network'));
+});
+
 test('composed: non-command args are not scanned (fs contents are not commands)', async () => {
   const { tools, asked } = await boot({ operator: 'allowed-once' });
   const noteTool = defineTool({

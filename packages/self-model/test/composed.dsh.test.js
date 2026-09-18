@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { Context, Service } from '@deepseek-ai/cordis';
 import { ToolRuntime } from '@deepseek-ai/dsh-tools';
 import { Session, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
+import * as constitution from 'compact-dsh-constitution';
 import * as selfModel from '../src/index.js';
 
 function header(id, parentSession) {
@@ -96,7 +97,42 @@ test('composed: the attestation arrives at the turn boundary, unasked (R-1)', as
   assert.match(text, /\[R-1\] Attestation/);
   assert.match(text, /You are: s1/);
   assert.match(text, /Standing: none/);
+  assert.match(text, /The law, in its taught form:\ntaught$/, 'the stub constitution\'s taught form closes the block');
   assert.equal(agent.injected[0].source.plugin, 'compact-self-model');
+});
+
+test('composed: the injected turn-start block carries the REAL constitution\'s taught form, in full', async () => {
+  const ctx = new Context();
+  ctx.plugin(SystemPromptStub);
+  ctx.plugin(AgentsStub);
+  ctx.plugin(ToolRuntime);
+  // The REAL constitution service — the bundled body boot-verified against
+  // its pinned digest — with the coupling roster and rule registry scoped
+  // out so this suite need not compose the whole blessed set. The taught
+  // form it serves is the body's own appendix: if compact.md changes, this
+  // test's expectation changes with it.
+  constitution.apply(ctx, { requires: [], register: { meta: { compactDigest: constitution.COMPACT_DIGEST }, entries: [] } });
+  selfModel.apply(ctx, { staleAfterMs: 1000 });
+  if (typeof ctx.start === 'function') await ctx.start();
+  for (let i = 0; i < 500 && (!ctx.tools || ctx.get('compact-self-model') === undefined); i++) {
+    await new Promise(r => setImmediate(r));
+  }
+  const agents = ctx.get('agents');
+  const agent = agents.add('s1');
+  ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+
+  assert.equal(agent.injected.length, 1);
+  const text = agent.injected[0].content[0].text;
+  assert.match(text, /The law, in its taught form:/);
+  assert.ok(text.includes(constitution.TAUGHT_DIGEST),
+    'the appendix is rendered in full, derived from the bundled body — never restated');
+  assert.match(text, /authority to break this law/, 'the law-over-task sentence reaches the Subject every turn');
+  assert.ok(text.length < 8192, 'the block stays bounded — the taught form is the short appendix, not the body');
+  assert.ok(!text.includes(constitution.COMPACT_BODY.slice(0, 200)), 'the full body is NOT injected');
+
+  // self_describe renders it identically (R-1, on demand)
+  const out = String((await call(ctx.tools, 'self_describe', {}, agent))?.value ?? '');
+  assert.ok(out.includes(constitution.TAUGHT_DIGEST), 'the on-demand render carries the same taught form');
 });
 
 test('composed: a non-turn session event injects nothing', async () => {

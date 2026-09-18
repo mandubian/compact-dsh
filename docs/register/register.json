@@ -101,7 +101,7 @@
       "kind": "enforced",
       "plugin": "compact-remote-access",
       "service": "compact-remote-access",
-      "evidence": "network findings route through the grant layers (approvable per-host); opaque findings fail closed",
+      "evidence": "network findings route through the grant layers (approvable per-host); opaque findings fail closed. Detection narrows provably non-invoking mentions (issue #5): a network verb as a bare argument of a read-only inspector in command position (command -v, which, type, man, …) is a mention, not an invocation; everything else keeps the opaque fail-closed behavior (echo curl, sudo curl, $(curl …) remain findings)",
       "enforcedBy": [
         "packages/remote-access/src/index.js",
         "packages/remote-access/src/analyzer.js"
@@ -251,7 +251,7 @@
       "kind": "enforced",
       "plugin": "compact-self-model",
       "service": "compact-self-model",
-      "evidence": "self-knowledge: the attestation is composed from the Enforcer's own services — capabilities from the capability gate, budgets and pending gates from the approval store, lineage from the durable session header, the law digest from the constitution, declared gaps from every service that owns one — and never from anything the Subject said. It is delivered at the Subject's own boundary (injected on every turn/start, unasked) and re-readable on demand via self_describe, which reports freshness against a cited epoch so a Subject can tell it is remembering rather than reading: a stale attestation raises an explicit alarm. DECLARED LIMIT: it is UNSIGNED — no identity keys are published, so it is authoritative within this runtime and proves nothing to another jurisdiction; that debt is I-1's, and the attestation states basis:'unsigned' and carries the limit among its gaps",
+      "evidence": "self-knowledge: the attestation is composed from the Enforcer's own services — capabilities from the capability gate, budgets and pending gates from the approval store, lineage from the durable session header, the law digest from the constitution, declared gaps from every service that owns one — and never from anything the Subject said. The rendered block closes with the law's own taught appendix (R-1's 'is taught this'), read live from the constitution service so it cannot drift from the bundled body; a composition without the constitution declares the omission rather than inventing a law (I-8). It is delivered at the Subject's own boundary (injected on every turn/start, unasked) and re-readable on demand via self_describe, which reports freshness against a cited epoch so a Subject can tell it is remembering rather than reading: a stale attestation raises an explicit alarm. DECLARED LIMIT: it is UNSIGNED — no identity keys are published, so it is authoritative within this runtime and proves nothing to another jurisdiction; that debt is I-1's, and the attestation states basis:'unsigned' and carries the limit among its gaps",
       "enforcedBy": [
         "packages/self-model/src/attestation.js",
         "packages/self-model/src/index.js"
