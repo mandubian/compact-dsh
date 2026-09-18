@@ -509,7 +509,13 @@ Compact composition without calling a model; it does not test provider access.
 
 ```bash
 npm run compact -- --workspace /absolute/project --state-dir /absolute/private-state "Inspect the project using bash and report what you find."
+npm run compact -- --attended "Run: git push https://github.com/owner/repo.git main"
 ```
+
+`--attended` mounts an operator answerer: gated asks prompt on stderr
+(default **deny** — empty answer, EOF, or ^C all reject), and `allowed-once`
+materializes an exec-cache entry so the identical operation replays without
+re-asking. Without it, operations needing a fresh approval fail closed.
 
 State defaults to `~/.compact-dsh`: session JSONL files under `sessions/`, hash
 chains under `chains/`, and persistent grants in `approvals.json`. Keep this
@@ -527,8 +533,9 @@ is explicitly **operator-declared**, not a verified build history.
 - Bash executes inside Docker with networking off. Native host file/search,
   jobs, skills, web, workflow and generic delegation tools are disabled;
   use Bash for file work and the five Compact specialists for delegation.
-- Unrestricted `danger-full-access` mode is rejected. Headless has no human
-  approval answerer: operations needing a new approval fail closed, not auto-approve.
+- Unrestricted `danger-full-access` mode is rejected. Plain headless has no
+  human answerer: operations needing a new approval fail closed, not
+  auto-approve. `--attended` composes the operator gate (see above).
 - The allowlist defaults to empty. Allowlisting alone does not enable container
   networking or replace the approval gate.
 - Container working directory follows the sandbox policy workspace root;

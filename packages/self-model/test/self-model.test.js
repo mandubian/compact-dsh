@@ -177,6 +177,28 @@ test('the rendered block teaches the authority rule and the alarm rule', async (
   assert.match(text, /not adopted: schedule_create/);
 });
 
+test('the block closes with the law in its taught form, read from the constitution service', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.law.taught, 'the taught form', 'law.taught is collected from the constitution service');
+  const text = renderAttestation(att);
+  assert.match(text, /The law, in its taught form:\n/, 'the taught section is framed, at the end of the block');
+  assert.ok(text.trimEnd().endsWith('the taught form'),
+    'the taught text is the last thing the Subject reads, rendered in full and unaltered');
+});
+
+test('a missing constitution omits the taught form with a declared note, never an invented one', async () => {
+  const { ctx, agents } = await boot({ withComposition: false });
+  agents.add('lonely');
+  const att = composeAttestation(ctx, { sessionId: 'lonely' });
+  assert.equal(att.law.taught, null, 'an absent fact is null, never a plausible value');
+  const text = renderAttestation(att);
+  assert.match(text, /The law, in its taught form:\n/);
+  assert.match(text, /omitted and declared missing rather than invented/,
+    'the degradation is declared where the taught text would stand (I-8)');
+});
+
 // -- R-13: identity, act, authority — and nothing else ------------------------
 
 test('the authority chain walks to the root and names the ultimate Principal', async () => {

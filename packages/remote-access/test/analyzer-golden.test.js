@@ -90,3 +90,45 @@ test('only command-shaped arg keys are scanned', () => {
 test('absolute-path invocations resolve to their verb (/usr/bin/curl)', () => {
   assert.deepEqual(targets('/usr/bin/curl https://api.example.com'), [{ url: 'https://api.example.com', host: 'api.example.com' }]);
 });
+
+test('verb mentions to read-only inspectors are not findings (issue #5)', () => {
+  // presence checks and doc lookups never invoke the verb
+  assert.deepEqual(findings('command -v curl'), []);
+  assert.deepEqual(findings('which wget'), []);
+  assert.deepEqual(findings('which -a curl'), []);
+  assert.deepEqual(findings('type -a curl'), []);
+  assert.deepEqual(findings('whence sftp'), []);
+  assert.deepEqual(findings('man ssh'), []);
+  assert.deepEqual(findings('whatis nc'), []);
+  assert.deepEqual(findings('whereis rsync'), []);
+  assert.deepEqual(findings('apropos telnet'), []);
+  // the inspector must be in COMMAND POSITION — first token or after a separator
+  assert.deepEqual(findings('(which curl)'), []);
+  assert.deepEqual(findings('ls -la && which curl'), []);
+  assert.deepEqual(findings('man ssh | grep -i protocol'), []);
+  // a mention does not hide a later invocation in the same line
+  assert.deepEqual(targets('which curl && curl $DEPLOY_URL'), ['opaque:curl']);
+});
+
+test('dangerous-adjacent verb forms stay opaque — only the inspector list suppresses (issue #5)', () => {
+  // wrappers that EXECUTE the verb are not inspectors
+  assert.deepEqual(targets('sudo curl $DEPLOY_URL'), ['opaque:curl']);
+  assert.deepEqual(targets('xargs curl'), ['opaque:curl']);
+  // command substitution is command position — $(curl …) invokes
+  assert.deepEqual(targets('$(curl $DEPLOY_URL)'), ['opaque:curl']);
+  assert.deepEqual(targets('echo $(curl https://api.example.com/x)'),
+    [{ url: 'https://api.example.com/x', host: 'api.example.com' }]);
+  // bare `command` executes its argument — only `command -v` is read-only
+  assert.deepEqual(targets('command curl $DEPLOY_URL'), ['opaque:curl']);
+  // echo is benign, but it is not a PROVEN non-invoking inspector — the
+  // doctrine narrows only what is provably non-invoking, so echo keeps the
+  // opaque fail-closed behavior (the URL-literal convention is unchanged:
+  // a URL in echo is still a finding, see above)
+  assert.deepEqual(targets('echo curl'), ['opaque:curl']);
+  // an inspector NOT in command position is itself an argument — no suppression
+  assert.deepEqual(targets('echo which curl'), ['opaque:curl']);
+  assert.deepEqual(targets('sudo which curl'), ['opaque:curl']);
+  // path-form mentions are not bare verbs — verb recognition of absolute
+  // paths applies in command position only, so these stay opaque
+  assert.deepEqual(targets('echo /usr/bin/curl'), ['opaque:curl']);
+});

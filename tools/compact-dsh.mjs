@@ -53,13 +53,17 @@ async function main() {
     options: {
       help: { type: 'boolean', short: 'h' },
       smoke: { type: 'boolean' },
+      attended: { type: 'boolean' },
       workspace: { type: 'string' },
       'state-dir': { type: 'string' },
     },
   });
   if (values.help) {
-    console.log('Usage: npm run compact -- [--workspace PATH] [--state-dir PATH] "task"\n       npm run compact -- --smoke [--workspace PATH] [--state-dir PATH]\nState defaults to ~/.compact-dsh (COMPACT_STATE_DIR overrides); DSH_HOME is isolated there.\nTask mode inherits DEEPSEEK_API_KEY; default model: deepseek-flash.\nDocker image must already exist locally: COMPACT_SANDBOX_IMAGE (default ubuntu:24.04).');
+    console.log('Usage: npm run compact -- [--attended] [--workspace PATH] [--state-dir PATH] "task"\n       npm run compact -- --smoke [--workspace PATH] [--state-dir PATH]\nState defaults to ~/.compact-dsh (COMPACT_STATE_DIR overrides); DSH_HOME is isolated there.\nTask mode inherits DEEPSEEK_API_KEY; default model: deepseek-flash.\n--attended prompts the operator on the terminal for uncovered gated calls (default deny; stderr only).\n--smoke never prompts and forbids --attended.\nDocker image must already exist locally: COMPACT_SANDBOX_IMAGE (default ubuntu:24.04).');
     return;
+  }
+  if (values.attended && values.smoke) {
+    throw new Error('--attended prompts the operator; --smoke forbids prompts and model calls — pick one');
   }
   const task = positionals.join(' ');
   if (values.smoke ? positionals.length > 0 : !task.trim()) {
@@ -174,6 +178,13 @@ async function main() {
       }, { prepend: true });
     }, rootUrl);
     if (exitCode === undefined) {
+      if (values.attended) {
+        // appended on the settled context, downstream of the composition's
+        // recorded answerer — it claims compact asks first; the operator
+        // decides what it delegates. Never mounted under --smoke (rejected above).
+        const { operatorAnswerer } = await import('./operator-answerer.mjs');
+        operatorAnswerer(ctx);
+      }
       if (ctx.get('compact-ready')?.ready !== true) throw new Error('compact-ready was not provided; refusing to run');
       console.error(`${binName}: ready${values.smoke ? ' (smoke; no LLM request)' : ''}; draft Compact, no Compact standing.`);
       console.error(`State: ${stateDir}; records: ${paths.COMPACT_RECORD_ROOT}; chains: ${paths.COMPACT_CHAIN_DIR}; approvals: ${paths.COMPACT_APPROVAL_PERSIST_PATH}`);

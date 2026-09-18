@@ -258,6 +258,18 @@ export function renderAttestation(att) {
     '',
     `This block is stale after ${Math.round(att.staleAfterMs / 1000)}s. A stale attestation is an alarm, not a truth ` +
     `to act on — call self_describe to re-read rather than relying on an older one (R-1).`,
+    // The taught form closes the block: R-1 says the Subject "is taught this",
+    // and the teaching text is the law's own appendix, read from the
+    // constitution service at compose time (`law.taught`) — never restated
+    // here, so it can never drift from the bundled body. It is the short
+    // appendix paragraph, rendered in full. An absent constitution degrades
+    // honestly (I-8): the section declares the omission instead of inventing
+    // a law.
+    '',
+    'The law, in its taught form:',
+    ...(att.law.taught
+      ? [att.law.taught]
+      : ['  (absent: the constitution service is not composed here, so the taught form is omitted and declared missing rather than invented)']),
   ];
   return lines.join('\n');
 }
