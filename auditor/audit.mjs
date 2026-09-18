@@ -32,7 +32,24 @@ function parseLog(file) {
   return text.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
 }
 
-export function audit(events, chainFile) {
+/**
+ * The dsh v3 JSONL format writes a session HEADER line (type:'session', no
+ * seq) before the first event. The chain commits to seq'd acts only, so the
+ * header is deployment metadata, not an act: it is counted, not audited. Any
+ * OTHER line without a numeric seq stays in the event list, where the
+ * contiguity check flags it — an act that cannot be ordered cannot be chained.
+ */
+export function splitPreamble(lines) {
+  const events = [];
+  let headerLines = 0;
+  for (const e of lines) {
+    if (e?.seq === undefined && e?.type === 'session' && e?.version === 3) headerLines += 1;
+    else events.push(e);
+  }
+  return { events, headerLines };
+}
+
+export function audit(events, chainFile, headerLines = 0) {
   const chain = chainFile ? checkChain(chainFile, events) : null;
   const findings = [];
   const askedIds = new Map();   // approval id -> seq
@@ -109,7 +126,7 @@ export function audit(events, chainFile) {
   const errors = findings.filter(f => f.severity === 'error');
   return {
     verdict: errors.length === 0 ? 'conforming' : 'violations',
-    checked: { events: events.length, asks: askedIds.size, chain: chain ? (chain.ok ? 'verified' : 'BROKEN') : 'not checked' },
+    checked: { events: events.length, asks: askedIds.size, headerLines: headerLines ?? 0, chain: chain ? (chain.ok ? 'verified' : 'BROKEN') : 'not checked' },
     ...(chain?.ok ? { chainHead: chain.head } : {}),
     reliesOn: chain
       ? `the hash chain in ${chain.file} (session ${chain.sessionId}), verified here — the log's integrity was checked ` +
@@ -136,7 +153,8 @@ function checkChain(file, events) {
   }
   try {
     verifySlice({ sessionId, firstSeq: 0, events, links });
-    return { file, sessionId, ok: true, head: links.get(events.length - 1) ?? genesisHash(sessionId), finding: null };
+    const lastSeq = events.length > 0 ? events[events.length - 1]?.seq : undefined;
+    return { file, sessionId, ok: true, head: (typeof lastSeq === 'number' ? links.get(lastSeq) : undefined) ?? genesisHash(sessionId), finding: null };
   } catch (e) {
     if (!(e instanceof RecordIntegrityError)) throw e;
     return {
@@ -155,14 +173,15 @@ function main() {
     console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--quiet]');
     process.exit(2);
   }
-  let events;
+  let parsed;
   try {
-    events = parseLog(file);
+    parsed = parseLog(file);
   } catch (e) {
     console.error(`auditor: cannot read ${file}: ${e.message}`);
     process.exit(2);
   }
-  const attestation = { session: file, ...audit(events, chainFile) };
+  const { events, headerLines } = splitPreamble(parsed);
+  const attestation = { session: file, ...audit(events, chainFile, headerLines) };
   if (!quiet) console.log(JSON.stringify(attestation, null, 2));
   const errors = attestation.findings.filter(f => f.severity === 'error');
   if (errors.length > 0) {

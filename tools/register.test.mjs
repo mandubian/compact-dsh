@@ -101,6 +101,36 @@ test('the auditor rejects outcomes outside the closed vocabulary and unbalanced 
   assert.ok(att.findings.some(f => f.detail.includes('without an open turn')));
 });
 
+test('a dsh v3 session header line is metadata, not an unevidenced act', async () => {
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { extendChain, genesisHash } = await import('../packages/record/src/chain.js');
+  const { splitPreamble } = await import('../auditor/audit.mjs');
+
+  const header = { type: 'session', version: 3, id: 'sess-v3-header', createdAt: 1 };
+  const events = [
+    { seq: 0, type: 'turn/start', time: 1, data: { turn: 1 } },
+    { seq: 1, type: 'turn/end', time: 2, data: { turn: 1 } },
+  ];
+  const { events: kept, headerLines } = splitPreamble([header, ...events]);
+  assert.deepEqual(kept, events, 'the header is not treated as an act');
+  assert.equal(headerLines, 1);
+
+  const dir = mkdtempSync(join(tmpdir(), 'compact-audit-v3-'));
+  const chainFile = join(dir, 'sess-v3-header.chain');
+  writeFileSync(chainFile, extendChain(genesisHash('sess-v3-header'), 0, events).map(l => JSON.stringify({ seq: l.seq, h: l.h })).join('\n') + '\n');
+  const good = audit(kept, chainFile, headerLines);
+  assert.equal(good.verdict, 'conforming', JSON.stringify(good.findings));
+  assert.equal(good.checked.headerLines, 1);
+  assert.equal(good.checked.chain, 'verified');
+
+  const tampered = kept.map(e => e.seq === 1 ? { ...e, time: 99 } : e);
+  const bad = audit(tampered, chainFile, headerLines);
+  assert.equal(bad.verdict, 'violations');
+  assert.equal(bad.checked.chain, 'BROKEN');
+});
+
 test('the auditor flags the crash tail: an ask never decided, a log ending mid-turn', () => {
   const log = [
     { seq: 0, type: 'turn/start', time: 1, data: { turn: 1 } },
