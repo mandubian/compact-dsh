@@ -33,6 +33,7 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
+import { createHash } from 'node:crypto';
 import { GrantStore, coveringGrants } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
@@ -104,6 +105,13 @@ function commandPreview(args) {
   const flat = String(raw ?? '').replace(/\s+/g, ' ').trim();
   const cut = flat.length > 240 ? flat.slice(0, 237) + '…' : flat;
   return redactEmbeddedSecrets(cut);
+}
+
+/** Command-aware identity for targetless calls that reference declared
+ *  secrets: allow-once covers exactly this command, never a blanket over the
+ *  tool (the LoopGuard's command-aware doctrine, reused for the agreement). */
+function commandAwareFingerprint(tool, args) {
+  return 'fp_' + createHash('sha256').update(JSON.stringify({ tool: String(tool), command: String(args?.command ?? '') })).digest('hex').slice(0, 16);
 }
 
 export function createApproval(opts = {}) {
@@ -239,6 +247,13 @@ export function approvalPlugin(opts = {}) {
       const tool = exec?.name ?? 'unknown-tool';
       const args = exec?.arguments ?? {};
       const { root, session } = identityOf(exec?.agent);
+      // Declared secret references in the call: `$NAME` in a command string,
+      // where NAME was declared by the composition. The approval of such a
+      // call is also the injection agreement — the envelope says so, so the
+      // decider knows what "allow once" will materialize. Undeclared `$FOO`
+      // is the Subject's own variable and none of this gate's business.
+      const secretRefs = approval.secretRefs.filter(re =>
+        new RegExp(`\\$\\{?${re}\\}?\\b`).test(String(args?.command ?? '')));
       // This gate gates IDENTIFIABLE targets only. A call with no canonical
       // target (an opaque command string, a path argument) would collapse to
       // one fingerprint per tool — approving it once would be a hidden
@@ -246,16 +261,29 @@ export function approvalPlugin(opts = {}) {
       // "no blanket grants" invariant, D-8). Opaque command strings are the
       // remote-access analyzer's domain (Phase 2 item 3); mount requests
       // carry their own gate.
-      if (Object.keys(canonicalTarget(args)).length === 0) return null;
+      //
+      // THE EXCEPTION PROVES THE RULE: a targetless call that references a
+      // DECLARED secret must pass the human gate — the injection agreement
+      // cannot exist without a decision — so it is gated under a
+      // COMMAND-AWARE fingerprint (the LoopGuard's own doctrine): allow-once
+      // covers exactly this command, never a blanket over the tool.
+      if (Object.keys(canonicalTarget(args)).length === 0) {
+        if (secretRefs.length === 0) return null;
+        const fp = commandAwareFingerprint(tool, args);
+        if (approval.store.cacheHit(fp, Date.now())) return null;   // the identical secret command replays
+        if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp, root, session, args, callId: exec.callId, secretRefs });
+        approval.store.recordPending(root);
+        // LoopGuard cooperation, same contract as the target-bearing path
+        try { ctx.emit?.(REFUSAL_EVENT, refusalPayload({ kind: 'ask', verdict: 'ask', ruleId: 'I-5/secret-use', tool, fingerprint: fp, root, session })); } catch { /* accounting must not break enforcement */ }
+        const env = buildEnvelope({ gate: 'AG', ruleId: 'I-5/secret-use',
+          reason: `"${tool}" references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
+            `approving it materializes the injection grant and the credential is available to this command inside the ` +
+            `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints`,
+          lawfulNextMoves: ['rephrase without the secret reference', 'escalate to your Principal'] });
+        return { kind: 'ask', reason: env.text };
+      }
       const v = approval.evaluate({ tool, args, root, session, now: Date.now() });
       if (v.verdict === 'allowed') return null;
-      // declared secret references in the call: `$NAME` in a command string,
-      // where NAME was declared by the composition. The approval of such a
-      // call is also the injection agreement — the envelope says so, so the
-      // decider knows what "allow once" will materialize. Undeclared `$FOO`
-      // is the Subject's own variable and none of this gate's business.
-      const secretRefs = approval.secretRefs.filter(re =>
-        new RegExp(`\\$\\{?${re}\\}?\\b`).test(String(args?.command ?? '')));
       const report = (kind) => {
         // LoopGuard cooperation — a throwing listener must never take the
         // gate down with it (the gate's answer stands either way)

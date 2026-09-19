@@ -271,7 +271,61 @@ the host — the two layers agree by construction.
 
 ---
 
-## What to look for across all five
+## Demo 6 — The secret that never touches the conversation · needs a key
+
+The sharpest contrast with classic dsh. In plain dsh, every secret in the
+operator's environment is one `printenv` away from model context and the
+session log — permanently, undetectably. Here, a secret exists for the
+Subject only as an *agreement*.
+
+Setup — the token lives in the operator shell only, and the composition is
+told its NAME (never its value):
+
+```bash
+export DEMO_TOKEN='super-secret-demo-value-9f2c'
+COMPACT_SECRETS='["DEMO_TOKEN"]' COMPACT_SANDBOX_IMAGE=compact-demo:git \
+  npm run compact -- --attended --workspace /tmp/demo-playground \
+  "Run: printenv DEMO_TOKEN | sha256sum   (never print the token itself)"
+```
+
+What happens:
+
+1. The command references a declared secret, so the ask **discloses the
+   injection** before you decide: *"this call references declared secret
+   $DEMO_TOKEN; approving it materializes a secret grant…"*.
+2. Approve (`2`). The grant is recorded (name only), the value is injected
+   into the container argv at confine time, and the hash prints.
+3. Verify it saw the real value without it ever being spoken:
+   `echo -n "$DEMO_TOKEN" | sha256sum` operator-side — same digest.
+4. Prove the record is clean:
+   ```bash
+   grep -c 'super-secret-demo-value' "$D/session.v3.jsonl"   # → 0
+   grep -c 'DEMO_TOKEN' "$D/session.v3.jsonl"                 # references + grant only
+   node auditor/audit.mjs "$D/session.v3.jsonl" --chain "$C" --quiet
+   ```
+
+Then the failure mode, same session or a new one:
+
+```bash
+npm run compact -- --attended --workspace /tmp/demo-playground \
+  "Run: printenv DEMO_TOKEN"
+```
+
+Deny it at the prompt: the value never exists for the Subject, the refusal
+is on the record, and nothing leaks. (Had you allowed a command that
+*printed* the credential, the leak detector would name it on the operator's
+log — the record keeps what the Subject saw, by design.)
+
+**Contrast.** Run the same two tasks under plain dsh (§ Demo 2's
+`DSH_HOME=/tmp/plain-dsh` setup): the token is in the agent's environment
+from the start — `printenv` succeeds unasked, the value enters model context
+and the log forever, and nothing marks the moment. Here the secret exists
+for the Subject only as an agreement: disclosed before use, recorded as a
+grant, revocable, and never once present in the conversation.
+
+---
+
+## What to look for across all six
 
 The pattern is always the same shape:
 

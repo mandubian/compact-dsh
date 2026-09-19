@@ -95,6 +95,7 @@
       name: compact-dsh-blessed
       config:
         allowlist: !!js JSON.parse(process.env.COMPACT_ALLOWLIST || '[]')
+        secrets: !!js JSON.parse(process.env.COMPACT_SECRETS || '[]')
         approval:
           persistPath: !!js process.env.COMPACT_APPROVAL_PERSIST_PATH
         protectedState:

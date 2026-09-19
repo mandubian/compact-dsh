@@ -106,3 +106,40 @@ test('a denial materializes nothing, and undeclared variables stay the Subject\'
     return ctx.listeners['approval/request'][0](req, async () => decision);
   }
 });
+
+// -- targetless secret commands: gated under a command-aware fingerprint -----
+
+const TARGETLESS = { command: 'printenv $GH_TOKEN | sha256sum' };
+
+test('a targetless command referencing a declared secret is GATED — the agreement needs a decision', () => {
+  const ctx = fakeCtx();
+  const apply = approvalPlugin({ secretRefs: ['GH_TOKEN'] });
+  apply(ctx, {});
+  const approval = apply.approval;
+
+  const ask = approval.gate({ name: 'bash', arguments: TARGETLESS, agent: AGENT, callId: 'c3' });
+  assert.equal(ask.kind, 'ask', 'it must not slip past the gate as "targetless"');
+  assert.match(ask.reason, /I-5\/secret-use/);
+  assert.match(ask.reason, /\$GH_TOKEN/);
+  const sameShape = approval.gate({ name: 'bash', arguments: { command: 'printenv OTHER | sha256sum' }, agent: AGENT, callId: 'c4' });
+  assert.equal(sameShape, null, 'a command WITHOUT the reference stays ungated — the exception is narrow');
+});
+
+test('allow-once covers exactly that command: the identical call replays, a different one asks', async () => {
+  const ctx = fakeCtx();
+  const apply = approvalPlugin({ secretRefs: ['GH_TOKEN'] });
+  apply(ctx, {});
+  const approval = apply.approval;
+  const answerer = (req) => ctx.listeners['approval/request'][0](req, async () => 'allowed-once');
+
+  const first = approval.gate({ name: 'bash', arguments: TARGETLESS, agent: AGENT, callId: 'c5' });
+  assert.equal(first.kind, 'ask');
+  await answerer({ toolName: 'bash', agent: AGENT, callId: 'c5' });
+  assert.deepEqual(approval.store.secretGrantsFor('s1').map(g => g.ref), ['GH_TOKEN']);
+
+  const replay = approval.gate({ name: 'bash', arguments: TARGETLESS, agent: AGENT, callId: 'c6' });
+  assert.equal(replay, null, 'the identical command replays from the cache — no re-ask, grant still alive');
+
+  const different = approval.gate({ name: 'bash', arguments: { command: 'printenv $GH_TOKEN | wc -c' }, agent: AGENT, callId: 'c7' });
+  assert.equal(different.kind, 'ask', 'a different secret-using command is a NEW agreement — never a blanket');
+});
