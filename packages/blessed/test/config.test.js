@@ -39,3 +39,14 @@ test('blank state paths are rejected rather than canonicalized into junk', () =>
   config.protectedState = ['/state/sessions', '  '];
   assert.throws(() => resolveConfig(config), /protectedState entry/);
 });
+
+test('a mistyped mask list fails loudly instead of spreading into character junk', () => {
+  for (const key of ['maskedPaths', 'protectedPaths']) {
+    const config = BASE();
+    config.sandbox[key] = '/extra/secret';
+    assert.throws(() => resolveConfig(config), new RegExp(`sandbox\\.${key} must be an array`));
+    const nested = BASE();
+    nested.sandbox[key] = { path: '/x' };
+    assert.throws(() => resolveConfig(nested), new RegExp(`sandbox\\.${key} must be an array`));
+  }
+});

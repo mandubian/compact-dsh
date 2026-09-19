@@ -55,6 +55,14 @@ export function resolveConfig(config) {
     throw new TypeError('blessed: protectedState must name the Enforcer state paths (record root, chain dir, approval store) — a composition whose Subject can reach the Enforcer\'s evidence lets it rewrite its own record; refusing to start rather than compose that silently (F-5, D-8)');
   }
   for (const p of config.protectedState) text(p, 'protectedState entry');
+  // a mistyped mask list (a string, a nested object) must fail loudly, never
+  // spread into character junk that silently canonicalizes to nothing
+  for (const key of ['maskedPaths', 'protectedPaths']) {
+    const v = config.sandbox[key];
+    if (v !== undefined && (!Array.isArray(v) || v.some(p => typeof p !== 'string' || !p.trim()))) {
+      throw new TypeError(`blessed: sandbox.${key} must be an array of non-empty path strings`);
+    }
+  }
   const masked = [...(config.sandbox.maskedPaths ?? []), ...config.protectedState].map(canonicalizeBestEffort);
   const protectedPaths = [...(config.sandbox.protectedPaths ?? []), ...config.protectedState].map(canonicalizeBestEffort);
   if (config.specialists !== undefined) object(config.specialists, 'specialists');
