@@ -1,5 +1,5 @@
 import { apply as applyAllowlist } from 'compact-dsh-allowlist-gate';
-import { approvalPlugin } from 'compact-dsh-approval';
+import { approvalPlugin, redactEmbeddedSecrets } from 'compact-dsh-approval';
 import { apply as applyCapabilityGate } from 'compact-dsh-capability-gate';
 import { apply as applyConstitution, DEFAULT_REQUIRES } from 'compact-dsh-constitution';
 import { apply as applyEmergency } from 'compact-dsh-emergency';
@@ -194,7 +194,41 @@ export async function apply(ctx, config = {}) {
   if (gate.breach() || gate.unregisteredClauses()) {
     throw new Error('blessed: capability enforcement is incomplete; refusing readiness');
   }
+
+  // Credential-shape detection (I-8 posture, warn-only): prevention is the
+  // first layer — no env in containers, envelopes that name no arguments,
+  // state paths masked — but nothing is infallible, and the completeness
+  // invariant forbids scrubbing the record after a leak. So the boundary
+  // DETECTS and warns, loudly and never altering: a tool call or result
+  // carrying a credential shape is named on the operator's log, the rotated
+  // credential is the operator's act, and the record stays exactly what the
+  // Subject saw.
+  ctx.on?.('tools/post-execute', async (exec, result, next) => {
+    if (credentialShapeIn(exec?.arguments) || credentialShapeIn(result?.value ?? result)) {
+      ctx.logger?.warn?.(
+        `[compact-dsh] credential-shaped content detected around "${exec?.name ?? 'unknown-tool'}" ` +
+        `(tool call ${exec?.callId ?? 'n/a'}) — the record is complete by design and cannot be scrubbed: ` +
+        `rotate the credential; the detector withholds nothing and alters nothing`);
+    }
+    return next();
+  });
+
   ctx.provide('compact-ready', Object.freeze({ name, ready: true, digest: ctx.get('constitution').digest }));
+}
+
+/**
+ * Does this tool-call argument object or result value carry a credential
+ * shape? The redaction catalogue run in DETECT mode: redact-and-compare, so
+ * detection and masking can never disagree about what a secret is.
+ */
+export function credentialShapeIn(value) {
+  let text;
+  try { text = typeof value === 'string' ? value : JSON.stringify(value ?? {}); } catch { return false; }
+  if (!text) return false;
+  // detection is more sensitive than masking: a lone PEM BEGIN marker (a
+  // truncated key) is a finding, though masking requires the full block
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text)) return true;
+  return redactEmbeddedSecrets(text) !== text;
 }
 
 export default { name, inject, apply };
