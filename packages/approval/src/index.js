@@ -71,16 +71,39 @@ export function identityOf(agent) {
 }
 
 /**
+ * In-place secret masking for operator-facing command text (the deciding
+ * preview's only consumer is the human gate). Reading the command is not the
+ * same as reading the credential inside it — the shape stays visible for
+ * triage, the material does not. Catalogue: authorization header values,
+ * credential-shaped env-var assignments, URL query secrets, URL userinfo,
+ * bare sk- tokens, PEM private-key blocks. Deliberately narrow: content
+ * digests and ids share long-hex/JWT shapes, so no shape-based fallback
+ * beyond PEM — a masked identifier is worse than a visible one.
+ */
+export function redactEmbeddedSecrets(text) {
+  return String(text ?? '')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, 'sk-***')
+    .replace(/(authorization\s*:\s*)([^'"\n]*)/gi, '$1***')
+    .replace(/\b([A-Z0-9_]*(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|ACCESS_KEY)[A-Z0-9_]*)\s*=\s*([^\s&|;'"]+)/gi, '$1=***')
+    .replace(/([?&][\w.-]*(?:key|token|secret|password|sig(?:nature)?)[\w.-]*=)[^&\s]+/gi, '$1***')
+    .replace(/(https?:\/\/)([^\s/@]+)@/g, '$1***@')
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '***private-key***');
+}
+
+/**
  * A one-line, operator-facing preview of the gated call. The host's
  * approval/request wire carries NO arguments, so without this the decider
  * sees "bash" and a fingerprint — approving blind is the hidden blanket grant
- * of the Phase 1 doctrine read from the human side. Truncated; the model and
- * the operator both see the same words (no secret channel).
+ * of the Phase 1 doctrine read from the human side. Truncated and
+ * secret-masked: the operator sees the command's shape, never its embedded
+ * credentials, and what the operator sees never reaches the record (the log
+ * carries the envelope, which names no arguments).
  */
 function commandPreview(args) {
   const raw = typeof args?.command === 'string' ? args.command : (() => { try { return JSON.stringify(args); } catch { return ''; } })();
   const flat = String(raw ?? '').replace(/\s+/g, ' ').trim();
-  return flat.length > 240 ? flat.slice(0, 237) + '…' : flat;
+  const cut = flat.length > 240 ? flat.slice(0, 237) + '…' : flat;
+  return redactEmbeddedSecrets(cut);
 }
 
 export function createApproval(opts = {}) {
