@@ -1,5 +1,5 @@
 import { apply as applyAllowlist } from 'compact-dsh-allowlist-gate';
-import { approvalPlugin } from 'compact-dsh-approval';
+import { approvalPlugin, redactEmbeddedSecrets } from 'compact-dsh-approval';
 import { apply as applyCapabilityGate } from 'compact-dsh-capability-gate';
 import { apply as applyConstitution, DEFAULT_REQUIRES } from 'compact-dsh-constitution';
 import { apply as applyEmergency } from 'compact-dsh-emergency';
@@ -11,6 +11,7 @@ import { apply as applyRemoteAccess } from 'compact-dsh-remote-access';
 import { apply as applySandbox, normalizeProvenanceRecords } from 'compact-dsh-sandbox-docker';
 import { apply as applySelfModel } from 'compact-dsh-self-model';
 import { apply as applySpecialists } from 'compact-dsh-specialists';
+import { canonicalizeBestEffort } from 'compact-dsh-sandbox-docker';
 
 export const name = 'compact-blessed';
 export const inject = ['tools', 'approval', 'commands', 'systemPrompt', 'sessionProjections', 'subagents', 'sessionPersistence', 'compact-record', 'sandboxPolicy'];
@@ -33,10 +34,10 @@ function text(value, path) {
   }
 }
 
-function resolveConfig(config) {
+export function resolveConfig(config) {
   object(config, 'config');
   for (const key of Object.keys(config)) {
-    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs'].includes(key)) {
+    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState'].includes(key)) {
       throw new TypeError(`blessed: unknown config key ${key}; record root and chainDir belong on the separate compact-dsh-record/provider loader row`);
     }
   }
@@ -50,6 +51,20 @@ function resolveConfig(config) {
   const allowlist = config.allowlist ?? DEFAULTS.allowlist;
   if (!Array.isArray(allowlist)) throw new TypeError('blessed: allowlist must be an array');
   for (const rule of allowlist) text(rule, 'allowlist entry');
+  if (!Array.isArray(config.protectedState) || config.protectedState.length === 0) {
+    throw new TypeError('blessed: protectedState must name the Enforcer state paths (record root, chain dir, approval store) — a composition whose Subject can reach the Enforcer\'s evidence lets it rewrite its own record; refusing to start rather than compose that silently (F-5, D-8)');
+  }
+  for (const p of config.protectedState) text(p, 'protectedState entry');
+  // a mistyped mask list (a string, a nested object) must fail loudly, never
+  // spread into character junk that silently canonicalizes to nothing
+  for (const key of ['maskedPaths', 'protectedPaths']) {
+    const v = config.sandbox[key];
+    if (v !== undefined && (!Array.isArray(v) || v.some(p => typeof p !== 'string' || !p.trim()))) {
+      throw new TypeError(`blessed: sandbox.${key} must be an array of non-empty path strings`);
+    }
+  }
+  const masked = [...(config.sandbox.maskedPaths ?? []), ...config.protectedState].map(canonicalizeBestEffort);
+  const protectedPaths = [...(config.sandbox.protectedPaths ?? []), ...config.protectedState].map(canonicalizeBestEffort);
   if (config.specialists !== undefined) object(config.specialists, 'specialists');
   const specialists = { ...DEFAULTS.specialists, ...config.specialists };
   text(specialists.provider, 'specialists.provider');
@@ -66,7 +81,8 @@ function resolveConfig(config) {
   return {
     allowlist: [...allowlist],
     approval: { ...config.approval },
-    sandbox: { ...DEFAULTS.sandbox, ...config.sandbox },
+    sandbox: { ...DEFAULTS.sandbox, ...config.sandbox, maskedPaths: masked, protectedPaths },
+    protectedState: [...config.protectedState],
     specialists,
     settleTimeoutMs,
   };
@@ -178,7 +194,41 @@ export async function apply(ctx, config = {}) {
   if (gate.breach() || gate.unregisteredClauses()) {
     throw new Error('blessed: capability enforcement is incomplete; refusing readiness');
   }
+
+  // Credential-shape detection (I-8 posture, warn-only): prevention is the
+  // first layer — no env in containers, envelopes that name no arguments,
+  // state paths masked — but nothing is infallible, and the completeness
+  // invariant forbids scrubbing the record after a leak. So the boundary
+  // DETECTS and warns, loudly and never altering: a tool call or result
+  // carrying a credential shape is named on the operator's log, the rotated
+  // credential is the operator's act, and the record stays exactly what the
+  // Subject saw.
+  ctx.on?.('tools/post-execute', async (exec, result, next) => {
+    if (credentialShapeIn(exec?.arguments) || credentialShapeIn(result?.value ?? result)) {
+      ctx.logger?.warn?.(
+        `[compact-dsh] credential-shaped content detected around "${exec?.name ?? 'unknown-tool'}" ` +
+        `(tool call ${exec?.callId ?? 'n/a'}) — the record is complete by design and cannot be scrubbed: ` +
+        `rotate the credential; the detector withholds nothing and alters nothing`);
+    }
+    return next();
+  });
+
   ctx.provide('compact-ready', Object.freeze({ name, ready: true, digest: ctx.get('constitution').digest }));
+}
+
+/**
+ * Does this tool-call argument object or result value carry a credential
+ * shape? The redaction catalogue run in DETECT mode: redact-and-compare, so
+ * detection and masking can never disagree about what a secret is.
+ */
+export function credentialShapeIn(value) {
+  let text;
+  try { text = typeof value === 'string' ? value : JSON.stringify(value ?? {}); } catch { return false; }
+  if (!text) return false;
+  // detection is more sensitive than masking: a lone PEM BEGIN marker (a
+  // truncated key) is a finding, though masking requires the full block
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text)) return true;
+  return redactEmbeddedSecrets(text) !== text;
 }
 
 export default { name, inject, apply };

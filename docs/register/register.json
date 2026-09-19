@@ -187,14 +187,17 @@
       "kind": "enforced",
       "plugin": "compact-sandbox-docker",
       "service": "compact-sandbox",
-      "evidence": "no undeclared capability: the sensitive-path deny-list is provider-level composition config, declared in the annex; the mount tool checks PROTECTED before MISSING, so a protected path is refused as protected whether or not it exists — answering \"missing\" first would turn the deny-list into an existence oracle for exactly the paths the masking hides",
+      "evidence": "no undeclared capability: the sensitive-path deny-list is provider-level composition config, declared in the annex; the mount tool checks PROTECTED before MISSING, so a protected path is refused as protected whether or not it exists — answering \"missing\" first would turn the deny-list into an existence oracle for exactly the paths the masking hides. The deny-list covers the Enforcer's OWN state: the compact state dir at its default location is on DEFAULT_SENSITIVE_PATHS, and the blessed composition additionally forces the record root, chain dir and approval store into the provider masks AND the mount-grant protected list — a composition whose Subject could reach the grant store or the chain sidecars could rewrite its own evidence, so blessed refuses to start without protectedState rather than compose that silently (F-5)",
       "enforcedBy": [
         "packages/sandbox-docker/src/mounts.js",
-        "packages/sandbox-docker/src/provider.js"
+        "packages/sandbox-docker/src/provider.js",
+        "packages/blessed/src/index.js"
       ],
       "verifiers": [
         "packages/sandbox-docker/test/composed.docker.test.js",
-        "packages/sandbox-docker/test/provenance.test.js"
+        "packages/sandbox-docker/test/provenance.test.js",
+        "packages/sandbox-docker/test/provider.test.js",
+        "packages/blessed/test/config.test.js"
       ]
     },
     {
@@ -225,7 +228,7 @@
       "kind": "enforced",
       "plugin": "compact-record",
       "service": "compact-record",
-      "evidence": "the record, made tamper-evident: a SessionPersistence decorator commits a hash chain beside every session log on append (entryHash = H(prev, seq, canonical(event)), genesis seeded from the SESSION ID so a chain cannot vouch for another Member's history) and verifies it on read. A slice that does not verify REJECTS rather than returning unverified history as history (D-7). Links are committed BEFORE the log accepts the event, so a crash can only leave a link with no event — never an event with no link. The chain lives in a sidecar, declaring no new session event vocabulary (D-8). Proven against the real JSONL backend, including a rewrite applied to the stored artifact. The public host sessionPersistence provider routes handle writes and live session events through the chain, including flush and teardown; provider restart and loader integration verify persisted history",
+      "evidence": "the record, made tamper-evident: a SessionPersistence decorator commits a hash chain beside every session log on append (entryHash = H(prev, seq, canonical(event)), genesis seeded from the SESSION ID so a chain cannot vouch for another Member's history) and verifies it on read. A slice that does not verify REJECTS rather than returning unverified history as history (D-7). Links are committed BEFORE the log accepts the event, so a crash can only leave a link with no event — never an event with no link. The chain lives in a sidecar, declaring no new session event vocabulary (D-8). Proven against the real JSONL backend, including a rewrite applied to the stored artifact. The public host sessionPersistence provider routes handle writes and live session events through the chain, including flush and teardown; provider restart and loader integration verify persisted history. The sidecars and the log are unreachable from inside confinement: the state paths are on the sandbox deny-list by default and the blessed composition forces them into the masks or refuses to start — the Subject cannot write the evidence that proves it",
       "enforcedBy": [
         "packages/record/src/chain.js",
         "packages/record/src/store.js",
