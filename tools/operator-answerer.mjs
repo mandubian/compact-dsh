@@ -8,8 +8,11 @@
 // reason are delegated untouched (no further answerer → host 'unavailable').
 // The prompt writes to stderr only — stdout stays clean for the task output.
 // The wire request carries agent + toolName + callId? + reason? + signal?
-// (no tool arguments), so the prompt shows exactly those fields; the
-// fingerprint/target lives in the recorded ask, already claimed upstream.
+// (no tool arguments). The prompt therefore shows exactly those fields, plus
+// the compact gate's per-decision preview when available: the recorded
+// answerer publishes {command, target, fingerprint} on
+// approval.deciding for exactly the decision's duration, so the operator
+// approves the actual command — never a bare "bash" with a fingerprint.
 
 import { createInterface as defaultCreateInterface } from 'node:readline';
 
@@ -19,7 +22,7 @@ const COMPACT_ENVELOPE_REASON = /^\[AG(\/|\])/;
 const OUTCOMES = ['allowed-once', 'rejected'];
 
 export function createOperatorPrompter({ input = process.stdin, output = process.stderr, createInterface = defaultCreateInterface } = {}) {
-  return function prompt(req) {
+  return function prompt(req, view) {
     return new Promise(resolve => {
       const rl = createInterface({ input, output, terminal: input.isTTY === true });
       let settled = false;
@@ -32,9 +35,12 @@ export function createOperatorPrompter({ input = process.stdin, output = process
       rl.on('SIGINT', () => done('rejected'));
       rl.on('close', () => done('rejected')); // EOF before an answer: default NO
       const reason = String(req.reason ?? '(no reason given)');
+      const targetBits = Object.entries(view?.target ?? {}).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(' ');
       output.write(
         `\n[compact-dsh] approval requested\n  tool: ${req.toolName ?? 'unknown'}` +
-        (req.callId != null ? `\n  call: ${req.callId}` : '') +
+        (view?.command ? `\n  command: ${view.command}` : '') +
+        (targetBits ? `\n  target: ${targetBits}` : '') +
+        (view?.fingerprint ? `\n  fingerprint: ${view.fingerprint}` : (req.callId != null ? `\n  call: ${req.callId}` : '')) +
         `\n${reason.split('\n').map(line => `  ${line}`).join('\n')}` +
         `\n  1) deny (default)\n  2) allow once\n`);
       rl.question('choice [1]: ', answer => {
@@ -52,7 +58,10 @@ export function createOperatorPrompter({ input = process.stdin, output = process
 export function operatorAnswerer(ctx, prompter = createOperatorPrompter()) {
   return ctx.on('approval/request', async (req, next) => {
     if (!COMPACT_ENVELOPE_REASON.test(String(req.reason ?? ''))) return next();
-    const outcome = await prompter(req);
+    // mirrors the recorded answerer's deciding key (callId, else agent+tool)
+    const key = req.callId != null ? String(req.callId) : `${req.agent?.id ?? '?'}:${req.toolName}`;
+    const view = ctx.get('compact-approval')?.deciding?.get(key);
+    const outcome = await prompter(req, view);
     return OUTCOMES.includes(outcome) ? outcome : 'rejected';
   });
 }

@@ -38,11 +38,12 @@ class SystemPromptStub extends Service {
 
 // The operator: an answerer composed DOWNSTREAM of our wrapper answerer.
 // Counts how many times the human was actually asked.
-function operatorAnswerer(ctx, decision) {
+function operatorAnswerer(ctx, decision, inspect) {
   const asked = { count: 0, reasons: [] };
   ctx.on('approval/request', async (req, next) => {
     asked.count += 1;
     asked.reasons.push(req.reason);
+    inspect?.(req);
     return typeof decision === 'function' ? decision(req) : decision;
   });
   return asked;
@@ -55,7 +56,7 @@ function makeAgent(id = 'sess-compact-1') {
   return { id, session };
 }
 
-async function boot({ operator = 'allowed-once' } = {}) {
+async function boot({ operator = 'allowed-once', inspect } = {}) {
   const ctx = new Context();
   ctx.plugin(SystemPromptStub);
   ctx.plugin(ApprovalService);
@@ -63,7 +64,7 @@ async function boot({ operator = 'allowed-once' } = {}) {
   ctx.plugin(CommandRuntime);
   const approvalPluginInstance = approvalPlugin({});
   approvalPluginInstance(ctx, {});
-  const asked = operatorAnswerer(ctx, operator);
+  const asked = operatorAnswerer(ctx, operator, inspect);
   if (typeof ctx.start === 'function') await ctx.start();
   let tools = ctx.tools ?? null;
   for (let i = 0; i < 200 && !tools; i++) {
@@ -81,6 +82,21 @@ async function boot({ operator = 'allowed-once' } = {}) {
 
 const run = (tools, agent, host) =>
   tools.execute({ name: 'net_probe', arguments: { host }, agent, signal: new AbortController().signal });
+
+test('composed: the deciding preview lives exactly as long as the decision', async () => {
+  let seen;
+  const { approval, tools } = await boot({ inspect: () => { seen = [...approval.deciding.values()][0]; } });
+  tools.register(probe);
+  executed = 0;
+  const agent = makeAgent();
+
+  await run(tools, agent, 'evil.example');
+  assert.ok(seen, 'the recorded answerer publishes the preview for the decision window');
+  assert.match(seen.command, /evil\.example/, 'the preview names the gated call, not just the tool');
+  assert.equal(seen.target.host, 'evil.example');
+  assert.match(seen.fingerprint, /^fp_[0-9a-f]{16}$/);
+  assert.equal(approval.deciding.size, 0, 'cleared when the decision lands');
+});
 
 test('composed: deny→ask→approve→replay-hit cycle in the real runtime', async () => {
   const { tools, asked } = await boot({ operator: 'allowed-once' });

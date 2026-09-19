@@ -67,19 +67,21 @@
       "kind": "enforced",
       "plugin": "compact-approval",
       "service": "compact-approval",
-      "evidence": "the five ordered grant layers: exec cache, plan grants, session grants, pending dedup, flood cap; decisions recorded (host audit pair); grants persist with budgets and revocation",
+      "evidence": "the five ordered grant layers: exec cache, plan grants, session grants, pending dedup, flood cap; decisions recorded (host audit pair); grants persist with budgets and revocation; the ask exposes the gated call's command preview and canonical target to the downstream decider for exactly the decision's duration (approval.deciding, keyed by callId, cleared on decision) — an operator approves the actual command, never a bare tool name",
       "enforcedBy": [
         "packages/approval/src/evaluate.js",
         "packages/approval/src/grants.js",
         "packages/approval/src/persist.js",
-        "packages/approval/src/index.js"
+        "packages/approval/src/index.js",
+        "tools/operator-answerer.mjs"
       ],
       "verifiers": [
         "packages/approval/test/evaluation.test.js",
         "packages/approval/test/answerer.test.js",
         "packages/approval/test/persist.test.js",
         "packages/approval/test/budget.test.js",
-        "packages/approval/test/composed.dsh.test.js"
+        "packages/approval/test/composed.dsh.test.js",
+        "tools/operator-answerer.test.mjs"
       ]
     },
     {

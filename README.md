@@ -512,10 +512,12 @@ npm run compact -- --workspace /absolute/project --state-dir /absolute/private-s
 npm run compact -- --attended "Run: git push https://github.com/owner/repo.git main"
 ```
 
-`--attended` mounts an operator answerer: gated asks prompt on stderr
-(default **deny** — empty answer, EOF, or ^C all reject), and `allowed-once`
-materializes an exec-cache entry so the identical operation replays without
-re-asking. Without it, operations needing a fresh approval fail closed.
+`--attended` mounts an operator answerer: gated asks prompt on stderr with
+the **actual command, its canonical target, and the fingerprint the decision
+would materialize** (default **deny** — empty answer, EOF, or ^C all reject),
+and `allowed-once` materializes an exec-cache entry so the identical operation
+replays without re-asking. Without it, operations needing a fresh approval
+fail closed.
 
 State defaults to `~/.compact-dsh`: session JSONL files under `sessions/`, hash
 chains under `chains/`, and persistent grants in `approvals.json`. Keep this
