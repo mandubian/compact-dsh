@@ -169,6 +169,7 @@ test('composed: grants-grant materializes a session grant; grants-revoke kills i
   assert.equal(g.result.kind, 'success', 'grants.grant succeeds — ' + JSON.stringify(g.result));
   const grantId = g.result.text.match(/grant (sg_\w+)/)?.[1];
   assert.ok(grantId, 'the grant id is reported');
+  assert.ok(g.result.text.includes('ExactHost:granted.example'), 'the echo shows the PARSED pattern, not the raw input');
 
   // host B runs under the session grant — never asked
   await run(tools, agent, 'granted.example');

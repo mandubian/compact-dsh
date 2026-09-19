@@ -23,13 +23,13 @@
 
 import { DockerSandboxProvider } from './provider.js';
 import { mountRequestTool } from './mount-tool.js';
-import { mountGrantsFor, DEFAULT_SENSITIVE_PATHS } from './mounts.js';
+import { mountGrantsFor, DEFAULT_SENSITIVE_PATHS, canonicalizeBestEffort } from './mounts.js';
 import {
   normalizeProvenanceRecords, networkGrantsFor, declaredGapsFor,
   checkSupplyChain, defaultDigestResolver, SupplyChainRefusal,
 } from './provenance.js';
 
-export { DockerSandboxProvider, mountRequestTool, mountGrantsFor, DEFAULT_SENSITIVE_PATHS };
+export { DockerSandboxProvider, mountRequestTool, mountGrantsFor, DEFAULT_SENSITIVE_PATHS, canonicalizeBestEffort };
 export {
   normalizeProvenanceRecords, networkGrantsFor, declaredGapsFor,
   checkSupplyChain, defaultDigestResolver, SupplyChainRefusal,
@@ -68,6 +68,12 @@ export function apply(ctx, config) {
       grantsFor: (sessionId) => mountGrantsFor(approval.store, sessionId),
       // CF-2: the run-time side of "excess is a new gate, not an inheritance"
       networkGrantsFor: (sessionId) => networkGrantsFor(approval.store, sessionId),
+      // secret injection: the grant store owns the agreement (a SecretGrant
+      // is operator-approved, session-scoped, TTL'd, revocable); the provider
+      // only resolves the env NAME it names. No grants → nothing injectable,
+      // which is the capability-absent posture enforced mechanically.
+      secretsFor: (sessionId) =>
+        approval.store.secretGrantsFor(sessionId).map(g => ({ ref: g.ref })),
     });
     scope.tools.register(mountRequestTool({
       approval,

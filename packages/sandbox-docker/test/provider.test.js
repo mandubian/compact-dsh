@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Context } from '@deepseek-ai/cordis';
 import { DockerSandboxProvider, DENIAL_SIGNATURES, RUNNER_FAILURE_RULES, SANDBOX_UNAVAILABLE } from '../src/provider.js';
-import { mountGrantsFor } from '../src/mounts.js';
+import { mountGrantsFor, DEFAULT_SENSITIVE_PATHS } from '../src/mounts.js';
 import { GrantStore } from 'compact-dsh-approval';
 
 // CF-2: every provider needs a declared, digest-keyed acquisition history for
@@ -97,6 +97,36 @@ test('masked paths outside every bound root are skipped (invisible by constructi
   const p = makeProvider({ maskedPaths: ['/somewhere/else'] });
   const s = p.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
   assert.ok(!s.includes('/somewhere/else'));
+});
+
+test('the Enforcer\'s own state is on the default deny-list (I-2, D-8)', () => {
+  // the compact state dir at its default location must be masked in every
+  // confined call and unreachable by mount grants — a Subject that can write
+  // the grant store or the chain sidecars can rewrite its own record
+  assert.ok(DEFAULT_SENSITIVE_PATHS.some(p => p.endsWith('/.compact-dsh')),
+    'DEFAULT_SENSITIVE_PATHS must include the compact state dir');
+});
+
+test('secret injection: a live grant puts -e REF=value in the confine argv; no grant, no env', () => {
+  process.env.SB_TEST_TOKEN = 'sb-value-123';
+  try {
+    const granted = makeProvider({ secretsFor: () => [{ ref: 'SB_TEST_TOKEN' }] });
+    const withSecret = granted.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
+    assert.ok(withSecret.includes('--env SB_TEST_TOKEN=sb-value-123'), 'the granted ref is injected');
+
+    const empty = makeProvider({});
+    const without = empty.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
+    assert.ok(!without.includes('SB_TEST_TOKEN'), 'the absent-capability posture injects nothing');
+  } finally {
+    delete process.env.SB_TEST_TOKEN;
+  }
+});
+
+test('a granted ref missing from the Enforcer environment is skipped, never invented', () => {
+  delete process.env.SB_TEST_MISSING;
+  const p = makeProvider({ secretsFor: () => [{ ref: 'SB_TEST_MISSING' }] });
+  const s = p.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
+  assert.ok(!s.includes('SB_TEST_MISSING'), 'fail-visible: the command fails on the empty variable instead');
 });
 
 test('fail-closed: daemon unavailable throws SANDBOX_UNAVAILABLE, never passthrough', () => {

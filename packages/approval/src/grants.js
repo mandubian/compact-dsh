@@ -6,10 +6,49 @@
 export class GrantStore {
   constructor() {
     this.sessionGrants = [];   // {id, pattern, root, session, expiresAt, createdAt, maxUses, uses, revokedAt}
+    this.secretGrants = [];    // {id, ref, fp, root, session, expiresAt, createdAt, revokedAt} — ref is the env NAME, never a value
     this.planGrants = [];      // {id, pattern, planRef, expiresAt, createdAt, maxUses, uses, revokedAt}
     this.cache = new Map();    // fingerprint -> {grantedAt, expiresAt, target}
     this.pending = new Map();  // fingerprint -> {count, firstAt, root}
     this.floodByRoot = new Map(); // root -> count
+  }
+
+  // -- secret grants --------------------------------------------------------
+  // The injection agreement: "THIS session may receive the credential named
+  // REF at confine time" — session-scoped, exactly like session grants and
+  // network grants (the grant-layer doctrine: scope, TTL, revocation). The
+  // ref is an environment variable NAME; the value lives only in the
+  // Enforcer's own environment and enters the container as `-e REF=<value>`
+  // in the confine argv — never model context, never the session log, never
+  // this store. Any confined command of the session may use it while it
+  // lives, including printing it — that exposure is what the operator
+  // agrees to and what the leak detector watches for.
+  addSecretGrant({ ref, root, session, ttlMs, now }) {
+    const grant = {
+      id: 'sec_' + Math.random().toString(16).slice(2, 10),
+      ref, root: root ?? null, session: session ?? null,
+      createdAt: now, expiresAt: now + (ttlMs || 60 * 60 * 1000),
+      revokedAt: null,
+    };
+    this.secretGrants.push(grant);
+    return grant;
+  }
+
+  /** Live secret grants for one session — the refs the confine argv may carry. */
+  secretGrantsFor(sessionId, now = Date.now()) {
+    const sid = sessionId != null ? String(sessionId) : null;
+    return this.secretGrants.filter(g =>
+      !g.revokedAt && g.expiresAt > now &&
+      ((g.session != null) ? g.session === sid
+        : (g.root != null) ? (sid === g.root || (sid ?? '').startsWith(g.root + '/'))
+        : true));
+  }
+
+  revokeSecretGrant(id, now) {
+    const g = this.secretGrants.find(x => x.id === id);
+    if (!g || g.revokedAt) return null;
+    g.revokedAt = now;
+    return g;
   }
 
   // -- session grants -------------------------------------------------------

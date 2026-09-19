@@ -97,6 +97,10 @@
         allowlist: !!js JSON.parse(process.env.COMPACT_ALLOWLIST || '[]')
         approval:
           persistPath: !!js process.env.COMPACT_APPROVAL_PERSIST_PATH
+        protectedState:
+          - !!js process.env.COMPACT_RECORD_ROOT
+          - !!js process.env.COMPACT_CHAIN_DIR
+          - !!js process.env.COMPACT_APPROVAL_PERSIST_PATH
         sandbox:
           image: !!js process.env.COMPACT_SANDBOX_IMAGE
           network: none

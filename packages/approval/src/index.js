@@ -71,16 +71,39 @@ export function identityOf(agent) {
 }
 
 /**
+ * In-place secret masking for operator-facing command text (the deciding
+ * preview's only consumer is the human gate). Reading the command is not the
+ * same as reading the credential inside it — the shape stays visible for
+ * triage, the material does not. Catalogue: authorization header values,
+ * credential-shaped env-var assignments, URL query secrets, URL userinfo,
+ * bare sk- tokens, PEM private-key blocks. Deliberately narrow: content
+ * digests and ids share long-hex/JWT shapes, so no shape-based fallback
+ * beyond PEM — a masked identifier is worse than a visible one.
+ */
+export function redactEmbeddedSecrets(text) {
+  return String(text ?? '')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, 'sk-***')
+    .replace(/(authorization\s*:\s*)([^'"\n]*)/gi, '$1***')
+    .replace(/\b([A-Z0-9_]*(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|ACCESS_KEY)[A-Z0-9_]*)\s*=\s*([^\s&|;'"]+)/gi, '$1=***')
+    .replace(/([?&][\w.-]*(?:key|token|secret|password|sig(?:nature)?)[\w.-]*=)[^&\s]+/gi, '$1***')
+    .replace(/(https?:\/\/)([^\s/@]+)@/g, '$1***@')
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '***private-key***');
+}
+
+/**
  * A one-line, operator-facing preview of the gated call. The host's
  * approval/request wire carries NO arguments, so without this the decider
  * sees "bash" and a fingerprint — approving blind is the hidden blanket grant
- * of the Phase 1 doctrine read from the human side. Truncated; the model and
- * the operator both see the same words (no secret channel).
+ * of the Phase 1 doctrine read from the human side. Truncated and
+ * secret-masked: the operator sees the command's shape, never its embedded
+ * credentials, and what the operator sees never reaches the record (the log
+ * carries the envelope, which names no arguments).
  */
 function commandPreview(args) {
   const raw = typeof args?.command === 'string' ? args.command : (() => { try { return JSON.stringify(args); } catch { return ''; } })();
   const flat = String(raw ?? '').replace(/\s+/g, ' ').trim();
-  return flat.length > 240 ? flat.slice(0, 237) + '…' : flat;
+  const cut = flat.length > 240 ? flat.slice(0, 237) + '…' : flat;
+  return redactEmbeddedSecrets(cut);
 }
 
 export function createApproval(opts = {}) {
@@ -92,6 +115,12 @@ export function createApproval(opts = {}) {
     execCacheTtlMs: opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs,
     maxPendingPerRoot: opts.maxPendingPerRoot ?? DEFAULTS.maxPendingPerRoot,
     pendingTtlMs: opts.pendingTtlMs ?? DEFAULTS.pendingTtlMs,
+    // declared secret references (env NAMES, never values): the only names
+    // whose presence in a gated command triggers the injection agreement. An
+    // empty list is the capability ABSENT — nothing is injectable, and that
+    // absence is enforced by the same lookup that would inject.
+    secretRefs: [...(opts.secretRefs ?? [])],
+    secretGrantTtlMs: opts.secretGrantTtlMs ?? (opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs),
     // asks currently waiting on the decider downstream: callId → preview.
     // Populated by the recorded answerer for exactly the duration of the
     // decision, so an operator answerer can show WHAT is being decided, not
@@ -170,6 +199,15 @@ async function answerRequest(approval, req, next) {
       // the only native grant: an exec-cache entry — same operation replays
       // without re-asking until the TTL, across sessions of this runtime
       approval.store.cacheSet(rec.fp, Date.now(), approval.execCacheTtlMs, canonicalTarget(rec.args));
+      // the injection agreement: an approved call that referenced declared
+      // secrets materializes one session-scoped grant per ref — TTL-bounded,
+      // revocable, covering only this session's confined calls
+      for (const ref of rec.secretRefs ?? []) {
+        approval.store.addSecretGrant({
+          ref, root: rec.root, session: rec.session,
+          ttlMs: approval.secretGrantTtlMs, now: Date.now(),
+        });
+      }
     }
     return outcome;
   } finally {
@@ -187,6 +225,7 @@ export function approvalPlugin(opts = {}) {
     if (config?.execCacheTtlMs !== undefined) approval.execCacheTtlMs = config.execCacheTtlMs;
     if (config?.maxPendingPerRoot !== undefined) approval.maxPendingPerRoot = config.maxPendingPerRoot;
     if (config?.pendingTtlMs !== undefined) approval.pendingTtlMs = config.pendingTtlMs;
+    if (config?.secretRefs !== undefined) approval.secretRefs = [...config.secretRefs];
 
     /**
      * The full pre-execute decision as a reusable function (Phase 2 routing):
@@ -210,6 +249,13 @@ export function approvalPlugin(opts = {}) {
       if (Object.keys(canonicalTarget(args)).length === 0) return null;
       const v = approval.evaluate({ tool, args, root, session, now: Date.now() });
       if (v.verdict === 'allowed') return null;
+      // declared secret references in the call: `$NAME` in a command string,
+      // where NAME was declared by the composition. The approval of such a
+      // call is also the injection agreement — the envelope says so, so the
+      // decider knows what "allow once" will materialize. Undeclared `$FOO`
+      // is the Subject's own variable and none of this gate's business.
+      const secretRefs = approval.secretRefs.filter(re =>
+        new RegExp(`\\$\\{?${re}\\}?\\b`).test(String(args?.command ?? '')));
       const report = (kind) => {
         // LoopGuard cooperation — a throwing listener must never take the
         // gate down with it (the gate's answer stands either way)
@@ -227,10 +273,15 @@ export function approvalPlugin(opts = {}) {
       // the answerer's decision correlation (needs the agent object: the host
       // denies asks without one before any approval dispatch). callId lets the
       // correlation survive concurrent asks for the same tool.
-      if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args, callId: exec.callId });
+      if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args, callId: exec.callId, secretRefs });
       report('ask');
       const env = buildEnvelope({ gate: 'AG', ruleId: v.ruleId,
-        reason: `"${tool}" is not covered by this runtime's grant layers`,
+        reason: `"${tool}" is not covered by this runtime's grant layers` +
+          (secretRefs.length
+            ? ` — this call references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
+              `approving it materializes a secret grant and the credential is injected into the confined execution ` +
+              `without entering this conversation`
+            : ''),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };
     };
@@ -289,7 +340,10 @@ function registerGrantCommands(ctx, approval) {
       const maxUses = uses != null ? Math.max(1, Math.floor(Number(uses))) : null;
       if (maxUses !== null && !Number.isFinite(maxUses)) return { kind: 'error', text: `maxUses must be a number, got "${uses}"` };
       const g = approval.grantSession({ pattern, root, session, ttlMs, maxUses });
-      return { kind: 'success', text: `grant ${g.id} covers ${pattern} for session ${session} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''} (recorded: command/run + command/done)` };
+      // echo the PARSED pattern, never the raw operator input: a token in a
+      // URL's userinfo is stripped by canonicalization — echoing the input
+      // would leak it into the durable session log (command/done is recorded)
+      return { kind: 'success', text: `grant ${g.id} covers ${patternText(g.pattern)} for session ${session} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''} (recorded: command/run + command/done)` };
     },
   });
   ctx.commands?.register({

@@ -18,7 +18,7 @@ import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, re
 import { dirname } from 'node:path';
 import { GrantStore } from './grants.js';
 
-const FORMAT_VERSION = 1;
+const FORMAT_VERSION = 2;  // v2 adds secretGrants (env NAMES + fingerprints; values are never stored)
 
 export class PersistentGrantStore extends GrantStore {
   constructor(path) {
@@ -38,7 +38,7 @@ export class PersistentGrantStore extends GrantStore {
     if (raw?.version !== FORMAT_VERSION) {
       throw new Error(`compact-dsh-approval: grant store ${this.path} has format version ${JSON.stringify(raw?.version)}, expected ${FORMAT_VERSION} — refusing to start`);
     }
-    for (const key of ['sessionGrants', 'planGrants']) {
+    for (const key of ['sessionGrants', 'planGrants', 'secretGrants']) {
       if (!Array.isArray(raw[key])) throw new Error(`compact-dsh-approval: grant store ${this.path} is corrupt: ${key} is not an array — refusing to start`);
     }
     for (const g of [...raw.sessionGrants, ...raw.planGrants]) {
@@ -46,9 +46,18 @@ export class PersistentGrantStore extends GrantStore {
         throw new Error(`compact-dsh-approval: grant store ${this.path} is corrupt: malformed grant ${JSON.stringify(g?.id)} — refusing to start`);
       }
     }
+    for (const g of raw.secretGrants) {
+      // a secret grant records the env NAME and its scope — if a store file
+      // ever contains a `value` field, someone put a secret where only a
+      // reference belongs, and the composition refuses to load it
+      if (typeof g?.id !== 'string' || typeof g?.ref !== 'string' || 'value' in g) {
+        throw new Error(`compact-dsh-approval: grant store ${this.path} is corrupt: malformed secret grant ${JSON.stringify(g?.id)} — refusing to start`);
+      }
+    }
     if (!Array.isArray(raw.cache)) throw new Error(`compact-dsh-approval: grant store ${this.path} is corrupt: cache is not an array — refusing to start`);
     this.sessionGrants = raw.sessionGrants;
     this.planGrants = raw.planGrants;
+    this.secretGrants = raw.secretGrants;
     this.cache = new Map(raw.cache.map(([fp, entry]) => {
       if (typeof fp !== 'string' || typeof entry?.grantedAt !== 'number') {
         throw new Error(`compact-dsh-approval: grant store ${this.path} is corrupt: malformed cache entry — refusing to start`);
@@ -62,6 +71,7 @@ export class PersistentGrantStore extends GrantStore {
       version: FORMAT_VERSION,
       sessionGrants: this.sessionGrants,
       planGrants: this.planGrants,
+      secretGrants: this.secretGrants,
       cache: [...this.cache.entries()],
     });
     const tmp = `${this.path}.tmp-${process.pid}`;
@@ -98,6 +108,8 @@ function flushed(method) {
 PersistentGrantStore.prototype.addSessionGrant = flushed('addSessionGrant');
 PersistentGrantStore.prototype.revokeSessionGrant = flushed('revokeSessionGrant');
 PersistentGrantStore.prototype.addPlanGrant = flushed('addPlanGrant');
+PersistentGrantStore.prototype.addSecretGrant = flushed('addSecretGrant');
+PersistentGrantStore.prototype.revokeSecretGrant = flushed('revokeSecretGrant');
 PersistentGrantStore.prototype.cacheSet = flushed('cacheSet');
 PersistentGrantStore.prototype.revokeFingerprint = flushed('revokeFingerprint');
 PersistentGrantStore.prototype.consumeUse = flushed('consumeUse');
