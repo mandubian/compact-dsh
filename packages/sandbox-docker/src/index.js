@@ -73,7 +73,7 @@ export function apply(ctx, config) {
       // only resolves the env NAME it names. No grants → nothing injectable,
       // which is the capability-absent posture enforced mechanically.
       secretsFor: (sessionId) =>
-        approval.secretGrantsFor(sessionId).map(g => ({ ref: g.ref })),
+        approval.store.secretGrantsFor(sessionId).map(g => ({ ref: g.ref })),
     });
     scope.tools.register(mountRequestTool({
       approval,
