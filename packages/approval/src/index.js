@@ -289,7 +289,10 @@ function registerGrantCommands(ctx, approval) {
       const maxUses = uses != null ? Math.max(1, Math.floor(Number(uses))) : null;
       if (maxUses !== null && !Number.isFinite(maxUses)) return { kind: 'error', text: `maxUses must be a number, got "${uses}"` };
       const g = approval.grantSession({ pattern, root, session, ttlMs, maxUses });
-      return { kind: 'success', text: `grant ${g.id} covers ${pattern} for session ${session} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''} (recorded: command/run + command/done)` };
+      // echo the PARSED pattern, never the raw operator input: a token in a
+      // URL's userinfo is stripped by canonicalization — echoing the input
+      // would leak it into the durable session log (command/done is recorded)
+      return { kind: 'success', text: `grant ${g.id} covers ${patternText(g.pattern)} for session ${session} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''} (recorded: command/run + command/done)` };
     },
   });
   ctx.commands?.register({

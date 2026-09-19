@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Context } from '@deepseek-ai/cordis';
 import { DockerSandboxProvider, DENIAL_SIGNATURES, RUNNER_FAILURE_RULES, SANDBOX_UNAVAILABLE } from '../src/provider.js';
-import { mountGrantsFor } from '../src/mounts.js';
+import { mountGrantsFor, DEFAULT_SENSITIVE_PATHS } from '../src/mounts.js';
 import { GrantStore } from 'compact-dsh-approval';
 
 // CF-2: every provider needs a declared, digest-keyed acquisition history for
@@ -97,6 +97,14 @@ test('masked paths outside every bound root are skipped (invisible by constructi
   const p = makeProvider({ maskedPaths: ['/somewhere/else'] });
   const s = p.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
   assert.ok(!s.includes('/somewhere/else'));
+});
+
+test('the Enforcer\'s own state is on the default deny-list (I-2, D-8)', () => {
+  // the compact state dir at its default location must be masked in every
+  // confined call and unreachable by mount grants — a Subject that can write
+  // the grant store or the chain sidecars can rewrite its own record
+  assert.ok(DEFAULT_SENSITIVE_PATHS.some(p => p.endsWith('/.compact-dsh')),
+    'DEFAULT_SENSITIVE_PATHS must include the compact state dir');
 });
 
 test('fail-closed: daemon unavailable throws SANDBOX_UNAVAILABLE, never passthrough', () => {

@@ -23,13 +23,13 @@
 
 import { DockerSandboxProvider } from './provider.js';
 import { mountRequestTool } from './mount-tool.js';
-import { mountGrantsFor, DEFAULT_SENSITIVE_PATHS } from './mounts.js';
+import { mountGrantsFor, DEFAULT_SENSITIVE_PATHS, canonicalizeBestEffort } from './mounts.js';
 import {
   normalizeProvenanceRecords, networkGrantsFor, declaredGapsFor,
   checkSupplyChain, defaultDigestResolver, SupplyChainRefusal,
 } from './provenance.js';
 
-export { DockerSandboxProvider, mountRequestTool, mountGrantsFor, DEFAULT_SENSITIVE_PATHS };
+export { DockerSandboxProvider, mountRequestTool, mountGrantsFor, DEFAULT_SENSITIVE_PATHS, canonicalizeBestEffort };
 export {
   normalizeProvenanceRecords, networkGrantsFor, declaredGapsFor,
   checkSupplyChain, defaultDigestResolver, SupplyChainRefusal,

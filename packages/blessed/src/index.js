@@ -11,6 +11,7 @@ import { apply as applyRemoteAccess } from 'compact-dsh-remote-access';
 import { apply as applySandbox, normalizeProvenanceRecords } from 'compact-dsh-sandbox-docker';
 import { apply as applySelfModel } from 'compact-dsh-self-model';
 import { apply as applySpecialists } from 'compact-dsh-specialists';
+import { canonicalizeBestEffort } from 'compact-dsh-sandbox-docker';
 
 export const name = 'compact-blessed';
 export const inject = ['tools', 'approval', 'commands', 'systemPrompt', 'sessionProjections', 'subagents', 'sessionPersistence', 'compact-record', 'sandboxPolicy'];
@@ -33,10 +34,10 @@ function text(value, path) {
   }
 }
 
-function resolveConfig(config) {
+export function resolveConfig(config) {
   object(config, 'config');
   for (const key of Object.keys(config)) {
-    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs'].includes(key)) {
+    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState'].includes(key)) {
       throw new TypeError(`blessed: unknown config key ${key}; record root and chainDir belong on the separate compact-dsh-record/provider loader row`);
     }
   }
@@ -50,6 +51,12 @@ function resolveConfig(config) {
   const allowlist = config.allowlist ?? DEFAULTS.allowlist;
   if (!Array.isArray(allowlist)) throw new TypeError('blessed: allowlist must be an array');
   for (const rule of allowlist) text(rule, 'allowlist entry');
+  if (!Array.isArray(config.protectedState) || config.protectedState.length === 0) {
+    throw new TypeError('blessed: protectedState must name the Enforcer state paths (record root, chain dir, approval store) — a composition whose Subject can reach the Enforcer\'s evidence lets it rewrite its own record; refusing to start rather than compose that silently (F-5, D-8)');
+  }
+  for (const p of config.protectedState) text(p, 'protectedState entry');
+  const masked = [...(config.sandbox.maskedPaths ?? []), ...config.protectedState].map(canonicalizeBestEffort);
+  const protectedPaths = [...(config.sandbox.protectedPaths ?? []), ...config.protectedState].map(canonicalizeBestEffort);
   if (config.specialists !== undefined) object(config.specialists, 'specialists');
   const specialists = { ...DEFAULTS.specialists, ...config.specialists };
   text(specialists.provider, 'specialists.provider');
@@ -66,7 +73,8 @@ function resolveConfig(config) {
   return {
     allowlist: [...allowlist],
     approval: { ...config.approval },
-    sandbox: { ...DEFAULTS.sandbox, ...config.sandbox },
+    sandbox: { ...DEFAULTS.sandbox, ...config.sandbox, maskedPaths: masked, protectedPaths },
+    protectedState: [...config.protectedState],
     specialists,
     settleTimeoutMs,
   };

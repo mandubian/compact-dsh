@@ -25,6 +25,13 @@ test('URL: trailing slashes and query strings are one prefix identity', () => {
   same({ url: 'https://api.example.com' }, { url: 'https://api.example.com/' });
 });
 
+test('URL: credentials in the userinfo never reach the identity', () => {
+  // https://user:token@host/ is the same target as https://host/ — and the
+  // token is not part of what is fingerprinted, granted, or persisted
+  same({ url: 'https://user:secret-token@api.example.com/v1' }, { url: 'https://api.example.com/v1' });
+  same({ url: 'https://user:secret-token@api.example.com:8443/v1' }, { url: 'https://api.example.com:8443/v1' });
+});
+
 test('URL: default ports for the scheme are dropped, others are exact', () => {
   same({ url: 'https://api.example.com:443/v1' }, { url: 'https://api.example.com/v1' });
   same({ url: 'http://api.example.com:80/v1' }, { url: 'http://api.example.com/v1' });

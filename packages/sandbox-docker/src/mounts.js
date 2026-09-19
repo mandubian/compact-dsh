@@ -46,6 +46,11 @@ export const DEFAULT_SENSITIVE_PATHS = (() => {
     `${home}/.ssh`, `${home}/.aws`, `${home}/.azure`, `${home}/.gnupg`,
     `${home}/.config/gcloud`, `${home}/.config/gh`, `${home}/.netrc`,
     `${home}/.docker`, `${home}/.kube`,
+    // the Enforcer's own state at its default location — a Subject that can
+    // reach the grant store or the chain sidecars can rewrite its own
+    // evidence (I-2/D-8); compositions with a custom state dir must extend
+    // the list (the blessed overlay does, or refuses to start)
+    `${home}/.compact-dsh`,
     '/etc/shadow', '/etc/gshadow', '/etc/sudoers',
   ].map(canonicalizeBestEffort);
 })();
