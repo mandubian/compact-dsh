@@ -70,6 +70,19 @@ export function identityOf(agent) {
   return { root, session };
 }
 
+/**
+ * A one-line, operator-facing preview of the gated call. The host's
+ * approval/request wire carries NO arguments, so without this the decider
+ * sees "bash" and a fingerprint — approving blind is the hidden blanket grant
+ * of the Phase 1 doctrine read from the human side. Truncated; the model and
+ * the operator both see the same words (no secret channel).
+ */
+function commandPreview(args) {
+  const raw = typeof args?.command === 'string' ? args.command : (() => { try { return JSON.stringify(args); } catch { return ''; } })();
+  const flat = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  return flat.length > 240 ? flat.slice(0, 237) + '…' : flat;
+}
+
 export function createApproval(opts = {}) {
   const approval = {
     // persistPath: the grant store survives restarts (grants, budgets,
@@ -79,6 +92,11 @@ export function createApproval(opts = {}) {
     execCacheTtlMs: opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs,
     maxPendingPerRoot: opts.maxPendingPerRoot ?? DEFAULTS.maxPendingPerRoot,
     pendingTtlMs: opts.pendingTtlMs ?? DEFAULTS.pendingTtlMs,
+    // asks currently waiting on the decider downstream: callId → preview.
+    // Populated by the recorded answerer for exactly the duration of the
+    // decision, so an operator answerer can show WHAT is being decided, not
+    // just that something is.
+    deciding: new Map(),
     // ask↔decision correlation: agent object → toolName → FIFO of ask records.
     // The host request carries NO tool arguments, so a single rec per
     // (agent, tool) would let a LATER ask overwrite an EARLIER one — and the
@@ -137,6 +155,15 @@ async function answerRequest(approval, req, next) {
   const { toolName, agent } = req;
   const rec = approval.takeAsk(agent, toolName, req.callId);
   if (!rec) return next(); // not our gate's ask — stay out of the chain
+  // expose WHAT is being decided for exactly the decision's duration: the
+  // wire carries no arguments, so without this the decider sees "bash" and a
+  // fingerprint — approving blind would be the blanket grant with a human
+  // face. Keyed by callId; cleared by identity so a racing ask never loses
+  // its own preview.
+  const key = req.callId != null ? String(req.callId) : `${agent?.id ?? '?'}:${toolName}`;
+  const view = { tool: toolName, callId: req.callId ?? null, fingerprint: rec.fp,
+    target: canonicalTarget(rec.args), command: commandPreview(rec.args) };
+  approval.deciding.set(key, view);
   try {
     const outcome = await next();
     if (outcome === 'allowed-once') {
@@ -146,6 +173,7 @@ async function answerRequest(approval, req, next) {
     }
     return outcome;
   } finally {
+    if (approval.deciding.get(key) === view) approval.deciding.delete(key);
     // decided (allowed, rejected, cancelled, or failed closed): release the
     // dedup record + flood slot — the next uncovered call re-asks as fresh
     approval.store.resolvePending(rec.root, rec.fp);

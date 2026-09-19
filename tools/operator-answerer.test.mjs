@@ -146,11 +146,27 @@ async function boot(behavior) {
     tools = ctx.tools ?? null;
   }
   if (!tools) throw new Error('tools runtime did not mount');
-  return { ctx, tools, transcript };
+  return { ctx, tools, transcript, approval: instance.approval };
 }
 
 const run = (tools, agent, host) =>
   tools.execute({ name: 'net_probe', arguments: { host }, agent, signal: new AbortController().signal });
+
+test('composed: the operator sees the gated command, never a bare tool name', async () => {
+  const { tools, transcript, approval } = await boot('1');
+  tools.register(probe);
+  executed = 0;
+  const agent = makeAgent();
+
+  const r = await run(tools, agent, 'evil.example');
+  assert.equal(executed, 0, 'denied: the probe must not run');
+  assert.ok(JSON.stringify(r).toLowerCase().includes('reject'), 'the denial names the rejection');
+  const prompt = transcript.join('');
+  assert.ok(prompt.includes('command: {"host":"evil.example"}'), 'the prompt shows the actual call — not just "net_probe"');
+  assert.ok(prompt.includes('target: host=evil.example'), 'the prompt shows the canonical target');
+  assert.match(prompt, /fingerprint: fp_[0-9a-f]{16}/, 'the fingerprint the decision would materialize');
+  assert.equal(approval.deciding.size, 0, 'the preview lives exactly as long as the decision');
+});
 
 test('composed: operator allow-once executes and materializes the exec-cache replay', async () => {
   const { tools, transcript } = await boot('2');
