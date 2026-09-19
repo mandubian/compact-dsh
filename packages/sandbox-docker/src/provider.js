@@ -73,6 +73,11 @@ export class DockerSandboxProvider extends SandboxProvider {
     // (sessionId) => [grant] — live RUN-TIME network grants. CF-2 answers a
     // run-time demand from these only; build approvals never reach this path.
     this.networkGrantsFor = config.networkGrantsFor ?? (() => []);
+    // (sessionId) => [{ref}] — live secret grants. The agreement side lives
+    // in the grant store; this side resolves each ref from the Enforcer's
+    // environment at confine time and never records the value.
+    this.secretsFor = config.secretsFor ?? (() => []);
+    this._warnedRefs = new Set();
     this._probeResult = undefined;
     this._digestByRef = new Map();
   }
@@ -145,6 +150,25 @@ export class DockerSandboxProvider extends SandboxProvider {
       if (!st) continue;
       if (st.isDirectory()) run.push('--mount', `type=tmpfs,destination=${m}`);
       else run.push('--mount', `type=bind,source=/dev/null,target=${m},readonly`);
+    }
+    // secret injection: the agreement side lives in the grant store (a
+    // SecretGrant is fingerprint-scoped and operator-approved); this side
+    // resolves the env NAME from the Enforcer's own environment at confine
+    // time. The value transits the confine argv only — never a log, never
+    // model context, never the grant store (which stores the NAME). A ref
+    // granted but unresolved from the environment is skipped with a warning:
+    // the command will fail visibly on the empty variable, which is the
+    // fail-closed direction.
+    for (const { ref } of this.secretsFor(policy.sessionId)) {
+      const value = process.env[ref];
+      if (value === undefined) {
+        if (!this._warnedRefs.has(ref)) {
+          this._warnedRefs.add(ref);
+          this.ctx?.logger?.warn?.(`sandbox-docker: secret ${ref} is granted but not present in the Enforcer environment; skipping injection — the command will fail on the empty variable`);
+        }
+        continue;
+      }
+      run.push('--env', `${ref}=${value}`);
     }
     run.push('-w', root, this.image, ...argv);
     return { argv: run, enforcement: 'full', denialSignatures: DENIAL_SIGNATURES, runnerFailureRules: RUNNER_FAILURE_RULES };

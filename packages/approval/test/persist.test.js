@@ -72,7 +72,13 @@ test('a corrupt store file fails the boot loudly, with the reason', () => {
   assert.throws(() => new PersistentGrantStore(path), /format version/);
 
   writeFileSync(path, JSON.stringify({ version: 1, sessionGrants: [{ id: 5 }], planGrants: [], cache: [] }));
+  assert.throws(() => new PersistentGrantStore(path), /format version/);
+
+  writeFileSync(path, JSON.stringify({ version: 2, sessionGrants: [{ id: 5 }], planGrants: [], secretGrants: [], cache: [] }));
   assert.throws(() => new PersistentGrantStore(path), /malformed grant/);
+
+  writeFileSync(path, JSON.stringify({ version: 2, sessionGrants: [], planGrants: [], secretGrants: [{ id: 'sec_x', ref: 'GH_TOKEN', value: 'oops' }], cache: [] }));
+  assert.throws(() => new PersistentGrantStore(path), /malformed secret grant/);
 });
 
 test('the plugin restarts into its own memory of approvals', () => {

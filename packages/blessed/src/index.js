@@ -37,7 +37,7 @@ function text(value, path) {
 export function resolveConfig(config) {
   object(config, 'config');
   for (const key of Object.keys(config)) {
-    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState'].includes(key)) {
+    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets'].includes(key)) {
       throw new TypeError(`blessed: unknown config key ${key}; record root and chainDir belong on the separate compact-dsh-record/provider loader row`);
     }
   }
@@ -66,6 +66,20 @@ export function resolveConfig(config) {
   const masked = [...(config.sandbox.maskedPaths ?? []), ...config.protectedState].map(canonicalizeBestEffort);
   const protectedPaths = [...(config.sandbox.protectedPaths ?? []), ...config.protectedState].map(canonicalizeBestEffort);
   if (config.specialists !== undefined) object(config.specialists, 'specialists');
+  // declared secret references: env NAMES the confined Subject may be
+  // granted, never values (the values stay in the operator's environment).
+  // Absent/empty is the lawful absent-capability posture: nothing is
+  // injectable, enforced by the same lookup that would inject.
+  let secrets = [];
+  if (config.secrets !== undefined) {
+    if (!Array.isArray(config.secrets)) throw new TypeError('blessed: secrets must be an array of env-var names');
+    for (const s of config.secrets) {
+      if (typeof s !== 'string' || !/^[A-Z_][A-Z0-9_]*$/.test(s)) {
+        throw new TypeError(`blessed: secrets entries must be env-var NAMES like GH_TOKEN, got ${JSON.stringify(s)}`);
+      }
+    }
+    secrets = [...new Set(config.secrets)];
+  }
   const specialists = { ...DEFAULTS.specialists, ...config.specialists };
   text(specialists.provider, 'specialists.provider');
   if (!['one-shot', 'continuable'].includes(specialists.backgroundMode)) {
@@ -80,9 +94,10 @@ export function resolveConfig(config) {
   }
   return {
     allowlist: [...allowlist],
-    approval: { ...config.approval },
+    approval: { ...config.approval, secretRefs: secrets },
     sandbox: { ...DEFAULTS.sandbox, ...config.sandbox, maskedPaths: masked, protectedPaths },
     protectedState: [...config.protectedState],
+    secrets,
     specialists,
     settleTimeoutMs,
   };
@@ -176,10 +191,20 @@ export async function apply(ctx, config = {}) {
   await mount('compact-loopguard', applyLoopguard);
   await mount('compact-promotion', promotionPlugin(), {}, ['tools']);
   await mount('compact-allowlist-gate', applyAllowlist, { allowlist: options.allowlist }, ['tools']);
-  await mount('compact-approval', approvalPlugin({ persistPath: options.approval.persistPath }), options.approval, ['approval', 'commands']);
+  await mount('compact-approval', approvalPlugin({ persistPath: options.approval.persistPath, secretRefs: options.secrets }), options.approval, ['approval', 'commands']);
   await mount('compact-remote-access', applyRemoteAccess, {}, ['compact-approval']);
   await mount('compact-sandbox', applySandbox, options.sandbox, ['tools', 'approval', 'compact-approval']);
   requireServices(ctx, ['sandbox']);
+  // D-8 declaration: the secret-injection posture is on the record at boot —
+  // BOUND (refs declared, injection only ever under a live SecretGrant) or
+  // ABSENT (no refs declared, nothing injectable, enforced by the same
+  // lookup that would inject). Values are never named here — only refs.
+  if (options.secrets.length > 0) {
+    ctx.logger?.warn?.(`blessed: secret injection is DECLARED and grant-bound for refs: ${options.secrets.join(', ')} — ` +
+      `injection happens only under a live operator-approved SecretGrant, at confine time, into the container only`);
+  } else {
+    ctx.logger?.warn?.('blessed: secret injection is ABSENT — no refs declared, nothing is injectable');
+  }
   if (!ctx.subagents.getProvider(options.specialists.provider)) {
     throw new Error(`blessed: subagent provider ${options.specialists.provider} must be registered before specialists mount`);
   }

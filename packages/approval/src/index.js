@@ -115,6 +115,12 @@ export function createApproval(opts = {}) {
     execCacheTtlMs: opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs,
     maxPendingPerRoot: opts.maxPendingPerRoot ?? DEFAULTS.maxPendingPerRoot,
     pendingTtlMs: opts.pendingTtlMs ?? DEFAULTS.pendingTtlMs,
+    // declared secret references (env NAMES, never values): the only names
+    // whose presence in a gated command triggers the injection agreement. An
+    // empty list is the capability ABSENT — nothing is injectable, and that
+    // absence is enforced by the same lookup that would inject.
+    secretRefs: [...(opts.secretRefs ?? [])],
+    secretGrantTtlMs: opts.secretGrantTtlMs ?? (opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs),
     // asks currently waiting on the decider downstream: callId → preview.
     // Populated by the recorded answerer for exactly the duration of the
     // decision, so an operator answerer can show WHAT is being decided, not
@@ -193,6 +199,15 @@ async function answerRequest(approval, req, next) {
       // the only native grant: an exec-cache entry — same operation replays
       // without re-asking until the TTL, across sessions of this runtime
       approval.store.cacheSet(rec.fp, Date.now(), approval.execCacheTtlMs, canonicalTarget(rec.args));
+      // the injection agreement: an approved call that referenced declared
+      // secrets materializes one session-scoped grant per ref — TTL-bounded,
+      // revocable, covering only this session's confined calls
+      for (const ref of rec.secretRefs ?? []) {
+        approval.store.addSecretGrant({
+          ref, root: rec.root, session: rec.session,
+          ttlMs: approval.secretGrantTtlMs, now: Date.now(),
+        });
+      }
     }
     return outcome;
   } finally {
@@ -210,6 +225,7 @@ export function approvalPlugin(opts = {}) {
     if (config?.execCacheTtlMs !== undefined) approval.execCacheTtlMs = config.execCacheTtlMs;
     if (config?.maxPendingPerRoot !== undefined) approval.maxPendingPerRoot = config.maxPendingPerRoot;
     if (config?.pendingTtlMs !== undefined) approval.pendingTtlMs = config.pendingTtlMs;
+    if (config?.secretRefs !== undefined) approval.secretRefs = [...config.secretRefs];
 
     /**
      * The full pre-execute decision as a reusable function (Phase 2 routing):
@@ -233,6 +249,13 @@ export function approvalPlugin(opts = {}) {
       if (Object.keys(canonicalTarget(args)).length === 0) return null;
       const v = approval.evaluate({ tool, args, root, session, now: Date.now() });
       if (v.verdict === 'allowed') return null;
+      // declared secret references in the call: `$NAME` in a command string,
+      // where NAME was declared by the composition. The approval of such a
+      // call is also the injection agreement — the envelope says so, so the
+      // decider knows what "allow once" will materialize. Undeclared `$FOO`
+      // is the Subject's own variable and none of this gate's business.
+      const secretRefs = approval.secretRefs.filter(re =>
+        new RegExp(`\\$\\{?${re}\\}?\\b`).test(String(args?.command ?? '')));
       const report = (kind) => {
         // LoopGuard cooperation — a throwing listener must never take the
         // gate down with it (the gate's answer stands either way)
@@ -250,10 +273,15 @@ export function approvalPlugin(opts = {}) {
       // the answerer's decision correlation (needs the agent object: the host
       // denies asks without one before any approval dispatch). callId lets the
       // correlation survive concurrent asks for the same tool.
-      if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args, callId: exec.callId });
+      if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args, callId: exec.callId, secretRefs });
       report('ask');
       const env = buildEnvelope({ gate: 'AG', ruleId: v.ruleId,
-        reason: `"${tool}" is not covered by this runtime's grant layers`,
+        reason: `"${tool}" is not covered by this runtime's grant layers` +
+          (secretRefs.length
+            ? ` — this call references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
+              `approving it materializes a secret grant and the credential is injected into the confined execution ` +
+              `without entering this conversation`
+            : ''),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };
     };

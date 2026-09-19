@@ -50,3 +50,18 @@ test('a mistyped mask list fails loudly instead of spreading into character junk
     assert.throws(() => resolveConfig(nested), new RegExp(`sandbox\\.${key} must be an array`));
   }
 });
+
+test('secrets are declared as env-var NAMES — values never enter the composition', () => {
+  const config = BASE();
+  config.secrets = ['GH_TOKEN', 'AWS_SECRET_ACCESS_KEY'];
+  const resolved = resolveConfig(config);
+  assert.deepEqual(resolved.secrets, ['GH_TOKEN', 'AWS_SECRET_ACCESS_KEY']);
+  assert.deepEqual(resolved.approval.secretRefs, ['GH_TOKEN', 'AWS_SECRET_ACCESS_KEY'],
+    'the approval gate learns the NAMES — its envelope can then name the injection agreement');
+
+  const invalid = BASE();
+  invalid.secrets = ['GH_TOKEN', '/path/oops'];
+  assert.throws(() => resolveConfig(invalid), /env-var NAMES/);
+  const defaulted = BASE();
+  assert.deepEqual(resolveConfig(defaulted).secrets, [], 'the absent posture: nothing declared, nothing injectable');
+});

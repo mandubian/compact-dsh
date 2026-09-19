@@ -107,6 +107,28 @@ test('the Enforcer\'s own state is on the default deny-list (I-2, D-8)', () => {
     'DEFAULT_SENSITIVE_PATHS must include the compact state dir');
 });
 
+test('secret injection: a live grant puts -e REF=value in the confine argv; no grant, no env', () => {
+  process.env.SB_TEST_TOKEN = 'sb-value-123';
+  try {
+    const granted = makeProvider({ secretsFor: () => [{ ref: 'SB_TEST_TOKEN' }] });
+    const withSecret = granted.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
+    assert.ok(withSecret.includes('--env SB_TEST_TOKEN=sb-value-123'), 'the granted ref is injected');
+
+    const empty = makeProvider({});
+    const without = empty.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
+    assert.ok(!without.includes('SB_TEST_TOKEN'), 'the absent-capability posture injects nothing');
+  } finally {
+    delete process.env.SB_TEST_TOKEN;
+  }
+});
+
+test('a granted ref missing from the Enforcer environment is skipped, never invented', () => {
+  delete process.env.SB_TEST_MISSING;
+  const p = makeProvider({ secretsFor: () => [{ ref: 'SB_TEST_MISSING' }] });
+  const s = p.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
+  assert.ok(!s.includes('SB_TEST_MISSING'), 'fail-visible: the command fails on the empty variable instead');
+});
+
 test('fail-closed: daemon unavailable throws SANDBOX_UNAVAILABLE, never passthrough', () => {
   const p = new DockerSandboxProvider(new Context(), { imageProvenance: TEST_PROVENANCE, digestResolver: () => ({ ok: true, digest: TEST_DIGEST }), probe: () => ({ ok: false, detail: 'docker info exited 1: boom' }) });
   assert.throws(() => p.confine(['bash', '-c', 'ls'], POLICY('read-only', '/ws')), (e) => {

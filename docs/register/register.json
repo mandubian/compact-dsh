@@ -89,7 +89,7 @@
       "kind": "enforced",
       "plugin": "compact-sandbox-docker",
       "service": "compact-sandbox",
-      "evidence": "mount grants: canonical request, protected/missing paths terminal, approval materializes the scoped PathPrefix row, provider binds at ceiling",
+      "evidence": "mount grants: canonical request, protected/missing paths terminal, approval materializes the scoped PathPrefix row, provider binds at ceiling. Secret grants: the injection agreement — an approved call referencing a DECLARED secret ref (env NAME, never a value) materializes a session-scoped, TTL'd, revocable SecretGrant; the provider resolves the NAME from the Enforcer environment at confine time and injects -e REF=value into the container only. The value never enters model context, the session log, or the grant store (which stores the NAME; a store file carrying a value field refuses to load). D-8 posture declared at boot: BOUND (refs declared, injection only under a live grant) or ABSENT (no refs, nothing injectable, enforced by the same lookup that would inject). The Subject may print the secret once its command holds it — that exposure is the operator's agreement and the leak detector's watch",
       "enforcedBy": [
         "packages/sandbox-docker/src/mount-tool.js",
         "packages/sandbox-docker/src/mounts.js"
