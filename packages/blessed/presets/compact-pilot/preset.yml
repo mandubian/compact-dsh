@@ -1,5 +1,6 @@
 name: Compact pilot
 description: >-
   Confined-bash coding agent under the Compact pilot gates — no host file
-  tools, no web, no fork/workflow delegation. Installed by the compact-dsh
-  launcher; overwritten at each --web boot (deployment-owned, do not edit here).
+  tools, no web, no fork/workflow delegation. Versioned in this checkout and
+  scanned read-only as the web roster's system root; change it via the
+  repository, not here.

@@ -75,7 +75,7 @@ async function main() {
       throw new Error(values.web ? '--web takes no task; sessions start from the browser' : '--smoke takes no task; use --help for usage');
     }
   } else if (!task.trim()) {
-    throw new Error('supply a task or --smoke, not both; use --help for usage');
+    throw new Error('supply a task, or --smoke for a no-model boot; use --help for usage');
   }
   for (const key of ['workspace', 'state-dir']) {
     if (values[key] !== undefined && !values[key].trim()) throw new Error(`--${key} must not be empty`);

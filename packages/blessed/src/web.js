@@ -98,7 +98,9 @@ export async function ensureInstallAnchor(stateDir) {
     existing = await lstat(link);
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
-    await symlink(target, link);
+    // junction on Windows: a directory link that needs no elevation; the type
+    // argument is ignored everywhere else
+    await symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir');
     return link;
   }
   if (!existing.isSymbolicLink()) {
