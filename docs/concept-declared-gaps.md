@@ -1,10 +1,10 @@
 # Concept — declared gaps (I-8, F-5): how the composition states what it does not do
 
-*The mechanism every enforcement service participates in and every reader of
-`self_describe` or a boot attestation consumes. The trigger for writing this
-down: a live run printed two contradictory record lines at once — see
-[the authority-boundary decision record](decision-rehearsal-identity.md) and
-PR #12, which made the structure described here mechanical.*
+*The mechanism that every enforcement service participates in — and that
+every reader of `self_describe` or a boot attestation consumes. The trigger
+for writing this down: a live run printed two contradictory record lines at
+once — see [the authority-boundary decision record](decision-rehearsal-identity.md)
+and PR #12, which made the structure described here mechanical.*
 
 ## What a declared gap is
 
@@ -38,7 +38,7 @@ Each service owns the truth about **its own** posture and exposes it as
 `declaredGaps` on its service object:
 
 | Service | Owns and declares |
-| --- | --- |
+|---|---|
 | `compact-record` | tamper-evidence vs tamper-proof; unsigned links vs authorship anchors |
 | `compact-sandbox` | image provenance basis; confinement limits |
 | `compact-self-model` | the attestation's own signature basis (`unsigned` / `dev-keyring`) |
