@@ -27,10 +27,12 @@
 // WHAT THIS DOES NOT DO. The chain is tamper-EVIDENT, not tamper-PROOF. Anyone
 // who can rewrite the log can also rewrite the sidecar; what they cannot do is
 // leave the pair consistent without the composition's cooperation, so an
-// alteration is detectable by anyone who kept a prior link. Signing links
-// under an identity key (I-1) is the next step and is not taken here: the
-// Compact has published no amendment keys, so a signature would attest to a
-// key nobody can check. That gap is declared, not papered over.
+// alteration is detectable by anyone who kept a prior link. Authorship is the
+// rehearsal concern: when the composition declares an enforcer annex, the
+// provider signs each flush as a chain anchor beside the chain (see
+// anchors.js and docs/decision-rehearsal-identity.md) — practice keys that
+// prove code-path correctness, never standing. Without an annex, the declared
+// gap below stands: no identity key signs the record.
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
@@ -39,12 +41,16 @@ import {
 } from './chain.js';
 import { ChainStore, MemoryChainStore } from './store.js';
 import {
+  anchorHashOf, signAnchor, genesisAnchor, anchorsPath, appendAnchors, readAnchors, verifyAnchorChain,
+} from './anchors.js';
+import {
   assertContiguous, materializeAppendBatch, SessionHandleClosedError, SessionReadOnlyError,
 } from '@deepseek-ai/dsh-session-persistence';
 
 export {
   canonicalize, extendChain, genesisHash, linkHash, verifySlice, RecordIntegrityError,
   ChainStore, MemoryChainStore,
+  anchorHashOf, signAnchor, genesisAnchor, anchorsPath, appendAnchors, readAnchors, verifyAnchorChain,
 };
 
 export const name = 'compact-record';

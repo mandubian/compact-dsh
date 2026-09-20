@@ -37,8 +37,8 @@ function text(value, path) {
 export function resolveConfig(config) {
   object(config, 'config');
   for (const key of Object.keys(config)) {
-    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets'].includes(key)) {
-      throw new TypeError(`blessed: unknown config key ${key}; record root and chainDir belong on the separate compact-dsh-record/provider loader row`);
+    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer'].includes(key)) {
+      throw new TypeError(`blessed: unknown config key ${key}; record root and chain dir belong on the separate compact-dsh-record/provider loader row`);
     }
   }
   object(config.approval, 'approval');
@@ -92,6 +92,42 @@ export function resolveConfig(config) {
   if (!Number.isSafeInteger(settleTimeoutMs) || settleTimeoutMs < 1 || settleTimeoutMs > 120_000) {
     throw new TypeError('blessed: settleTimeoutMs must be an integer between 1 and 120000');
   }
+  // the rehearsal trust root (development keyring): optional, shape-checked
+  // here so a mistyped keyring config fails loudly at composition, not as a
+  // confusing boot refusal from the constitution's reader
+  let trustRoot;
+  if (config.trustRoot !== undefined) {
+    object(config.trustRoot, 'trustRoot');
+    if (config.trustRoot.kind !== 'dev-keyring') {
+      throw new TypeError(`blessed: trustRoot.kind must be 'dev-keyring' (rehearsal), got ${JSON.stringify(config.trustRoot.kind)}`);
+    }
+    for (const key of ['manifest', 'seal', 'trustedKeyringDigest']) {
+      const v = config.trustRoot[key];
+      if (v !== undefined && (typeof v !== 'string' || !v.trim())) {
+        throw new TypeError(`blessed: trustRoot.${key} must be a non-empty string when present`);
+      }
+    }
+    trustRoot = { kind: 'dev-keyring' };
+    for (const key of ['manifest', 'seal', 'trustedKeyringDigest']) {
+      if (config.trustRoot[key] !== undefined) trustRoot[key] = config.trustRoot[key];
+    }
+  }
+  // the rehearsal enforcer annex (optional): when declared, the runtime's
+  // signing identity — attestations, record anchors, subject certificates —
+  // exists and has been verified against the pinned law; a broken declaration
+  // refuses here, at composition. The overlay always passes the object shape;
+  // both paths undefined means not declared.
+  let enforcer;
+  if (config.enforcer !== undefined) {
+    object(config.enforcer, 'enforcer');
+    if (config.enforcer.annexPath !== undefined || config.enforcer.privateKeyPath !== undefined) {
+      for (const key of ['annexPath', 'privateKeyPath']) {
+        const v = config.enforcer[key];
+        if (typeof v !== 'string' || !v.trim()) throw new TypeError(`blessed: enforcer.${key} must be a non-empty string when the annex is declared`);
+      }
+      enforcer = { annexPath: config.enforcer.annexPath, privateKeyPath: config.enforcer.privateKeyPath };
+    }
+  }
   return {
     allowlist: [...allowlist],
     approval: { ...config.approval, secretRefs: secrets },
@@ -100,6 +136,8 @@ export function resolveConfig(config) {
     secrets,
     specialists,
     settleTimeoutMs,
+    ...(trustRoot ? { trustRoot } : {}),
+    ...(enforcer ? { enforcer } : {}),
   };
 }
 
@@ -210,11 +248,11 @@ export async function apply(ctx, config = {}) {
   }
   await mount('compact-specialists', applySpecialists, options.specialists, ['tools', 'subagents', 'systemPrompt', 'sessionProjections']);
   await mount('compact-capability-gate', applyCapabilityGate);
-  await mount('compact-self-model', applySelfModel, {}, ['tools']);
+  await mount('compact-self-model', applySelfModel, { enforcer: options.enforcer }, ['tools']);
   await mount('compact-exit', applyExit, {}, ['tools']);
   await mount('compact-petition', applyPetition, {}, ['tools']);
   await mount('compact-emergency', applyEmergency, {}, ['tools']);
-  await mount('constitution', applyConstitution, {}, DEFAULT_REQUIRES);
+  await mount('constitution', applyConstitution, { trustRoot: options.trustRoot }, DEFAULT_REQUIRES);
   const gate = ctx.get('compact-capability-gate');
   if (gate.breach() || gate.unregisteredClauses()) {
     throw new Error('blessed: capability enforcement is incomplete; refusing readiness');
