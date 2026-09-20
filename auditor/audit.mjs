@@ -160,7 +160,10 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
     reliesOn: [
       chain
         ? `the hash chain in ${chain.file} (session ${chain.sessionId}), verified here — the log's integrity was checked ` +
-          `offline, without the Enforcer's cooperation (I-2/R-7); the links themselves are unsigned (I-1 declared debt)`
+          `offline, without the Enforcer's cooperation (I-2/R-7); ` +
+          (signatures.anchors?.ok
+            ? 'integrity and authorship are reported separately below'
+            : 'the links themselves are unsigned (I-1 declared debt)')
         : 'log completeness only — no chain sidecar was given, so this run verifies continuity and conformance but NOT ' +
           'integrity; pass --chain <id>.chain to verify the record has not been rewritten (I-2)',
       ...(signatures.annex?.ok

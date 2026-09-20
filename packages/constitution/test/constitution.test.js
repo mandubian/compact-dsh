@@ -262,3 +262,24 @@ test('a tampered body refuses the seal (digest mismatch), and a rehearsal keyrin
   const verdict = verifyTrustRoot({ kind: 'dev-keyring', manifest: manifestPath, seal: sealPath }, COMPACT_BODY);
   assert.equal(verdict.distinctSigners, 3);
 });
+
+test('the record-posture gaps come from the record service, so the label never contradicts itself', () => {
+  // anchors declared: the stale "links are unsigned" line must be gone, and
+  // the R-9 line must name the rehearsal closure instead of denying authorship
+  const anchored = { name: 'record', declaredGaps: ['the record is tamper-EVIDENT, not tamper-proof: its head is AUTHORSHIP-ANCHORED at each flush under the development keyring (I-1 debt, declared)'] };
+  const services = { ...ALL_SERVICES, 'compact-record': anchored };
+  const ctx = fakeCtx({ services });
+  apply(ctx, { trustRoot: { kind: 'dev-keyring' } });
+  const gaps = ctx.get('constitution').attestation().gaps;
+  assert.ok(!gaps.some(g => g.includes('links are unsigned')), 'the stale unsigned-record label is gone');
+  assert.ok(gaps.some(g => g.includes('AUTHORSHIP-ANCHORED')), 'the record speaks for itself');
+  assert.match(gaps.find(g => g.startsWith('R-9')), /authorship limb is REHEARSED/, 'the R-9 line follows the posture');
+  // unsigned record: the static line stands
+  const plain = { ...ALL_SERVICES, 'compact-record': { name: 'record', declaredGaps: ['the record is tamper-EVIDENT, not tamper-proof, and its links are unsigned (I-1 debt, declared)'] } };
+  const ctx2 = fakeCtx({ services: plain });
+  apply(ctx2, {});
+  const gaps2 = ctx2.get('constitution').attestation().gaps;
+  assert.ok(gaps2.some(g => g.includes('its links are unsigned')), 'the unsigned-record label stands');
+  assert.match(gaps2.find(g => g.includes('its links are unsigned')), /the record service|tamper-EVIDENT, not tamper-proof/);
+  assert.match(gaps2.find(g => g.startsWith('R-9')), /but not its AUTHORSHIP/);
+});
