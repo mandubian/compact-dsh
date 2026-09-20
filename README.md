@@ -524,6 +524,7 @@ chains under `chains/`, and persistent grants in `approvals.json`. Keep this
 operator-owned directory outside the agent workspace. The launcher isolates
 `DSH_HOME` there and disables telemetry; it does not modify your normal dsh
 profile or load its patches. `compact.generated.cordis.yml` must remain empty.
+The rehearsal identity set (below) lives there too, when installed.
 
 The bundle replaces stock persistence with `compact-dsh-record/provider`, so
 host session writes actually pass through the chain. It replaces the stock
@@ -548,6 +549,40 @@ is explicitly **operator-declared**, not a verified build history.
 - The no-key loader, confinement and persistence checks are tested; a live
   model-backed task has not been verified here. Keys, Part V adjudication and
   ratified standing remain declared gaps.
+
+**Rehearsal signatures (development keyring).** The composition's signature
+machinery is live under the upstream development keyring (mandubian/compact
+amendment 0004). The boot verifies the law seal over the pinned body — k-of-n
+with distinct-signer semantics; `COMPACT_TRUSTED_KEYRING_DIGEST` pins the
+manifest the way `trustedDigest` pins the body. When the operator installs a
+rehearsal identity set, the runtime also signs what it says:
+
+```bash
+node tools/rehearsal-keyring.mjs ensure ~/.compact-dsh/keyring
+COMPACT_ENFORCER_ANNEX=~/.compact-dsh/keyring/enforcer.annex.json \
+COMPACT_ENFORCER_KEY=~/.compact-dsh/keyring/enforcer.pem \
+npm run compact -- --attended "Use self_describe."
+```
+
+Attestations gain `basis: 'dev-keyring'` plus a signature; every flush writes
+a chain anchor (authorship over the record); each session gets an enforcer-
+certified subject identity; the amendment loop is rehearsed with
+`tools/rehearsal-amendment.mjs` (seal → SIMULATED ENACTMENT ledger → apply →
+re-seal → re-pin); and the offline auditor verifies all of it:
+
+```bash
+node auditor/audit.mjs <session.jsonl> --chain <id>.chain \
+  --annex ~/.compact-dsh/keyring/enforcer.annex.json \
+  --anchors <id>.chain.sigs.jsonl \
+  --keyring <manifest> --seal <sig.json> --body packages/constitution/compact/compact.md
+```
+
+Every signature verdict reads **"VALID under DEV keyring — conveys no
+standing"**: this rehearses the I-1/I-3/R-7 machinery and nothing else — no
+clause moves from planned to enforced, and the authority boundary is
+structural (the Compact's authority keys sign law artifacts only; the enforcer
+key, declared in its own signed annex, signs runtime artifacts; there is
+deliberately no CA). See docs/decision-rehearsal-identity.md for the design.
 
 ## Verify locally
 

@@ -119,6 +119,11 @@ test('loader: base and blessed patches boot real host services, deny tools and p
   assert.deepEqual(ctx.get('compact-ready'), { name: 'compact-blessed', ready: true, digest: COMPACT_DIGEST });
   assert.equal(ctx.get('constitution').digest, COMPACT_DIGEST);
   assert.deepEqual(ctx.get('constitution').attestation().verified.missing, []);
+  const bodySeal = ctx.get('constitution').attestation().verified.bodySeal;
+  assert.deepEqual(
+    { basis: bodySeal.basis, threshold: bodySeal.threshold, distinctSigners: bodySeal.distinctSigners, conveysStanding: bodySeal.conveysStanding },
+    { basis: 'dev-keyring', threshold: '2-of-3', distinctSigners: 3, conveysStanding: false },
+    'the rehearsal trust root verifies the founder seal over the pinned body at boot');
   assert.equal(ctx.get('compact-capability-gate').breach(), null);
   assert.equal(ctx.get('compact-capability-gate').unregisteredClauses(), null);
   assert.ok(ctx.subagents.getProvider('spawn'));
@@ -259,4 +264,42 @@ test('loader: missing operator approval path refuses boot', { timeout: 45_000 },
   const f = fixture(t);
   delete process.env.COMPACT_APPROVAL_PERSIST_PATH;
   await assert.rejects(boot('compact-test', f.configFile, f.patches, undefined, rootUrl), /approval.persistPath/);
+});
+
+test('loader: a declared enforcer annex signs what the runtime says — attestations, subject certs, chain anchors', { timeout: 60_000 }, async (t) => {
+  const f = fixture(t);
+  const { ensureRehearsalKeyring } = await import('../../../tools/rehearsal-keyring.mjs');
+  const kr = mkdtempSync(join(tmpdir(), 'loader-enforcer-'));
+  t.after(() => rmSync(kr, { recursive: true, force: true }));
+  ensureRehearsalKeyring(kr);
+  process.env.COMPACT_ENFORCER_ANNEX = join(kr, 'enforcer.annex.json');
+  process.env.COMPACT_ENFORCER_KEY = join(kr, 'enforcer.pem');
+  t.after(() => { delete process.env.COMPACT_ENFORCER_ANNEX; delete process.env.COMPACT_ENFORCER_KEY; });
+
+  const ctx = await launch(f);
+  // the composition's identity: the annex verified against the pinned law
+  const record = ctx.get('compact-record');
+  assert.match(record.declaredGaps[0], /AUTHORSHIP-ANCHORED/, 'the record declares the anchored posture');
+  // the self-model signs what it says, and certifies the Subject
+  const selfModel = ctx.get('compact-self-model');
+  const att = selfModel.attest('loader-annex-subject');
+  assert.equal(att.basis, 'dev-keyring');
+  assert.equal(selfModel.verifyAttestation(att).valid, true);
+  const identity = selfModel.subjectIdentity('loader-annex-subject');
+  assert.ok(identity, 'a subject session identity was issued');
+  assert.deepEqual(selfModel.verifySubjectCert(identity.cert).valid, true);
+  // a session on the record is authored: anchors cover its chain head
+  const session = ctx.sessions.prepare('loader-annex-live');
+  const writer = await ctx.get('sessionPersistence').create(session.header);
+  f.cleanup.push(() => writer.close());
+  const detach = ctx.sessions.enter(session);
+  t.after(detach);
+  ctx.sessions.announce(session);
+  session.append('turn/start', { turn: 1 });
+  session.append('turn/end', { turn: 1 });
+  await ctx.sessions.flush(session);
+  const verdict = await record.verifyAnchors(session.id);
+  assert.equal(verdict.ok, true);
+  assert.equal(verdict.basis, 'dev-keyring');
+  assert.equal(verdict.conveysStanding, false);
 });

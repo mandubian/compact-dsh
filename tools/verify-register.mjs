@@ -83,6 +83,13 @@ if (register) {
       if (!e.service && e.plugin !== 'compact-constitution' && e.plugin !== 'auditor') {
         fail(`${e.clause} (${e.plugin}): an enforced entry must name the service whose presence the boot couples on`);
       }
+    } else if (e.kind === 'rehearsal') {
+      // binding machinery exercised under the declared development keyring:
+      // refuses the act on verification failure, conveys no standing,
+      // discharges no clause — and like an enforced entry, a rehearsal that
+      // cannot fail proves nothing (F-5)
+      if (!e.plugin) fail(`${e.clause}: a rehearsal entry must name the plugin that reheurses the machinery`);
+      if ((e.verifiers ?? []).length === 0) fail(`${e.clause} (${e.plugin}): a rehearsal entry without a verifier proves nothing (F-5)`);
     } else if (!['planned', 'convention'].includes(e.kind)) {
       fail(`${e.clause}: unknown kind ${e.kind}`);
     }

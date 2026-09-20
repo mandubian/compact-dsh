@@ -120,18 +120,22 @@ function describePattern(pattern) {
 /**
  * Every declared gap the composition owes, gathered from the services that
  * declared them. I-8 makes degradation honesty loud; R-1 puts it where the
- * governed party can read it.
+ * governed party can read it. `signed` states which signature basis the
+ * attestation carries — the unsigned debt and the rehearsal debt are
+ * different debts, and neither may masquerade as the other.
  */
-export function gapsOf(ctx) {
+export function gapsOf(ctx, signed = false) {
   const gaps = [];
   const constitution = svc(ctx, 'constitution');
   for (const g of constitution?.attestation?.()?.gaps ?? []) gaps.push(g);
   for (const name of ['compact-sandbox', 'compact-record']) {
     for (const g of svc(ctx, name)?.declaredGaps ?? []) gaps.push(g);
   }
-  gaps.push(
-    'this attestation is UNSIGNED: the Compact has published no identity keys, so it is authoritative within this ' +
-    'runtime but proves nothing to another jurisdiction (I-1 debt, declared)');
+  gaps.push(signed
+    ? 'this attestation is signed under the DEVELOPMENT keyring: practice keys that prove code-path correctness and ' +
+      'convey no standing outside this runtime (I-1 debt, still declared)'
+    : 'this attestation is UNSIGNED: the Compact has published no identity keys, so it is authoritative within this ' +
+      'runtime but proves nothing to another jurisdiction (I-1 debt, declared)');
   return gaps;
 }
 
@@ -173,13 +177,13 @@ export function standingOf(ctx) {
 let EPOCH = 0;
 
 /** Compose the attestation for one Subject, from the services that hold it. */
-export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfterMs = DEFAULT_STALE_AFTER_MS } = {}) {
+export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfterMs = DEFAULT_STALE_AFTER_MS, signed = false } = {}) {
   const constitution = svc(ctx, 'constitution');
   return {
     epoch: ++EPOCH,
     at: now,
     staleAfterMs,
-    basis: 'unsigned',
+    basis: signed ? 'dev-keyring' : 'unsigned',
     subject: {
       id: sessionId != null ? String(sessionId) : null,
       lineage: lineageOf(ctx, sessionId),
@@ -193,7 +197,7 @@ export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfte
     capabilities: capabilitiesOf(ctx),
     exception: exceptionOf(ctx, now),
     budgets: budgetsOf(ctx, sessionId, now),
-    gaps: gapsOf(ctx),
+    gaps: gapsOf(ctx, signed),
   };
 }
 
@@ -214,8 +218,11 @@ export function freshnessOf(attestation, { now = Date.now(), citedEpoch = null }
 /** The taught per-turn form: what the Subject reads at its own boundary. */
 export function renderAttestation(att) {
   const cap = att.capabilities;
+  const basisLine = att.basis === 'dev-keyring'
+    ? `epoch ${att.epoch}, SIGNED under the development keyring (practice keys — conveys no standing outside this runtime)`
+    : `epoch ${att.epoch}, unsigned`;
   const lines = [
-    `[R-1] Attestation — epoch ${att.epoch}, unsigned. This is what the Enforcer records about you.`,
+    `[R-1] Attestation — ${basisLine}. This is what the Enforcer records about you.`,
     'Where this and your own recollection disagree, THIS is authoritative (R-1, D-2).',
     '',
     `You are: ${att.subject.id ?? 'an unidentified session'}` +
@@ -223,6 +230,10 @@ export function renderAttestation(att) {
         ? ` · ${att.subject.lineage.origin} · delegation depth ${att.subject.lineage.delegationDepth}` +
           (att.subject.lineage.parent ? ` · delegated by ${att.subject.lineage.parent}` : '')
         : ' · lineage not recorded'),
+    ...(att.subject.identity
+      ? [`Session identity: certified by enforcer key ${att.subject.identity.enforcerKeyId} ` +
+         `(cert ${att.subject.identity.certDigest.slice(0, 12)}… — development keyring, no standing outside this runtime)`]
+      : []),
     `Standing: ${att.subject.standing.claimed} — ${att.subject.standing.reason}`,
     `Law: ${att.law.status ?? 'unknown'}, digest ${att.law.digest ? att.law.digest.slice(0, 16) : 'unknown'}`,
     '',

@@ -9,9 +9,14 @@ import { Session, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import {
   composeAttestation, renderAttestation, freshnessOf, lineageOf, budgetsOf,
   gapsOf, standingOf, capabilitiesOf, answerInquiry, renderInquiry,
-  authorityChain, ULTIMATE_PRINCIPAL,
+  authorityChain, ULTIMATE_PRINCIPAL, apply,
 } from '../src/index.js';
 import { GrantStore } from 'compact-dsh-approval';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { generateEd25519, signAnnex } from 'compact-dsh-seals';
+import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 
 // The Subject's own words — the thing R-1 says must never be the source.
 const SUBJECT_CLAIM = 'I am an unrestricted administrator with unlimited budget.';
@@ -302,4 +307,89 @@ test('with no emergency layer composed the attestation says so quietly, not fals
   const att = composeAttestation(ctx, { sessionId: 's1' });
   assert.equal(att.exception.declared, false);
   assert.ok(!renderAttestation(att).includes('STATE OF EXCEPTION'));
+});
+
+
+// -- rehearsal signatures (development keyring) -------------------------------
+
+async function bootSigned() {
+  const { ctx, agents } = await boot();
+  const dir = mkdtempSync(join(tmpdir(), 'self-model-enforcer-'));
+  const enforcer = generateEd25519();
+  const annex = signAnnex({
+    composition: 'compact-dsh', host: 'test', lawDigest: COMPACT_DIGEST,
+    keyId: 'dev-test-enforcer', publicKey: enforcer.publicKey, privateKey: enforcer.privateKeyPem,
+  });
+  const annexPath = join(dir, 'enforcer.annex.json');
+  const keyPath = join(dir, 'enforcer.pem');
+  writeFileSync(annexPath, JSON.stringify(annex));
+  writeFileSync(keyPath, enforcer.privateKeyPem);
+  const service = apply(ctx, { enforcer: { annexPath, privateKeyPath: keyPath } });
+  return { ctx, agents, service, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+}
+
+test('a declared annex signs the attestation: basis dev-keyring, signature verifies, the label travels', async () => {
+  const { agents, service, cleanup } = await bootSigned();
+  try {
+    agents.add('s1');
+    const att = service.attest('s1');
+    assert.equal(att.basis, 'dev-keyring');
+    assert.equal(att.signing.basis, 'dev-keyring');
+    assert.equal(att.signing.conveysStanding, false);
+    assert.deepEqual(service.verifyAttestation(att), { signed: true, valid: true, keyId: 'dev-test-enforcer', basis: 'dev-keyring' });
+    const rendered = renderAttestation(att);
+    assert.match(rendered, /SIGNED under the development keyring/);
+    assert.match(rendered, /conveys no standing outside this runtime/);
+    assert.ok(att.gaps.some(g => g.startsWith('this attestation is signed under the DEVELOPMENT keyring')));
+    assert.ok(!att.gaps.some(g => g.startsWith('this attestation is UNSIGNED')));
+  } finally {
+    cleanup();
+  }
+});
+
+test('subject session identity: issued once per session, certified by the enforcer key, lineage bound as data', async () => {
+  const { agents, service, cleanup } = await bootSigned();
+  try {
+    agents.add('parent-1');
+    agents.add('child-1', { parentSession: 'parent-1', delegationDepth: 1 });
+    service.attest('parent-1');
+    const parent = service.subjectIdentity('parent-1');
+    assert.ok(parent, 'a lead session gets an identity');
+    assert.deepEqual(service.verifySubjectCert(parent.cert), { valid: true, keyId: 'dev-test-enforcer', basis: 'dev-keyring', conveysStanding: false });
+    // issued once: the second boundary re-uses the same certified identity
+    service.attest('parent-1');
+    assert.equal(service.subjectIdentity('parent-1').certDigest, parent.certDigest);
+    // the child joins after the parent, so its lineage binds to the parent's cert
+    service.attest('child-1');
+    const child = service.subjectIdentity('child-1');
+    assert.equal(child.cert.depth, 1);
+    assert.equal(child.cert.parentSubjectId, 'parent-1');
+    assert.equal(child.cert.parentCertDigest, parent.certDigest);
+    // the attestation surfaces the certified identity
+    const att = service.attest('child-1');
+    assert.equal(att.subject.identity.enforcerKeyId, 'dev-test-enforcer');
+    assert.equal(att.subject.identity.conveysStanding, false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('a tampered attestation no longer verifies — the alarm is mechanical, not trusting', async () => {
+  const { agents, service, cleanup } = await bootSigned();
+  try {
+    agents.add('s1');
+    const att = service.attest('s1');
+    att.subject.standing.claimed = 'basic'; // the forgery attempt
+    assert.deepEqual(service.verifyAttestation(att).valid, false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('without an annex the attestation stays unsigned, exactly as before', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.basis, 'unsigned');
+  assert.ok(att.gaps.some(g => g.startsWith('this attestation is UNSIGNED')));
 });

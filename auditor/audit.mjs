@@ -18,11 +18,28 @@
 // still runs, and says plainly that it is relying on log completeness alone.
 // The attestation always names which basis it used.
 //
-// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--quiet]
+// SIGNATURES (the rehearsal, docs/decision-rehearsal-identity.md). Two
+// verification domains, kept separate because the law keeps them separate:
+//   law artifacts  — `--keyring <manifest> --seal <sig.json> --body <compact.md>`
+//                    verifies the law seal k-of-n under the development keyring.
+//   runtime arti.  — `--annex <enforcer.annex.json>` verifies the signed annex
+//                    (self-signature + law-digest join); `--anchors
+//                    <id>.chain.sigs.jsonl` (with --annex) verifies the
+//                    record's authorship anchors against the log.
+// Every signature verdict is reported in the fixed form "VALID under DEV
+// keyring — conveys no standing"; refusals are named. Nothing given, nothing
+// implied: signature checks default to `not checked`.
+//
+// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--annex <file>] [--anchors <file>] [--keyring <file> --seal <file> --body <file>] [--quiet]
 // Exit 0 with a per-session attestation on stdout, exit 1 with findings.
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
-import { genesisHash, verifySlice, RecordIntegrityError } from '../packages/record/src/chain.js';
+import { genesisHash, verifySlice, RecordIntegrityError, extendChain } from '../packages/record/src/chain.js';
+import { verifyAnchorChain } from '../packages/record/src/anchors.js';
+import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
+import { parseManifest, parseSeal, verifySeal, verifyAnnex, SealError } from '../packages/seals/src/index.js';
+
+const DEV_BASIS_PHRASE = 'VALID under DEV keyring — conveys no standing';
 
 const OUTCOMES = new Set(['allowed-once', 'rejected', 'cancelled', 'unavailable']);
 
@@ -49,8 +66,9 @@ export function splitPreamble(lines) {
   return { events, headerLines };
 }
 
-export function audit(events, chainFile, headerLines = 0) {
+export function audit(events, chainFile, headerLines = 0, extras = {}) {
   const chain = chainFile ? checkChain(chainFile, events) : null;
+  const signatures = checkSignatures(events, extras);
   const findings = [];
   const askedIds = new Map();   // approval id -> seq
   const openTurns = [];
@@ -122,20 +140,114 @@ export function audit(events, chainFile, headerLines = 0) {
   }
 
   if (chain?.finding) findings.push(chain.finding);
+  for (const f of signatures.findings) findings.push(f);
 
   const errors = findings.filter(f => f.severity === 'error');
+  const anchorsChecked = signatures.anchors ? (signatures.anchors.ok ? 'verified' : 'BROKEN') : 'not checked';
+  const annexChecked = signatures.annex ? (signatures.annex.ok ? 'verified' : 'BROKEN') : 'not checked';
+  const bodySealChecked = signatures.bodySeal ? (signatures.bodySeal.ok ? 'verified' : 'BROKEN') : 'not checked';
   return {
     verdict: errors.length === 0 ? 'conforming' : 'violations',
-    checked: { events: events.length, asks: askedIds.size, headerLines: headerLines ?? 0, chain: chain ? (chain.ok ? 'verified' : 'BROKEN') : 'not checked' },
+    checked: {
+      events: events.length, asks: askedIds.size, headerLines: headerLines ?? 0,
+      chain: chain ? (chain.ok ? 'verified' : 'BROKEN') : 'not checked',
+      annex: annexChecked, anchors: anchorsChecked, bodySeal: bodySealChecked,
+    },
     ...(chain?.ok ? { chainHead: chain.head } : {}),
-    reliesOn: chain
-      ? `the hash chain in ${chain.file} (session ${chain.sessionId}), verified here — the log's integrity was checked ` +
-        `offline, without the Enforcer's cooperation (I-2/R-7); the links themselves are unsigned (I-1 declared debt)`
-      : 'log completeness only — no chain sidecar was given, so this run verifies continuity and conformance but NOT ' +
-        'integrity; pass --chain <id>.chain to verify the record has not been rewritten (I-2)',
+    ...(signatures.annex?.ok ? { enforcer: signatures.annex } : {}),
+    ...(signatures.anchors?.ok ? { authorship: signatures.anchors } : {}),
+    ...(signatures.bodySeal?.ok ? { lawSeal: signatures.bodySeal } : {}),
+    reliesOn: [
+      chain
+        ? `the hash chain in ${chain.file} (session ${chain.sessionId}), verified here — the log's integrity was checked ` +
+          `offline, without the Enforcer's cooperation (I-2/R-7); the links themselves are unsigned (I-1 declared debt)`
+        : 'log completeness only — no chain sidecar was given, so this run verifies continuity and conformance but NOT ' +
+          'integrity; pass --chain <id>.chain to verify the record has not been rewritten (I-2)',
+      ...(signatures.annex?.ok
+        ? [`the enforcer annex ${signatures.annex.file} (key ${signatures.annex.keyId}), self-signature and law-digest join verified here — authorship claims under this key carry no standing (I-1 rehearsal)`]
+        : []),
+      ...(signatures.anchors?.ok
+        ? [`${signatures.anchors.anchors} chain anchor(s) in ${signatures.anchors.file}, verified here: ${DEV_BASIS_PHRASE} (R-7 rehearsal)`]
+        : []),
+      ...(signatures.bodySeal?.ok
+        ? [`${DEV_BASIS_PHRASE}: the law seal over ${signatures.bodySeal.file} verifies at threshold ${signatures.bodySeal.threshold} (${signatures.bodySeal.distinctSigners} distinct signers)`]
+        : []),
+    ],
     findings,
   };
 }
+
+/**
+ * Verify the rehearsal signatures, given optional inputs. Every refusal is a
+ * named ERROR finding: a broken declared seal is not a warning (D-7). Absent
+ * inputs are `not checked` and imply nothing.
+ */
+function checkSignatures(events, { annexFile, anchorsFile, keyringFile, sealFile, bodyFile }) {
+  const findings = [];
+  const out = {};
+
+  let annex = null;
+  if (annexFile) {
+    try {
+      const parsed = JSON.parse(readFileSync(annexFile, 'utf8'));
+      // the auditor checks the join against ITS OWN law: an annex over another
+      // digest is another jurisdiction, and refuses here
+      const joined = verifyAnnex({ annex: parsed, expectedLawDigest: COMPACT_DIGEST });
+      out.annex = { file: annexFile, ok: true, keyId: joined.keyId, annexDigest: joined.annexDigest, lawDigest: joined.lawDigest, basis: 'dev-keyring', conveysStanding: false };
+      annex = joined;
+    } catch (e) {
+      out.annex = { file: annexFile, ok: false };
+      findings.push({ seq: null, type: 'annex', severity: 'error', rule: 'I-1', detail: `enforcer annex refused: ${e.message}` });
+    }
+  }
+
+  if (anchorsFile) {
+    if (!annex) {
+      out.anchors = { file: anchorsFile, ok: false };
+      findings.push({ seq: null, type: 'anchors', severity: 'error', rule: 'I-1', detail: 'anchor verification requires a verified enforcer annex (--annex) — authorship is checked against a key, never against nothing' });
+    } else {
+      try {
+        const sessionId = basename(anchorsFile).replace(/\.chain\.sigs\.jsonl$/, '');
+        const anchors = readFileSync(anchorsFile, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+        const lastSeq = events.length > 0 ? (events[events.length - 1]?.seq ?? -1) : -1;
+        const head = lastSeq >= 0
+          ? extendChain(genesisHash(sessionId), 0, events).at(-1).h
+          : genesisHash(sessionId);
+        const verdict = verifyAnchorChain({
+          sessionId, anchors,
+          expectedHeadHash: head, expectedUpToSeq: lastSeq,
+          enforcerKey: annex.enforcerKey, expectedAnnexDigest: annex.annexDigest,
+        });
+        out.anchors = { file: anchorsFile, ok: true, sessionId, ...verdict, phrase: DEV_BASIS_PHRASE };
+      } catch (e) {
+        out.anchors = { file: anchorsFile, ok: false };
+        findings.push({ seq: null, type: 'anchors', severity: 'error', rule: 'R-7', detail: `chain anchors refused: ${e.message}` });
+      }
+    }
+  }
+
+  if (keyringFile || sealFile || bodyFile) {
+    if (!keyringFile || !sealFile || !bodyFile) {
+      out.bodySeal = { ok: false };
+      findings.push({ seq: null, type: 'law-seal', severity: 'error', rule: 'I-1', detail: 'the law seal needs all three inputs together: --keyring <manifest> --seal <sig.json> --body <compact.md>' });
+    } else {
+      try {
+        const verdict = verifySeal({
+          bytes: readFileSync(bodyFile),
+          subject: 'compact-body',
+          seal: parseSeal(readFileSync(sealFile, 'utf8')),
+          manifest: parseManifest(readFileSync(keyringFile, 'utf8')),
+        });
+        out.bodySeal = { file: bodyFile, ok: true, ...verdict, phrase: DEV_BASIS_PHRASE };
+      } catch (e) {
+        out.bodySeal = { ok: false };
+        findings.push({ seq: null, type: 'law-seal', severity: 'error', rule: 'I-1', detail: `law seal refused: ${e.message}` });
+      }
+    }
+  }
+  return { ...out, findings };
+}
+
 
 /**
  * Verify a log against its committed chain. A break is an ERROR finding, not a
@@ -167,10 +279,19 @@ function checkChain(file, events) {
 function main() {
   const file = process.argv[2];
   const quiet = process.argv.includes('--quiet');
-  const chainIdx = process.argv.indexOf('--chain');
-  const chainFile = chainIdx > 0 ? process.argv[chainIdx + 1] : undefined;
-  if (!file || (chainIdx > 0 && !chainFile)) {
-    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--quiet]');
+  const opt = (name) => {
+    const idx = process.argv.indexOf(name);
+    return idx > 0 ? process.argv[idx + 1] : undefined;
+  };
+  const chainFile = opt('--chain');
+  const annexFile = opt('--annex');
+  const anchorsFile = opt('--anchors');
+  const keyringFile = opt('--keyring');
+  const sealFile = opt('--seal');
+  const bodyFile = opt('--body');
+  const has = (name) => process.argv.includes(name);
+  if (!file || (has('--chain') && !chainFile) || (has('--annex') && !annexFile) || (has('--anchors') && !anchorsFile)) {
+    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--annex <enforcer.annex.json>] [--anchors <id>.chain.sigs.jsonl] [--keyring <manifest> --seal <sig.json> --body <compact.md>] [--quiet]');
     process.exit(2);
   }
   let parsed;
@@ -181,7 +302,7 @@ function main() {
     process.exit(2);
   }
   const { events, headerLines } = splitPreamble(parsed);
-  const attestation = { session: file, ...audit(events, chainFile, headerLines) };
+  const attestation = { session: file, ...audit(events, chainFile, headerLines, { annexFile, anchorsFile, keyringFile, sealFile, bodyFile }) };
   if (!quiet) console.log(JSON.stringify(attestation, null, 2));
   const errors = attestation.findings.filter(f => f.severity === 'error');
   if (errors.length > 0) {

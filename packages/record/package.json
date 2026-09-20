@@ -10,7 +10,17 @@
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
-  "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
-  "scripts": { "test": "node --test \"test/*.test.js\"" },
-  "engines": { "node": ">=22.19" }
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "compact-dsh-constitution": "0.1.0",
+    "compact-dsh-seals": "0.1.0"
+  }
 }

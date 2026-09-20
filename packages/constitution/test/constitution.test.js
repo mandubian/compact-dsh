@@ -4,11 +4,16 @@
 // list derives from the body's own headers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   COMPACT_BODY, COMPACT_DIGEST, TAUGHT_DIGEST, CLAUSES, clauseIds, clauseOf, verifyBody,
 } from '../src/body.js';
-import { apply, DECLARED_GAPS } from '../src/index.js';
+import { apply, DECLARED_GAPS, verifyTrustRoot } from '../src/index.js';
+import { generateEd25519, parseManifest, SealError, signSeal } from 'compact-dsh-seals';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 function fakeCtx({ services = {}, missing = [] } = {}) {
   const provided = {};
@@ -179,4 +184,81 @@ test('R-6: the law itself is readable, addressed by digest, with the taught form
   assert.equal(constitution.body(), COMPACT_BODY);
   assert.ok(constitution.taughtDigest().startsWith('## Appendix'));
   assert.ok(TAUGHT_DIGEST.includes('authority to break this law'), 'the taught form carries law-over-task');
+});
+
+// ── the rehearsal trust root (development keyring) ──────────────────────────
+const VENDORED_MANIFEST = fileURLToPath(new URL('../keyring/dev/keyring.json', import.meta.url));
+const VENDORED_SEAL = fileURLToPath(new URL('../keyring/dev/compact-body.sig.json', import.meta.url));
+
+
+
+
+
+test('the rehearsal trust root verifies the vendored founder seal over the bundled body — machinery, no standing', () => {
+  const verdict = verifyTrustRoot({ kind: 'dev-keyring' }, COMPACT_BODY);
+  assert.deepEqual(
+    { basis: verdict.basis, threshold: verdict.threshold, distinctSigners: verdict.distinctSigners, conveysStanding: verdict.conveysStanding },
+    { basis: 'dev-keyring', threshold: '2-of-3', distinctSigners: 3, conveysStanding: false });
+});
+
+test('boot with trustRoot: the attestation carries the seal and the signature gap names the rehearsal basis', () => {
+  const ctx = fakeCtx({ services: ALL_SERVICES });
+  apply(ctx, { trustRoot: { kind: 'dev-keyring' } });
+  const att = ctx.get('constitution').attestation();
+  assert.deepEqual(
+    { basis: att.verified.bodySeal.basis, conveysStanding: att.verified.bodySeal.conveysStanding },
+    { basis: 'dev-keyring', conveysStanding: false });
+  const sealGap = att.gaps.find(g => g.startsWith('the body seal verifies under the declared DEVELOPMENT keyring'));
+  assert.ok(sealGap, 'the seal gap names the rehearsal basis');
+  assert.match(sealGap, /I-1 debt, declared/, 'the debt stays declared — machinery is not ratification');
+  assert.ok(!att.gaps.some(g => g.startsWith('signature verification unimplemented')), 'the stale gap line is gone');
+});
+
+test('boot without trustRoot keeps the pin-only posture and the unsigned gap', () => {
+  const ctx = fakeCtx({ services: ALL_SERVICES });
+  apply(ctx, {});
+  const att = ctx.get('constitution').attestation();
+  assert.equal(att.verified.bodySeal, undefined);
+  assert.ok(att.gaps.some(g => g.startsWith('signature verification unimplemented')));
+});
+
+test('an unknown trust root kind refuses the boot', () => {
+  assert.throws(() => verifyTrustRoot({ kind: 'prod-ca' }, COMPACT_BODY), /unsupported trustRoot kind/);
+});
+
+test('a swapped manifest is refused against trustedKeyringDigest (operator pinning)', () => {
+  assert.throws(
+    () => verifyTrustRoot({ kind: 'dev-keyring', trustedKeyringDigest: '0'.repeat(64) }, COMPACT_BODY),
+    e => e instanceof SealError && e.reason === 'manifest-digest-mismatch');
+  // the vendored manifest accepts its own true digest
+  const trueDigest = createHash('sha256').update(readFileSync(VENDORED_MANIFEST)).digest('hex');
+  verifyTrustRoot({ kind: 'dev-keyring', trustedKeyringDigest: trueDigest }, COMPACT_BODY);
+});
+
+test('a tampered body refuses the seal (digest mismatch), and a rehearsal keyring seals its own law', async () => {
+  assert.throws(
+    () => verifyTrustRoot({ kind: 'dev-keyring', seal: VENDORED_SEAL }, COMPACT_BODY + '\n<!-- rehearsal scratch -->\n'),
+    e => e instanceof SealError && e.reason === 'digest-mismatch');
+
+  // the ratification cure, rehearsed: generate a local authority keyring, seal
+  // the SAME body, and point trustRoot at it — configuration swap, not code
+  const keys = [];
+  const priv = new Map();
+  for (let i = 1; i <= 3; i++) {
+    const k = generateEd25519();
+    keys.push({ id: `dev-rehearsal-${i}`, holder: 'rehearsal — one entity', publicKey: k.publicKey });
+    priv.set(`dev-rehearsal-${i}`, k.privateKeyPem);
+  }
+  const localManifest = {
+    kind: 'dev-keyring', version: 1, created: '2026-09-20',
+    declaration: 'NOT the A-1 trust root — machinery only', algorithm: 'ed25519',
+    threshold: { k: 2, n: 3 }, keys, rotations: [], cure: 'ratification', standing: 'none',
+  };
+  const dir = mkdtempSync(join(tmpdir(), 'constitution-keyring-'));
+  const manifestPath = join(dir, 'keyring.json');
+  const sealPath = join(dir, 'compact-body.sig.json');
+  writeFileSync(manifestPath, JSON.stringify(localManifest, null, 2) + '\n');
+  writeFileSync(sealPath, JSON.stringify(signSeal({ bytes: Buffer.from(COMPACT_BODY, 'utf8'), subject: 'compact-body', source: 'compact.md', manifest: parseManifest(JSON.stringify(localManifest)), privateKeys: priv }), null, 2) + '\n');
+  const verdict = verifyTrustRoot({ kind: 'dev-keyring', manifest: manifestPath, seal: sealPath }, COMPACT_BODY);
+  assert.equal(verdict.distinctSigners, 3);
 });
