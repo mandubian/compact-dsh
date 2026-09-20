@@ -6,6 +6,7 @@
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
+    "./web": "./src/web.js",
     "./package.json": "./package.json"
   },
   "peerDependencies": {

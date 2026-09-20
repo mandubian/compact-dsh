@@ -54,20 +54,28 @@ async function main() {
       help: { type: 'boolean', short: 'h' },
       smoke: { type: 'boolean' },
       attended: { type: 'boolean' },
+      web: { type: 'boolean' },
       workspace: { type: 'string' },
       'state-dir': { type: 'string' },
     },
   });
   if (values.help) {
-    console.log('Usage: npm run compact -- [--attended] [--workspace PATH] [--state-dir PATH] "task"\n       npm run compact -- --smoke [--workspace PATH] [--state-dir PATH]\nState defaults to ~/.compact-dsh (COMPACT_STATE_DIR overrides); DSH_HOME is isolated there.\nTask mode inherits DEEPSEEK_API_KEY; default model: deepseek-flash.\n--attended prompts the operator on the terminal for uncovered gated calls (default deny; stderr only).\n--smoke never prompts and forbids --attended.\nDocker image must already exist locally: COMPACT_SANDBOX_IMAGE (default ubuntu:24.04).');
+    console.log('Usage: npm run compact -- [--attended] [--workspace PATH] [--state-dir PATH] "task"\n       npm run compact -- --web [--workspace PATH] [--state-dir PATH]\n       npm run compact -- --smoke [--workspace PATH] [--state-dir PATH]\nState defaults to ~/.compact-dsh (COMPACT_STATE_DIR overrides); DSH_HOME is isolated there.\nTask mode inherits DEEPSEEK_API_KEY; default model: deepseek-flash.\n--web serves the browser UI (default 127.0.0.1:3080; COMPACT_WEB_PORT / COMPACT_WEB_HOST override): chat in the browser, approval prompts fall through to this terminal. No task argument; takes no --smoke.\n--attended prompts the operator on the terminal for uncovered gated calls (default deny; stderr only); implied by --web.\n--smoke never prompts and forbids --attended.\nDocker image must already exist locally: COMPACT_SANDBOX_IMAGE (default ubuntu:24.04).');
     return;
   }
   if (values.attended && values.smoke) {
     throw new Error('--attended prompts the operator; --smoke forbids prompts and model calls — pick one');
   }
+  if (values.web && values.smoke) {
+    throw new Error('--web serves live browser sessions; --smoke forbids model calls and prompts — pick one');
+  }
   const task = positionals.join(' ');
-  if (values.smoke ? positionals.length > 0 : !task.trim()) {
-    throw new Error('supply a task or --smoke, not both; use --help for usage');
+  if (values.web || values.smoke) {
+    if (positionals.length > 0) {
+      throw new Error(values.web ? '--web takes no task; sessions start from the browser' : '--smoke takes no task; use --help for usage');
+    }
+  } else if (!task.trim()) {
+    throw new Error('supply a task, or --smoke for a no-model boot; use --help for usage');
   }
   for (const key of ['workspace', 'state-dir']) {
     if (values[key] !== undefined && !values[key].trim()) throw new Error(`--${key} must not be empty`);
@@ -85,6 +93,16 @@ async function main() {
     throw new Error(`cannot inspect local Docker image ${image}; ensure Docker is installed/running and accessible, then run: docker pull ${image}. No image was pulled.`);
   }
   if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error('Docker image inspect did not return a valid .Id digest');
+  const webArgs = ['--no-open'];
+  if (values.web) {
+    const port = process.env.COMPACT_WEB_PORT;
+    if (port !== undefined && !/^\d+$/.test(port)) throw new Error('COMPACT_WEB_PORT must be a port number');
+    const host = process.env.COMPACT_WEB_HOST;
+    // mirrored from dsh-web-app/startup: 0.0.0.0 would expose the surface to the network
+    if (host === '0.0.0.0') throw new Error('COMPACT_WEB_HOST 0.0.0.0 is refused: the pilot is single-user local, not a network service');
+    if (host !== undefined) webArgs.push('--host', host);
+    if (port !== undefined) webArgs.push('--port', port);
+  }
   const paths = {
     COMPACT_STATE_DIR: stateDir,
     COMPACT_WORKSPACE: workspace,
@@ -120,13 +138,15 @@ async function main() {
 
   const { boot, loadOverlayPatches, installFailLoud } = await import('@deepseek-ai/dsh-app-boot');
   const { provideCmdline } = await import('@deepseek-ai/dsh-cmdline');
+  const { webRows, PRESET_ID, ensureInstallAnchor } = await import('compact-dsh-blessed/web');
+  if (values.web) await ensureInstallAnchor(stateDir);
   const bundle = name => loadOverlayPatches(binName, fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve(`${name}/package.json`))));
   const patches = [
     ...bundle('@deepseek-ai/dsh-base'),
-    ...values.smoke ? [] : bundle('@deepseek-ai/dsh-headless'),
+    ...values.smoke ? [] : values.web ? bundle('@deepseek-ai/dsh-web-app') : bundle('@deepseek-ai/dsh-headless'),
     ...bundle('compact-dsh-blessed'),
     { id: 'tools', config: { mode: 'native' } },
-    ...values.smoke ? [] : [
+    ...values.web ? webRows() : values.smoke ? [] : [
       { id: 'headless-startup', disabled: true },
       { id: 'code-runtime', disabled: true },
       { id: 'headless-runner', inject: ['compact-ready'], config: { task } },
@@ -171,23 +191,28 @@ async function main() {
     ctx = await boot(binName, configFile, patches, host => {
       ctx = host;
       if (exitCode !== undefined) throw new Error('startup interrupted');
-      provideCmdline(host, { args: [], exit: requestExit });
+      provideCmdline(host, { args: values.web ? webArgs : [], exit: requestExit });
       if (values.smoke) host.on('llm/stream', () => {
         modelRequests++;
         throw new Error('compact smoke forbids model requests');
       }, { prepend: true });
     }, rootUrl);
     if (exitCode === undefined) {
-      if (values.attended) {
+      if (values.attended || values.web) {
         // appended on the settled context, downstream of the composition's
         // recorded answerer — it claims compact asks first; the operator
-        // decides what it delegates. Never mounted under --smoke (rejected above).
+        // decides what it delegates. Never mounted under --smoke (rejected
+        // above). In web mode the browser may surface the ask first over the
+        // gateway; this answerer is the fall-through decider on the terminal.
         const { operatorAnswerer } = await import('./operator-answerer.mjs');
         operatorAnswerer(ctx);
       }
       if (ctx.get('compact-ready')?.ready !== true) throw new Error('compact-ready was not provided; refusing to run');
-      console.error(`${binName}: ready${values.smoke ? ' (smoke; no LLM request)' : ''}; draft Compact, no Compact standing.`);
+      console.error(`${binName}: ready${values.smoke ? ' (smoke; no LLM request)' : values.web ? ' (web; approval prompts fall through to this terminal)' : ''}; draft Compact, no Compact standing.`);
       console.error(`State: ${stateDir}; records: ${paths.COMPACT_RECORD_ROOT}; chains: ${paths.COMPACT_CHAIN_DIR}; approvals: ${paths.COMPACT_APPROVAL_PERSIST_PATH}`);
+      if (values.web) {
+        console.error(`${binName}: browser sessions compose the '${PRESET_ID}' agent preset — confined bash only; the dynamic-plugin runner is absent by declaration (A-4/DYN)`);
+      }
       if (values.smoke) {
         if (modelRequests !== 0) throw new Error('smoke attempted a model request');
         requestExit(0);
