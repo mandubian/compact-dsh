@@ -336,7 +336,11 @@ test('a declared annex signs the attestation: basis dev-keyring, signature verif
     assert.equal(att.basis, 'dev-keyring');
     assert.equal(att.signing.basis, 'dev-keyring');
     assert.equal(att.signing.conveysStanding, false);
-    assert.deepEqual(service.verifyAttestation(att), { signed: true, valid: true, keyId: 'dev-test-enforcer', basis: 'dev-keyring' });
+    const verdict = service.verifyAttestation(att);
+    assert.deepEqual(
+      { signed: verdict.signed, valid: verdict.valid, keyId: verdict.keyId, basis: verdict.basis, conveysStanding: undefined },
+      { signed: true, valid: true, keyId: 'dev-test-enforcer', basis: 'dev-keyring', conveysStanding: undefined });
+    assert.equal(verdict.annexDigest, att.signing.annexDigest);
     const rendered = renderAttestation(att);
     assert.match(rendered, /SIGNED under the development keyring/);
     assert.match(rendered, /conveys no standing outside this runtime/);

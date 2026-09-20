@@ -33,8 +33,8 @@
 // Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--annex <file>] [--anchors <file>] [--keyring <file> --seal <file> --body <file>] [--quiet]
 // Exit 0 with a per-session attestation on stdout, exit 1 with findings.
 import { readFileSync } from 'node:fs';
-import { basename } from 'node:path';
-import { genesisHash, verifySlice, RecordIntegrityError, extendChain } from '../packages/record/src/chain.js';
+import { basename, dirname, join } from 'node:path';
+import { genesisHash, verifySlice, RecordIntegrityError, extendChain, readAnchors } from '../packages/record/src/index.js';
 import { verifyAnchorChain } from '../packages/record/src/anchors.js';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { parseManifest, parseSeal, verifySeal, verifyAnnex, SealError } from '../packages/seals/src/index.js';
@@ -208,7 +208,9 @@ function checkSignatures(events, { annexFile, anchorsFile, keyringFile, sealFile
     } else {
       try {
         const sessionId = basename(anchorsFile).replace(/\.chain\.sigs\.jsonl$/, '');
-        const anchors = readFileSync(anchorsFile, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+        // the record's own reader parses the sidecar: a corrupted line is a
+        // named anchor-malformed refusal, not a bare SyntaxError
+        const anchors = readAnchors(dirname(anchorsFile), sessionId);
         const lastSeq = events.length > 0 ? (events[events.length - 1]?.seq ?? -1) : -1;
         const head = lastSeq >= 0
           ? extendChain(genesisHash(sessionId), 0, events).at(-1).h

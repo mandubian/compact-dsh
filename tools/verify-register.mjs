@@ -88,7 +88,7 @@ if (register) {
       // refuses the act on verification failure, conveys no standing,
       // discharges no clause — and like an enforced entry, a rehearsal that
       // cannot fail proves nothing (F-5)
-      if (!e.plugin) fail(`${e.clause}: a rehearsal entry must name the plugin that reheurses the machinery`);
+      if (!e.plugin) fail(`${e.clause}: a rehearsal entry must name the plugin that rehearses the machinery`);
       if ((e.verifiers ?? []).length === 0) fail(`${e.clause} (${e.plugin}): a rehearsal entry without a verifier proves nothing (F-5)`);
     } else if (!['planned', 'convention'].includes(e.kind)) {
       fail(`${e.clause}: unknown kind ${e.kind}`);

@@ -134,12 +134,22 @@ export function apply(ctx, config = {}) {
   const verifySignedAttestation = (att) => {
     if (!att?.signing) return { signed: false };
     if (!enforcer) return { signed: true, valid: false, reason: 'no enforcer annex is composed, so no attestation here can be signed' };
+    // the signing metadata is an attacker-visible claim, not a fact: the
+    // keyId, basis, and annex digest must match the composed annex before the
+    // bytes are tested, and the verdict reports OUR annex, never the claim
+    const s = att.signing;
+    if (s.basis !== 'dev-keyring' || s.keyId !== enforcer.keyId || s.annexDigest !== enforcer.annexDigest) {
+      return {
+        signed: true, valid: false,
+        reason: `the attestation claims signing metadata that does not match the composed annex (claimed basis ${JSON.stringify(s.basis)}, key ${JSON.stringify(s.keyId)}) — the claim is untrusted; the key decides`,
+      };
+    }
     const ok = verifyMessage(
       canonicalBytes(withoutField(att, 'signing')),
       enforcer.enforcerKey,
-      att.signing.signature,
+      s.signature,
     );
-    return { signed: true, valid: ok, keyId: att.signing.keyId, basis: att.signing.basis };
+    return { signed: true, valid: ok, keyId: enforcer.keyId, basis: 'dev-keyring', annexDigest: enforcer.annexDigest };
   };
 
   // 1. at the boundary of the Subject's own operation

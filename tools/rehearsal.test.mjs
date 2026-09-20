@@ -117,7 +117,7 @@ test('rehearsal-amendment: a tampered amendment is refused before anything is re
       failed = true;
     }
     assert.equal(failed, true, 'sealing without authority keys must refuse');
-    assert.ok(!existsSync(join(root, 'packages', 'constitution', 'src', 'body.js')) === false, 'the scaffold is untouched by the refusal');
+    assert.ok(existsSync(join(root, 'packages', 'constitution', 'src', 'body.js')), 'the scaffold is untouched by the refusal');
     const ledger = JSON.parse(readFileSync(join(kr, 'ledger.json'), 'utf8'));
     assert.equal(ledger.entries.length, 1, 'the refused act recorded nothing new');
   } finally {
