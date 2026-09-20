@@ -21,14 +21,14 @@
 // while a changed one cannot.
 
 import { createHash } from 'node:crypto';
+import { canonicalJson } from 'compact-dsh-seals';
 
-/** Deterministic JSON: object keys sorted at every depth, arrays kept in order. */
-export function canonicalize(value) {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`;
-  const keys = Object.keys(value).sort();
-  return `{${keys.map(k => `${JSON.stringify(k)}:${canonicalize(value[k])}`).join(',')}}`;
-}
+/**
+ * Deterministic JSON: object keys sorted at every depth, arrays kept in order.
+ * One authority — the seals package owns it; signatures over runtime artifacts
+ * and chain links must never disagree about what canonical means.
+ */
+export const canonicalize = canonicalJson;
 
 const sha256 = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 

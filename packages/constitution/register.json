@@ -833,6 +833,50 @@
       "verifiers": [
         "packages/capability-gate/test/capability-gate.test.js"
       ]
+    },
+    {
+      "clause": "I-1",
+      "kind": "rehearsal",
+      "plugin": "compact-constitution",
+      "service": null,
+      "evidence": "identity and keys, REHEARSED under the development keyring (amendment 0004 upstream): the boot verifies the law seal over the bundled body — k-of-n with DISTINCT-signer semantics (the review-0004 finding, ported as the reference loop), manifest pinned by trustedKeyringDigest, vendored founder seal as the interop fixture, every failure refusing the boot with a named reason; runtime-side, the enforcer key is declared in a signed ANNEX anchored to the sealed law by digest (F-5's own mechanism — no CA: the authority keyring signs law artifacts only, never enforcer identities), and subject session certificates bind {subjectId, publicKey, scope, depth, lineage} under the annex key. Machinery exercised, nothing discharged: this entry conveys no standing and the planned I-1 entry above stands",
+      "enforcedBy": [
+        "packages/seals/src/seal.js",
+        "packages/seals/src/annex.js",
+        "packages/constitution/src/index.js"
+      ],
+      "verifiers": [
+        "packages/seals/test/seals.test.js",
+        "packages/constitution/test/constitution.test.js"
+      ]
+    },
+    {
+      "clause": "I-3",
+      "kind": "rehearsal",
+      "plugin": "compact-self-model",
+      "service": null,
+      "evidence": "attestation SIGNATURE, rehearsed: the per-boundary attestation is signed by the Enforcer key declared in the signed annex — canonical JSON bytes (one authority, shared with the chain), basis 'dev-keyring', annex digest attached, self_describe verifies on read and alarms on a bad signature; the rendered block names the basis and its non-standing nature, and the composition degrades to basis 'unsigned' when no annex is declared. Machinery exercised, nothing discharged: this entry conveys no standing and the planned I-3 entry above stands",
+      "enforcedBy": [
+        "packages/self-model/src/index.js"
+      ],
+      "verifiers": [
+        "packages/self-model/test/self-model.test.js"
+      ]
+    },
+    {
+      "clause": "R-7",
+      "kind": "rehearsal",
+      "plugin": "compact-record",
+      "service": null,
+      "evidence": "authorship over the record, REHEARSED: the chain stays hash-based (I-2 tamper-evidence above); each flush writes a chain anchor — {sessionId, upToSeq, headHash, prevAnchorHash} signed by the Enforcer key, genesis anchored at creation, anchors chained so they cannot be thinned selectively — and the auditor verifies anchors against the annex, reporting 'VALID under DEV keyring — conveys no standing'. Inside the rehearsal domain this closes R-9's authorship limb mechanically; the label still says it proves nothing outside. Machinery exercised, nothing discharged: this entry conveys no standing and the enforced I-2/R-7 entries stand",
+      "enforcedBy": [
+        "packages/record/src/anchors.js",
+        "packages/record/src/provider.js"
+      ],
+      "verifiers": [
+        "packages/record/test/anchors.test.js",
+        "auditor/audit.test.mjs"
+      ]
     }
   ]
 }

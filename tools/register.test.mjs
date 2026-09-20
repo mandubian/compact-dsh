@@ -40,7 +40,7 @@ test('the auditor attests a conforming synthetic session', () => {
   const att = audit(log);
   assert.equal(att.verdict, 'conforming', JSON.stringify(att.findings));
   assert.equal(att.checked.asks, 1);
-  assert.ok(att.reliesOn.includes('no chain sidecar was given'), 'the attestation names its trust basis (I-8)');
+  assert.ok(att.reliesOn.some(r => r.includes('no chain sidecar was given')), 'the attestation names its trust basis (I-8)');
   assert.equal(att.checked.chain, 'not checked', 'an unverified integrity claim is never implied');
 });
 
@@ -63,7 +63,7 @@ test('the auditor verifies the record offline when given the chain, and refuses 
   const good = audit(log, chainFile);
   assert.equal(good.verdict, 'conforming', JSON.stringify(good.findings));
   assert.equal(good.checked.chain, 'verified');
-  assert.match(good.reliesOn, /verified here/);
+  assert.ok(good.reliesOn.some(r => /verified here/.test(r)));
   assert.match(good.chainHead, /^[0-9a-f]{64}$/);
 
   // the same log with one decision rewritten — the shape the log-only auditor

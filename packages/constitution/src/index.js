@@ -17,12 +17,14 @@
 //      register can never drift from the law.
 //
 // The boot attestation records what was verified and what is owed — the
-// declared gaps (draft-not-ratified, pinned-not-signed digest, unsigned
+// declared gaps (draft-not-ratified, the rehearsal signature basis, unsigned
 // chain links) are degradation honesty (I-8): loud, never silent.
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { parseManifest, parseSeal, verifySeal, SealError } from 'compact-dsh-seals';
 import {
   COMPACT_BODY, COMPACT_DIGEST, COMPACT_SOURCE_URL, COMPACT_SOURCE_REVISION,
   TAUGHT_DIGEST, clauseIds, verifyBody,
@@ -32,6 +34,34 @@ export { COMPACT_BODY, COMPACT_DIGEST, COMPACT_SOURCE_URL, TAUGHT_DIGEST, clause
 // The clause table, so a plugin can derive entrenchment from the body's own
 // (core) markers rather than restating A-2's list where it could drift (F-7).
 export { CLAUSES, clauseOf } from './body.js';
+
+// The vendored development-keyring artifacts — the upstream founder seal over
+// THIS body digest, public material only (the seal is verified, never
+// produced, here). See docs/decision-rehearsal-identity.md.
+const VENDORED_KEYRING = fileURLToPath(new URL('../keyring/dev/keyring.json', import.meta.url));
+const VENDORED_SEAL = fileURLToPath(new URL('../keyring/dev/compact-body.sig.json', import.meta.url));
+
+/**
+ * The rehearsal trust root: verify the law seal under the declared
+ * development keyring. The threshold counts DISTINCT verified signers
+ * (review-0004 semantics); every failure refuses the boot with a named
+ * reason. A seal here is MACHINERY: it conveys no standing, and the attestation
+ * carries that label next to the result.
+ */
+export function verifyTrustRoot(trustRoot, body, digest = COMPACT_DIGEST) {
+  if (trustRoot?.kind !== 'dev-keyring') {
+    throw new SealError('trust-root-unknown', `constitution: unsupported trustRoot kind ${JSON.stringify(trustRoot?.kind)} — the only installed kind is 'dev-keyring' (rehearsal)`);
+  }
+  const manifestText = readFileSync(trustRoot.manifest ?? VENDORED_KEYRING, 'utf8');
+  const manifest = parseManifest(manifestText, { trustedDigest: trustRoot.trustedKeyringDigest ?? null });
+  const seal = parseSeal(readFileSync(trustRoot.seal ?? VENDORED_SEAL, 'utf8'));
+  try {
+    return verifySeal({ bytes: body, subject: 'compact-body', seal, manifest });
+  } catch (e) {
+    if (e instanceof SealError) throw new SealError(e.reason, `constitution: body seal verification refused — ${e.message}`);
+    throw e;
+  }
+}
 
 export const name = 'compact-constitution';
 // Composition ordering, expressed the Cordis way: when loaded through the
@@ -76,6 +106,11 @@ export function apply(ctx, config) {
       `the operator is being given a different law than the one pinned; refusing to start`,
     );
   }
+  // 1b. the rehearsal trust root (development keyring): verify the law seal
+  // over the bundled body. Machinery, not standing — the attestation carries
+  // the label, and an absent trustRoot is exactly today's pin-only posture.
+  let bodySeal = null;
+  if (config?.trustRoot) bodySeal = verifyTrustRoot(config.trustRoot, COMPACT_BODY);
 
   // 2. composition coupling — enforcement services must exist NOW (the
   // blessed composition applies enforcement plugins before the constitution)
@@ -129,6 +164,16 @@ export function apply(ctx, config) {
     registry.set(entry.clause, list);
   }
 
+  // the declared gaps, per boot: the signature gap states what the rehearsal
+  // actually proved (machinery under the development keyring) and what is
+  // still owed (ratified keys — I-1), never conflating the two (I-8)
+  const gaps = bodySeal
+    ? DECLARED_GAPS.map(g => g.startsWith('signature verification unimplemented')
+      ? 'the body seal verifies under the declared DEVELOPMENT keyring — practice machinery that conveys no standing; ' +
+        'the Compact has still published no ratified amendment keys (I-1 debt, declared)'
+      : g)
+    : DECLARED_GAPS;
+
   const constitution = {
     digest: COMPACT_DIGEST,
     source: { url: COMPACT_SOURCE_URL, revision: COMPACT_SOURCE_REVISION, status: 'draft v0.5 — not yet ratified' },
@@ -150,14 +195,18 @@ export function apply(ctx, config) {
     /** The boot attestation: what was verified, what is registered, what is owed. */
     attestation: () => ({
       compact: { digest: COMPACT_DIGEST, source: COMPACT_SOURCE_URL, revision: COMPACT_SOURCE_REVISION, status: 'draft v0.5 — NOT yet ratified' },
-      verified: { bodyDigest: true, requires, missing: [], register: register.entries.length },
+      verified: {
+        bodyDigest: true,
+        ...(bodySeal ? { bodySeal } : {}),
+        requires, missing: [], register: register.entries.length,
+      },
       registeredRules: [...registry.keys()],
-      gaps: DECLARED_GAPS,
+      gaps,
       at: new Date().toISOString(),
     }),
   };
 
   ctx.provide?.('constitution', constitution);
-  ctx.logger?.warn?.(`constitution: declared gaps — ${DECLARED_GAPS.join(' | ')}`);
+  ctx.logger?.warn?.(`constitution: declared gaps — ${gaps.join(' | ')}`);
   return constitution;
 }

@@ -8,6 +8,7 @@
     "@deepseek-ai/dsh": "~0.1.5-rc.1"
   },
   "dependencies": {
+    "compact-dsh-seals": "0.1.0",
     "compact-envelope": "0.1.0"
   },
   "scripts": {

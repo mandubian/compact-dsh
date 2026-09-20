@@ -2,8 +2,13 @@ import { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import JsonlSessionPersistence, { JsonlCompressionSchema } from '@deepseek-ai/dsh-session-persistence-jsonl';
 import { materializeAppendBatch, SessionHandleClosedError } from '@deepseek-ai/dsh-session-persistence';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { verifyAnnex, SealError } from 'compact-dsh-seals';
+import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 import {
   ChainStore, chainedPersistence, DECLARED_GAPS, genesisHash,
+  signAnchor, genesisAnchor, appendAnchors, readAnchors, anchorHashOf, verifyAnchorChain,
 } from './index.js';
 
 export const name = 'compact-record-provider';
@@ -11,7 +16,34 @@ export const Config = z.object({
   root: z.string().required(),
   chainDir: z.string().required(),
   compression: JsonlCompressionSchema,
+  // the rehearsal enforcer annex (optional): when declared, every flush is
+  // authored — a chain anchor signed under the annex key rides beside the
+  // chain. A declared-but-broken annex refuses the boot (D-7).
+  enforcerAnnexPath: z.any(),
+  enforcerKeyPath: z.any(),
 });
+
+/** The authorship gap, per posture: what changes when anchors are on. */
+export const ANCHORED_GAPS = [
+  'the record is tamper-EVIDENT, not tamper-proof: the chain detects a rewrite, it cannot prevent one. Its head is ' +
+  'AUTHORSHIP-ANCHORED at each flush under the development keyring — practice keys that prove code-path correctness ' +
+  'and convey no standing (I-1 debt, declared)',
+];
+
+function loadSigner(config) {
+  if (!config.enforcerAnnexPath && !config.enforcerKeyPath) return null;
+  if (!config.enforcerAnnexPath || !config.enforcerKeyPath) {
+    throw new TypeError('record: enforcerAnnexPath and enforcerKeyPath must be declared together');
+  }
+  const annex = JSON.parse(readFileSync(config.enforcerAnnexPath, 'utf8'));
+  const joined = verifyAnnex({ annex, expectedLawDigest: COMPACT_DIGEST });
+  return {
+    keyId: joined.keyId,
+    enforcerKey: joined.enforcerKey,
+    annexDigest: joined.annexDigest,
+    privateKey: readFileSync(config.enforcerKeyPath, 'utf8'),
+  };
+}
 
 export async function apply(ctx, config) {
   for (const key of ['root', 'chainDir']) {
@@ -23,6 +55,26 @@ export async function apply(ctx, config) {
 }
 
 async function* install(ctx, config) {
+  const signer = loadSigner(config);
+  const declaredGaps = signer ? ANCHORED_GAPS : DECLARED_GAPS;
+  // anchor chaining state per session: the last anchor's canonical digest
+  const lastAnchor = new Map();
+  const lastAnchorOf = (sessionId) => {
+    if (!lastAnchor.has(sessionId)) {
+      const existing = readAnchors(config.chainDir, sessionId);
+      lastAnchor.set(sessionId, existing.length ? anchorHashOf(existing.at(-1)) : '');
+    }
+    return lastAnchor.get(sessionId);
+  };
+  const writeAnchor = (sessionId, upToSeq, headHash) => {
+    const anchor = signer
+      ? signAnchor({ sessionId, upToSeq, headHash, prevAnchorHash: lastAnchorOf(sessionId), annexDigest: signer.annexDigest, keyId: signer.keyId, privateKey: signer.privateKey })
+      : null;
+    if (anchor) {
+      appendAnchors(config.chainDir, sessionId, [anchor]);
+      lastAnchor.set(sessionId, anchorHashOf(anchor));
+    }
+  };
   const backendContext = new Context();
   yield () => backendContext.fiber.dispose();
   await backendContext.plugin(JsonlSessionPersistence, {
@@ -60,6 +112,14 @@ async function* install(ctx, config) {
       buffered = [];
       try {
         await inner.append(batch);
+        // the flush is authored: an anchor commits the chain head as of this
+        // batch, under the annex key. A DECLARED signer that fails to sign
+        // refuses the batch — a seal that does not seal is the D-7 case.
+        if (signer) {
+          const { links, lastSeq } = store.load(String(inner.id));
+          const head = lastSeq < 0 ? genesisHash(String(inner.id)) : links.get(lastSeq);
+          writeAnchor(String(inner.id), lastSeq, head);
+        }
       } catch (error) {
         buffered = batch.concat(buffered);
         throw error;
@@ -98,17 +158,25 @@ async function* install(ctx, config) {
       chainHead: () => inner.chainHead(),
     };
     handles.add(handle);
-    if (inner.access === 'write') writers.set(inner.id, {
-      handle,
-      enqueue(event) {
-        if (closing) throw new SessionHandleClosedError(inner.id, 'append');
-        buffered.push(...materializeAppendBatch([event]));
-        timer ??= setTimeout(() => {
-          timer = undefined;
-          run('append', drain).catch(warn);
-        }, 200);
-      },
-    });
+    if (inner.access === 'write') {
+      if (signer && !existsSync(join(config.chainDir, `${String(inner.id)}.chain.sigs.jsonl`))) {
+        // first write handle for this session: the genesis anchor
+        writeAnchor(String(inner.id), -1, genesisHash(String(inner.id)));
+      } else if (signer) {
+        lastAnchorOf(String(inner.id));
+      }
+      writers.set(inner.id, {
+        handle,
+        enqueue(event) {
+          if (closing) throw new SessionHandleClosedError(inner.id, 'append');
+          buffered.push(...materializeAppendBatch([event]));
+          timer ??= setTimeout(() => {
+            timer = undefined;
+            run('append', drain).catch(warn);
+          }, 200);
+        },
+      });
+    }
     return handle;
   };
   const settle = async (operations, message) => {
@@ -143,7 +211,7 @@ async function* install(ctx, config) {
     name: 'compact-record',
     chained: persistence,
     store,
-    declaredGaps: DECLARED_GAPS,
+    declaredGaps,
     head(sessionId) {
       const { links, lastSeq } = store.load(sessionId);
       return lastSeq < 0 ? genesisHash(sessionId) : links.get(lastSeq);
@@ -157,8 +225,32 @@ async function* install(ctx, config) {
         await handle.close();
       }
     },
+    /** The session's anchor sidecar, parsed (empty when unsigned). */
+    anchors: (sessionId) => (signer ? readAnchors(config.chainDir, sessionId) : []),
+    /**
+     * Verify the anchor chain against the log: recompute the head from the
+     * events, then require the anchors to cover it under the annex key.
+     * Refuses when no annex is declared (nothing here claims authorship).
+     */
+    async verifyAnchors(sessionId) {
+      if (!signer) throw new SealError('anchor-stale', 'record: no enforcer annex is declared, so this record carries no authorship anchors — there is nothing to verify');
+      const anchors = readAnchors(config.chainDir, sessionId);
+      const handle = await persistence.open(sessionId, 'read');
+      try {
+        const { events } = await handle.read(0);
+        const { links, lastSeq } = store.load(sessionId);
+        const head = lastSeq < 0 ? genesisHash(String(sessionId)) : links.get(lastSeq);
+        return verifyAnchorChain({
+          sessionId, anchors,
+          expectedHeadHash: head, expectedUpToSeq: lastSeq,
+          enforcerKey: signer.enforcerKey, expectedAnnexDigest: signer.annexDigest,
+        });
+      } finally {
+        await handle.close();
+      }
+    },
   });
-  for (const gap of DECLARED_GAPS) ctx.logger.warn(`record: ${gap}`);
+  for (const gap of declaredGaps) ctx.logger.warn(`record: ${gap}`);
 }
 
 export default { name, Config, apply };

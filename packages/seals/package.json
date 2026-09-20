@@ -1,0 +1,14 @@
+{
+  "name": "compact-dsh-seals",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Signature machinery for the rehearsal (development-keyring) posture: canonical JSON, ed25519 keys, k-of-n distinct-signer seals over law artifacts, and single-key enforcer signatures over runtime artifacts.",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "kind": "dev-keyring-signature",
+  "declaration": "mechanism testing only — NOT ratification, NOT standing, NOT the A-1 trust root (see keyring/dev/keyring.json)",
+  "subject": "compact-body",
+  "source": "compact.md",
+  "digest": {
+    "algorithm": "sha256",
+    "value": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95"
+  },
+  "message": "compact-body-sha256:27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95",
+  "keyring": "keyring/dev/keyring.json (dev-keyring: all keys founder-held)",
+  "signatures": [
+    {
+      "keyId": "dev-founder-2026-09-1",
+      "signature": "lvN39iRuDO2hTMswjRY8/pabWJuj2knKQSW7wnSxXlA59drkgz1ziV2BtCo42GvgHQJiKyiytZu2yvI7AZR9BA=="
+    },
+    {
+      "keyId": "dev-founder-2026-09-2",
+      "signature": "2RWchhLVVmFROC8fnJPdcVhJ5n/XddRhkGvR5T5SolSCIQCmJ011JaTNhxMZ5ODbQZvbkXpNHDxOFN9qESJ6DQ=="
+    },
+    {
+      "keyId": "dev-founder-2026-09-3",
+      "signature": "LGfaddxWwpD1S1yJCQrk3uIWsQhwpHxntjgMb9z7qdwyXcpIsbf1kNj8+eMjNaJbExIVt7qAjCAxt+xSUVXvCQ=="
+    }
+  ],
+  "signedAt": "2026-09-20T18:26:16.889Z"
+}

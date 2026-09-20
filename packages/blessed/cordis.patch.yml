@@ -90,6 +90,11 @@
         root: !!js process.env.COMPACT_RECORD_ROOT
         chainDir: !!js process.env.COMPACT_CHAIN_DIR
         compression: none
+        # the rehearsal enforcer annex (optional, with compact-blessed's
+        # enforcer block): each flush is authored by a chain anchor signed
+        # under the annex key
+        enforcerAnnexPath: !!js process.env.COMPACT_ENFORCER_ANNEX || undefined
+        enforcerKeyPath: !!js process.env.COMPACT_ENFORCER_KEY || undefined
 
     - id: compact-blessed
       name: compact-dsh-blessed
@@ -102,6 +107,24 @@
           - !!js process.env.COMPACT_RECORD_ROOT
           - !!js process.env.COMPACT_CHAIN_DIR
           - !!js process.env.COMPACT_APPROVAL_PERSIST_PATH
+        # the rehearsal trust root (development keyring): verify the law seal at
+        # boot. Machinery that conveys no standing — the default points at the
+        # vendored upstream artifacts; COMPACT_KEYRING_* re-seat it (the
+        # amendment harness uses this after a re-seal). See
+        # docs/decision-rehearsal-identity.md.
+        trustRoot:
+          kind: dev-keyring
+          manifest: !!js process.env.COMPACT_KEYRING_MANIFEST || undefined
+          seal: !!js process.env.COMPACT_KEYRING_SEAL || undefined
+          trustedKeyringDigest: !!js process.env.COMPACT_TRUSTED_KEYRING_DIGEST || undefined
+        # the rehearsal enforcer annex (optional): when the operator installs a
+        # rehearsal identity set (tools/rehearsal-keyring.mjs), the runtime
+        # signs what it says — attestations, record anchors, subject
+        # certificates — under the annex's own key, anchored to the sealed law
+        # by digest. A declared but broken annex refuses the boot (D-7).
+        enforcer:
+          annexPath: !!js process.env.COMPACT_ENFORCER_ANNEX || undefined
+          privateKeyPath: !!js process.env.COMPACT_ENFORCER_KEY || undefined
         sandbox:
           image: !!js process.env.COMPACT_SANDBOX_IMAGE
           network: none

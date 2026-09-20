@@ -1,0 +1,31 @@
+{
+  "kind": "dev-keyring",
+  "version": 1,
+  "created": "2026-09-20",
+  "declaration": "NOT the A-1 trust root. All keys in this keyring are held by one entity (the founder, mandubian); the k-of-n threshold exercises verification machinery only — a threshold of one entity is not a threshold (A-1), and founder keys verifying founder text would be the self-judgment J-1 forbids. Signatures under this keyring prove code-path correctness and nothing else: no ratification, no standing, no I-1 identity. Scheduled cure: ratification replaces this keyring with the distributed trust root; runtimes swap keyring configuration, not code.",
+  "algorithm": "ed25519",
+  "threshold": {
+    "k": 2,
+    "n": 3
+  },
+  "keys": [
+    {
+      "id": "dev-founder-2026-09-1",
+      "holder": "founder (mandubian) — ALL keys one entity; see declaration",
+      "publicKey": "MCowBQYDK2VwAyEAk9VNx1g+MrruFFa247fObNSsvwWuB0CDcG9YrnDLG9I="
+    },
+    {
+      "id": "dev-founder-2026-09-2",
+      "holder": "founder (mandubian) — ALL keys one entity; see declaration",
+      "publicKey": "MCowBQYDK2VwAyEAqj16u3uhrhjqN9vWBciAG+vve8A7oH8SkTLENeZS5vo="
+    },
+    {
+      "id": "dev-founder-2026-09-3",
+      "holder": "founder (mandubian) — ALL keys one entity; see declaration",
+      "publicKey": "MCowBQYDK2VwAyEAKqj7jDVYnyUy5+guE08zKy5z6q2ePkN+TXdpekq1LnE="
+    }
+  ],
+  "rotations": [],
+  "cure": "ratification: this keyring is retired and replaced by the A-1 distributed trust root; archived for forensics only",
+  "standing": "none — signatures under this keyring prove code-path correctness only"
+}
