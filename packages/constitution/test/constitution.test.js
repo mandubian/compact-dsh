@@ -273,7 +273,9 @@ test('the record-posture gaps come from the record service, so the label never c
   const gaps = ctx.get('constitution').attestation().gaps;
   assert.ok(!gaps.some(g => g.includes('links are unsigned')), 'the stale unsigned-record label is gone');
   assert.ok(gaps.some(g => g.includes('AUTHORSHIP-ANCHORED')), 'the record speaks for itself');
-  assert.match(gaps.find(g => g.startsWith('R-9')), /authorship limb is REHEARSED/, 'the R-9 line follows the posture');
+  const r9 = gaps.find(g => g.startsWith('R-9'));
+  assert.ok(r9, 'the R-9 line is present');
+  assert.match(r9, /authorship limb is REHEARSED/, 'the R-9 line follows the posture');
   // unsigned record: the static line stands
   const plain = { ...ALL_SERVICES, 'compact-record': { name: 'record', declaredGaps: ['the record is tamper-EVIDENT, not tamper-proof, and its links are unsigned (I-1 debt, declared)'] } };
   const ctx2 = fakeCtx({ services: plain });
@@ -281,5 +283,15 @@ test('the record-posture gaps come from the record service, so the label never c
   const gaps2 = ctx2.get('constitution').attestation().gaps;
   assert.ok(gaps2.some(g => g.includes('its links are unsigned')), 'the unsigned-record label stands');
   assert.match(gaps2.find(g => g.includes('its links are unsigned')), /the record service|tamper-EVIDENT, not tamper-proof/);
-  assert.match(gaps2.find(g => g.startsWith('R-9')), /but not its AUTHORSHIP/);
+  const r9Unsigned = gaps2.find(g => g.startsWith('R-9'));
+  assert.ok(r9Unsigned, 'the unsigned-posture R-9 line is present');
+  assert.match(r9Unsigned, /but not its AUTHORSHIP/);
+});
+
+test('a record service declaring an unreadable posture refuses with a named reason', () => {
+  const bad = { ...ALL_SERVICES, 'compact-record': { name: 'record', declaredGaps: 'links unsigned, trust me' } };
+  assert.throws(
+    () => apply(fakeCtx({ services: bad }), {}),
+    /declaredGaps must be an array of non-empty strings/,
+    'a sibling posture that cannot be read is a named refusal, never a silent fallback');
 });

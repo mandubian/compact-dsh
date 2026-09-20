@@ -176,19 +176,31 @@ export function apply(ctx, config) {
   //     are unsigned" line would sit next to a current "authorship-anchored"
   //     one, and a gap list that contradicts itself attests nothing;
   //   - the R-9 line's authorship claim follows the same posture.
+  // Substitution is by the substituted line's own prefix, never by position:
+  // a new static gap appended later must survive into the attestation.
   const signatureGap = bodySeal
     ? 'the body seal verifies under the declared DEVELOPMENT keyring — practice machinery that conveys no standing; ' +
       'the Compact has still published no ratified amendment keys (I-1 debt, declared)'
     : 'signature verification unimplemented: the Compact has published no amendment keys — the digest is pinned, not signed (I-1 debt, declared)';
   const recordGapsDeclared = ctx.get?.('compact-record')?.declaredGaps;
+  const badRecordGaps = recordGapsDeclared !== undefined &&
+    (!Array.isArray(recordGapsDeclared) || recordGapsDeclared.some(g => typeof g !== 'string' || !g.trim()));
+  if (badRecordGaps) {
+    throw new TypeError('constitution: compact-record.declaredGaps must be an array of non-empty strings — a sibling service declaring an unreadable posture refuses the boot rather than being silently mislabeled');
+  }
   const recordGapLines = recordGapsDeclared?.length
     ? [...recordGapsDeclared]
     : ['the record is tamper-EVIDENT but not tamper-proof, and its links are unsigned: the chain detects a rewrite, it cannot prevent one, and no identity key signs it (I-1 debt, declared — I-2/R-7 themselves are enforced by compact-record)'];
-  const anchorsOn = recordGapsDeclared?.some(g => g.includes('AUTHORSHIP-ANCHORED'));
+  const anchorsOn = recordGapLines.some(g => g.includes('AUTHORSHIP-ANCHORED'));
   const r9Gap = anchorsOn
     ? 'R-9\'s value-scoped refusal (amendment 0002): the authorship limb is REHEARSED — the record\'s anchors bind ordering AND authorship under the development keyring, inside this rehearsal domain only. The external limit stands: practice keys held by one entity prove nothing to a party who trusts nothing of this Enforcer (I-1 debt, declared)'
     : 'R-9\'s value-scoped refusal (amendment 0002) is exercisable against an honest Enforcer and inert against a dishonest one: the record proves a ground\'s ORDERING (the compact-record chain, I-2/R-7) but not its AUTHORSHIP, so a Member cannot demonstrate prior declaration to anyone who does not already trust this Enforcer\'s log (I-1 debt, declared)';
-  const gaps = [DECLARED_GAPS[0], signatureGap, ...recordGapLines, r9Gap];
+  const gaps = DECLARED_GAPS.flatMap(g => {
+    if (g.startsWith('signature verification unimplemented')) return [signatureGap];
+    if (g.startsWith('the record is tamper-EVIDENT but not tamper-proof')) return recordGapLines;
+    if (g.startsWith('R-9\'s value-scoped refusal')) return [r9Gap];
+    return [g];
+  });
 
   const constitution = {
     digest: COMPACT_DIGEST,
