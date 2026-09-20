@@ -95,6 +95,54 @@ founder's dev keys" from "locally generated rehearsal keys" — both are just
 *an installed keyring and an installed annex*, which is precisely how the
 ratified swap will arrive.
 
+### How an identity set is generated (the mechanics)
+
+`node tools/rehearsal-keyring.mjs ensure <dir>` produces, from nothing but
+`node:crypto` (no dependencies, no external tools; randomness is the OS-backed
+CSPRNG):
+
+    <dir>/
+    ├── keyring.json            the authority manifest: 3 ed25519 keys
+    │                           (threshold 2-of-3), declaration, standing: none
+    ├── private/<id>.pem        the authority PRIVATE keys — 0600, gitignored,
+    │                           never leave this directory; the amendment
+    │                           harness seals law artifacts with these
+    ├── enforcer.pem            the Enforcer private key — 0600
+    └── enforcer.annex.json     the SIGNED ANNEX (see §3/§7)
+
+Key facts the implementation is pinned to:
+
+- **Formats.** Public keys travel exactly as the upstream keyring ships them —
+  SPKI DER, base64 (`MCowBQYDK2VwAyEA…`); private keys are PKCS8 PEM. So the
+  founder's manifest, a rehearsal manifest, and (later) the ratified root are
+  read by the same parser with no branching.
+- **What a signature covers.** Every runtime artifact (annex, attestation,
+  chain anchor, subject certificate) is signed over **canonical JSON of the
+  artifact minus its `signature` field** — keys sorted at every depth, no
+  whitespace — using ed25519 one-shot signing (`crypto.sign(null, bytes, key)`;
+  ed25519 signs the message directly, no prehash). Two consequences: the
+  artifact's own `kind` field is inside the signed bytes, which is the domain
+  separation; and because the signature is over canonical form rather than raw
+  file bytes, a file may be re-serialized with different indentation and still
+  verify — the *content* is pinned, not the formatting. (Law seals differ by
+  upstream contract: they sign the domain-separated message string
+  `<subject>-sha256:<hex>` over the artifact's exact raw bytes.)
+- **Roles of the three tiers, in file terms.** `keyring.json`'s keys verify
+  law seals and nothing else; `enforcer.pem` signs the annex, attestations,
+  record anchors, and subject certificates; subject session keys (ephemeral,
+  in-memory, issued per session by the self-model) sign member statements.
+  Nothing signs across a tier boundary.
+- **Verification is generation's mirror.** `rehearsal-keyring.mjs verify`
+  runs the same join the runtime runs at boot when
+  `COMPACT_ENFORCER_ANNEX`/`COMPACT_ENFORCER_KEY` point at the set, and the
+  same one the auditor runs offline: manifest shape → annex self-signature →
+  `lawDigest` against the pinned body → `registerDigest` against the bundled
+  register.
+- **Regeneration is rotation.** `ensure` refuses to overwrite an installed
+  set without `--force`, because a new keyring is a new trust basis for
+  everything signed under the old one — treated the same way the upstream
+  tool treats manifest churn.
+
 ## Decisions, by checklist item
 
 ### 1. Boot seal verification (constitution package)
