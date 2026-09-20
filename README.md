@@ -491,8 +491,9 @@ release ships something this composition actually needs.
 
 ## Try Compact inside dsh
 
-This checkout provides a **headless pilot**, not a ratified jurisdiction or an
-interactive approval UI. Node >=22.19 and a working Docker daemon are required.
+This checkout provides a **pilot** — headless one-shot tasks and a local
+browser surface over the same composition — not a ratified jurisdiction or an
+in-browser approval UI. Node >=22.19 and a working Docker daemon are required.
 Use the lockfile to reproduce the tested host dependency set.
 
 ```bash
@@ -500,6 +501,7 @@ npm ci
 docker pull ubuntu:24.04
 npm run compact:smoke
 npm run compact -- "Use self_describe to report your standing and declared gaps."
+npm run compact -- --web
 ```
 
 The last command makes real model requests and requires `DEEPSEEK_API_KEY` in
@@ -519,6 +521,22 @@ and `allowed-once` materializes an exec-cache entry so the identical operation
 replays without re-asking. Without it, operations needing a fresh approval
 fail closed.
 
+`--web` serves the browser surface over the same composition: chat in the
+browser (default `127.0.0.1:3080`; `COMPACT_WEB_PORT` / `COMPACT_WEB_HOST`
+override, loopback-only by design), answer approval prompts on the terminal
+where you started it — the operator answerer is mounted implicitly. Browser
+sessions compose the `compact-pilot` agent preset, the roster's **only**
+member (scanned read-only from this checkout), so the per-session tool plane
+matches the headless surface: confined bash, todo/ask-user/present, the same
+compaction stack — no host file tools, no web, no fork or workflow rows;
+delegation stays with the Compact specialists. The web bundle's dynamic-plugin
+runner (`cordis-host-runner`) is disabled: the interactive composition declares
+the self-modification capability **ABSENT** (A-4/DYN) and the capability gate
+enforces that absence exactly as it does headless. The launcher links the
+checkout's `node_modules` beside the generated config as the install anchor
+dsh's two-anchor resolution expects; a `node_modules` already present in the
+state directory that is not that symlink is refused, not replaced.
+
 State defaults to `~/.compact-dsh`: session JSONL files under `sessions/`, hash
 chains under `chains/`, and persistent grants in `approvals.json`. Keep this
 operator-owned directory outside the agent workspace. The launcher isolates
@@ -535,9 +553,17 @@ is explicitly **operator-declared**, not a verified build history.
 - Bash executes inside Docker with networking off. Native host file/search,
   jobs, skills, web, workflow and generic delegation tools are disabled;
   use Bash for file work and the five Compact specialists for delegation.
+  The same holds per session under `--web` via the compact-pilot preset.
 - Unrestricted `danger-full-access` mode is rejected. Plain headless has no
   human answerer: operations needing a new approval fail closed, not
-  auto-approve. `--attended` composes the operator gate (see above).
+  auto-approve. `--attended` composes the operator gate (see above);
+  `--web` composes it implicitly. The browser may also surface an approval
+  card over the gateway — when a connected page answers first, that verdict
+  stands, the terminal prompt is the fall-through, and every decision is
+  recorded upstream by the composition's recorded answerer either way.
+- `--web` is single-user local, not a network service: the server binds
+  loopback by default (a `0.0.0.0` host is refused) and the printed URL
+  carries the session trust token.
 - The allowlist defaults to empty. Allowlisting alone does not enable container
   networking or replace the approval gate.
 - Container working directory follows the sandbox policy workspace root;

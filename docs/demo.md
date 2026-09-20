@@ -325,7 +325,7 @@ grant, revocable, and never once present in the conversation.
 
 ---
 
-## What to look for across all six
+## What to look for across all seven
 
 The pattern is always the same shape:
 
@@ -340,3 +340,58 @@ The pattern is always the same shape:
    "no Compact standing" (F-5), and every gap above (unsigned links, no
    judicature, unratified law) is a *declared* debt, visible in the register
    (`docs/register/register.json`) and in every attestation.
+
+---
+
+## Demo 7 — The interactive surface: chat in the browser, governed as headless (A-4/DYN · D-8) · needs a key for the chat
+
+The stock web profile of dsh mounts the dynamic-plugin runner — the
+self-modification capability the Compact declares ABSENT — and moves the
+agent's tool plane behind agent presets whose shipped `standard` preset
+re-mounts the file tools, fork, workflow and web rows the pilot refuses.
+`--web` is the pilot's answer: the browser surface boots under the same
+enforcement stack, with a roster that carries none of that.
+
+```bash
+npm run compact -- --web
+```
+
+Boot output **(verified)**:
+
+```
+dsh web: http://127.0.0.1:3080/?token=…
+compact-dsh: ready (web; approval prompts fall through to this terminal); draft Compact, no Compact standing.
+State: ~/.compact-dsh; records: …/sessions; chains: …/chains; approvals: …/approvals.json
+compact-dsh: browser sessions compose the 'compact-pilot' agent preset — confined bash only; the dynamic-plugin runner is absent by declaration (A-4/DYN)
+```
+
+Open the printed URL (it carries the session trust token), chat, and:
+
+1. A gated bash call prompts **on the terminal** with the command preview and
+   fingerprint, exactly as in Demo 5 — deny, and the refusal lands in the
+   browser session's transcript.
+2. A network attempt denies with the AG-1 envelope in the session itself.
+3. The session is on the same provable record:
+   ```bash
+   D=~/.compact-dsh/sessions/--home-…--/session-<id>
+   node auditor/audit.mjs "$D/session.v3.jsonl" --chain ~/.compact-dsh/chains/session-<id>.chain --quiet
+   ```
+
+What the demo claims, and how it is proven:
+
+- **The interactive composition does not carry the self-modification
+  capability.** `cordis-host-runner` is disabled at the row, so
+  `dynamicCordisRunner` is absent, the Part VI trigger is not present, and a
+  late mount latches a breach that denies every tool call. Of D-8's two lawful
+  postures this is ABSENT; the flip to BIND (signed capsules) is a register
+  move when authorship keys exist. Verified by the loader suite —
+  `packages/blessed/test/loader.web.dsh.test.js`.
+- **The per-session tool plane is honest.** The roster is replaced wholesale
+  with the `compact-pilot` preset (the only member, scanned read-only from
+  this checkout): confined bash, todo/ask-user/present, the same compaction
+  stack — nothing the headless surface refuses is re-armed per session. The
+  gates themselves ride the host waterfall every execution passes through.
+- **Not yet verified here:** a live model-backed browser session (needs a
+  key). On the first live run, observe the approval precedence between a
+  connected browser page and the terminal fall-through — the record is
+  complete either way, because the recorded answerer claims every ask first.

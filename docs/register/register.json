@@ -707,14 +707,16 @@
       "kind": "enforced",
       "plugin": "compact-constitution",
       "service": "constitution",
-      "evidence": "the Enforcer's code is constitutional: the register maps clauses to conduct; verify-register fails when mapped files move without a register edit. The runtime self-modification surface is covered by the same clause, discharged by declared absence: a mounted dynamicCordisRunner refuses the boot, a late-mounted one latches a breach denying every tool call, and the model-facing cordis lifecycle tools (cordis_define/run/stop/undefine) are denied in the waterfall with an A-4 envelope — read-only cordis_inspect_* tools are not mutation and are not gated",
+      "evidence": "the Enforcer's code is constitutional: the register maps clauses to conduct; verify-register fails when mapped files move without a register edit. The runtime self-modification surface is covered by the same clause, discharged by declared absence: a mounted dynamicCordisRunner refuses the boot, a late-mounted one latches a breach denying every tool call, and the model-facing cordis lifecycle tools (cordis_define/run/stop/undefine) are denied in the waterfall with an A-4 envelope — read-only cordis_inspect_* tools are not mutation and are not gated. The interactive (web) surface discharges the same clause the same way: the launcher's web rows disable the dsh-web-app bundle's cordis-host-runner and code-runtime rows, so the browser composition carries no dynamicCordisRunner capability and boots clean under the gate, and the agent-preset roster is replaced wholesale with the compact-pilot system preset, so the per-session tool plane re-arms nothing the headless surface refuses",
       "enforcedBy": [
         "tools/verify-register.mjs",
         "packages/capability-gate/src/parts.js"
       ],
       "verifiers": [
-        "tools/register.test.mjs",
-        "packages/capability-gate/test/capability-gate.test.js"
+        "packages/blessed/test/loader.web.dsh.test.js",
+        "packages/blessed/test/web.test.js",
+        "packages/capability-gate/test/capability-gate.test.js",
+        "tools/register.test.mjs"
       ]
     },
     {
