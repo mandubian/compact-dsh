@@ -539,8 +539,12 @@ state directory that is not that symlink is refused, not replaced.
 
 **Testing against a given directory.** `npm run compact` starts from this
 checkout, so point the workspace at the project instead of `cd`-ing into it —
-`--workspace` (absolute) becomes the sandbox root: Docker bind-mounts exactly
-that directory, and the container's working directory is set to it. Typical
+`--workspace` takes any path (a relative one resolves against your shell's
+working directory, `~` works) and becomes the sandbox root: the launcher
+records its realpath, Docker bind-mounts that root at the same path inside
+the container — alongside the mounts the composition itself adds (a
+container-private `/tmp`, over-mounted masked paths, and operator-granted
+mounts) — and the container's working directory is set to it. Typical
 testing commands:
 
 ```bash
@@ -549,8 +553,9 @@ COMPACT_ENFORCER_ANNEX=~/.compact-dsh/keyring/enforcer.annex.json \
 COMPACT_ENFORCER_KEY=~/.compact-dsh/keyring/enforcer.pem \
 npm run compact -- --web --workspace /absolute/path/to/project
 
-# the same, fully isolated: own port, own state (sessions, chains, approvals),
-# own sandbox image — nothing touches ~/.compact-dsh or the default port
+# the same, elsewhere: own port, own state directory (sessions, chains,
+# approvals), own sandbox image — ~/.compact-dsh is only READ here (the
+# annex and key below come from its keyring), never written
 COMPACT_ENFORCER_ANNEX=~/.compact-dsh/keyring/enforcer.annex.json \
 COMPACT_ENFORCER_KEY=~/.compact-dsh/keyring/enforcer.pem \
 COMPACT_WEB_PORT=8080 \
@@ -573,8 +578,10 @@ Afterwards, audit the session offline (see the rehearsal section below for
 the full signature-checking form):
 
 ```bash
-node auditor/audit.mjs ~/.compact-dsh/sessions/--home-…--/session-<id>/session.v3.jsonl \
-  --chain ~/.compact-dsh/chains/session-<id>.chain --quiet
+# <session-id> is the full session id, e.g. session-617a3bb0-… — that same
+# id names the session directory and the chain file
+node auditor/audit.mjs ~/.compact-dsh/sessions/--home-…--/<session-id>/session.v3.jsonl \
+  --chain ~/.compact-dsh/chains/<session-id>.chain --quiet
 ```
 
 State defaults to `~/.compact-dsh` (`--state-dir` / `COMPACT_STATE_DIR` move
@@ -585,20 +592,24 @@ must stay **outside the agent workspace**. Contents, verified layout:
 ```text
 ~/.compact-dsh/
 ├── compact.generated.cordis.yml   generated boot root — must stay "[]"; rewritten each launch
-├── node_modules → <checkout>/     install anchor (web mode): a SYMLINK into this
-│                                  checkout; any other node_modules here is refused
+├── node_modules → <checkout>/node_modules/   install anchor (web mode): a
+│                                  SYMLINK to this checkout's node_modules; any
+│                                  other node_modules here is refused
 ├── settings.yaml                  model-route settings (provider names reference env
 │                                  vars by NAME — API keys stay in your shell)
 ├── .credentials.yaml              provider credentials written by dsh-credentials-local
 │                                  (0600; operator-owned, never in the record)
 ├── storages/                      dsh storage-json deployment state
 ├── sessions/                      the record (COMPACT_RECORD_ROOT): one dir per
-│   └── <workspace-path>/          workspace, one dir per session:
-│       └── session-<id>/          session.v3.jsonl (the log) + session.lock
-├── chains/                        (COMPACT_CHAIN_DIR): per session,
-│   ├── session-<id>.chain         the committed hash links, and — when an
-│   └── session-<id>.chain.sigs.jsonl   enforcer annex is declared — the
-│                                  authorship anchors signed at each flush
+│   └── <workspace-path>/          workspace, one dir per session — the session
+│       └── <session-id>/          dir's name IS the session id (ids look like
+│                                  session-<uuid>): session.v3.jsonl (the log)
+│                                  + session.lock
+├── chains/                        (COMPACT_CHAIN_DIR): per session — the file
+│   ├── <session-id>.chain         names are the session id + suffix; the
+│   └── <session-id>.chain.sigs.jsonl  committed hash links, and — when an
+│                                  enforcer annex is declared — the authorship
+│                                  anchors signed at each flush
 ├── approvals.json                 persistent grants + exec-cache (created on
 │                                  first use; an approved "allow once" replays
 │                                  from here without re-asking)
