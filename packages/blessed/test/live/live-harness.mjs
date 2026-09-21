@@ -15,7 +15,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('../../../../..', import.meta.url));
+// repo root: verified by resolution — four ups from this file lands on the checkout
+const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 export const liveEnabled = () => process.env.COMPACT_LIVE_TEST === '1';
 export const liveSkipReason = () =>
