@@ -584,11 +584,56 @@ node auditor/audit.mjs ~/.compact-dsh/sessions/--home-…--/<session-id>/session
   --chain ~/.compact-dsh/chains/<session-id>.chain --quiet
 ```
 
-State defaults to `~/.compact-dsh`: session JSONL files under `sessions/`, hash
-chains under `chains/`, and persistent grants in `approvals.json`. Keep this
-operator-owned directory outside the agent workspace. The launcher isolates
-`DSH_HOME` there and disables telemetry; it does not modify your normal dsh
-profile or load its patches. `compact.generated.cordis.yml` must remain empty.
+State defaults to `~/.compact-dsh` (`--state-dir` / `COMPACT_STATE_DIR` move
+it): it is the pilot's **operator-owned trust root** — the record, the
+evidence, the grants, and the signing keys live here, which is exactly why it
+must stay **outside the agent workspace**. Contents, verified layout:
+
+```text
+~/.compact-dsh/
+├── compact.generated.cordis.yml   generated boot root — must stay "[]"; rewritten each launch
+├── node_modules → <checkout>/node_modules/   install anchor (web mode): a
+│                                  SYMLINK to this checkout's node_modules; any
+│                                  other node_modules here is refused
+├── settings.yaml                  model-route settings (provider names reference env
+│                                  vars by NAME — API keys stay in your shell)
+├── .credentials.yaml              provider credentials written by dsh-credentials-local
+│                                  (0600; operator-owned, never in the record)
+├── storages/                      dsh storage-json deployment state
+├── sessions/                      the record (COMPACT_RECORD_ROOT): one dir per
+│   └── <workspace-path>/          workspace, one dir per session — the session
+│       └── <session-id>/          dir's name IS the session id (ids look like
+│                                  session-<uuid>): session.v3.jsonl (the log)
+│                                  + session.lock
+├── chains/                        (COMPACT_CHAIN_DIR): per session — the file
+│   ├── <session-id>.chain         names are the session id + suffix; the
+│   └── <session-id>.chain.sigs.jsonl  committed hash links, and — when an
+│                                  enforcer annex is declared — the authorship
+│                                  anchors signed at each flush
+├── approvals.json                 persistent grants + exec-cache (created on
+│                                  first use; an approved "allow once" replays
+│                                  from here without re-asking)
+└── keyring/                       (only if installed — see the rehearsal section)
+    ├── keyring.json               authority manifest (practice keys, 2-of-3)
+    ├── private/*.pem              authority private keys (0600; amendment sealing)
+    ├── enforcer.pem               the Enforcer private key (0600)
+    ├── enforcer.annex.json        the signed annex (lawDigest, registerDigest)
+    └── ledger.json                SIMULATED ENACTMENTS from the amendment rehearsal
+```
+
+What is deliberately **not** here: your normal dsh profile (`~/.dsh` — never
+touched; the launcher isolates `DSH_HOME` and loads no external patches); the
+agent's working files (those stay in the `--workspace`; only the *record* of
+what happened lands here); model API keys (referenced by env-var **name** in
+`settings.yaml`, held in your shell); the browser session token (per-boot,
+never persisted); and plugin or preset code (the roster is scanned read-only
+from the checkout). The individual record locations can be moved with
+`COMPACT_RECORD_ROOT`, `COMPACT_CHAIN_DIR`, and
+`COMPACT_APPROVAL_PERSIST_PATH`; the launcher creates them and keeps
+directories owner-only (0700). The sessions, chains, approvals, and keyring
+are the parts that carry history or authority — back them up or wipe them as
+deliberate operator acts; everything else regenerates on the next boot.
+
 The rehearsal identity set (below) lives there too, when installed.
 
 The bundle replaces stock persistence with `compact-dsh-record/provider`, so
