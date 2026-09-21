@@ -216,6 +216,22 @@ export function workspaceAnchorDecision(sessionCwd, bootRoot) {
   return { kind: 'deny', reason: env.text };
 }
 
+/**
+ * The resolver-seam half of the workspace anchor (#18): the sandbox policy's
+ * resolved boundary must never leave the boot's declaration. The dsh policy
+ * resolves the per-session root from `header.cwd`, so a stale session header
+ * would move the write boundary to a directory this boot never declared —
+ * the resolver fails loudly at the seam rather than handing that root to the
+ * provider. Canonical comparison, so trailing separators and `.` are the
+ * same directory.
+ */
+export function assertBootAnchor(resolvedRoot, declaredRoot) {
+  if (resolvedRoot == null) return;
+  if (canonicalizeBestEffort(resolvedRoot) === canonicalizeBestEffort(declaredRoot)) return;
+  throw new Error(`blessed: refusing to confine to ${resolvedRoot} — this boot's declared workspace is ${declaredRoot}, ` +
+    `and a session header naming another directory may not move the boundary (#18)`);
+}
+
 export async function apply(ctx, config = {}) {
   if (process.env.DSH_PERMISSION_MODE === 'danger-full-access') {
     throw new Error('blessed: danger-full-access is unavailable in the confined pilot');
@@ -232,9 +248,7 @@ export async function apply(ctx, config = {}) {
     }
     // a stale session header re-anchors the resolved boundary to a directory
     // this boot never declared — fail at the resolver seam rather than bind it
-    if (effective.workspaceRoot != null && canonicalizeBestEffort(effective.workspaceRoot) !== declaredRoot) {
-      throw new Error(`blessed: refusing to confine to ${effective.workspaceRoot} — this boot's declared workspace is ${policy.workspaceRoot}, and a session header naming another directory may not move the boundary (#18)`);
-    }
+    assertBootAnchor(effective.workspaceRoot, policy.workspaceRoot);
     return effective;
   };
   confinedPolicy.call(policy);

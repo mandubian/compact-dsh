@@ -5,7 +5,7 @@
 // otherwise re-anchor confinement to a directory the boot never declared.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { workspaceAnchorDecision } from '../src/index.js';
+import { assertBootAnchor, workspaceAnchorDecision } from '../src/index.js';
 
 test('a session naming the boot workspace — or no workspace at all — passes', () => {
   assert.equal(workspaceAnchorDecision(null, '/repo'), null, 'no named cwd: the boot root applies by the dsh fallback');
@@ -31,4 +31,25 @@ test('the anchor decision comes from the composition, never from the session', (
   const stale = '/home/me/compact-dsh';
   assert.equal(workspaceAnchorDecision(stale, stale)?.kind, undefined,
     'the same directory under the boot\'s own declaration is lawful');
+});
+
+// -- the resolver seam: the policy boundary may never leave the declaration --
+
+test('the resolver seam passes the boot-declared root and refuses a foreign one', () => {
+  assert.equal(assertBootAnchor('/repo', '/repo'), undefined);
+  assert.equal(assertBootAnchor('/repo/', '/repo'), undefined, 'canonical form is the same directory');
+  assert.equal(assertBootAnchor(null, '/repo'), undefined, 'no resolved root: nothing to refuse');
+  assert.throws(
+    () => assertBootAnchor('/home/me/compact-dsh', '/tmp/dsh-compact-demo'),
+    /refusing to confine to \/home\/me\/compact-dsh.*declared workspace is \/tmp\/dsh-compact-demo/,
+    'a stale header must not move the write boundary',
+  );
+});
+
+test('the resolver-seam refusal names the anchor rule, not just the paths', () => {
+  assert.throws(
+    () => assertBootAnchor('/somewhere/else', '/repo'),
+    /may not move the boundary/,
+    'the refusal states the constraint the session header violated',
+  );
 });
