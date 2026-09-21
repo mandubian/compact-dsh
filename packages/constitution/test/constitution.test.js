@@ -38,6 +38,8 @@ const ALL_SERVICES = {
   'compact-emergency': { name: 'emergency' },
   'compact-allowlist-gate': { name: 'allowlist-gate' },
   'compact-remote-access': { name: 'remote-access' },
+  // the composition's workspace anchor (#18) couples on the host sandbox policy
+  'sandboxPolicy': { name: 'sandbox-policy', workspaceRoot: '/repo' },
 };
 
 test('the bundled body hashes to the pinned digest, and tampering is detected', () => {

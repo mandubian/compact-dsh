@@ -12,6 +12,7 @@ import { apply as applySandbox, normalizeProvenanceRecords } from 'compact-dsh-s
 import { apply as applySelfModel } from 'compact-dsh-self-model';
 import { apply as applySpecialists } from 'compact-dsh-specialists';
 import { canonicalizeBestEffort } from 'compact-dsh-sandbox-docker';
+import { buildEnvelope } from 'compact-envelope';
 
 export const name = 'compact-blessed';
 export const inject = ['tools', 'approval', 'commands', 'systemPrompt', 'sessionProjections', 'subagents', 'sessionPersistence', 'compact-record', 'sandboxPolicy'];
@@ -187,6 +188,50 @@ async function bounded(operation, timeoutMs, label) {
   }
 }
 
+/**
+ * The workspace anchor (#18). A session REOPENED under this boot may carry a
+ * `header.cwd` recorded by an earlier boot — and the dsh layer resolves BOTH
+ * the UI file root AND the sandbox's write boundary from that header, so a
+ * stale session would execute (and write) inside a directory this boot never
+ * declared. The composition refuses such calls with a named envelope instead
+ * of running inside a name that no longer matches reality (D-7: refuse, never
+ * guess). Null = no anchor conflict; a session without a cwd uses the boot
+ * root by the dsh fallback.
+ */
+export function workspaceAnchorDecision(sessionCwd, bootRoot) {
+  if (sessionCwd == null) return null;
+  if (canonicalizeBestEffort(sessionCwd) === canonicalizeBestEffort(bootRoot)) return null;
+  const env = buildEnvelope({
+    gate: 'CF',
+    ruleId: 'CF-1/workspace-anchor',
+    reason: `this session was recorded under the workspace "${sessionCwd}", which this runtime does not expose — ` +
+      `it exposes only "${bootRoot}". Running would confine execution to a boundary the session's own name ` +
+      `contradicts, so the call is refused (D-7)`,
+    lawfulNextMoves: [
+      'start a fresh session in the exposed workspace',
+      'have your Principal relaunch the pilot with --workspace naming this session\'s recorded workspace',
+      'escalate to your Principal',
+    ],
+  });
+  return { kind: 'deny', reason: env.text };
+}
+
+/**
+ * The resolver-seam half of the workspace anchor (#18): the sandbox policy's
+ * resolved boundary must never leave the boot's declaration. The dsh policy
+ * resolves the per-session root from `header.cwd`, so a stale session header
+ * would move the write boundary to a directory this boot never declared —
+ * the resolver fails loudly at the seam rather than handing that root to the
+ * provider. Canonical comparison, so trailing separators and `.` are the
+ * same directory.
+ */
+export function assertBootAnchor(resolvedRoot, declaredRoot) {
+  if (resolvedRoot == null) return;
+  if (canonicalizeBestEffort(resolvedRoot) === canonicalizeBestEffort(declaredRoot)) return;
+  throw new Error(`blessed: refusing to confine to ${resolvedRoot} — this boot's declared workspace is ${declaredRoot}, ` +
+    `and a session header naming another directory may not move the boundary (#18)`);
+}
+
 export async function apply(ctx, config = {}) {
   if (process.env.DSH_PERMISSION_MODE === 'danger-full-access') {
     throw new Error('blessed: danger-full-access is unavailable in the confined pilot');
@@ -195,11 +240,15 @@ export async function apply(ctx, config = {}) {
   requireServices(ctx, inject);
   const policy = ctx.get('sandboxPolicy');
   const resolve = policy.resolve;
+  const declaredRoot = canonicalizeBestEffort(policy.workspaceRoot);
   const confinedPolicy = function (...args) {
     const effective = resolve.apply(this, args);
     if (!['read-only', 'workspace-write'].includes(effective.mode)) {
       throw new Error('blessed: effective sandbox mode must be read-only or workspace-write');
     }
+    // a stale session header re-anchors the resolved boundary to a directory
+    // this boot never declared — fail at the resolver seam rather than bind it
+    assertBootAnchor(effective.workspaceRoot, policy.workspaceRoot);
     return effective;
   };
   confinedPolicy.call(policy);
@@ -209,6 +258,21 @@ export async function apply(ctx, config = {}) {
   ctx.effect(() => {
     policy.resolve = confinedPolicy;
     return () => { policy.resolve = resolve; };
+  });
+  // CF-1/workspace-anchor (#18): refuse calls from sessions naming another
+  // workspace BEFORE any other gate runs. First divergence is named on the
+  // operator's log, loudly (I-8) — the UI file tree of such a session is the
+  // documented residual (operator-local, read-only window until reopened).
+  let anchorWarned = null;
+  ctx.on?.('tools/pre-execute', async (exec, next) => {
+    const cwd = exec?.agent?.session?.header?.cwd;
+    const decision = workspaceAnchorDecision(cwd, declaredRoot);
+    if (!decision) return next();
+    if (anchorWarned !== cwd) {
+      anchorWarned = String(cwd);
+      ctx.logger?.error?.(`blessed: a session names workspace ${anchorWarned}, which this boot does not expose (exposed: ${policy.workspaceRoot}) — its tool calls are refused until it is reopened under the exposed workspace`);
+    }
+    return decision;
   });
   if (ctx.get('compact-record').chained !== ctx.get('sessionPersistence')) {
     throw new Error('blessed: compact-dsh-record/provider must supply the public sessionPersistence service');
