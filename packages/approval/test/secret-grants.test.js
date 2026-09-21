@@ -143,3 +143,59 @@ test('allow-once covers exactly that command: the identical call replays, a diff
   const different = approval.gate({ name: 'bash', arguments: { command: 'printenv $GH_TOKEN | wc -c' }, agent: AGENT, callId: 'c7' });
   assert.equal(different.kind, 'ask', 'a different secret-using command is a NEW agreement — never a blanket');
 });
+
+// -- the phrasing matrix (#27): a reference is a word occurrence, not a `$` --
+
+test('every natural phrasing of a declared secret reference triggers the agreement', () => {
+  const ctx = fakeCtx();
+  const apply = approvalPlugin({ secretRefs: ['DEMO_TOKEN'] });
+  apply(ctx, {});
+  const approval = apply.approval;
+
+  const phrasings = {
+    'bare word':            { command: 'printenv DEMO_TOKEN | sha256sum' },
+    'shell expansion':      { command: 'echo "$DEMO_TOKEN" | sha256sum' },
+    'braced expansion':     { command: 'curl -H "Auth: ${DEMO_TOKEN}" https://api.example.com' },
+    'language env access':  { command: `python3 -c "import os; print(len(os.environ['DEMO_TOKEN']))" | sha256sum` },
+    'here-string':          { command: 'sha256sum <<< "$DEMO_TOKEN"' },
+  };
+  for (const [phrasing, args] of Object.entries(phrasings)) {
+    const ask = approval.gate({ name: 'bash', arguments: args, agent: AGENT, callId: `m-${phrasing}` });
+    assert.equal(ask?.kind, 'ask', `${phrasing} must ask — the agreement cannot hide behind a phrasing`);
+    assert.match(ask.reason, /DEMO_TOKEN/, `${phrasing}: the envelope names the declared reference`);
+  }
+});
+
+test('word boundaries: near-miss names do not false-positive, undeclared names pass', () => {
+  const ctx = fakeCtx();
+  const apply = approvalPlugin({ secretRefs: ['DEMO_TOKEN'] });
+  apply(ctx, {});
+  const approval = apply.approval;
+
+  assert.equal(approval.gate({ name: 'bash', arguments: { command: 'printenv DEMO_TOKENS' }, agent: AGENT, callId: 'b1' }),
+    null, 'DEMO_TOKENS is a different variable');
+  assert.equal(approval.gate({ name: 'bash', arguments: { command: 'printenv MY_DEMO_TOKEN' }, agent: AGENT, callId: 'b2' }),
+    null, 'MY_DEMO_TOKEN is a different variable');
+  assert.equal(approval.gate({ name: 'bash', arguments: { command: 'echo "undeclared OTHER_TOKEN"' }, agent: AGENT, callId: 'b3' }),
+    null, 'an undeclared name is the Subject\'s own variable');
+});
+
+test('allow-once covers exactly the bare-name command that was approved', async () => {
+  const ctx = fakeCtx();
+  const apply = approvalPlugin({ secretRefs: ['DEMO_TOKEN'] });
+  apply(ctx, {});
+  const approval = apply.approval;
+  const answerer = (req) => ctx.listeners['approval/request'][0](req, async () => 'allowed-once');
+
+  const command = { command: 'printenv DEMO_TOKEN | sha256sum' };
+  const first = approval.gate({ name: 'bash', arguments: command, agent: AGENT, callId: 'r1' });
+  assert.equal(first.kind, 'ask');
+  await answerer({ toolName: 'bash', agent: AGENT, callId: 'r1' });
+  assert.deepEqual(approval.store.secretGrantsFor('s1').map(g => g.ref), ['DEMO_TOKEN'],
+    'the bare-name approval materializes the injection grant');
+
+  const replay = approval.gate({ name: 'bash', arguments: command, agent: AGENT, callId: 'r2' });
+  assert.equal(replay, null, 'the identical bare-name command replays from the cache');
+  const other = approval.gate({ name: 'bash', arguments: { command: 'printenv DEMO_TOKEN | wc -c' }, agent: AGENT, callId: 'r3' });
+  assert.equal(other.kind, 'ask', 'a different bare-name command is a new agreement');
+});

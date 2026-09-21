@@ -247,13 +247,22 @@ export function approvalPlugin(opts = {}) {
       const tool = exec?.name ?? 'unknown-tool';
       const args = exec?.arguments ?? {};
       const { root, session } = identityOf(exec?.agent);
-      // Declared secret references in the call: `$NAME` in a command string,
-      // where NAME was declared by the composition. The approval of such a
-      // call is also the injection agreement — the envelope says so, so the
-      // decider knows what "allow once" will materialize. Undeclared `$FOO`
-      // is the Subject's own variable and none of this gate's business.
+      // Declared secret references in the call: any word occurrence of a NAME
+      // declared by the composition. The detector is deliberately NOT anchored
+      // on shell expansion — requiring the `$` hid the agreement behind a
+      // phrasing requirement the Subject was never taught: `printenv NAME`
+      // (the canonical read) and `os.environ['NAME']` referenced the secret
+      // and passed ungated (#27). The names are declared by the composition,
+      // so false positives are bounded to commands that mention a declared
+      // secret, which ARE references in spirit. `$NAME` and `${NAME}` are
+      // subsumed (`$` precedes a word boundary); word boundaries keep a
+      // declared TOKEN from matching TOKENS or GH_TOKEN. Undeclared FOO is
+      // still the Subject's own variable and none of this gate's business.
+      // The approval of such a call is also the injection agreement — the
+      // envelope says so, so the decider knows what "allow once" materializes.
       const secretRefs = approval.secretRefs.filter(re =>
-        new RegExp(`\\$\\{?${re}\\}?\\b`).test(String(args?.command ?? '')));
+        new RegExp(`\\b${String(re).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
+          .test(String(args?.command ?? '')));
       // This gate gates IDENTIFIABLE targets only. A call with no canonical
       // target (an opaque command string, a path argument) would collapse to
       // one fingerprint per tool — approving it once would be a hidden
