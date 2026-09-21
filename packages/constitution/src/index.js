@@ -27,13 +27,13 @@ import { fileURLToPath } from 'node:url';
 import { parseManifest, parseSeal, verifySeal, SealError } from 'compact-dsh-seals';
 import {
   COMPACT_BODY, COMPACT_DIGEST, COMPACT_SOURCE_URL, COMPACT_SOURCE_REVISION,
-  TAUGHT_DIGEST, clauseIds, verifyBody,
+  TAUGHT_DIGEST, clauseIds, verifyBody, partNameOf,
 } from './body.js';
 
 export { COMPACT_BODY, COMPACT_DIGEST, COMPACT_SOURCE_URL, TAUGHT_DIGEST, clauseIds, verifyBody };
 // The clause table, so a plugin can derive entrenchment from the body's own
 // (core) markers rather than restating A-2's list where it could drift (F-7).
-export { CLAUSES, clauseOf } from './body.js';
+export { CLAUSES, clauseOf, partNameOf } from './body.js';
 
 // The vendored development-keyring artifacts — the upstream founder seal over
 // THIS body digest, public material only (the seal is verified, never
@@ -216,6 +216,10 @@ export function apply(ctx, config) {
       return true;
     },
     snapshot: () => Object.fromEntries([...registry.entries()].map(([k, v]) => [k, v])),
+    /** A part code's display name, derived from the body's own Part VI headers
+     *  (F-7) — the attestation renders `MA — Multi-agent operation` so the
+     *  Subject's self-description has no silence to confabulate (#21). */
+    partNameOf,
     /** R-6: the full text of the law, addressed by its digest. */
     body: () => COMPACT_BODY,
     /** The taught per-turn form (the body's appendix) — R-1 groundwork. */

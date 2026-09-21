@@ -76,6 +76,39 @@ export function clauseIds() {
   return new Set(ID_INDEX.keys());
 }
 
+// Part VI's section headers name the capability parts:
+// `### CODE — Name · [C: the Enforcer …]`. The attestation renders the name
+// next to the part code so a Subject's authoritative self-description leaves
+// no silence for the model to fill with confabulated legalisms (#21) — the
+// names are derived from the body itself (F-7), never restated in code.
+const PART_NAME_RE = /^### ([A-Z]{1,4}) — (.+?) · \[/gm;
+
+const PART_NAME_INDEX = (() => {
+  const start = COMPACT_BODY.indexOf('## Part VI');
+  const end = COMPACT_BODY.indexOf('## Part VII');
+  // guard the slice (#review): a body whose part structure moved — or was
+  // mis-pinned — must degrade to unnamed parts (bare codes), never derive
+  // "names" from some other section of the law
+  if (start < 0 || end <= start) return new Map();
+  const names = new Map();
+  for (const m of COMPACT_BODY.slice(start, end).matchAll(PART_NAME_RE)) names.set(m[1], m[2]);
+  return names;
+})();
+
+/**
+ * The display name of a capability part, from the body's own headers: the
+ * Part VI section name when the code has one (`MA` — Multi-agent operation),
+ * else the base clause's title (`A-4/DYN` — The Enforcer's code is
+ * constitutional). Null when the body names neither: the caller degrades to
+ * the bare code rather than inventing a name.
+ */
+export function partNameOf(code) {
+  const named = PART_NAME_INDEX.get(code);
+  if (named) return named;
+  const base = String(code ?? '').split('/')[0];
+  return ID_INDEX.get(base)?.title ?? null;
+}
+
 /** The taught digest (the body's appendix) — the per-turn form, R-6/R-1 groundwork. */
 export const TAUGHT_DIGEST = COMPACT_BODY.slice(COMPACT_BODY.indexOf('## Appendix')).trim();
 

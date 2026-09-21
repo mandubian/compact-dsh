@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  COMPACT_BODY, COMPACT_DIGEST, TAUGHT_DIGEST, CLAUSES, clauseIds, clauseOf, verifyBody,
+  COMPACT_BODY, COMPACT_DIGEST, TAUGHT_DIGEST, CLAUSES, clauseIds, clauseOf, partNameOf, verifyBody,
 } from '../src/body.js';
 import { apply, DECLARED_GAPS, verifyTrustRoot } from '../src/index.js';
 import { generateEd25519, parseManifest, SealError, signSeal } from 'compact-dsh-seals';
@@ -294,4 +294,20 @@ test('a record service declaring an unreadable posture refuses with a named reas
     () => apply(fakeCtx({ services: bad }), {}),
     /declaredGaps must be an array of non-empty strings/,
     'a sibling posture that cannot be read is a named refusal, never a silent fallback');
+});
+
+// -- part names derive from the body's own Part VI headers (#21, F-7) --------
+
+test('partNameOf derives every Part VI name from the body headers, never from code', () => {
+  assert.equal(partNameOf('MA'), 'Multi-agent operation');
+  assert.equal(partNameOf('CF'), 'Confinement');
+  assert.equal(partNameOf('SCH'), 'Scheduling');
+  assert.equal(partNameOf('MEM'), 'Memory and knowledge planes');
+  assert.equal(partNameOf('FED'), 'Federation across runtimes');
+});
+
+test('partNameOf falls back to the base clause title for codes outside Part VI', () => {
+  assert.equal(partNameOf('A-4/DYN'), clauseOf('A-4').title,
+    'A-4/DYN is named by its clause header, the way the body itself names it');
+  assert.equal(partNameOf('ZZ'), null, 'a code the body does not name stays unnamed — degrade, never invent');
 });
