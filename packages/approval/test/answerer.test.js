@@ -2,7 +2,7 @@
 // that kills covered cache entries (port plan Phase 1 items 4 & 6).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createApproval, canonicalTarget } from '../src/index.js';
+import { createApproval, approvalPlugin, canonicalTarget } from '../src/index.js';
 
 const NOW = 1_700_000_000_000;
 const agent = (id = 'sess-a') => ({ id, session: { id, header: {} } });
@@ -110,4 +110,84 @@ test('a stale ask record (decision that never arrived) is dropped on the next ta
   const ag = agent('sess-a');
   a.recordAsk(ag, 'net.fetch', { fp: 'fp_old', root: 'sess-a', session: 'sess-a', args: {}, at: Date.now() - 10_000 });
   assert.equal(a.takeAsk(ag, 'net.fetch'), null, 'a stale record never materializes a grant');
+});
+
+// -- web-mode ordering (#24) ------------------------------------------------
+// dsh-api-remotes registers the browser's approval bridge from a boot EFFECT,
+// and an effect-registered listener precedes a plain apply-registered one in
+// the waterfall. The plugin must therefore PREPEND its recorded answerer, or
+// the bridge sits upstream in web mode and a browser verdict resolves the
+// chain without ever flowing through the answerer's next() — the only place
+// cacheSet executes. Replicated here with a plain Cordis context: the bridge
+// plugin is loaded FIRST and registers via ctx.effect, exactly like
+// api-remotes; the verdict it returns is the browser's.
+test('web mode: a browser verdict answered upstream still materializes the exec-cache', async () => {
+  const { Context } = await import('@deepseek-ai/cordis');
+  const { mkdtempSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const persistPath = join(mkdtempSync(join(tmpdir(), 'approval-web-')), 'approvals.json');
+
+  const seen = { order: [], decidingDuringBridge: null };
+  const bridge = {
+    name: 'web-bridge',
+    apply: (c) => c.effect(() => {
+      // the browser page: answers without calling next(), like forwardWaterfall
+      // does when the gateway resolves the parked dispatch with a result
+      c.on('approval/request', async (req) => {
+        seen.order.push('bridge');
+        seen.decidingDuringBridge = ctx.get('compact-approval')?.deciding?.get(String(req.callId)) ?? null;
+        return 'allowed-once';
+      });
+    }, 'web-bridge: approval waterfall'),
+  };
+  const ctx = new Context();
+  ctx.plugin(bridge);
+  await new Promise(r => setImmediate(r));                   // the web bundle settles first: the bridge registers BEFORE the composition applies (patch-row order in the real boot)
+  const inst = approvalPlugin({ persistPath });
+  inst(ctx, {});
+
+  const ag = agent('sess-web');
+  const gated = inst.approval.gate({ name: 'net.fetch', arguments: { host: 'evil.example' }, agent: ag, callId: 'call-web-1' });
+  assert.equal(gated?.kind, 'ask', 'the uncovered target is gated');
+
+  const outcome = await ctx.waterfall(
+    'approval/request',
+    { toolName: 'net.fetch', agent: ag, callId: 'call-web-1', reason: gated.reason },
+    () => 'unavailable',
+  );
+  assert.equal(outcome, 'allowed-once');
+  assert.deepEqual(seen.order, ['bridge'], 'the bridge handled the request (it answers without calling next())');
+  assert.ok(seen.decidingDuringBridge,
+    'the recorded answerer ran BEFORE the bridge: the deciding view it publishes was live during the bridge\'s decision — that is the ordering guarantee, since the bridge itself only answers');
+  assert.match(seen.decidingDuringBridge.command, /evil\.example/);
+  assert.equal(inst.approval.store.cache.size, 1, 'the browser-approved verdict materialized the exec-cache');
+  assert.equal(inst.approval.store.countPending('sess-web'), 0, 'the pending record was released');
+  assert.ok(existsSync(persistPath), 'the store flushed to approvals.json');
+});
+
+test('web mode: a browser rejection upstream materializes nothing', async () => {
+  const { Context } = await import('@deepseek-ai/cordis');
+  const bridge = {
+    name: 'web-bridge',
+    apply: (c) => c.effect(() => {
+      c.on('approval/request', async () => 'rejected');
+    }, 'web-bridge: approval waterfall'),
+  };
+  const ctx = new Context();
+  ctx.plugin(bridge);
+  await new Promise(r => setImmediate(r));                   // bridge first, as in the real web boot
+  const inst = approvalPlugin({});
+  inst(ctx, {});
+
+  const ag = agent('sess-web');
+  inst.approval.gate({ name: 'net.fetch', arguments: { host: 'denied.example' }, agent: ag, callId: 'call-web-2' });
+  const outcome = await ctx.waterfall(
+    'approval/request',
+    { toolName: 'net.fetch', agent: ag, callId: 'call-web-2', reason: '[AG/I-5] ask' },
+    () => 'unavailable',
+  );
+  assert.equal(outcome, 'rejected');
+  assert.equal(inst.approval.store.cache.size, 0, 'a rejection never caches');
+  assert.equal(inst.approval.store.countPending('sess-web'), 0);
 });
