@@ -70,7 +70,15 @@ export function makeFixture(t) {
     COMPACT_SANDBOX_IMAGE: 'ubuntu:24.04',
     COMPACT_STATE_DIR: stateDir,
   };
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // COMPACT_LIVE_KEEP=1 preserves the fixture on failure — the session record,
+  // chains, and grants are the forensics; default cleanup is intentional (the
+  // fixture holds recorded model turns), but a failed run with no evidence is
+  // a run that cannot be diagnosed.
+  const keep = process.env.COMPACT_LIVE_KEEP === '1';
+  if (keep) console.error(`[live] fixture preserved for triage: ${dir}`);
+  t.after(() => {
+    if (!keep) rmSync(dir, { recursive: true, force: true });
+  });
   return { dir, workspace, stateDir, baseEnv, keyring };
 }
 
