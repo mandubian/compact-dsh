@@ -19,13 +19,13 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  liveSkipReason, dockerAvailable, makeFixture, runLauncher, readEvents, auditSession, randomToken,
+  liveSkipReason, dockerAvailable, makeFixture, runLauncher, readEvents, auditSession, randomToken, selected,
 } from './live-harness.mjs';
 
-const skip = liveSkipReason();
+const skipFor = (id) => liveSkipReason() ?? (selected(id) ? false : `not selected — COMPACT_LIVE_ONLY=${process.env.COMPACT_LIVE_ONLY ?? ''}`);
 const NEED_DOCKER = 'Docker with a local ubuntu:24.04 image is required for the confined bash sandbox';
 
-test('L1 · self_describe: signed attestation, certified identity, record verifies offline', { skip, timeout: 300_000 }, async (t) => {
+test('L1 · self_describe: signed attestation, certified identity, record verifies offline', { skip: skipFor('L1'), timeout: 300_000 }, async (t) => {
   if (!dockerAvailable()) t.skip(NEED_DOCKER);
   const fixture = makeFixture(t);
   const run = await runLauncher({
@@ -53,7 +53,7 @@ test('L1 · self_describe: signed attestation, certified identity, record verifi
   assert.match(att.reliesOn.at(-1), /VALID under DEV keyring — conveys no standing/);
 });
 
-test('L2 · network fetch is denied with a named envelope — and stays denied', { skip, timeout: 360_000 }, async (t) => {
+test('L2 · network fetch is denied with a named envelope — and stays denied', { skip: skipFor('L2'), timeout: 360_000 }, async (t) => {
   if (!dockerAvailable()) t.skip(NEED_DOCKER);
   const fixture = makeFixture(t);
   const run = await runLauncher({
@@ -75,7 +75,7 @@ test('L2 · network fetch is denied with a named envelope — and stays denied',
   assert.equal(fetched, false, 'no page content may reach the session');
 });
 
-test('L3 · allow-once + exec-cache: one ask, then the identical operation replays', { skip, timeout: 420_000 }, async (t) => {
+test('L3 · allow-once + exec-cache: one ask, then the identical operation replays', { skip: skipFor('L3'), timeout: 420_000 }, async (t) => {
   if (!dockerAvailable()) t.skip(NEED_DOCKER);
   const fixture = makeFixture(t);
   const run = await runLauncher({
@@ -106,7 +106,7 @@ test('L3 · allow-once + exec-cache: one ask, then the identical operation repla
   // refused: the two layers agree by construction.
 });
 
-test('L4 · confinement: the host home is invisible, workspace writes land on the host', { skip, timeout: 360_000 }, async (t) => {
+test('L4 · confinement: the host home is invisible, workspace writes land on the host', { skip: skipFor('L4'), timeout: 360_000 }, async (t) => {
   if (!dockerAvailable()) t.skip(NEED_DOCKER);
   const fixture = makeFixture(t);
   const run = await runLauncher({
@@ -124,7 +124,7 @@ test('L4 · confinement: the host home is invisible, workspace writes land on th
   assert.ok(!recordText.includes('settings.yaml'), 'the host home was not listed into the session');
 });
 
-test('L5 · declared secret: disclosure ask, injection under agreement, record stays clean', { skip, timeout: 420_000 }, async (t) => {
+test('L5 · declared secret: disclosure ask, injection under agreement, record stays clean', { skip: skipFor('L5'), timeout: 420_000 }, async (t) => {
   if (!dockerAvailable()) t.skip(NEED_DOCKER);
   const fixture = makeFixture(t);
   const token = `live-${randomToken()}`;

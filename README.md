@@ -737,5 +737,7 @@ state dir seeded with that settings file, so runs never touch
 the default `npm test` never picks it up.
 
 ```bash
-npm run test:live
+npm run test:live                                   # the full flow
+COMPACT_LIVE_ONLY=L2,L5 npm run test:live           # selected tests only
+COMPACT_LIVE_KEEP=1 npm run test:live               # keep fixtures for triage
 ```

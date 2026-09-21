@@ -30,6 +30,18 @@ export function hasModelRoute() {
     (process.env.COMPACT_LIVE_SETTINGS != null && existsSync(process.env.COMPACT_LIVE_SETTINGS));
 }
 
+/**
+ * Per-test selection: `COMPACT_LIVE_ONLY=L2,L3` runs only the listed ids.
+ * Enforced by the tests themselves (the node runner's --test-name-pattern
+ * does not reliably filter file-level test() calls), so selection is
+ * hermetic across Node versions.
+ */
+export function selected(id) {
+  const only = (process.env.COMPACT_LIVE_ONLY ?? '')
+    .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  return only.length === 0 || only.includes(id.toUpperCase());
+}
+
 export function dockerAvailable() {
   try {
     execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', 'ubuntu:24.04'], { encoding: 'utf8', timeout: 10_000 });
