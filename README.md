@@ -537,6 +537,46 @@ checkout's `node_modules` beside the generated config as the install anchor
 dsh's two-anchor resolution expects; a `node_modules` already present in the
 state directory that is not that symlink is refused, not replaced.
 
+**Testing against a given directory.** `npm run compact` starts from this
+checkout, so point the workspace at the project instead of `cd`-ing into it —
+`--workspace` (absolute) becomes the sandbox root: Docker bind-mounts exactly
+that directory, and the container's working directory is set to it. Typical
+testing commands:
+
+```bash
+# browser UI against a project, signing on (annex + key from the rehearsal set)
+COMPACT_ENFORCER_ANNEX=~/.compact-dsh/keyring/enforcer.annex.json \
+COMPACT_ENFORCER_KEY=~/.compact-dsh/keyring/enforcer.pem \
+npm run compact -- --web --workspace /absolute/path/to/project
+
+# the same, fully isolated: own port, own state (sessions, chains, approvals),
+# own sandbox image — nothing touches ~/.compact-dsh or the default port
+COMPACT_ENFORCER_ANNEX=~/.compact-dsh/keyring/enforcer.annex.json \
+COMPACT_ENFORCER_KEY=~/.compact-dsh/keyring/enforcer.pem \
+COMPACT_WEB_PORT=8080 \
+COMPACT_STATE_DIR=/tmp/compact-test-state \
+COMPACT_SANDBOX_IMAGE=my-project-tools:latest \
+npm run compact -- --web --workspace /absolute/path/to/project
+
+# headless one-shot against the same directory, attended (prompts on stderr)
+npm run compact -- --attended --workspace /absolute/path/to/project "Inspect the project using bash and report what you find."
+```
+
+Notes for these runs: `ubuntu:24.04` is a bare shell — set
+`COMPACT_SANDBOX_IMAGE` to a locally prepared image if the project needs
+tooling (the launcher inspects its local digest, never pulls); bash has
+**network off** by design, so fetches deny with the AG-1 envelope; use an
+explicit `cd` inside bash for subdirectories rather than the workdir option;
+`COMPACT_SECRETS='["NAME"]'` declares env-var NAMES the confined bash may be
+granted (values stay in your shell, injection only under an approved grant).
+Afterwards, audit the session offline (see the rehearsal section below for
+the full signature-checking form):
+
+```bash
+node auditor/audit.mjs ~/.compact-dsh/sessions/--home-…--/session-<id>/session.v3.jsonl \
+  --chain ~/.compact-dsh/chains/session-<id>.chain --quiet
+```
+
 State defaults to `~/.compact-dsh`: session JSONL files under `sessions/`, hash
 chains under `chains/`, and persistent grants in `approvals.json`. Keep this
 operator-owned directory outside the agent workspace. The launcher isolates
