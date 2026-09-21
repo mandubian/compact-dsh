@@ -157,8 +157,9 @@ test('web mode: a browser verdict answered upstream still materializes the exec-
     () => 'unavailable',
   );
   assert.equal(outcome, 'allowed-once');
-  assert.deepEqual(seen.order, ['bridge'], 'the recorded answerer claimed the ask before the bridge decided');
-  assert.ok(seen.decidingDuringBridge, 'the deciding preview was live while the browser decided');
+  assert.deepEqual(seen.order, ['bridge'], 'the bridge handled the request (it answers without calling next())');
+  assert.ok(seen.decidingDuringBridge,
+    'the recorded answerer ran BEFORE the bridge: the deciding view it publishes was live during the bridge\'s decision — that is the ordering guarantee, since the bridge itself only answers');
   assert.match(seen.decidingDuringBridge.command, /evil\.example/);
   assert.equal(inst.approval.store.cache.size, 1, 'the browser-approved verdict materialized the exec-cache');
   assert.equal(inst.approval.store.countPending('sess-web'), 0, 'the pending record was released');
