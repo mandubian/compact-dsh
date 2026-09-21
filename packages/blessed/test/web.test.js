@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { composeEntries, loadOverlayPatches } from '@deepseek-ai/dsh-app-boot';
 import { PRESET_ID, ensureInstallAnchor, installAnchor, presetCompositionPath, presetRoot, webRows } from '../src/web.js';
@@ -203,7 +203,7 @@ test('workspace registry: writing a new aside prunes older ones beyond the reten
   assert.equal(kept.length, ASIDE_RETENTION, `exactly ${ASIDE_RETENTION} asides survive`);
   assert.equal(kept.includes('workspace.json.aside-170000000006'), true, 'the newest stale aside survives');
   assert.equal(kept.includes('workspace.json.aside-170000000001'), false, 'the oldest stale aside is pruned');
-  assert.equal(kept.includes(r.aside.split('/').pop()), true, 'the fresh aside survives');
+  assert.equal(kept.includes(basename(r.aside)), true, 'the fresh aside survives');
   assert.deepEqual(r.pruned.sort(), ['workspace.json.aside-170000000001', 'workspace.json.aside-170000000002'],
     'the boot log names what went');
 });
