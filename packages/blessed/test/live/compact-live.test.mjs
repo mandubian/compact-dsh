@@ -88,12 +88,18 @@ test('L3 · allow-once + exec-cache: one ask, then the identical operation repla
     timeoutMs: 420_000,
   });
   const events = readEvents(run.sessionDir);
-  const asks = events.filter(e => e.type === 'approval/asked' && JSON.stringify(e).includes('example.com'));
+  // the asked event carries the callId and the fingerprint — never the tool
+  // arguments (the wire request carries no arguments, by design) — so the ask
+  // is correlated to the operation by callId, not by URL
+  const targetCallIds = events
+    .filter(e => e.type === 'tool/call' && JSON.stringify(e).includes('example.com'))
+    .map(e => e.data.callId);
+  const asks = events.filter(e => e.type === 'approval/asked' && targetCallIds.includes(e.data.callId));
   const decided = events.filter(e => e.type === 'approval/decided');
   assert.equal(asks.length, 1, `the operation asked exactly once (got ${asks.length}) — the exec-cache replay must not re-ask (see #24)`);
   assert.ok(decided.length >= 1, 'the ask was decided');
   assert.ok(decided.every(d => d.data.outcome === 'allowed-once'));
-  const attempts = events.filter(e => e.type === 'tool/call' && JSON.stringify(e).includes('example.com'));
+  const attempts = events.filter(e => e.type === 'tool/call' && targetCallIds.includes(e.data.callId));
   assert.ok(attempts.length >= 2, `the command ran twice (got ${attempts.length} executions)`);
   // one ask, two executions: the replay happened. Both attempts fail at
   // connect (the container has no network) — consent was granted, physics

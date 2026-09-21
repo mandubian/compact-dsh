@@ -131,6 +131,9 @@ export function runLauncher({ task, fixture, answer, env = {}, timeoutMs = 300_0
       settled = true;
       clearTimeout(timer);
       clearInterval(poll);
+      // a clean exit (code 0) is completion too: the runner exits after the
+      // turn's final flush, which can race the record poller past turn/end
+      if (code === 0) turnEnded = true;
       resolve({ code, turnEnded, stdout, stderr, prompts, sessionDir: newestSessionDir(fixture.stateDir) });
     };
     const timer = setTimeout(() => {
