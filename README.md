@@ -544,6 +544,15 @@ operator-owned directory outside the agent workspace. The launcher isolates
 profile or load its patches. `compact.generated.cordis.yml` must remain empty.
 The rehearsal identity set (below) lives there too, when installed.
 
+At web boot the launcher aligns the dsh workspace registry
+(`storages/workspace.json`) with the one directory this boot exposes: records
+naming other directories are removed from the registry (UI state only — the
+session record is never touched) and the boot log names what went. A registry
+too corrupt to parse is moved aside as
+`storages/workspace.json.aside-<timestamp>` — never silently destroyed — and
+asides beyond the **5 most recent** are pruned on each such move (the boot log
+says what was pruned).
+
 The bundle replaces stock persistence with `compact-dsh-record/provider`, so
 host session writes actually pass through the chain. It replaces the stock
 sandbox with Docker and starts the agent loop only after `compact-ready`.
