@@ -64,31 +64,40 @@ test('L2 · network fetch is denied with a named envelope — and stays denied',
   });
   const events = readEvents(run.sessionDir);
   const recordText = JSON.stringify(events);
-  assert.match(recordText, /AG-1|opaque-network/,
-    'the denial names its rule: the per-host network gate, or the fail-closed opaque-network posture');
+  // an operator DENIAL surfaces to the Subject as "the user rejected tool …";
+  // the RULE travels on the record instead — the asked event carries the AG
+  // fingerprint envelope and the decided event carries the outcome (I-4/I-5)
+  assert.match(recordText, /the user rejected tool/, 'the operator denial surfaced to the Subject');
+  assert.match(recordText, /approval\/asked/, 'the ask is on the record');
+  assert.match(recordText, /approval\/decided[^}]*rejected/, 'the denial decision is on the record');
   const results = events.filter(e => e.type === 'tool/result').map(e => JSON.stringify(e));
-  const fetched = results.some(r => r.includes('Example Domain') || r.includes('example com page'));
+  const fetched = results.some(r => r.includes('Example Domain'));
   assert.equal(fetched, false, 'no page content may reach the session');
 });
 
 test('L3 · allow-once + exec-cache: one ask, then the identical operation replays', { skip, timeout: 420_000 }, async (t) => {
   if (!dockerAvailable()) t.skip(NEED_DOCKER);
   const fixture = makeFixture(t);
-  const marker = `compact-live-${Math.floor(Math.random() * 1e9)}`;
   const run = await runLauncher({
     fixture,
-    task: `Run this exact bash command two times, one after the other: echo ${marker}`,
+    // a network-targeting command: the ask fires per (tool + target), so the
+    // second identical call is the exec-cache replay (plain confined bash does
+    // not ask at all — the sandbox contract is its pre-approval)
+    task: 'Run this exact bash command two times, one after the other: curl -s https://example.com',
     answer: () => '2',                       // allow once, for every ask that appears
     timeoutMs: 420_000,
   });
   const events = readEvents(run.sessionDir);
-  const asks = events.filter(e => e.type === 'approval/asked' && JSON.stringify(e).includes(marker));
-  const decided = events.filter(e => e.type === 'approval/decided' && JSON.stringify(e).includes('allowed-once'));
+  const asks = events.filter(e => e.type === 'approval/asked' && JSON.stringify(e).includes('example.com'));
+  const decided = events.filter(e => e.type === 'approval/decided');
   assert.equal(asks.length, 1, `the operation asked exactly once (got ${asks.length}) — the exec-cache replay must not re-ask (see #24)`);
   assert.ok(decided.length >= 1, 'the ask was decided');
-  const echoes = events.filter(e => e.type === 'tool/call' && JSON.stringify(e).includes(marker));
-  assert.ok(echoes.length >= 2, `the command ran twice (got ${echoes.length} executions)`);
-  // one ask, two executions: the replay happened
+  assert.ok(decided.every(d => d.data.outcome === 'allowed-once'));
+  const attempts = events.filter(e => e.type === 'tool/call' && JSON.stringify(e).includes('example.com'));
+  assert.ok(attempts.length >= 2, `the command ran twice (got ${attempts.length} executions)`);
+  // one ask, two executions: the replay happened. Both attempts fail at
+  // connect (the container has no network) — consent was granted, physics
+  // refused: the two layers agree by construction.
 });
 
 test('L4 · confinement: the host home is invisible, workspace writes land on the host', { skip, timeout: 360_000 }, async (t) => {
