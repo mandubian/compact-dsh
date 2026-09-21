@@ -191,3 +191,103 @@ test('web mode: a browser rejection upstream materializes nothing', async () => 
   assert.equal(inst.approval.store.cache.size, 0, 'a rejection never caches');
   assert.equal(inst.approval.store.countPending('sess-web'), 0);
 });
+
+// -- transcript notes (#25): the decision is visible where the Subject lives -
+
+test('the note renders every outcome from envelope-grade facts only', async () => {
+  const { approvalTranscriptNote } = await import('../src/index.js');
+  const view = { tool: 'bash', fingerprint: 'fp_46e54fc76ae61559', target: {} };
+  const allowed = approvalTranscriptNote(view, 'allowed-once');
+  assert.match(allowed, /^\[compact-approval\] Gate decision: "bash" \[fp_46e54fc76ae61559\] was allowed once/);
+  assert.match(allowed, /replays without re-asking/, 'the note teaches the replay consequence');
+  assert.match(approvalTranscriptNote(view, 'rejected'), /was denied by the operator — the call did not run/);
+  assert.match(approvalTranscriptNote(view, 'cancelled'), /closed cancelled.*fail-closed/);
+  assert.match(approvalTranscriptNote(view, 'unavailable'), /closed unavailable.*fail-closed/);
+  const targeted = approvalTranscriptNote({ tool: 'net.fetch', fingerprint: 'fp_x', target: { host: 'evil.example' } }, 'rejected');
+  assert.match(targeted, /"net\.fetch" \(host=evil\.example\) \[fp_x\]/, 'the canonical target is on the note');
+});
+
+test('a decided ask injects a plugin-sourced note through the agent', async () => {
+  const { Context } = await import('@deepseek-ai/cordis');
+  const ctx = new Context();
+  const injected = [];
+  const ag = {
+    id: 'sess-note',
+    session: { id: 'sess-note', header: {} },
+    inject(message) { injected.push(message); },
+  };
+  const inst = approvalPlugin({});
+  inst(ctx, {});
+  const gated = inst.approval.gate({ name: 'bash', arguments: { command: 'curl --quiet https://evil.example/MARKERTEXT', url: 'https://evil.example/' }, agent: ag, callId: 'note-1' });
+  assert.equal(gated?.kind, 'ask');
+  const outcome = await ctx.waterfall(
+    'approval/request',
+    { toolName: 'bash', agent: ag, callId: 'note-1', reason: gated.reason },
+    () => 'allowed-once',
+  );
+  assert.equal(outcome, 'allowed-once');
+  assert.equal(injected.length, 1, 'one note per decision');
+  assert.equal(injected[0].source?.kind, 'plugin');
+  assert.equal(injected[0].source?.plugin, 'compact-approval');
+  const text = injected[0].content?.[0]?.text ?? '';
+  assert.match(text, /\[fp_[0-9a-f]{16}\]/, 'the fingerprint is on the note');
+  assert.match(text, /was allowed once/);
+  assert.ok(!text.includes('MARKERTEXT'), 'the command text never reaches the transcript note — the deciding preview is operator-only');
+  assert.ok(!text.includes('curl'), 'not even the phrasing survives: the note is envelope-grade facts only');
+});
+
+test('a rejected ask injects the denial note; an agent without inject skips silently', async () => {
+  const { Context } = await import('@deepseek-ai/cordis');
+  const ctx = new Context();
+  const injected = [];
+  const ag = {
+    id: 'sess-note-2',
+    session: { id: 'sess-note-2', header: {} },
+    inject(message) { injected.push(message); },
+  };
+  const inst = approvalPlugin({});
+  inst(ctx, {});
+  inst.approval.gate({ name: 'net.fetch', arguments: { host: 'denied.example' }, agent: ag, callId: 'note-2' });
+  await ctx.waterfall(
+    'approval/request',
+    { toolName: 'net.fetch', agent: ag, callId: 'note-2', reason: '[AG/I-5] ask' },
+    () => 'rejected',
+  );
+  assert.equal(injected.length, 1);
+  assert.match(injected[0].content?.[0]?.text ?? '', /was denied by the operator/);
+
+  // the plain agent shape (no inject) stays legal: the note skips, the
+  // decision path is untouched — every test above already ran it this way
+  const bare = agent('sess-bare');
+  const gated = inst.approval.gate({ name: 'net.fetch', arguments: { host: 'other.example' }, agent: bare, callId: 'note-3' });
+  assert.equal(gated?.kind, 'ask');
+  const outcome = await ctx.waterfall(
+    'approval/request',
+    { toolName: 'net.fetch', agent: bare, callId: 'note-3', reason: gated.reason },
+    () => 'allowed-once',
+  );
+  assert.equal(outcome, 'allowed-once', 'the decision lands with or without the note channel');
+});
+
+test('an approved secret-referencing command notes the live injection grant', async () => {
+  const { Context } = await import('@deepseek-ai/cordis');
+  const ctx = new Context();
+  const injected = [];
+  const ag = {
+    id: 'sess-note-3',
+    session: { id: 'sess-note-3', header: {} },
+    inject(message) { injected.push(message); },
+  };
+  const inst = approvalPlugin({ secretRefs: ['DEMO_TOKEN'] });
+  inst(ctx, {});
+  const gated = inst.approval.gate({ name: 'bash', arguments: { command: 'printenv DEMO_TOKEN | sha256sum' }, agent: ag, callId: 'note-4' });
+  assert.equal(gated?.kind, 'ask');
+  await ctx.waterfall(
+    'approval/request',
+    { toolName: 'bash', agent: ag, callId: 'note-4', reason: gated.reason },
+    () => 'allowed-once',
+  );
+  const text = injected[0].content?.[0]?.text ?? '';
+  assert.match(text, /was allowed once/);
+  assert.match(text, /injection grant is live for this session \(\$DEMO_TOKEN\)/, 'the Subject is told what approval materialized');
+});

@@ -653,7 +653,12 @@ is explicitly **operator-declared**, not a verified build history.
   `--web` composes it implicitly. The browser may also surface an approval
   card over the gateway — when a connected page answers first, that verdict
   stands, the terminal prompt is the fall-through, and every decision is
-  recorded upstream by the composition's recorded answerer either way.
+  recorded upstream by the composition's recorded answerer either way. Every
+  decided approval also leaves a one-line note in the session transcript —
+  tool, canonical target, fingerprint, outcome, never the command text — so
+  a gate firing and being answered is visible where the Subject lives, not
+  only in the record; an allowed-once note says the replay consequence it
+  just materialized.
 - `--web` is single-user local, not a network service: the server binds
   loopback by default (a `0.0.0.0` host is refused) and the printed URL
   carries the session trust token.

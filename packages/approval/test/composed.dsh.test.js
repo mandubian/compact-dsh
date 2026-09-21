@@ -53,7 +53,13 @@ function makeAgent(id = 'sess-compact-1') {
   const session = Session.create(id, [
     { type: 'turn/start', seq: 0, time: Date.now(), data: { turn: 1 } },
   ]);
-  return { id, session };
+  return {
+    id, session,
+    // #25: the transcript-note channel — the recorded answerer queues a
+    // plugin-sourced user message for the agent's next model step
+    injected: [],
+    inject(message) { this.injected.push(message); },
+  };
 }
 
 async function boot({ operator = 'allowed-once', inspect } = {}) {
@@ -121,6 +127,29 @@ test('composed: deny→ask→approve→replay-hit cycle in the real runtime', as
   await run(tools, agent, 'other.example');
   assert.equal(executed, 3);
   assert.equal(asked.count, 2);
+});
+
+test('composed: every decided ask leaves a transcript note (#25)', async () => {
+  const { tools } = await boot({ operator: 'allowed-once' });
+  tools.register(probe);
+  executed = 0;
+  const agent = makeAgent();
+
+  await run(tools, agent, 'noted.example');                 // ask → allow → note
+  await run(tools, agent, 'noted.example');                 // replay → no ask, no note
+  assert.equal(agent.injected.length, 1, 'one note for one decision — a replay is silent');
+  const note = agent.injected[0];
+  assert.equal(note.source?.kind, 'plugin');
+  assert.equal(note.source?.plugin, 'compact-approval');
+  const text = note.content?.[0]?.text ?? '';
+  assert.match(text, /\[fp_[0-9a-f]{16}\] was allowed once/);
+  assert.match(text, /host=noted\.example/, 'the canonical target is envelope-grade and on the note');
+
+  // the record keeps its own pair; the note is the transcript copy, not a
+  // replacement for the audit events
+  const types = [];
+  for (let seq = 0; seq < agent.session.seq; seq++) types.push(agent.session.eventAt(seq)?.type);
+  assert.ok(types.includes('approval/asked') && types.includes('approval/decided'));
 });
 
 test('composed: the approval/asked + approval/decided audit pair is on the session log', async () => {
