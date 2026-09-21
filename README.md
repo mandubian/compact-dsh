@@ -565,6 +565,14 @@ is explicitly **operator-declared**, not a verified build history.
 - `--web` is single-user local, not a network service: the server binds
   loopback by default (a `0.0.0.0` host is refused) and the printed URL
   carries the session trust token.
+- One boot exposes one workspace. Reopening a session recorded under a
+  different directory refuses its tool calls with a named envelope, and the
+  sandbox resolver refuses to move the confinement boundary to it — a stale
+  header cannot re-anchor execution to a directory this boot never declared.
+  Relaunch with `--workspace` naming that directory to reopen it honestly, or
+  start a fresh session. Until then the session's file tree in the browser may
+  still show the historical directory (an operator-local read; the Subject has
+  no file tools and bash never leaves the exposed workspace).
 - The allowlist defaults to empty. Allowlisting alone does not enable container
   networking or replace the approval gate.
 - Container working directory follows the sandbox policy workspace root;

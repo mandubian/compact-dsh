@@ -2,7 +2,7 @@
   "name": "compact-dsh-blessed",
   "version": "0.1.0",
   "type": "module",
-  "description": "The Compact on dsh — ordered runtime integration and readiness barrier.",
+  "description": "The Compact on dsh \u2014 ordered runtime integration and readiness barrier.",
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
@@ -26,7 +26,8 @@
     "compact-dsh-remote-access": "0.1.0",
     "compact-dsh-sandbox-docker": "0.1.0",
     "compact-dsh-self-model": "0.1.0",
-    "compact-dsh-specialists": "0.2.0"
+    "compact-dsh-specialists": "0.2.0",
+    "compact-envelope": "0.1.0"
   },
   "engines": {
     "node": ">=22.19"
