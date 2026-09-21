@@ -191,6 +191,7 @@ function namedParts(ctx, parts) {
 /** Compose the attestation for one Subject, from the services that hold it. */
 export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfterMs = DEFAULT_STALE_AFTER_MS, signed = false } = {}) {
   const constitution = svc(ctx, 'constitution');
+  const capabilities = capabilitiesOf(ctx);
   return {
     epoch: ++EPOCH,
     at: now,
@@ -206,7 +207,7 @@ export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfte
       status: constitution?.source?.status ?? null,
       taught: constitution?.taughtDigest?.() ?? null,
     },
-    capabilities: { ...capabilitiesOf(ctx), parts: namedParts(ctx, capabilitiesOf(ctx).parts) },
+    capabilities: { ...capabilities, parts: namedParts(ctx, capabilities.parts) },
     exception: exceptionOf(ctx, now),
     budgets: budgetsOf(ctx, sessionId, now),
     gaps: gapsOf(ctx, signed),
