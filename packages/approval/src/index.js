@@ -316,7 +316,17 @@ export function approvalPlugin(opts = {}) {
 
     ctx.on('tools/pre-execute', async (exec, next) => approval.gate(exec) ?? next());
 
-    ctx.on('approval/request', (req, next) => answerRequest(approval, req, next));
+    // PREPENDED: the recorded answerer must WRAP every decider, including the
+    // web surface's. dsh-api-remotes registers its browser bridge for this
+    // event from a boot effect, and an effect-registered listener precedes a
+    // plain apply-registered one in the waterfall — so without the prepend the
+    // bridge sits UPSTREAM of us in web mode and a browser verdict resolves
+    // the chain directly: allowed-once never flows through next(), cacheSet
+    // never runs, and the identical operation re-asks forever (#24). Prepended,
+    // we claim our asks first and delegate via next() — the designed
+    // "recorded answerer claims, downstream decides" order — in headless
+    // (operator answerer downstream) and web (browser bridge downstream) alike.
+    ctx.on('approval/request', (req, next) => answerRequest(approval, req, next), { prepend: true });
 
     // Cross-plugin consumption (Phase 2): the sandbox provider lists mount
     // grants and the remote-access analyzer routes findings through the same
