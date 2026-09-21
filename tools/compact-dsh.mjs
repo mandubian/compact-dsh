@@ -144,9 +144,11 @@ async function main() {
     // one boot, one exposed workspace: a registry naming another directory
     // would attach browser sessions to files this boot never exposed
     const aligned = alignWorkspaceRegistry(stateDir, workspace);
+    if (aligned.foreign.length > 0) {
+      console.error(`${binName}: the workspace registry named ${aligned.foreign.length} director${aligned.foreign.length === 1 ? 'y' : 'ies'} this boot does not expose (${aligned.foreign.join(', ')}); removed from the registry — browser sessions attach to ${workspace}`);
+    }
     if (aligned.aside) {
-      console.error(`${binName}: the workspace registry named ${aligned.foreign.length} director${aligned.foreign.length === 1 ? 'y' : 'ies'} this boot does not expose (${aligned.foreign.join(', ')}); moved to ${aligned.aside}`);
-      console.error(`${binName}: this boot's browser sessions attach to ${workspace} — restore the aside file only if you re-expose that directory`);
+      console.error(`${binName}: the workspace registry was unreadable and moved to ${aligned.aside}; the first session bootstrap may re-register directories from session history — remove them in the UI workspace settings`);
     }
   }
   const bundle = name => loadOverlayPatches(binName, fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve(`${name}/package.json`))));

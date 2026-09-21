@@ -28,8 +28,9 @@
 //    gates themselves ride the host tool waterfall and are preset-
 //    independent; the preset keeps the model-facing catalog honest.
 
-import { join } from 'node:path';
-import { existsSync, readFileSync, renameSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { basename, join } from 'node:path';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { lstat, mkdir, readlink, realpath, symlink } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -88,32 +89,60 @@ export const workspaceRegistryPath = (stateDir) => join(stateDir, 'storages', 'w
  * one exposed workspace: a registry entry naming a directory THIS boot never
  * exposed would attach browser sessions to it — the UI would browse files
  * the confined bash cannot touch, and bash would write files the UI cannot
- * see. So a registry that names any other directory (or cannot be read) is
- * moved aside — never deleted — and the boot proceeds against the default
- * cwd, which IS the exposed workspace. The UI re-registers on demand.
+ * see.
  *
- * @returns {{aside: string|null, foreign: string[]}} the aside path when the
- *   registry was moved, and the offending entries that caused it
+ * The registry carries an `initialized` marker: once true, dsh-workspace
+ * NEVER re-derives records from session headers; before, it bootstraps the
+ * table from every session's `header.cwd`. So deletion is the one move that
+ * cannot work (a fresh registry re-derives the old directories from session
+ * history). Instead this edits the registry in place, preserving the marker:
+ * records naming other directories are removed, a record for the boot
+ * workspace is added when none exists, and everything else (order, archive
+ * set, matching records) is preserved untouched. Only a CORRUPT registry is
+ * moved aside (timestamped, never deleted) — and the boot log then says that
+ * the first session bootstrap may re-register old directories, which the UI
+ * workspace settings can remove.
+ *
+ * @returns {{aside: string|null, foreign: string[], realigned: boolean}}
  */
 export function alignWorkspaceRegistry(stateDir, workspace) {
   const path = workspaceRegistryPath(stateDir);
-  if (!existsSync(path)) return { aside: null, foreign: [] };
+  if (!existsSync(path)) return { aside: null, foreign: [], realigned: false };
   let registry;
   try {
     registry = JSON.parse(readFileSync(path, 'utf8'));
   } catch {
-    // corrupt UI state is not evidence: move it aside rather than boot
-    // against a registry that cannot be read
     const aside = `${path}.aside-${Date.now()}`;
     renameSync(path, aside);
-    return { aside, foreign: ['(unreadable)'] };
+    return { aside, foreign: ['(unreadable — the first boot may re-register directories from session history; remove them in the UI workspace settings)'], realigned: false };
   }
-  const entries = Object.entries(registry?.tables?.workspaces ?? {});
-  const foreign = entries.filter(([, w]) => w?.path !== workspace).map(([, w]) => w?.path ?? '(no path)');
-  if (foreign.length === 0) return { aside: null, foreign: [] };
-  const aside = `${path}.aside-${Date.now()}`;
-  renameSync(path, aside);
-  return { aside, foreign };
+  const workspaces = registry?.tables?.workspaces;
+  if (registry?.global?.initialized !== true || typeof workspaces !== 'object' || workspaces === null) {
+    // a fresh, uninitialized registry bootstraps from session headers by
+    // design; there is nothing to align without forging dsh state
+    return { aside: null, foreign: [], realigned: false };
+  }
+  const ids = Array.isArray(registry.global.workspaceIds) ? registry.global.workspaceIds : [];
+  const foreign = ids.map(id => workspaces[id]).filter(w => w?.path !== workspace).map(w => w?.path ?? '(no path)');
+  const keptIds = ids.filter(id => workspaces[id]?.path === workspace);
+  if (foreign.length === 0 && keptIds.length > 0) return { aside: null, foreign: [], realigned: false };
+  for (const id of ids) {
+    if (workspaces[id]?.path !== workspace) delete workspaces[id];
+  }
+  if (keptIds.length === 0) {
+    const id = randomUUID();
+    workspaces[id] = {
+      path: workspace,
+      title: basename(workspace) || workspace,
+      sessionIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    keptIds.push(id);
+  }
+  registry.global.workspaceIds = keptIds;
+  writeFileSync(path, JSON.stringify(registry, null, 2) + '\n', { mode: 0o600 });
+  return { aside: null, foreign, realigned: true };
 }
 
 /** The checkout's dependency root — the install anchor the launcher points at. */

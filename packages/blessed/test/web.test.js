@@ -122,41 +122,66 @@ function registryFixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'compact-registry-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, 'storages'), { recursive: true });
-  const write = (workspaces) => writeFileSync(
+  const write = (global, workspaces) => writeFileSync(
     workspaceRegistryPath(dir),
-    JSON.stringify({ unit: { name: 'workspace', version: 2 }, global: { initialized: true, workspaceIds: Object.keys(workspaces) }, tables: { workspaces } }, null, 2) + '\n',
+    JSON.stringify({ unit: { name: 'workspace', version: 2 }, global, tables: { workspaces } }, null, 2) + '\n',
   );
-  return { dir, write };
+  const initialized = { initialized: true, workspaceIds: [] };
+  return { dir, write, initialized };
 }
 
-test('workspace registry: matching-only or absent registry is left alone', (t) => {
-  const { dir, write } = registryFixture(t);
-  assert.deepEqual(alignWorkspaceRegistry(dir, '/repo'), { aside: null, foreign: [] }, 'no registry at all is not a defect');
-  write({ id1: { path: '/repo', title: 'repo', sessionIds: [] } });
-  assert.deepEqual(alignWorkspaceRegistry(dir, '/repo'), { aside: null, foreign: [] });
-  assert.ok(existsSync(workspaceRegistryPath(dir)), 'the registry stays');
+test('workspace registry: matching-only or absent registry is left untouched', (t) => {
+  const { dir, write, initialized } = registryFixture(t);
+  assert.deepEqual(alignWorkspaceRegistry(dir, '/repo').realigned, false, 'no registry at all is not a defect');
+  write({ ...initialized, workspaceIds: ['id1'] }, { id1: { path: '/repo', title: 'repo', sessionIds: [], createdAt: '', updatedAt: '' } });
+  const r = alignWorkspaceRegistry(dir, '/repo');
+  assert.equal(r.realigned, false);
+  assert.deepEqual(r.foreign, []);
+  // the initialized marker survives: the header bootstrap must never re-run
+  const after = JSON.parse(readFileSync(workspaceRegistryPath(dir), 'utf8'));
+  assert.equal(after.global.initialized, true);
 });
 
-test('workspace registry: a foreign directory is moved aside, never deleted, and the reason is named', (t) => {
-  const { dir, write } = registryFixture(t);
-  write({
-    id1: { path: '/repo', title: 'repo', sessionIds: ['session-1'] },
-    id2: { path: '/tmp/other', title: 'other', sessionIds: [] },
-  });
-  const aligned = alignWorkspaceRegistry(dir, '/repo');
-  assert.notEqual(aligned.aside, null, 'the registry moved aside');
-  assert.deepEqual(aligned.foreign, ['/tmp/other'], 'only the non-exposed directory is named');
-  assert.ok(!existsSync(workspaceRegistryPath(dir)), 'the registry no longer sits in place');
-  const aside = JSON.parse(readFileSync(aligned.aside, 'utf8'));
-  assert.equal(aside.tables.workspaces.id2.path, '/tmp/other', 'the moved file is intact');
-  // after the move, the boot workspace is the only exposure: a fresh registry passes
-  assert.deepEqual(alignWorkspaceRegistry(dir, '/repo'), { aside: null, foreign: [] });
+test('workspace registry: foreign records are removed and the boot workspace is ensured — initialized preserved', (t) => {
+  const { dir, write, initialized } = registryFixture(t);
+  write(
+    { ...initialized, workspaceIds: ['id1', 'id2'] },
+    {
+      id1: { path: '/repo', title: 'repo', sessionIds: ['session-1'], createdAt: 't1', updatedAt: 't1' },
+      id2: { path: '/tmp/other', title: 'other', sessionIds: [], createdAt: 't2', updatedAt: 't2' },
+    },
+  );
+  const r = alignWorkspaceRegistry(dir, '/repo');
+  assert.deepEqual(r.foreign, ['/tmp/other']);
+  assert.equal(r.realigned, true);
+  assert.equal(r.aside, null, 'nothing is moved aside — the initialized marker is the fix');
+  const after = JSON.parse(readFileSync(workspaceRegistryPath(dir), 'utf8'));
+  assert.deepEqual(after.global.workspaceIds, ['id1'], 'the matching record survives in order');
+  assert.deepEqual(Object.keys(after.tables.workspaces), ['id1'], 'the foreign record is gone');
+  assert.deepEqual(after.tables.workspaces.id1.sessionIds, ['session-1'], 'the matching record is preserved verbatim');
+  assert.equal(after.global.initialized, true, 'the header bootstrap must never re-run');
 });
 
-test('workspace registry: a corrupt registry moves aside rather than booting against it', (t) => {
-  const { dir } = registryFixture(t);
+test('workspace registry: an initialized registry with no boot-workspace record gains one', (t) => {
+  const { dir, write, initialized } = registryFixture(t);
+  write({ ...initialized, workspaceIds: ['id1'] }, { id1: { path: '/tmp/other', title: 'other', sessionIds: [], createdAt: 't', updatedAt: 't' } });
+  const r = alignWorkspaceRegistry(dir, '/repo');
+  assert.equal(r.realigned, true);
+  const after = JSON.parse(readFileSync(workspaceRegistryPath(dir), 'utf8'));
+  assert.deepEqual(after.global.workspaceIds.length, 1);
+  const record = after.tables.workspaces[after.global.workspaceIds[0]];
+  assert.equal(record.path, '/repo');
+  assert.equal(record.title, 'repo');
+  assert.deepEqual(record.sessionIds, []);
+});
+
+test('workspace registry: an uninitialized registry is left for the header bootstrap, and a corrupt one moves aside', (t) => {
+  const { dir, write, initialized } = registryFixture(t);
+  write({ ...initialized, initialized: false, workspaceIds: ['id1'] }, { id1: { path: '/repo', title: 'repo', sessionIds: [], createdAt: '', updatedAt: '' } });
+  assert.deepEqual(alignWorkspaceRegistry(dir, '/repo').realigned, false,
+    'an uninitialized registry bootstraps from session headers by design; nothing to align without forging dsh state');
   writeFileSync(workspaceRegistryPath(dir), '{ not json');
   const aligned = alignWorkspaceRegistry(dir, '/repo');
-  assert.notEqual(aligned.aside, null);
-  assert.deepEqual(aligned.foreign, ['(unreadable)']);
+  assert.notEqual(aligned.aside, null, 'a corrupt registry moves aside');
+  assert.ok(aligned.foreign[0].includes('re-register'), 'the boot names the bootstrap consequence');
 });
