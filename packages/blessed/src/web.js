@@ -29,6 +29,7 @@
 //    independent; the preset keeps the model-facing catalog honest.
 
 import { join } from 'node:path';
+import { existsSync, readFileSync, renameSync } from 'node:fs';
 import { lstat, mkdir, readlink, realpath, symlink } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -74,6 +75,46 @@ export function webRows() {
 
 /** Absolute path of the preset's composition file, for diagnostics. */
 export const presetCompositionPath = () => join(presetRoot(), PRESET_ID, 'agent.cordis.yml');
+
+/** The dsh workspace registry lives here (UI state, not evidence). */
+export const workspaceRegistryPath = (stateDir) => join(stateDir, 'storages', 'workspace.json');
+
+/**
+ * Align the dsh workspace registry with this boot's exposure.
+ *
+ * The registry persists across boots (storages/workspace.json), and the
+ * browser attaches new sessions to a registered workspace in preference to
+ * the session controller's default cwd. The pilot's contract is one boot,
+ * one exposed workspace: a registry entry naming a directory THIS boot never
+ * exposed would attach browser sessions to it — the UI would browse files
+ * the confined bash cannot touch, and bash would write files the UI cannot
+ * see. So a registry that names any other directory (or cannot be read) is
+ * moved aside — never deleted — and the boot proceeds against the default
+ * cwd, which IS the exposed workspace. The UI re-registers on demand.
+ *
+ * @returns {{aside: string|null, foreign: string[]}} the aside path when the
+ *   registry was moved, and the offending entries that caused it
+ */
+export function alignWorkspaceRegistry(stateDir, workspace) {
+  const path = workspaceRegistryPath(stateDir);
+  if (!existsSync(path)) return { aside: null, foreign: [] };
+  let registry;
+  try {
+    registry = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    // corrupt UI state is not evidence: move it aside rather than boot
+    // against a registry that cannot be read
+    const aside = `${path}.aside-${Date.now()}`;
+    renameSync(path, aside);
+    return { aside, foreign: ['(unreadable)'] };
+  }
+  const entries = Object.entries(registry?.tables?.workspaces ?? {});
+  const foreign = entries.filter(([, w]) => w?.path !== workspace).map(([, w]) => w?.path ?? '(no path)');
+  if (foreign.length === 0) return { aside: null, foreign: [] };
+  const aside = `${path}.aside-${Date.now()}`;
+  renameSync(path, aside);
+  return { aside, foreign };
+}
 
 /** The checkout's dependency root — the install anchor the launcher points at. */
 export const installAnchor = () => fileURLToPath(new URL('../../../node_modules/', import.meta.url));

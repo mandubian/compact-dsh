@@ -113,3 +113,50 @@ test('ensureInstallAnchor links the state dir to the checkout deps, reusing and 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── the workspace registry alignment (one boot, one exposed workspace) ──────
+
+import { alignWorkspaceRegistry, workspaceRegistryPath } from '../src/web.js';
+
+function registryFixture(t) {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-registry-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, 'storages'), { recursive: true });
+  const write = (workspaces) => writeFileSync(
+    workspaceRegistryPath(dir),
+    JSON.stringify({ unit: { name: 'workspace', version: 2 }, global: { initialized: true, workspaceIds: Object.keys(workspaces) }, tables: { workspaces } }, null, 2) + '\n',
+  );
+  return { dir, write };
+}
+
+test('workspace registry: matching-only or absent registry is left alone', (t) => {
+  const { dir, write } = registryFixture(t);
+  assert.deepEqual(alignWorkspaceRegistry(dir, '/repo'), { aside: null, foreign: [] }, 'no registry at all is not a defect');
+  write({ id1: { path: '/repo', title: 'repo', sessionIds: [] } });
+  assert.deepEqual(alignWorkspaceRegistry(dir, '/repo'), { aside: null, foreign: [] });
+  assert.ok(existsSync(workspaceRegistryPath(dir)), 'the registry stays');
+});
+
+test('workspace registry: a foreign directory is moved aside, never deleted, and the reason is named', (t) => {
+  const { dir, write } = registryFixture(t);
+  write({
+    id1: { path: '/repo', title: 'repo', sessionIds: ['session-1'] },
+    id2: { path: '/tmp/other', title: 'other', sessionIds: [] },
+  });
+  const aligned = alignWorkspaceRegistry(dir, '/repo');
+  assert.notEqual(aligned.aside, null, 'the registry moved aside');
+  assert.deepEqual(aligned.foreign, ['/tmp/other'], 'only the non-exposed directory is named');
+  assert.ok(!existsSync(workspaceRegistryPath(dir)), 'the registry no longer sits in place');
+  const aside = JSON.parse(readFileSync(aligned.aside, 'utf8'));
+  assert.equal(aside.tables.workspaces.id2.path, '/tmp/other', 'the moved file is intact');
+  // after the move, the boot workspace is the only exposure: a fresh registry passes
+  assert.deepEqual(alignWorkspaceRegistry(dir, '/repo'), { aside: null, foreign: [] });
+});
+
+test('workspace registry: a corrupt registry moves aside rather than booting against it', (t) => {
+  const { dir } = registryFixture(t);
+  writeFileSync(workspaceRegistryPath(dir), '{ not json');
+  const aligned = alignWorkspaceRegistry(dir, '/repo');
+  assert.notEqual(aligned.aside, null);
+  assert.deepEqual(aligned.foreign, ['(unreadable)']);
+});
