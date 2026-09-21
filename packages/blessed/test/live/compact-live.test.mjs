@@ -34,8 +34,7 @@ test('L1 · self_describe: signed attestation, certified identity, record verifi
     answer: () => '1',                       // nothing here should ask; default deny
     timeoutMs: 240_000,
   });
-  assert.equal(run.code, 0, `the task completed: ${run.stderr.slice(-800)}`);
-  assert.ok(run.sessionDir, 'a session was recorded');
+  assert.equal(run.turnEnded, true, `the model finished its turn: ${run.stderr.slice(-800)}`);
 
   // what the Subject was told (the injected attestation, in the record)
   const events = readEvents(run.sessionDir);

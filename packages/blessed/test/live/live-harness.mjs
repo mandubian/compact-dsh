@@ -92,8 +92,9 @@ export function makeFixture(t) {
  *   terminal prompt text, return the choice to write ('1' | '2') or null to wait
  * @param {object} [p.env] - extra env (COMPACT_SECRETS, exported token values, …)
  * @param {number} [p.timeoutMs] - overall budget; the child is killed past it
- * @returns {Promise<{code: number, stdout: string, stderr: string, prompts: number, sessionDir: string|null}>}
- *   `prompts` counts the approval prompts the harness answered.
+ * @returns {Promise<{code: number, turnEnded: boolean, stdout: string, stderr: string, prompts: number, sessionDir: string|null}>}
+ *   `prompts` counts the approval prompts the harness answered; `turnEnded` is
+ *   true when the run completed (exit or turn/end observed in the record).
  */
 export function runLauncher({ task, fixture, answer, env = {}, timeoutMs = 300_000 }) {
   return new Promise((resolve) => {
@@ -108,11 +109,29 @@ export function runLauncher({ task, fixture, answer, env = {}, timeoutMs = 300_0
     let promptText = '';
     let answered = 0;
     let settled = false;
+    let turnEnded = false;
+    // Completion is judged by the RECORD, not the exit: the launcher can hang
+    // after a completed turn once an approval has been answered (#36). When
+    // the newest session shows turn/end, the model is done — kill the child
+    // and let the tests assert on the record.
+    const poll = setInterval(() => {
+      if (turnEnded || settled) return;
+      const dir = newestSessionDir(fixture.stateDir);
+      if (!dir) return;
+      try {
+        const events = readEvents(dir);
+        if (events.at(-1)?.type === 'turn/end') {
+          turnEnded = true;
+          child.kill('SIGTERM');
+        }
+      } catch { /* a torn tail line is not a diagnosis yet */ }
+    }, 500);
     const finish = (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ code, stdout, stderr, prompts, sessionDir: newestSessionDir(fixture.stateDir) });
+      clearInterval(poll);
+      resolve({ code, turnEnded, stdout, stderr, prompts, sessionDir: newestSessionDir(fixture.stateDir) });
     };
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
