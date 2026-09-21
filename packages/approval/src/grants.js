@@ -23,6 +23,21 @@ export class GrantStore {
   // this store. Any confined command of the session may use it while it
   // lives, including printing it — that exposure is what the operator
   // agrees to and what the leak detector watches for.
+  //
+  // SCOPING, VERIFIED (issue #27): the grant is session-scoped, NOT
+  // command-scoped — the sandbox provider injects every live ref of the
+  // session into every confined execution while the grant lives, including
+  // commands that do not name the ref. With word-token reference detection,
+  // every command that NAMES a declared secret re-asks (a fresh command-aware
+  // fingerprint each time), so the undisclosed path through a referencing
+  // command is closed. The residual is a confined command that reads the
+  // environment WITHOUT naming any declared secret (`env`, `printenv` with no
+  // argument): it receives — and may print — the injected value without an
+  // ask. That residual is the agreement's own terms — scoped to this session,
+  // bounded by the TTL and revocation, inside the confined container, and
+  // anything printed is kept by the record — not a detection defect; widening
+  // detection to "any command that could read the environment" is a
+  // content-classifier's job (D-7 territory), not a name match.
   addSecretGrant({ ref, root, session, ttlMs, now }) {
     const grant = {
       id: 'sec_' + Math.random().toString(16).slice(2, 10),
