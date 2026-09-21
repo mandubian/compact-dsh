@@ -138,7 +138,7 @@ async function main() {
 
   const { boot, loadOverlayPatches, installFailLoud } = await import('@deepseek-ai/dsh-app-boot');
   const { provideCmdline } = await import('@deepseek-ai/dsh-cmdline');
-  const { webRows, PRESET_ID, ensureInstallAnchor, alignWorkspaceRegistry } = await import('compact-dsh-blessed/web');
+  const { webRows, PRESET_ID, ensureInstallAnchor, alignWorkspaceRegistry, ASIDE_RETENTION } = await import('compact-dsh-blessed/web');
   if (values.web) {
     ensureInstallAnchor(stateDir);
     // one boot, one exposed workspace: a registry naming another directory
@@ -148,7 +148,8 @@ async function main() {
       console.error(`${binName}: the workspace registry named ${aligned.foreign.length} director${aligned.foreign.length === 1 ? 'y' : 'ies'} this boot does not expose (${aligned.foreign.join(', ')}); removed from the registry — browser sessions attach to ${workspace}`);
     }
     if (aligned.aside) {
-      console.error(`${binName}: the workspace registry was unreadable and moved to ${aligned.aside}; the first session bootstrap may re-register directories from session history — remove them in the UI workspace settings`);
+      const prunedNote = aligned.pruned?.length ? `; pruned ${aligned.pruned.length} older aside(s) beyond the kept ${ASIDE_RETENTION}` : '';
+      console.error(`${binName}: the workspace registry was unreadable and moved to ${aligned.aside}${prunedNote}; the first session bootstrap may re-register directories from session history — remove them in the UI workspace settings`);
     }
   }
   const bundle = name => loadOverlayPatches(binName, fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve(`${name}/package.json`))));

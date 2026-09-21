@@ -5,7 +5,7 @@
 // loader.web.dsh.test.js, which needs Docker like its headless sibling.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -116,7 +116,7 @@ test('ensureInstallAnchor links the state dir to the checkout deps, reusing and 
 
 // ── the workspace registry alignment (one boot, one exposed workspace) ──────
 
-import { alignWorkspaceRegistry, workspaceRegistryPath } from '../src/web.js';
+import { alignWorkspaceRegistry, ASIDE_RETENTION, workspaceRegistryPath } from '../src/web.js';
 
 function registryFixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'compact-registry-'));
@@ -184,4 +184,26 @@ test('workspace registry: an uninitialized registry is left for the header boots
   const aligned = alignWorkspaceRegistry(dir, '/repo');
   assert.notEqual(aligned.aside, null, 'a corrupt registry moves aside');
   assert.ok(aligned.foreign[0].includes('re-register'), 'the boot names the bootstrap consequence');
+});
+
+// -- aside retention (#22): a moved-aside registry is pruned, newest kept -----
+
+test('workspace registry: writing a new aside prunes older ones beyond the retention count', (t) => {
+  const { dir } = registryFixture(t);
+  const storages = join(dir, 'storages');
+  // six stale asides from earlier boot cycles, oldest first
+  for (let i = 1; i <= 6; i++) {
+    writeFileSync(join(storages, `workspace.json.aside-17000000000${i}`), '{}\n');
+  }
+  // a corrupt registry forces the move-aside path
+  writeFileSync(workspaceRegistryPath(dir), '{not json');
+  const r = alignWorkspaceRegistry(dir, '/repo');
+  assert.ok(r.aside, 'the corrupt registry was moved aside');
+  const kept = readdirSync(storages).filter(n => n.startsWith('workspace.json.aside-')).sort();
+  assert.equal(kept.length, ASIDE_RETENTION, `exactly ${ASIDE_RETENTION} asides survive`);
+  assert.equal(kept.includes('workspace.json.aside-170000000006'), true, 'the newest stale aside survives');
+  assert.equal(kept.includes('workspace.json.aside-170000000001'), false, 'the oldest stale aside is pruned');
+  assert.equal(kept.includes(r.aside.split('/').pop()), true, 'the fresh aside survives');
+  assert.deepEqual(r.pruned.sort(), ['workspace.json.aside-170000000001', 'workspace.json.aside-170000000002'],
+    'the boot log names what went');
 });
