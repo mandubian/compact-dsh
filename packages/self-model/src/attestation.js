@@ -176,6 +176,18 @@ export function standingOf(ctx) {
 
 let EPOCH = 0;
 
+/**
+ * Part names derive from the law's own Part VI headers, via the constitution
+ * service (F-7: derivation, not restatement) — the render shows
+ * `MA — Multi-agent operation` so the Subject's authoritative
+ * self-description has no silence to fill with confabulated expansions (#21).
+ * A part the body does not name degrades to the bare code (I-8).
+ */
+function namedParts(ctx, parts) {
+  const nameOf = svc(ctx, 'constitution')?.partNameOf;
+  return parts.map(p => ({ ...p, name: typeof nameOf === 'function' ? (nameOf(p.part) ?? null) : null }));
+}
+
 /** Compose the attestation for one Subject, from the services that hold it. */
 export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfterMs = DEFAULT_STALE_AFTER_MS, signed = false } = {}) {
   const constitution = svc(ctx, 'constitution');
@@ -194,7 +206,7 @@ export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfte
       status: constitution?.source?.status ?? null,
       taught: constitution?.taughtDigest?.() ?? null,
     },
-    capabilities: capabilitiesOf(ctx),
+    capabilities: { ...capabilitiesOf(ctx), parts: namedParts(ctx, capabilitiesOf(ctx).parts) },
     exception: exceptionOf(ctx, now),
     budgets: budgetsOf(ctx, sessionId, now),
     gaps: gapsOf(ctx, signed),
@@ -238,7 +250,7 @@ export function renderAttestation(att) {
     `Law: ${att.law.status ?? 'unknown'}, digest ${att.law.digest ? att.law.digest.slice(0, 16) : 'unknown'}`,
     '',
     'Capabilities in force:',
-    ...cap.parts.map(p => `  - ${p.part}: ${p.posture} (${p.clauses.join(', ')})`),
+    ...cap.parts.map(p => `  - ${p.part}${p.name ? ` — ${p.name}` : ''}: ${p.posture} (${p.clauses.join(', ')})`),
     ...(cap.absent.length > 0
       ? [`  - not adopted: ${cap.absent.map(a => a.tool).join(', ')} — calling one is refused`]
       : []),
