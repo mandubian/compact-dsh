@@ -10,7 +10,7 @@
 
 import { execFileSync, spawn } from 'node:child_process';
 import { webcrypto as crypto } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,8 +20,14 @@ const ROOT = fileURLToPath(new URL('../../../../..', import.meta.url));
 export const liveEnabled = () => process.env.COMPACT_LIVE_TEST === '1';
 export const liveSkipReason = () =>
   liveEnabled()
-    ? (process.env.DEEPSEEK_API_KEY ? false : 'DEEPSEEK_API_KEY is not set — a live model route is required')
+    ? (hasModelRoute() ? false : 'no model route — set DEEPSEEK_API_KEY, or point COMPACT_LIVE_SETTINGS at a settings.yaml with a configured route (e.g. your opencode-go profile)')
     : 'live tests cost tokens — run explicitly with `npm run test:live` (COMPACT_LIVE_TEST=1)';
+
+/** A model route is available when the default key is set, or when the operator points at a settings file that configures one. */
+export function hasModelRoute() {
+  return Boolean(process.env.DEEPSEEK_API_KEY) ||
+    (process.env.COMPACT_LIVE_SETTINGS != null && existsSync(process.env.COMPACT_LIVE_SETTINGS));
+}
 
 export function dockerAvailable() {
   try {
@@ -32,7 +38,8 @@ export function dockerAvailable() {
   }
 }
 
-const randomToken = () => [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join('');
+/** A random token value for secret-injection tests (never a fixed string). */
+export const randomToken = () => [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join('');
 
 /**
  * A self-contained fixture: temp workspace, temp state dir, and its OWN
@@ -47,6 +54,15 @@ export function makeFixture(t) {
   // generate the rehearsal identity set: authority keys + enforcer key + annex,
   // via the real tool, so the live boot exercises the installed artifacts
   execFileSync(process.execPath, [join(ROOT, 'tools', 'rehearsal-keyring.mjs'), 'ensure', keyring], { encoding: 'utf8' });
+  // a custom model route (e.g. the opencode-go profile): the operator's
+  // settings file is seeded into the fixture's DSH_HOME, because a throwaway
+  // state dir would otherwise fall back to the default route
+  if (process.env.COMPACT_LIVE_SETTINGS) {
+    if (!existsSync(process.env.COMPACT_LIVE_SETTINGS)) {
+      throw new Error(`COMPACT_LIVE_SETTINGS points at a missing file: ${process.env.COMPACT_LIVE_SETTINGS}`);
+    }
+    copyFileSync(process.env.COMPACT_LIVE_SETTINGS, join(stateDir, 'settings.yaml'));
+  }
   const baseEnv = {
     COMPACT_ENFORCER_ANNEX: join(keyring, 'enforcer.annex.json'),
     COMPACT_ENFORCER_KEY: join(keyring, 'enforcer.pem'),
@@ -67,7 +83,8 @@ export function makeFixture(t) {
  *   terminal prompt text, return the choice to write ('1' | '2') or null to wait
  * @param {object} [p.env] - extra env (COMPACT_SECRETS, exported token values, …)
  * @param {number} [p.timeoutMs] - overall budget; the child is killed past it
- * @returns {Promise<{code: number, stdout: string, stderr: string, prompts: string[], sessionDir: string|null}>}
+ * @returns {Promise<{code: number, stdout: string, stderr: string, prompts: number, sessionDir: string|null}>}
+ *   `prompts` counts the approval prompts the harness answered.
  */
 export function runLauncher({ task, fixture, answer, env = {}, timeoutMs = 300_000 }) {
   return new Promise((resolve) => {
@@ -99,17 +116,18 @@ export function runLauncher({ task, fixture, answer, env = {}, timeoutMs = 300_0
       stderr += d;
       promptText += d;
       // the attended answerer asks with `choice [1]: ` on stderr; answer each
-      // prompt exactly once, from the test's policy
+      // prompt exactly once, from the test's policy. The marker stays in the
+      // buffer when the policy defers — clearing it early could lose the only
+      // copy of the prompt and deadlock the run past its timeout.
       if (promptText.includes('choice [1]:')) {
         const choice = answer(promptText);
-        promptText = '';
         if (choice != null) {
           answered += 1;
           prompts = answered;
+          promptText = '';
           child.stdin.write(`${choice}\n`);
         }
       }
-      if (stderr.includes('compact-dsh: ')) { /* readiness/diagnostic lines accumulate for the report */ }
     });
     child.on('exit', (code) => finish(code ?? -1));
   });
@@ -117,10 +135,12 @@ export function runLauncher({ task, fixture, answer, env = {}, timeoutMs = 300_0
 
 /** The newest session recorded under the fixture's state dir (null before any run). */
 export function newestSessionDir(stateDir) {
+  const sessionsRoot = join(stateDir, 'sessions');
+  if (!existsSync(sessionsRoot)) return null;   // the launcher may exit before its first write
   let best = null;
   let bestM = -1;
-  for (const group of readdirSync(join(stateDir, 'sessions'))) {
-    const groupDir = join(stateDir, 'sessions', group);
+  for (const group of readdirSync(sessionsRoot)) {
+    const groupDir = join(sessionsRoot, group);
     if (!statSync(groupDir).isDirectory()) continue;
     for (const session of readdirSync(groupDir)) {
       const jsonl = join(groupDir, session, 'session.v3.jsonl');
