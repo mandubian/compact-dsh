@@ -539,8 +539,12 @@ state directory that is not that symlink is refused, not replaced.
 
 **Testing against a given directory.** `npm run compact` starts from this
 checkout, so point the workspace at the project instead of `cd`-ing into it —
-`--workspace` (absolute) becomes the sandbox root: Docker bind-mounts exactly
-that directory, and the container's working directory is set to it. Typical
+`--workspace` takes any path (a relative one resolves against your shell's
+working directory, `~` works) and becomes the sandbox root: the launcher
+records its realpath, Docker bind-mounts that root at the same path inside
+the container — alongside the mounts the composition itself adds (a
+container-private `/tmp`, over-mounted masked paths, and operator-granted
+mounts) — and the container's working directory is set to it. Typical
 testing commands:
 
 ```bash
@@ -549,8 +553,9 @@ COMPACT_ENFORCER_ANNEX=~/.compact-dsh/keyring/enforcer.annex.json \
 COMPACT_ENFORCER_KEY=~/.compact-dsh/keyring/enforcer.pem \
 npm run compact -- --web --workspace /absolute/path/to/project
 
-# the same, fully isolated: own port, own state (sessions, chains, approvals),
-# own sandbox image — nothing touches ~/.compact-dsh or the default port
+# the same, elsewhere: own port, own state directory (sessions, chains,
+# approvals), own sandbox image — ~/.compact-dsh is only READ here (the
+# annex and key below come from its keyring), never written
 COMPACT_ENFORCER_ANNEX=~/.compact-dsh/keyring/enforcer.annex.json \
 COMPACT_ENFORCER_KEY=~/.compact-dsh/keyring/enforcer.pem \
 COMPACT_WEB_PORT=8080 \
@@ -573,8 +578,10 @@ Afterwards, audit the session offline (see the rehearsal section below for
 the full signature-checking form):
 
 ```bash
-node auditor/audit.mjs ~/.compact-dsh/sessions/--home-…--/session-<id>/session.v3.jsonl \
-  --chain ~/.compact-dsh/chains/session-<id>.chain --quiet
+# <session-id> is the full session id, e.g. session-617a3bb0-… — that same
+# id names the session directory and the chain file
+node auditor/audit.mjs ~/.compact-dsh/sessions/--home-…--/<session-id>/session.v3.jsonl \
+  --chain ~/.compact-dsh/chains/<session-id>.chain --quiet
 ```
 
 State defaults to `~/.compact-dsh`: session JSONL files under `sessions/`, hash
