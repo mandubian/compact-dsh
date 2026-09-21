@@ -718,3 +718,24 @@ npm test               # node --test across packages
 npm run verify-pin     # dsh pin gate
 npm run verify-register  # enforcement register gate (Phase 4)
 ```
+
+### Live tests (real model, real tokens — opt-in)
+
+`npm run test:live` drives the **real launcher** end-to-end with real model
+requests: self_describe + offline audit, the network refusal, allow-once with
+exec-cache replay, confinement with a host-side write check, and the declared-
+secret injection agreement (disclosure ask → injection → hash match → record
+stays clean). Assertions land on the record, the grants file, and host
+filesystem effects — never on the model's prose. Requirements:
+A model route and Docker running with a local `ubuntu:24.04`. The route is
+either `DEEPSEEK_API_KEY` (default deepseek-flash) or your own profile — set
+`COMPACT_LIVE_SETTINGS=/path/to/settings.yaml` (e.g. `~/.compact-dsh/settings.yaml`
+for the opencode-go route; provider keys still come from your environment by
+name). Each fixture generates its own rehearsal keyring and uses a throwaway
+state dir seeded with that settings file, so runs never touch
+`~/.compact-dsh`. Without `COMPACT_LIVE_TEST=1` the suite skips itself — and
+the default `npm test` never picks it up.
+
+```bash
+npm run test:live
+```
