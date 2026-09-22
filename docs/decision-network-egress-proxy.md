@@ -144,14 +144,15 @@ stated at the moment the operator decides, not discovered afterwards.
 
 Four probes × three Docker network postures, `ubuntu:24.04`, engine 29.1.3 on
 `Linux …-WSL2` (Docker Desktop, WSL2 engine); a host listener bound
-`0.0.0.0:80999`:
+`0.0.0.0:8099`, confirmed with `ss` before each run, **every cell measured
+twice with identical results**:
 
 | Probe | ordinary user-defined bridge | `--internal` bridge | `--network none` |
 |---|---|---|---|
-| DNS (`getent hosts example.com`) | resolves (exit 0) | **fails (exit 2)** — no query leaves | n/a |
+| DNS (`getent hosts example.com`) | resolves | **fails** — no query leaves | n/a |
 | TCP `1.1.1.1:443` (internet) | **reached — raw egress** | `Network is unreachable` | loopback only |
-| host listener via `host.docker.internal` | **reached** | refused | n/a |
-| host listener via bridge gateway `172.x.0.1` | refused | refused | n/a |
+| host listener via `host.docker.internal` | **reached** (both runs) | refused — and the name does not resolve either (DNS itself fails here) | n/a |
+| host listener via bridge gateway (`172.20.0.1` / `172.21.0.1`) | refused | refused | n/a |
 
 **The conclusion this table forces:** on Docker Desktop/WSL2 the host is
 reachable from a container only through `host.docker.internal`, which exists
