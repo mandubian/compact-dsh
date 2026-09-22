@@ -164,12 +164,38 @@ is ordinary host-bound traffic behind no NAT rule) — the one cell this host
 cannot measure. That cell is therefore a **phase-3 acceptance item**, to be
 pinned by the composed docker suite where CI already runs a native daemon.
 
-**Fallback profile, decided now so a later change is not a redesign:** if the
-native cell fails, the mediator runs as a dedicated **container attached to
-both** the internal network and an egress-capable one. The invariant is
-identical (the confined container has no route; a mediator outside it enforces
-the live grants); only the placement moves. Taking that profile is a
-configuration decision under this record, not a new decision.
+### The fallback profile, measured — and what it costs
+
+The mediator-container profile was exercised end to end on this host before
+this record was written (`python:3.12-slim` as the mediator peer, internal
+network `172.19.0.0/16`):
+
+| Probe | Result |
+|---|---|
+| confined peer → mediator, on the internal network | **reached** |
+| mediator → internet, attached to the internal network alone | blocked (`Network is unreachable`) |
+| mediator → internet, after a second egress-capable attachment | **reached** |
+| confined peer → internet, throughout | **unreachable** |
+
+So the profile composes: only the mediator has a route, and only through the
+mediator can the confined container reach anything. It is kept as the
+**decided fallback rather than the adopted default for a stated reason, not
+preference**: the mediator is an *execution environment we spawn*, so CF-2
+applies to it — its image must join the digest-keyed acquisition history and
+the annex's provenance declaration, a second supply-chain surface the host-side
+process never creates (it is the runtime's own code, already inside the
+trusted boundary). The host-side placement buys that surface away; the
+fallback keeps the identical invariant at the cost of one declared image.
+
+**Acceptance-test strategy, decided here:** the phase-3 pinning tests are
+unit-level at the proxy (grant → allowed, refusal, redirect, TTL, revocation,
+method/session identity) and run on every platform; the end-to-end cell —
+container → mediator → grant decision — runs where the placement composes:
+natively on CI's daemon (authoritative, and required there), and on hosts
+where it does not compose the test **skips with the measured platform reason
+named** rather than passing silently (the same discipline the CI job itself
+uses for the docker suite: a check that cannot run must say so, never imply it
+ran).
 
 ## Residuals — said, not solved (I-8)
 
@@ -190,7 +216,10 @@ configuration decision under this record, not a new decision.
 4. **In-tunnel redirects are invisible until the next `CONNECT`** — and are
    enforced there: the new host must be granted or the tunnel is refused.
 5. **Platform placement** (above): host-side on native Linux; the
-   mediator-container profile where it does not compose.
+   mediator-container fallback **measured working on this host** and taken as
+   configuration if the native cell fails — at the cost of its image joining
+   CF-2's provenance declaration, which is why it is the fallback and not the
+   default.
 
 ## Phase 3 — the implementation slice, specified so it lands mechanically
 
