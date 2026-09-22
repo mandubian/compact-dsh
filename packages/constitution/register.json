@@ -503,7 +503,7 @@
       "kind": "enforced",
       "plugin": "compact-self-model",
       "service": "compact-self-model",
-      "evidence": "inquiry: the inquiry tool answers identity, act and authority for another Member from recorded state only — session headers and the MA-3 delegation record — with the authority chain walked to its root and the ultimate Principal named. No prompt, message, tool argument or output is ever read, so reasoning is not disclosed (R-10, which R-13 states twice). Where the record cannot answer, the answer says so in that field rather than filling the gap with a plausible value (D-3); an unknown Member yields a recorded 'not known to this runtime', because a refusal to answer violates D-3/D-7 and silence is not an answer. A malformed lineage cycle yields a bounded answer, never a hang. Every inquiry and answer is a recorded tool call",
+      "evidence": "inquiry: the inquiry tool answers identity, act and authority for another Member from recorded state only — session headers and the MA-3 delegation record — with the authority chain walked to its root and the ultimate Principal named. No prompt, message, tool argument or output is ever read, so reasoning is not disclosed (R-10, which R-13 states twice). Where the record cannot answer, the answer says so in that field rather than filling the gap with a plausible value (D-3); an unknown Member yields a recorded 'not known to this runtime', because a refusal to answer violates D-3/D-7 and silence is not an answer. A malformed lineage cycle yields a bounded answer, never a hang. Every inquiry and answer is a recorded tool call. Identity is answered CRYPTOGRAPHICALLY alongside the header's account (#20): the answer carries the subject certificate the Enforcer issued for that Member — its digest, its verdict under the annex key, and the parent digest it binds — and each authority-chain link shows its own certificate digest, so \"who is acting on you\" is checkable offline against a signed artifact; where no annex is composed the answer declares that instead of implying a check that did not happen.",
       "enforcedBy": [
         "packages/self-model/src/inquiry.js",
         "packages/self-model/src/index.js"
@@ -854,15 +854,20 @@
       "kind": "rehearsal",
       "plugin": "compact-constitution",
       "service": null,
-      "evidence": "identity and keys, REHEARSED under the development keyring (amendment 0004 upstream): the boot verifies the law seal over the bundled body — k-of-n with DISTINCT-signer semantics (the review-0004 finding, ported as the reference loop), manifest pinned by trustedKeyringDigest, vendored founder seal as the interop fixture, every failure refusing the boot with a named reason; runtime-side, the enforcer key is declared in a signed ANNEX anchored to the sealed law by digest (F-5's own mechanism — no CA: the authority keyring signs law artifacts only, never enforcer identities), and subject session certificates bind {subjectId, publicKey, scope, depth, lineage} under the annex key. Machinery exercised, nothing discharged: this entry conveys no standing and the planned I-1 entry above stands",
+      "evidence": "identity and keys, REHEARSED under the development keyring (amendment 0004 upstream): the boot verifies the law seal over the bundled body — k-of-n with DISTINCT-signer semantics (the review-0004 finding, ported as the reference loop), manifest pinned by trustedKeyringDigest, vendored founder seal as the interop fixture, every failure refusing the boot with a named reason; runtime-side, the enforcer key is declared in a signed ANNEX anchored to the sealed law by digest (F-5's own mechanism — no CA: the authority keyring signs law artifacts only, never enforcer identities), and subject session certificates bind {subjectId, publicKey, scope, depth, lineage} under the annex key — issued for a delegated child AT ITS SPAWN BOUNDARY and chained to the PARENT certificate's digest, ledgered beside the chains (a lead session is certified at its first attestation; a parent whose header cannot be read yields a child certificate that NAMES the parent and is reported as the unbound link it is, never as a chain that verifies), and verified OFFLINE by the auditor's --identities: signature under the annex key, the ledger line's declared digest re-derived from the certificate it carries, every child at exactly one depth below a parent present in the ledger, expiry and unknown-key certificates refused by name, an unbound parent link declared as a warning and an unreadable ledger refused as an error. Machinery exercised, nothing discharged: this entry conveys no standing and the planned I-1 entry above stands",
       "enforcedBy": [
         "packages/seals/src/seal.js",
         "packages/seals/src/annex.js",
-        "packages/constitution/src/index.js"
+        "packages/constitution/src/index.js",
+        "packages/self-model/src/index.js",
+        "auditor/audit.mjs"
       ],
       "verifiers": [
         "packages/seals/test/seals.test.js",
-        "packages/constitution/test/constitution.test.js"
+        "packages/constitution/test/constitution.test.js",
+        "packages/self-model/test/self-model.test.js",
+        "packages/self-model/test/composed.dsh.test.js",
+        "auditor/audit.test.mjs"
       ]
     },
     {

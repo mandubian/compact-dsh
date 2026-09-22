@@ -616,9 +616,13 @@ must stay **outside the agent workspace**. Contents, verified layout:
 │                                  + session.lock
 ├── chains/                        (COMPACT_CHAIN_DIR): per session — the file
 │   ├── <session-id>.chain         names are the session id + suffix; the
-│   └── <session-id>.chain.sigs.jsonl  committed hash links, and — when an
-│                                  enforcer annex is declared — the authorship
-│                                  anchors signed at each flush
+│   ├── <session-id>.chain.sigs.jsonl  committed hash links, and — when an
+│   │                              enforcer annex is declared — the authorship
+│   │                              anchors signed at each flush
+│   └── subjects.jsonl             one line per subject certificate issued
+│                                  (lead sessions and spawn-boundary children
+│                                  alike), so the offline auditor verifies the
+│                                  certified lineage without this runtime
 ├── approvals.json                 persistent grants + exec-cache (created on
 │                                  first use; an approved "allow once" replays
 │                                  from here without re-asking)
@@ -706,7 +710,9 @@ npm run compact -- --attended "Use self_describe."
 
 Attestations gain `basis: 'dev-keyring'` plus a signature; every flush writes
 a chain anchor (authorship over the record); each session gets an enforcer-
-certified subject identity; the amendment loop is rehearsed with
+certified subject identity — and a delegated child is certified **at the spawn
+boundary**, chained to its parent's certificate, with every issuance appended
+to `chains/subjects.jsonl`; the amendment loop is rehearsed with
 `tools/rehearsal-amendment.mjs` (seal → SIMULATED ENACTMENT ledger → apply →
 re-seal → re-pin); and the offline auditor verifies all of it:
 
@@ -714,6 +720,7 @@ re-seal → re-pin); and the offline auditor verifies all of it:
 node auditor/audit.mjs <session.jsonl> --chain <id>.chain \
   --annex ~/.compact-dsh/keyring/enforcer.annex.json \
   --anchors <id>.chain.sigs.jsonl \
+  --identities ~/.compact-dsh/chains/subjects.jsonl \
   --keyring <manifest> --seal <sig.json> --body packages/constitution/compact/compact.md
 ```
 

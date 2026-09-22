@@ -91,3 +91,26 @@ test('sandbox.network must be a non-empty docker network name when present', () 
   config.sandbox.network = 'host';
   assert.equal(resolveConfig(config).sandbox.network, 'host');
 });
+
+test('the subject-identity ledger rides the enforcer block — beside the chains the masks already cover (#20)', () => {
+  const config = BASE();
+  config.enforcer = {
+    annexPath: '/state/enforcer.annex.json',
+    privateKeyPath: '/state/enforcer.pem',
+    ledgerPath: '/state/chains/subjects.jsonl',
+  };
+  const resolved = resolveConfig(config);
+  assert.equal(resolved.enforcer.ledgerPath, '/state/chains/subjects.jsonl',
+    'the offline auditor reads the certified lineage from here — an enforcer that writes its certificates nowhere is one whose lineage nobody can check');
+  assert.ok(resolved.sandbox.protectedPaths.includes('/state/chains'),
+    'the ledger sits inside Enforcer state the composition already protects — no new mask, same boundary');
+  assert.ok(resolved.sandbox.maskedPaths.includes('/state/chains'));
+
+  // a blank path is refused like every other declared path, never coerced
+  const blank = { ...config, enforcer: { ...config.enforcer, ledgerPath: '  ' } };
+  assert.throws(() => resolveConfig(blank), /enforcer\.ledgerPath must be a non-empty string/);
+
+  // a ledger with no annex means nothing to ledger: no signing identity, no block
+  const annexless = { ...config, enforcer: { ledgerPath: config.enforcer.ledgerPath } };
+  assert.equal(resolveConfig(annexless).enforcer, undefined);
+});

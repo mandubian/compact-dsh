@@ -8,6 +8,10 @@ import { ToolRuntime } from '@deepseek-ai/dsh-tools';
 import { Session, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import * as constitution from 'compact-dsh-constitution';
 import * as selfModel from '../src/index.js';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { generateEd25519, signAnnex } from 'compact-dsh-seals';
 
 function header(id, parentSession) {
   return {
@@ -197,4 +201,66 @@ test('composed: the service exposes the attestation to an operator or auditor', 
   assert.equal(att.subject.id, 's1');
   assert.equal(att.basis, 'unsigned', 'the basis is stated on the object, not only in the prose');
   assert.equal(service.inquire('s1').answered, true);
+});
+
+// -- #20: the certified child identity, end to end ---------------------------
+//
+// The same path the blessed composition runs: an annex declared, a child
+// spawned, its keypair issued and certified at the spawn edge, the chain
+// surfaced by both tools through the REAL registry, and the ledger written
+// where the offline auditor reads it.
+
+async function bootSigned() {
+  const ctx = new Context();
+  ctx.plugin(SystemPromptStub);
+  ctx.plugin(AgentsStub);
+  ctx.plugin(ConstitutionStub);
+  ctx.plugin(ToolRuntime);
+  const dir = mkdtempSync(join(tmpdir(), 'composed-enforcer-'));
+  const enforcer = generateEd25519();
+  const annex = signAnnex({
+    composition: 'compact-dsh', host: 'test', lawDigest: constitution.COMPACT_DIGEST,
+    keyId: 'dev-test-enforcer', publicKey: enforcer.publicKey, privateKey: enforcer.privateKeyPem,
+  });
+  const annexPath = join(dir, 'enforcer.annex.json');
+  const keyPath = join(dir, 'enforcer.pem');
+  const ledgerPath = join(dir, 'subjects.jsonl');
+  writeFileSync(annexPath, JSON.stringify(annex));
+  writeFileSync(keyPath, enforcer.privateKeyPem);
+  selfModel.apply(ctx, { enforcer: { annexPath, privateKeyPath: keyPath, ledgerPath } });
+  if (typeof ctx.start === 'function') await ctx.start();
+  for (let i = 0; i < 500 && (!ctx.tools || ctx.get('compact-self-model') === undefined); i++) {
+    await new Promise(r => setImmediate(r));
+  }
+  return {
+    ctx, tools: ctx.tools, agents: ctx.get('agents'), service: ctx.get('compact-self-model'), ledgerPath,
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+test('composed: spawn certifies the child, both tools surface the chain, the ledger keeps it (#20)', async () => {
+  const { ctx, tools, agents, ledgerPath, cleanup } = await bootSigned();
+  try {
+    agents.add('root');
+    const worker = agents.add('worker', 'root');
+    ctx.emit('subagent/start', { id: 'worker', runId: 'run-1', provider: 'spawn' });
+
+    // R-1: the child's own boundary names the chain it stands in
+    const described = String((await call(tools, 'self_describe', {}, worker))?.value ?? '');
+    assert.match(described, /cert [0-9a-f]{12}…, depth 1, chained to parent cert [0-9a-f]{12}…/,
+      'self_describe carries depth and the parent digest, not only a bare cert id');
+
+    // R-13: another Subject asking WHO the child is gets the verdict
+    const asked = String((await call(tools, 'inquiry', { agent_id: 'worker' }, worker))?.value ?? '');
+    assert.match(asked, /certificate: [0-9a-f]{12}… — VERIFIES under enforcer key dev-test-enforcer/);
+    assert.match(asked, /depth 1 · chained to parent certificate [0-9a-f]{12}… \(parent root\)/);
+    assert.match(asked, /development keyring, conveys no standing/, 'the practice label travels with the verdict');
+
+    // the offline evidence: both certificates, parent line first
+    const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(lines.map(l => l.subjectId), ['root', 'worker']);
+    assert.equal(lines[1].parentCertDigest, lines[0].certDigest);
+  } finally {
+    cleanup();
+  }
 });

@@ -25,19 +25,24 @@
 //   runtime arti.  — `--annex <enforcer.annex.json>` verifies the signed annex
 //                    (self-signature + law-digest join); `--anchors
 //                    <id>.chain.sigs.jsonl` (with --annex) verifies the
-//                    record's authorship anchors against the log.
+//                    record's authorship anchors against the log;
+//                    `--identities <subjects.jsonl>` (with --annex) verifies
+//                    the subject certificates and the certified delegation
+//                    lineage — every signature under the annex key, every
+//                    child bound to its parent's digest at depth+1, expiry
+//                    and unknown keys refused by name.
 // Every signature verdict is reported in the fixed form "VALID under DEV
 // keyring — conveys no standing"; refusals are named. Nothing given, nothing
 // implied: signature checks default to `not checked`.
 //
-// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--annex <file>] [--anchors <file>] [--keyring <file> --seal <file> --body <file>] [--quiet]
+// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--annex <file>] [--anchors <file>] [--identities <file>] [--keyring <file> --seal <file> --body <file>] [--quiet]
 // Exit 0 with a per-session attestation on stdout, exit 1 with findings.
 import { readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { genesisHash, verifySlice, RecordIntegrityError, extendChain, readAnchors } from '../packages/record/src/index.js';
 import { verifyAnchorChain } from '../packages/record/src/anchors.js';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
-import { parseManifest, parseSeal, verifySeal, verifyAnnex, SealError } from '../packages/seals/src/index.js';
+import { parseManifest, parseSeal, verifySeal, verifyAnnex, verifySubjectCert, canonicalBytes, withoutField, sha256Hex, SealError } from '../packages/seals/src/index.js';
 
 const DEV_BASIS_PHRASE = 'VALID under DEV keyring — conveys no standing';
 
@@ -146,16 +151,18 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
   const anchorsChecked = signatures.anchors ? (signatures.anchors.ok ? 'verified' : 'BROKEN') : 'not checked';
   const annexChecked = signatures.annex ? (signatures.annex.ok ? 'verified' : 'BROKEN') : 'not checked';
   const bodySealChecked = signatures.bodySeal ? (signatures.bodySeal.ok ? 'verified' : 'BROKEN') : 'not checked';
+  const identitiesChecked = signatures.identities ? (signatures.identities.ok ? 'verified' : 'BROKEN') : 'not checked';
   return {
     verdict: errors.length === 0 ? 'conforming' : 'violations',
     checked: {
       events: events.length, asks: askedIds.size, headerLines: headerLines ?? 0,
       chain: chain ? (chain.ok ? 'verified' : 'BROKEN') : 'not checked',
-      annex: annexChecked, anchors: anchorsChecked, bodySeal: bodySealChecked,
+      annex: annexChecked, anchors: anchorsChecked, bodySeal: bodySealChecked, identities: identitiesChecked,
     },
     ...(chain?.ok ? { chainHead: chain.head } : {}),
     ...(signatures.annex?.ok ? { enforcer: signatures.annex } : {}),
     ...(signatures.anchors?.ok ? { authorship: signatures.anchors } : {}),
+    ...(signatures.identities?.ok ? { identityChain: signatures.identities } : {}),
     ...(signatures.bodySeal?.ok ? { lawSeal: signatures.bodySeal } : {}),
     reliesOn: [
       chain
@@ -175,7 +182,125 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
       ...(signatures.bodySeal?.ok
         ? [`${DEV_BASIS_PHRASE}: the law seal over ${signatures.bodySeal.file} verifies at threshold ${signatures.bodySeal.threshold} (${signatures.bodySeal.distinctSigners} distinct signers)`]
         : []),
+      ...(signatures.identities?.ok
+        ? [`${signatures.identities.certificates} subject certificate(s) in ${signatures.identities.file} verify under enforcer key ${signatures.identities.keyId} — ` +
+          `${signatures.identities.roots} root(s), ${signatures.identities.chained} chained to their parent's digest, ` +
+          `${signatures.identities.incomplete} declared-but-unverifiable link(s): ${DEV_BASIS_PHRASE} (I-1/MA-1 rehearsal)`]
+        : []),
     ],
+    findings,
+  };
+}
+
+/**
+ * Verify the subject-identity ledger (#20), the offline half of the
+ * certified delegation lineage:
+ *
+ *   1. SIGNATURE — every certificate against the annex key: an unknown or
+ *      forged key, a malformed certificate, and an EXPIRED one each refuse by
+ *      name (`cert-signature-invalid`, `cert-malformed`, `cert-expired`).
+ *   2. FRAMING — the line's declared subjectId and digest are re-derived from
+ *      the certificate it carries: a ledger line that disagrees with its own
+ *      artifact is evidence, not bookkeeping, and it fails.
+ *   3. LINEAGE — a child naming a parent certificate must resolve that digest
+ *      HERE, at exactly one depth less. A digest that resolves nowhere is an
+ *      ERROR (the chain cannot be verified past that link); a child that
+ *      names a parent WITHOUT a digest was issued against an unreadable
+ *      parent header — honestly incomplete, reported as a warning rather than
+ *      left to look complete (D-7).
+ *
+ * Superseded certificates are not a defect: a restarted runtime issues a new
+ * keypair for the same session id, and every issuance still verifies on its
+ * own line. An unreadable ledger is an ERROR — evidence that cannot be read
+ * is refused, never skipped.
+ */
+function checkIdentities(file, annex, now = Date.now()) {
+  const findings = [];
+  let lines;
+  try {
+    lines = readFileSync(file, 'utf8').split('\n').filter((line) => line.trim() !== '');
+  } catch (e) {
+    return {
+      ok: false,
+      summary: { certificates: 0, roots: 0, chained: 0, incomplete: 0 },
+      findings: [{ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: `subject-identity ledger unreadable: ${e.message}` }],
+    };
+  }
+  const certs = [];
+  const byDigest = new Map();
+  lines.forEach((line, index) => {
+    const at = `identity ledger line ${index + 1}`;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch (e) {
+      findings.push({ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: `${at} is not JSON (${e.message}) — evidence that cannot be read is refused, not skipped` });
+      return;
+    }
+    if (entry?.kind !== 'subject-certificate') {
+      findings.push({ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: `${at} does not declare kind "subject-certificate" — a line the verifier cannot place is refused, not interpreted` });
+      return;
+    }
+    try {
+      verifySubjectCert({
+        cert: entry.cert,
+        enforcerKey: annex.enforcerKey,
+        expectedSubjectId: typeof entry.subjectId === 'string' ? entry.subjectId : null,
+        now,
+      });
+    } catch (e) {
+      findings.push({ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: `${at}: ${e.message}` });
+      return;
+    }
+    const digest = sha256Hex(canonicalBytes(withoutField(entry.cert, 'signature')));
+    if (entry.certDigest !== digest) {
+      findings.push({ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: `${at} declares digest ${String(entry.certDigest).slice(0, 12)}… but its own certificate hashes to ${digest.slice(0, 12)}… — the line and the artifact disagree, and the artifact is what verifies` });
+      return;
+    }
+    byDigest.set(digest, entry.cert);
+    certs.push({ cert: entry.cert, digest, line: index + 1 });
+  });
+
+  const summary = { certificates: certs.length, roots: 0, chained: 0, incomplete: 0 };
+  for (const { cert, line } of certs) {
+    const at = `identity ledger line ${line}`;
+    if (!cert.parentSubjectId && !cert.parentCertDigest) { summary.roots += 1; continue; }
+    if (!cert.parentCertDigest) {
+      summary.incomplete += 1;
+      findings.push({
+        seq: null, type: 'identities', severity: 'warning', rule: 'MA-1',
+        detail: `${at}: ${cert.subjectId} names parent ${cert.parentSubjectId} but binds no parent digest — issued against a parent header this runtime could not read; the link is declared but CANNOT be verified offline`,
+      });
+      continue;
+    }
+    const parent = byDigest.get(cert.parentCertDigest);
+    if (!parent) {
+      findings.push({
+        seq: null, type: 'identities', severity: 'error', rule: 'MA-1',
+        detail: `${at}: broken certified lineage — ${cert.subjectId} binds parent certificate ${cert.parentCertDigest.slice(0, 12)}…, which is not in this ledger; the chain cannot be verified past that link`,
+      });
+      continue;
+    }
+    if (parent.subjectId !== cert.parentSubjectId) {
+      findings.push({
+        seq: null, type: 'identities', severity: 'error', rule: 'MA-1',
+        detail: `${at}: ${cert.subjectId} names parent ${cert.parentSubjectId}, but the bound certificate belongs to ${parent.subjectId} — the binding names one Member and certifies another`,
+      });
+      continue;
+    }
+    if (cert.depth !== parent.depth + 1) {
+      findings.push({
+        seq: null, type: 'identities', severity: 'error', rule: 'MA-1',
+        detail: `${at}: ${cert.subjectId} declares depth ${cert.depth} under a parent certified at depth ${parent.depth} — delegation depth is off by ${cert.depth - (parent.depth + 1)}`,
+      });
+      continue;
+    }
+    summary.chained += 1;
+  }
+
+  return {
+    ok: !findings.some((f) => f.severity === 'error'),
+    summary: { ...summary, keyId: annex.keyId, basis: 'dev-keyring', conveysStanding: false, phrase: DEV_BASIS_PHRASE },
     findings,
   };
 }
@@ -185,7 +310,7 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
  * named ERROR finding: a broken declared seal is not a warning (D-7). Absent
  * inputs are `not checked` and imply nothing.
  */
-function checkSignatures(events, { annexFile, anchorsFile, keyringFile, sealFile, bodyFile }) {
+function checkSignatures(events, { annexFile, anchorsFile, identitiesFile, keyringFile, sealFile, bodyFile }) {
   const findings = [];
   const out = {};
 
@@ -228,6 +353,17 @@ function checkSignatures(events, { annexFile, anchorsFile, keyringFile, sealFile
         out.anchors = { file: anchorsFile, ok: false };
         findings.push({ seq: null, type: 'anchors', severity: 'error', rule: 'R-7', detail: `chain anchors refused: ${e.message}` });
       }
+    }
+  }
+
+  if (identitiesFile) {
+    if (!annex) {
+      out.identities = { file: identitiesFile, ok: false };
+      findings.push({ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: 'identity verification requires a verified enforcer annex (--annex) — a subject certificate is checked against the key that signed it, never against nothing' });
+    } else {
+      const verdict = checkIdentities(identitiesFile, annex);
+      out.identities = { file: identitiesFile, ok: verdict.ok, ...verdict.summary };
+      findings.push(...verdict.findings);
     }
   }
 
@@ -291,12 +427,13 @@ function main() {
   const chainFile = opt('--chain');
   const annexFile = opt('--annex');
   const anchorsFile = opt('--anchors');
+  const identitiesFile = opt('--identities');
   const keyringFile = opt('--keyring');
   const sealFile = opt('--seal');
   const bodyFile = opt('--body');
   const has = (name) => process.argv.includes(name);
-  if (!file || (has('--chain') && !chainFile) || (has('--annex') && !annexFile) || (has('--anchors') && !anchorsFile)) {
-    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--annex <enforcer.annex.json>] [--anchors <id>.chain.sigs.jsonl] [--keyring <manifest> --seal <sig.json> --body <compact.md>] [--quiet]');
+  if (!file || (has('--chain') && !chainFile) || (has('--annex') && !annexFile) || (has('--anchors') && !anchorsFile) || (has('--identities') && !identitiesFile)) {
+    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--annex <enforcer.annex.json>] [--anchors <id>.chain.sigs.jsonl] [--identities <subjects.jsonl>] [--keyring <manifest> --seal <sig.json> --body <compact.md>] [--quiet]');
     process.exit(2);
   }
   let parsed;
@@ -307,7 +444,7 @@ function main() {
     process.exit(2);
   }
   const { events, headerLines } = splitPreamble(parsed);
-  const attestation = { session: file, ...audit(events, chainFile, headerLines, { annexFile, anchorsFile, keyringFile, sealFile, bodyFile }) };
+  const attestation = { session: file, ...audit(events, chainFile, headerLines, { annexFile, anchorsFile, identitiesFile, keyringFile, sealFile, bodyFile }) };
   if (!quiet) console.log(JSON.stringify(attestation, null, 2));
   const errors = attestation.findings.filter(f => f.severity === 'error');
   if (errors.length > 0) {

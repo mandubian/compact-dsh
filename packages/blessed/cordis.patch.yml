@@ -125,6 +125,11 @@
         enforcer:
           annexPath: !!js process.env.COMPACT_ENFORCER_ANNEX || undefined
           privateKeyPath: !!js process.env.COMPACT_ENFORCER_KEY || undefined
+          # the subject-identity ledger (#20): certificates issued at the
+          # spawn boundary are appended BESIDE the chains — the same
+          # protected Enforcer state — so the offline auditor can verify the
+          # certified lineage with no cooperation from this runtime (I-7).
+          ledgerPath: !!js 'process.env.COMPACT_CHAIN_DIR ? process.env.COMPACT_CHAIN_DIR + "/subjects.jsonl" : undefined'
         sandbox:
           image: !!js process.env.COMPACT_SANDBOX_IMAGE
           network: none

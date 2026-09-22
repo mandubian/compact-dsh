@@ -29,6 +29,14 @@
 //   answer says so in that field. Filling a gap with a plausible value is the
 //   false answer D-3 names, and it is worse than the gap.
 //
+//   IDENTITY IS ALSO CRYPTOGRAPHIC (#20). Alongside the header's account of a
+//   Member, the answer carries the certificate the Enforcer issued for it and
+//   the verdict under the annex key — still never the Member's own assertion:
+//   the certificate is composed and signed on the Enforcer's side, and a
+//   chain link shows the digest so the auditor can check it offline. Where no
+//   annex is composed the answer declares that instead of implying a check
+//   that did not happen.
+//
 //   A REFUSAL TO ANSWER VIOLATES D-3/D-7. So there is no refusal path here for
 //   an identifiable Member. An unknown id yields a recorded "not known to this
 //   runtime", which is an answer; silence is not.
@@ -49,8 +57,13 @@ function agentOf(ctx, id) {
  * Walk the delegation chain from a Member up to the root, from durable session
  * headers. Cycles are impossible in a well-formed lineage but are guarded
  * anyway: a malformed record must produce a bounded answer, not a hang.
+ *
+ * With an identity surface in hand every link also carries the CERTIFICATE
+ * digest the Enforcer issued for it — the chain then answers "under whose
+ * authority" with signatures the auditor can check, not only with the
+ * headers' word for themselves (#20).
  */
-export function authorityChain(ctx, id, { maxDepth = 64 } = {}) {
+export function authorityChain(ctx, id, { maxDepth = 64, identities = null } = {}) {
   const chain = [];
   const seen = new Set();
   let cursor = id != null ? String(id) : null;
@@ -70,6 +83,7 @@ export function authorityChain(ctx, id, { maxDepth = 64 } = {}) {
       known: true,
       origin: header.origin ?? 'root',
       delegationDepth: header.delegationDepth ?? 0,
+      ...(identities ? { certDigest: identities.of?.(cursor)?.certDigest ?? null } : {}),
     });
     cursor = header.parentSession ? String(header.parentSession) : null;
   }
@@ -78,13 +92,55 @@ export function authorityChain(ctx, id, { maxDepth = 64 } = {}) {
 }
 
 /**
+ * The certified identity one Member holds, as R-13's identity limb reports it
+ * (#20). Three honest outcomes, never a plausible-looking default:
+ *   - a certificate, with its verdict under THIS Enforcer's key and its place
+ *     in the lineage (root, or bound to its parent's digest);
+ *   - `none` — no identity issued here (the Member has not been certified);
+ *   - `unavailable` — no enforcer annex is composed, so no certificate could
+ *     exist — declared rather than rendered as absence (I-8).
+ */
+function certificateOf(id, identities) {
+  if (!identities) {
+    return { known: false, note: 'no enforcer identity is composed in this runtime, so no certificate exists to show' };
+  }
+  const found = identities.of?.(id);
+  if (!found) {
+    // distinguish the two absences: an annex that issues nothing and an
+    // annex that was never composed are different facts (I-8)
+    const keyId = identities.keyId?.() ?? null;
+    return {
+      known: false,
+      note: keyId
+        ? 'no certificate was issued for this Member in this runtime'
+        : 'no enforcer annex is composed in this runtime, so no certificate exists to show',
+    };
+  }
+  const verdict = identities.verify?.(found.cert) ?? { valid: false, reason: 'no verifier is available' };
+  return {
+    known: true,
+    certDigest: found.certDigest,
+    depth: found.cert.depth ?? 0,
+    parentSubjectId: found.cert.parentSubjectId ?? null,
+    parentCertDigest: found.cert.parentCertDigest ?? null,
+    keyId: verdict.keyId ?? identities.keyId?.() ?? null,
+    valid: verdict.valid === true,
+    ...(verdict.valid ? {} : { reason: verdict.reason ?? 'the certificate did not verify' }),
+    conveysStanding: false,
+  };
+}
+
+/**
  * Answer one inquiry from recorded state.
  *
  * @param about - the Member being asked about
  * @param childState - the specialists' MA-3 registry, when composed: the
  *   Enforcer's own picture of what a delegated Member is doing
+ * @param identities - the identity surface (subject certificate lookup +
+ *   verification), when an enforcer annex is composed: the certified half of
+ *   R-13's identity answer (#20)
  */
-export function answerInquiry(ctx, { about, childState = null, now = Date.now() } = {}) {
+export function answerInquiry(ctx, { about, childState = null, identities = null, now = Date.now() } = {}) {
   const id = about != null ? String(about) : null;
   if (id == null) {
     return {
@@ -107,6 +163,7 @@ export function answerInquiry(ctx, { about, childState = null, now = Date.now() 
         createdAt: header.createdAt ?? null,
         delegationDepth: header.delegationDepth ?? 0,
         preset: header.agentPreset ?? null,
+        certificate: certificateOf(id, identities),
       }
     : { id, known: false, note: 'no session recorded under this id in this runtime' };
 
@@ -135,7 +192,7 @@ export function answerInquiry(ctx, { about, childState = null, now = Date.now() 
   }
 
   // AUTHORITY — the delegation chain to its root, then the ultimate Principal.
-  const walked = authorityChain(ctx, id);
+  const walked = authorityChain(ctx, id, { identities });
   const authority = {
     chain: walked.chain,
     complete: walked.complete,
@@ -153,6 +210,26 @@ export function answerInquiry(ctx, { about, childState = null, now = Date.now() 
   };
 }
 
+/** Render one certified-identity line as the in-band prose the asking Subject reads. */
+function certificateLines(cert, indent = '  ') {
+  if (!cert?.known) {
+    return [`${indent}certificate: unavailable — ${cert?.note ?? 'no certificate is composed here'}`];
+  }
+  const digest = `${cert.certDigest.slice(0, 12)}…`;
+  const verdict = cert.valid
+    ? `VERIFIES under enforcer key ${cert.keyId ?? 'unknown key'} — development keyring, conveys no standing`
+    : `DOES NOT VERIFY: ${cert.reason}`;
+  const lineage = cert.depth === 0 && !cert.parentSubjectId
+    ? 'root — no parent certificate'
+    : `depth ${cert.depth}` +
+      (cert.parentCertDigest
+        ? ` · chained to parent certificate ${cert.parentCertDigest.slice(0, 12)}… (parent ${cert.parentSubjectId})`
+        : cert.parentSubjectId
+          ? ` · names parent ${cert.parentSubjectId} but binds no parent digest — this link CANNOT be verified offline (the parent's certificate was not available at issuance)`
+          : ' · no parent');
+  return [`${indent}certificate: ${digest} — ${verdict}`, `${indent}  ${lineage}`];
+}
+
 /** Render an inquiry answer as the in-band prose the asking Subject reads. */
 export function renderInquiry(answer) {
   if (!answer.answered) return `[R-13] ${answer.detail}`;
@@ -165,6 +242,7 @@ export function renderInquiry(answer) {
       ? `  ${answer.identity.id} — ${answer.identity.kind}, delegation depth ${answer.identity.delegationDepth}` +
         (answer.identity.preset ? `, composed from preset ${answer.identity.preset}` : '')
       : `  ${answer.identity.id} — ${answer.identity.note}`,
+    ...(answer.identity.known ? certificateLines(answer.identity.certificate) : []),
     '',
     'ACT:',
     answer.act.known
@@ -174,7 +252,8 @@ export function renderInquiry(answer) {
     'AUTHORITY:',
     ...a.chain.map((link, i) =>
       `  ${'  '.repeat(i)}${i === 0 ? '' : 'delegated by '}${link.id}` +
-      (link.known ? ` (${link.origin}, depth ${link.delegationDepth})` : ` — ${link.note ?? 'not recorded'}`)),
+      (link.known ? ` (${link.origin}, depth ${link.delegationDepth})` : ` — ${link.note ?? 'not recorded'}`) +
+      (link.certDigest ? ` · cert ${link.certDigest.slice(0, 12)}…` : '')),
     a.complete
       ? `  ${'  '.repeat(a.chain.length)}under ${a.ultimatePrincipal.description}`
       : `  chain incomplete: ${a.incompleteBecause} — this is what the record supports, not a guess`,

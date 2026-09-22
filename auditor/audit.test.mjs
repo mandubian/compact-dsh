@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateEd25519, signSeal, signAnnex, annexDigestOf } from '../packages/seals/src/index.js';
+import { generateEd25519, signSeal, signAnnex, annexDigestOf, signSubjectCert, canonicalBytes, withoutField, sha256Hex } from '../packages/seals/src/index.js';
 import { extendChain, genesisHash, signAnchor, genesisAnchor, anchorHashOf } from '../packages/record/src/index.js';
 import { COMPACT_BODY, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { audit } from './audit.mjs';
@@ -65,7 +65,47 @@ function rehearsalDir() {
   writeFileSync(anchorsPath, [genesis, anchor].map(a => JSON.stringify(a)).join('\n') + '\n');
   const logPath = join(dir, `${sessionId}.jsonl`);
   writeFileSync(logPath, events.map(e => JSON.stringify(e)).join('\n') + '\n');
-  return { dir, manifestPath, sealPath, annexPath, anchorsPath, logPath, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  return { dir, manifestPath, sealPath, annexPath, anchorsPath, logPath, enforcer, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+}
+
+/** One ledger line, shaped exactly as the runtime appends it (#20). */
+function ledgerLine(cert) {
+  const certDigest = sha256Hex(canonicalBytes(withoutField(cert, 'signature')));
+  return {
+    kind: 'subject-certificate',
+    subjectId: cert.subjectId,
+    certDigest,
+    issuedAt: cert.issuedAt,
+    ...(cert.parentSubjectId ? { parentSubjectId: cert.parentSubjectId } : {}),
+    ...(cert.parentCertDigest ? { parentCertDigest: cert.parentCertDigest } : {}),
+    cert,
+  };
+}
+
+/** Sign one subject certificate under the fixture's enforcer key. */
+function subjectCert(enforcer, over = {}) {
+  const key = generateEd25519();
+  return signSubjectCert({
+    subjectId: 'subject', publicKey: key.publicKey, scope: 'rehearsal', depth: 0,
+    privateKey: enforcer.privateKeyPem, ...over,
+  });
+}
+
+/** Write `lines` to `<dir>/subjects.jsonl` and return its path. */
+function writeIdentityLedger(f, lines) {
+  const identitiesPath = join(f.dir, 'subjects.jsonl');
+  writeFileSync(identitiesPath, lines.map(l => JSON.stringify(l)).join('\n') + '\n');
+  return identitiesPath;
+}
+
+/** The happy shape: a root, its child, and a grandchild, each bound upward. */
+function chainedLedger(enforcer) {
+  const root = subjectCert(enforcer, { subjectId: 'root-1' });
+  const rootDigest = sha256Hex(canonicalBytes(withoutField(root, 'signature')));
+  const child = subjectCert(enforcer, { subjectId: 'child-1', depth: 1, parentSubjectId: 'root-1', parentCertDigest: rootDigest });
+  const childDigest = sha256Hex(canonicalBytes(withoutField(child, 'signature')));
+  const grand = subjectCert(enforcer, { subjectId: 'grand-1', depth: 2, parentSubjectId: 'child-1', parentCertDigest: childDigest });
+  return [root, child, grand].map(c => ledgerLine(c));
 }
 
 test('the auditor reports the law seal, annex, and anchors as VALID under DEV keyring — conveys no standing', async () => {
@@ -116,7 +156,154 @@ test('absent signature inputs are `not checked` and imply nothing', () => {
   assert.equal(att.checked.annex, 'not checked');
   assert.equal(att.checked.anchors, 'not checked');
   assert.equal(att.checked.bodySeal, 'not checked');
+  assert.equal(att.checked.identities, 'not checked');
   assert.equal(att.enforcer, undefined);
   assert.equal(att.authorship, undefined);
+  assert.equal(att.identityChain, undefined);
   assert.equal(att.verdict, 'conforming');
+});
+
+// -- the certified delegation lineage (#20) ----------------------------------
+//
+// The auditor verifies the identity chain OFFLINE: every certificate under
+// the annex key, every declared digest re-derived from its artifact, every
+// child bound to a parent that is present at exactly one depth less. Unknown
+// keys and expiry refuse by name; an honestly incomplete link is a warning;
+// an unreadable ledger is an error, never a skip.
+
+test('the certified lineage verifies offline: roots, chained children, and the fixed practice label (#20)', async () => {
+  const f = await rehearsalDir();
+  try {
+    const identitiesFile = writeIdentityLedger(f, chainedLedger(f.enforcer));
+    const att = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile });
+    assert.equal(att.verdict, 'conforming', JSON.stringify(att.findings));
+    assert.equal(att.checked.identities, 'verified');
+    assert.deepEqual(
+      { certificates: att.identityChain.certificates, roots: att.identityChain.roots,
+        chained: att.identityChain.chained, incomplete: att.identityChain.incomplete },
+      { certificates: 3, roots: 1, chained: 2, incomplete: 0 });
+    assert.equal(att.identityChain.phrase, 'VALID under DEV keyring — conveys no standing');
+    assert.equal(att.identityChain.conveysStanding, false);
+    assert.ok(att.reliesOn.some(r => /3 subject certificate\(s\).*VALID under DEV keyring — conveys no standing \(I-1\/MA-1 rehearsal\)/.test(r)),
+      'the verdict states its basis: which key, how many links, how many gaps');
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('a certificate the annex key never signed is an unknown identity — refused by name (#20)', async () => {
+  const f = await rehearsalDir();
+  try {
+    const stranger = generateEd25519();
+    const rogue = signSubjectCert({
+      subjectId: 'intruder', publicKey: generateEd25519().publicKey, scope: 'rehearsal', depth: 0,
+      privateKey: stranger.privateKeyPem,
+    });
+    const identitiesFile = writeIdentityLedger(f, [ledgerLine(rogue)]);
+    const att = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile });
+    assert.equal(att.verdict, 'violations');
+    assert.equal(att.checked.identities, 'BROKEN');
+    const finding = att.findings.find(x => x.type === 'identities');
+    assert.match(finding.detail, /does not verify under the annex's enforcer key/);
+    assert.equal(finding.severity, 'error');
+    assert.equal(finding.rule, 'I-1');
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('an expired subject certificate is an alarm at the auditor too (#20)', async () => {
+  const f = await rehearsalDir();
+  try {
+    const stale = subjectCert(f.enforcer, { subjectId: 'stale-1', expiresAt: new Date(Date.now() - 60_000).toISOString() });
+    const identitiesFile = writeIdentityLedger(f, [ledgerLine(stale)]);
+    const att = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile });
+    assert.equal(att.verdict, 'violations');
+    const finding = att.findings.find(x => x.type === 'identities');
+    assert.match(finding.detail, /expired at/);
+    assert.equal(finding.rule, 'I-1');
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('a child binding a parent certificate that is not in the ledger breaks the chain — named, not glossed (#20)', async () => {
+  const f = await rehearsalDir();
+  try {
+    const orphan = subjectCert(f.enforcer, {
+      subjectId: 'child-1', depth: 1, parentSubjectId: 'root-1', parentCertDigest: 'f'.repeat(64),
+    });
+    const identitiesFile = writeIdentityLedger(f, [ledgerLine(orphan)]);
+    const att = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile });
+    assert.equal(att.verdict, 'violations');
+    const finding = att.findings.find(x => x.rule === 'MA-1');
+    assert.match(finding.detail, /broken certified lineage/);
+    assert.match(finding.detail, /not in this ledger/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('a depth that does not follow its parent is a different lineage than the one certified (#20)', async () => {
+  const f = await rehearsalDir();
+  try {
+    const root = subjectCert(f.enforcer, { subjectId: 'root-1' });
+    const rootDigest = sha256Hex(canonicalBytes(withoutField(root, 'signature')));
+    // same parent binding, wrong depth: the cert says root-child, the data says siblings
+    const lying = subjectCert(f.enforcer, { subjectId: 'child-1', depth: 0, parentSubjectId: 'root-1', parentCertDigest: rootDigest });
+    const identitiesFile = writeIdentityLedger(f, [ledgerLine(root), ledgerLine(lying)]);
+    const att = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile });
+    assert.equal(att.verdict, 'violations');
+    const finding = att.findings.find(x => x.rule === 'MA-1');
+    assert.match(finding.detail, /declares depth 0 under a parent certified at depth 0/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('a link bound without a digest is a declared warning — incomplete, not broken (#20)', async () => {
+  const f = await rehearsalDir();
+  try {
+    const unbound = subjectCert(f.enforcer, { subjectId: 'child-1', depth: 1, parentSubjectId: 'gone-parent' });
+    const identitiesFile = writeIdentityLedger(f, [ledgerLine(unbound)]);
+    const att = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile });
+    assert.equal(att.verdict, 'conforming', 'a gap the runtime declared is not a violation — a false verification would be');
+    assert.equal(att.checked.identities, 'verified');
+    assert.equal(att.identityChain.incomplete, 1);
+    const finding = att.findings.find(x => x.type === 'identities');
+    assert.equal(finding.severity, 'warning');
+    assert.equal(finding.rule, 'MA-1');
+    assert.match(finding.detail, /binds no parent digest/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('identity verification without a verified annex refuses — checked against a key, never against nothing (#20)', async () => {
+  const f = await rehearsalDir();
+  try {
+    const identitiesFile = writeIdentityLedger(f, chainedLedger(f.enforcer));
+    const att = audit(LOG, undefined, 0, { identitiesFile });
+    assert.equal(att.verdict, 'violations');
+    assert.equal(att.checked.identities, 'BROKEN');
+    assert.match(att.findings.find(x => x.type === 'identities').detail, /requires a verified enforcer annex/);
+    assert.equal(att.identityChain, undefined, 'no verdict is reported for a check that could not run');
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('an unreadable identity ledger is an ERROR, never a skipped check (#20)', async () => {
+  const f = await rehearsalDir();
+  try {
+    const identitiesPath = join(f.dir, 'subjects.jsonl');
+    writeFileSync(identitiesPath, 'not json at all\n');
+    const att = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile: identitiesPath });
+    assert.equal(att.verdict, 'violations');
+    const finding = att.findings.find(x => x.type === 'identities');
+    assert.match(finding.detail, /is not JSON/);
+    assert.match(finding.detail, /refused, not skipped/);
+  } finally {
+    f.cleanup();
+  }
 });
