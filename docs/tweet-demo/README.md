@@ -28,7 +28,7 @@ No model key, no Docker, no network. Offline by construction.
 
 ## Tweet 1 — the decision
 
-Attach `tweet-1.png`.
+Attach `tweet-1.png`, or `tweet-1-v2.png` for the live variant.
 
 ```
 Agent gates look like `Allow? [y/N]`.
@@ -41,6 +41,24 @@ Consent ≠ connectivity.
 A denial is a doorway, not a dead end.
 
 That's an agent runtime with law.
+```
+
+v2 text — names the project (so "The Compact" and compact-dsh resolve to one
+thing) and links the repo; 274/280 with the URL weighted:
+
+```
+Agent gates look like `Allow? [y/N]`.
+
+The Compact's gate looks like this ↓
+
+Rule named.
+What "yes" materializes — before you decide.
+Consent ≠ connectivity.
+A denial is a doorway, not a dead end.
+
+That's compact-dsh — an agent runtime with law.
+
+https://github.com/mandubian/compact-dsh
 ```
 
 What the image is showing, in order:
@@ -61,7 +79,8 @@ The left box is the contrast. The size difference *is* the argument.
 
 ## Tweet 2 — the evidence
 
-Attach `tweet-2.png`. Post as a reply to tweet 1.
+Attach `tweet-2.png` (staged) or `tweet-2-v2.png` (live). Post as a reply to
+tweet 1.
 
 ```
 Then I rewrote that session with `sed`.
@@ -73,6 +92,21 @@ can prove which events were forged — offline, years later.
 
 The most motivated forger of an agent session is the operator.
 Even that rewrite fails.
+```
+
+v2 text — the card footer already carries the operator line verbatim, so the
+tweet gives that beat to the image and closes on the one the live session
+adds; 260/280:
+
+```
+Then I rewrote that session with `sed`.
+
+Plain dsh: nobody can tell. Forever.
+
+The Compact: broken-link at seq 0. One kept 64-hex chain head
+proves which events were forged — offline, years later.
+
+I never even answered the gate. The ask was already evidence.
 ```
 
 What the image is showing, in order:
