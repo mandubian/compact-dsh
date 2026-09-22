@@ -426,30 +426,36 @@ confinement …)"*, where the body says **Multi-agent operation** and
 **Confinement** (`c4cd70e9…` seq 26; part names now render from the body's
 Part VI headers, #21) — and it offered a capability the roster does not carry:
 *"Edit files, run background jobs"* (`b41e27b8…` seq 18), while the
-`compact-pilot` preset mounts confined bash, todo, ask-user and present only.
-The attestation is authoritative; the prose around it is a model.
+`compact-pilot` preset mounts confined bash (pwsh on Windows), todo,
+ask-user, present and the compaction stack — there is no background-jobs
+tool among them. The attestation is authoritative; the prose around it is a
+model.
 
 ### 1. `describe yourself` — standing none, postures, certified identity (R-1/I-1)
 
 **(verified)** `b41e27b8…` seq 14 calls `self_describe`, seq 15 returns:
 
 ```
-[R-1] Attestation — epoch 2, SIGNED under the development keyring (practice
-keys — conveys no standing outside this runtime). This is what the Enforcer
-records about you.
+[R-1] Attestation — epoch 2, SIGNED under the development keyring (practice keys — conveys no standing outside this runtime). This is what the Enforcer records about you.
+Where this and your own recollection disagree, THIS is authoritative (R-1, D-2).
+
 You are: session-b41e27b8-3dfa-403a-855c-54f728cbcc79 · root · delegation depth 0
-Session identity: certified by enforcer key dev-rehearsal-enforcer
-  (cert 6ae778909310… — development keyring, no standing outside this runtime)
+Session identity: certified by enforcer key dev-rehearsal-enforcer (cert 6ae778909310… — development keyring, no standing outside this runtime)
 Standing: none — the Compact is draft v0.5 and NOT ratified, … (F-5)
 Law: draft v0.5 — not yet ratified, digest 27bb7078fe9aea50…
+
+Capabilities in force:
   - MA — Multi-agent operation: bound (MA-1, MA-2, MA-3, MA-4)
   - CF — Confinement: bound (CF-1, CF-2)
   - SCH — Scheduling: absent (SCH-1)
   - A-4/DYN — The Enforcer's code is constitutional: absent (A-4)
-  - not adopted: schedule_create, cordis_define, cordis_run, cordis_stop,
-    cordis_undefine — calling one is refused
+  - not adopted: schedule_create, cordis_define, cordis_run, cordis_stop, cordis_undefine — calling one is refused
+
+Budgets remaining:
   - no live grants: every gated act will ask
   - loop repairs: 0 spent of 3
+
+… (declared gaps this runtime owes — the unratified draft, the development-keyring seal, the tamper-EVIDENT record, the operator-declared image history — one line each) …
 This block is stale after 300s. A stale attestation is an alarm, not a truth
 to act on — call self_describe to re-read rather than relying on an older one (R-1).
 ```
