@@ -2,14 +2,18 @@
 // persona is spawnable through the tools registry, and the spawn request the
 // provider receives carries exactly the declared surface — the composed
 // persona prose, the deny filter (excluded_tools semantics), and the depth
-// cap (leaves 0 = no-recursive-spawn; leads capped). The provider stub is
-// the verified contract's consumer stand-in: it captures the
-// SubagentStartRequest the tool layer builds.
+// cap (specialists capped at 1: spawnable at depth 1, never spawning — the
+// leaves rule rides the denied spawn tools on their own surface; leads
+// capped). The provider stub is the verified contract's consumer stand-in:
+// it captures the SubagentStartRequest the tool layer builds, and the depth
+// arithmetic asserted against is the pinned provider's own enforcement
+// function (@deepseek-ai/dsh-subagent resolveChildDepth), not a re-derivation.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Context, Service } from '@deepseek-ai/cordis';
 import { ToolRuntime } from '@deepseek-ai/dsh-tools';
 import { Session } from '@deepseek-ai/dsh-session';
+import { resolveChildDepth, SubagentDepthError } from '@deepseek-ai/dsh-subagent';
 import { specialistsPlugin } from '../src/index.js';
 import { loadRoster } from '../src/roster.js';
 
@@ -128,8 +132,8 @@ test('composed: the active roster is all leaves; archived personas are not mount
   assert.equal(service.personas.length, 5, 'the active roster is the basic five');
   for (const p of service.personas) {
     assert.equal(p.kind, 'specialist', `${p.name}: the active roster carries no leads`);
-    assert.equal(p.maxDepth, 0, `${p.name}: leaves never delegate`);
-    assert.ok(p.deny.includes('subagent') && p.deny.includes('subagent_fork'), `${p.name}: spawn tools denied`);
+    assert.equal(p.maxDepth, 1, `${p.name}: spawnable at depth 1 — a cap of 0 would refuse the first spawn (#37)`);
+    assert.ok(p.deny.includes('subagent') && p.deny.includes('subagent_fork'), `${p.name}: spawn tools denied on the child's own surface (no-recursive-spawn is a surface property)`);
   }
   // the archive is data, not mount surface: no delegation row exists for it
   for (const archived of ['planner', 'planner_collaborative', 'packager', 'discovery', 'watchdog_fast']) {
@@ -138,6 +142,40 @@ test('composed: the active roster is all leaves; archived personas are not mount
     assert.equal(tools.get(`specialist_${archived}`), undefined);
   }
   assert.ok(ctx.systemPrompt, 'the systemPrompt service resolved at apply time');
+});
+
+test('composed: the mounted cap bounds delegation — a lead may spawn a specialist, a specialist may not spawn a grandchild (#37)', async () => {
+  const { service } = await boot();
+  // The provider's own depth arithmetic: child depth = parent depth + 1,
+  // refused past maxDepth. A top-level parent (depth 0) spawning a
+  // specialist makes a depth-1 child — the mounted cap of 1 admits it and
+  // exactly refuses the depth-2 grandchild. The agent shape below is the
+  // duck type resolveChildDepth consumes (options.subagentDepth vs the
+  // session header's delegationDepth — the monotone floor).
+  const specialistMaxDepth = service.surface('researcher').maxDepth;
+  assert.equal(specialistMaxDepth, 1, 'the mounted specialist cap');
+
+  const topLevel = { options: {}, session: { header: {} } };
+  assert.equal(resolveChildDepth(topLevel, specialistMaxDepth), 1, 'top-level → specialist child: depth 1 is within the cap (spawnable)');
+
+  const specialistChild = { options: { subagentDepth: 1 }, session: { header: { delegationDepth: 1 } } };
+  assert.throws(
+    () => resolveChildDepth(specialistChild, specialistMaxDepth),
+    (e) => e instanceof SubagentDepthError && e.attemptedDepth === 2 && e.maxDepth === 1,
+    'specialist → grandchild: depth 2 exceeds the cap (refused at the provider, beyond the denied surface)',
+  );
+
+  // the lead arithmetic keeps its own budget: 3 admits depth-3 children,
+  // refuses depth-4
+  const leadMaxDepth = 3;
+  const depth3 = { options: { subagentDepth: 2 }, session: { header: { delegationDepth: 2 } } };
+  assert.equal(resolveChildDepth(depth3, leadMaxDepth), 3, 'lead cap admits depth 3');
+  const depth4 = { options: { subagentDepth: 3 }, session: { header: { delegationDepth: 3 } } };
+  assert.throws(
+    () => resolveChildDepth(depth4, leadMaxDepth),
+    (e) => e instanceof SubagentDepthError && e.attemptedDepth === 4 && e.maxDepth === 3,
+    'lead cap refuses depth 4',
+  );
 });
 
 test('composed: the roster card is registered as a scoped prompt section', async () => {

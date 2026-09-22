@@ -797,7 +797,7 @@
       "kind": "enforced",
       "plugin": "compact-dsh-specialists",
       "service": "compact-specialists",
-      "evidence": "bounded delegation: per-persona maxDepth enforced by the provider at every start — leaves 0 with the spawn tools denied on the surface (no-recursive-spawn), leads capped (default 3); the roster is the declared finite surface (MA-2/R-4)",
+      "evidence": "bounded delegation: per-persona maxDepth enforced by the provider at every start — specialists capped at 1 (spawnable at depth 1; their own surface denies the spawn tools, so no grandchild is attempted, and a depth-2 grandchild refuses at the provider regardless — no-recursive-spawn), leads capped (default 3); the roster is the declared finite surface (MA-2/R-4)",
       "enforcedBy": [
         "packages/specialists/src/index.js",
         "packages/specialists/src/roster.js"

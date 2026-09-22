@@ -76,7 +76,7 @@ Highlights (full board in the register file):
 | I-8 (degradation honesty) | the boot attestation's declared gaps | constitution.test.js |
 | F-5 (refuse-to-start) | the constitution coupling | constitution + composed tests |
 | MA-1 (spawn under law) | `compact-dsh-specialists` — every spawn a recorded tool call naming the persona; session-backed children with durable descriptors | `packages/specialists/test/composed.dsh.test.js` |
-| MA-2 (bounded delegation) | `compact-dsh-specialists` — per-persona maxDepth (leaves 0, spawn tools denied; leads capped), provider-enforced at every start | `packages/specialists/test/composed.dsh.test.js`, `…/lint.test.js` |
+| MA-2 (bounded delegation) | `compact-dsh-specialists` — per-persona maxDepth (specialists capped at 1 — spawnable, never spawning, spawn tools denied on their surface; leads capped), provider-enforced at every start | `packages/specialists/test/composed.dsh.test.js`, `…/lint.test.js` |
 | MA-3 (child-state honesty) | `compact-specialists` — the host's own `subagent/start`/`subagent/end` edges pushed to the parent with `agent.inject()`; the child's `lastAssistantMessage` read nowhere | `packages/specialists/test/child-state.test.js` |
 | MA-4 (consent-scoped address) | `compact-specialists` — `send_message`/`interrupt_agent` gated against the recipient's declared scopes; only the recipient narrows | `packages/specialists/test/consent.test.js` |
 | CF-2 (supply-chain honesty) | `compact-sandbox-docker` — digest-keyed acquisition history, undeclared image refuses the boot, build approvals never a run-time entitlement | `packages/sandbox-docker/test/provenance.test.js`, `…/composed.docker.test.js` |
