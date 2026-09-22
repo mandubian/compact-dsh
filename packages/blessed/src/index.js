@@ -134,12 +134,19 @@ export function resolveConfig(config) {
   let enforcer;
   if (config.enforcer !== undefined) {
     object(config.enforcer, 'enforcer');
+    for (const key of ['annexPath', 'privateKeyPath', 'ledgerPath']) {
+      const v = config.enforcer[key];
+      if (v !== undefined && (typeof v !== 'string' || !v.trim())) throw new TypeError(`blessed: enforcer.${key} must be a non-empty string when the annex is declared`);
+    }
     if (config.enforcer.annexPath !== undefined || config.enforcer.privateKeyPath !== undefined) {
-      for (const key of ['annexPath', 'privateKeyPath']) {
-        const v = config.enforcer[key];
-        if (typeof v !== 'string' || !v.trim()) throw new TypeError(`blessed: enforcer.${key} must be a non-empty string when the annex is declared`);
-      }
       enforcer = { annexPath: config.enforcer.annexPath, privateKeyPath: config.enforcer.privateKeyPath };
+      // The subject-identity ledger (#20) lives BESIDE the chains — Enforcer
+      // state the composition already masks — so the offline auditor can
+      // verify the certified lineage without asking this runtime. Declared
+      // with the annex because a certifying runtime that writes its
+      // certificates nowhere is a runtime whose lineage nobody can check;
+      // absent (an annex-less composition) means no certificates at all.
+      if (config.enforcer.ledgerPath !== undefined) enforcer.ledgerPath = config.enforcer.ledgerPath;
     }
   }
   return {

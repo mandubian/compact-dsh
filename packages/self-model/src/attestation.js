@@ -245,7 +245,14 @@ export function renderAttestation(att) {
         : ' · lineage not recorded'),
     ...(att.subject.identity
       ? [`Session identity: certified by enforcer key ${att.subject.identity.enforcerKeyId} ` +
-         `(cert ${att.subject.identity.certDigest.slice(0, 12)}… — development keyring, no standing outside this runtime)`]
+         `(cert ${att.subject.identity.certDigest.slice(0, 12)}…` +
+         (att.subject.identity.depth ? `, depth ${att.subject.identity.depth}` : '') +
+         (att.subject.identity.parentCertDigest
+           ? `, chained to parent cert ${att.subject.identity.parentCertDigest.slice(0, 12)}…`
+           : att.subject.identity.parentSubjectId
+             ? `, parent ${att.subject.identity.parentSubjectId} unchained (no parent digest available at issuance)`
+             : '') +
+         ` — development keyring, no standing outside this runtime)`]
       : []),
     `Standing: ${att.subject.standing.claimed} — ${att.subject.standing.reason}`,
     `Law: ${att.law.status ?? 'unknown'}, digest ${att.law.digest ? att.law.digest.slice(0, 16) : 'unknown'}`,

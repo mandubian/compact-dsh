@@ -287,7 +287,16 @@ rejection, and the lineage fields are the rehearsed surface. **Landing scope
 for this slice:** lead-session issuance, projection, and verification, plus
 the full verification primitives; child issuance at the specialists spawn
 boundary follows in the next slice and is specified here so its landing is
-mechanical.
+mechanical. **Landed (#20):** the child's keypair is issued and certified on
+`subagent/start` — the edge where the Enforcer learns a child exists, while
+the parent's certificate is still resolvable — bound to the parent's digest,
+appended to `chains/subjects.jsonl` beside the chains (Enforcer state the
+composition already masks), surfaced by `self_describe` (depth + parent cert)
+and `inquiry` (certificate, verdict under the annex key, per-link digests),
+and verified offline by `audit.mjs --identities`: signature, re-derived
+digests, depth = parent + 1, expiry and unknown keys refused by name; a
+parent whose header could not be read yields a link that NAMES it and is
+reported unbound (warning) rather than fabricated to verify.
 
 ### 9. Register (A-4/F-5 bookkeeping)
 

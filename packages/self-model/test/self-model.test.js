@@ -12,10 +12,10 @@ import {
   authorityChain, ULTIMATE_PRINCIPAL, apply,
 } from '../src/index.js';
 import { GrantStore } from 'compact-dsh-approval';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, statSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { generateEd25519, signAnnex } from 'compact-dsh-seals';
+import { generateEd25519, signAnnex, signSubjectCert, canonicalBytes, withoutField, sha256Hex } from 'compact-dsh-seals';
 import { COMPACT_DIGEST, partNameOf } from 'compact-dsh-constitution';
 
 // The Subject's own words — the thing R-1 says must never be the source.
@@ -312,7 +312,7 @@ test('with no emergency layer composed the attestation says so quietly, not fals
 
 // -- rehearsal signatures (development keyring) -------------------------------
 
-async function bootSigned() {
+async function bootSigned({ ledger = false } = {}) {
   const { ctx, agents } = await boot();
   const dir = mkdtempSync(join(tmpdir(), 'self-model-enforcer-'));
   const enforcer = generateEd25519();
@@ -324,8 +324,14 @@ async function bootSigned() {
   const keyPath = join(dir, 'enforcer.pem');
   writeFileSync(annexPath, JSON.stringify(annex));
   writeFileSync(keyPath, enforcer.privateKeyPem);
-  const service = apply(ctx, { enforcer: { annexPath, privateKeyPath: keyPath } });
-  return { ctx, agents, service, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  const ledgerPath = ledger ? join(dir, 'subjects.jsonl') : undefined;
+  const service = apply(ctx, {
+    enforcer: { annexPath, privateKeyPath: keyPath, ...(ledgerPath ? { ledgerPath } : {}) },
+  });
+  return {
+    ctx, agents, service, enforcer, ledgerPath,
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
 }
 
 test('a declared annex signs the attestation: basis dev-keyring, signature verifies, the label travels', async () => {
@@ -436,4 +442,204 @@ test('a constitution without name derivation renders bare codes — the render d
   const text = renderAttestation(att);
   assert.match(text, /- MA: bound/, 'degradation keeps the attestation honest, not richer');
   assert.ok(!/- MA — /.test(text));
+});
+
+// -- child subject identity at the spawn boundary (#20) ----------------------
+//
+// MA-1's delegation lineage becomes cryptographic at the edge where the
+// Enforcer learns a child exists: an enforcer-certified keypair issued at
+// spawn, bound to the PARENT's certificate digest, ledgered beside the chains
+// for the offline auditor, surfaced by self_describe and inquiry — and the
+// two refusals every certificate machinery must be able to make (expiry,
+// unknown key) drilled rather than assumed.
+
+test('a delegated child is certified at the SPAWN edge — chained to its parent, before any attestation (#20)', async () => {
+  const { ctx, agents, service, cleanup } = await bootSigned();
+  try {
+    agents.add('parent-1');
+    service.attest('parent-1');                       // the parent's own boundary issues its identity
+    agents.add('child-1', { parentSession: 'parent-1', delegationDepth: 1 });
+    assert.equal(service.subjectIdentity('child-1'), null, 'nothing exists before the spawn edge');
+
+    ctx.emit('subagent/start', { id: 'child-1', runId: 'run-1', provider: 'spawn' });
+
+    const child = service.subjectIdentity('child-1');
+    assert.ok(child, 'the spawn edge issues the certificate — not the child\'s first attestation, which may never come');
+    assert.equal(child.cert.subjectId, 'child-1');
+    assert.equal(child.cert.depth, 1);
+    assert.equal(child.cert.parentSubjectId, 'parent-1');
+    assert.equal(child.cert.parentCertDigest, service.subjectIdentity('parent-1').certDigest,
+      'the lineage binds to the parent CERTIFICATE digest, not only to its id');
+    assert.equal(service.verifySubjectCert(child.cert).valid, true);
+
+    // issued once: the child's later attestation re-uses this identity
+    const att = service.attest('child-1');
+    assert.equal(att.subject.identity.certDigest, child.certDigest);
+    assert.equal(att.subject.identity.parentCertDigest, service.subjectIdentity('parent-1').certDigest);
+    const rendered = renderAttestation(att);
+    assert.match(rendered, /cert [0-9a-f]{12}…, depth 1/);
+    assert.match(rendered, new RegExp(`chained to parent cert ${service.subjectIdentity('parent-1').certDigest.slice(0, 12)}…`));
+    const blockLines = rendered.split('\n');
+    const identityAt = blockLines.findIndex(l => l.startsWith('Session identity:'));
+    assert.ok(identityAt > 0 && blockLines[identityAt + 1].startsWith('Standing:'),
+      'the identity line is followed directly by Standing — a stray empty element would put a blank line between them');
+  } finally {
+    cleanup();
+  }
+});
+
+test('the spawn edge binds only real lineage — no parentSession means nothing to chain (#20)', async () => {
+  const { ctx, agents, service, cleanup } = await bootSigned();
+  try {
+    agents.add('free-agent');
+    ctx.emit('subagent/start', { id: 'free-agent', runId: 'run-free' });
+    assert.equal(service.subjectIdentity('free-agent'), null,
+      'the spawn edge invents no lineage: without a parentSession there is nothing to bind (D-7)');
+
+    // …and that session is certified at its own boundary, as a root
+    const att = service.attest('free-agent');
+    assert.equal(att.subject.identity.depth, 0);
+    assert.equal(att.subject.identity.parentSubjectId, undefined);
+    assert.equal(att.subject.identity.parentCertDigest, undefined);
+    assert.match(renderAttestation(att), /cert [0-9a-f]{12}… — development keyring/,
+      'the root identity line keeps exactly its shape: no depth, no parent, no invented chain');
+    assert.ok(!/depth|parent/.test(renderAttestation(att).split('\n').find(l => l.startsWith('Session identity:'))));
+  } finally {
+    cleanup();
+  }
+});
+
+test('an uncertified parent is certified FIRST at the spawn edge, so no child binds an unresolvable digest (#20)', async () => {
+  const { ctx, agents, service, cleanup } = await bootSigned();
+  try {
+    agents.add('parent-2');
+    agents.add('child-2', { parentSession: 'parent-2', delegationDepth: 1 });
+    ctx.emit('subagent/start', { id: 'child-2', runId: 'run-2' });
+    const parent = service.subjectIdentity('parent-2');
+    const child = service.subjectIdentity('child-2');
+    assert.ok(parent, 'the parent is certified when its child needs its digest');
+    assert.ok(child);
+    assert.equal(child.cert.parentCertDigest, parent.certDigest);
+
+    // an unknown edge id changes nothing — issuance is keyed by the durable header
+    ctx.emit('subagent/start', { id: 'never-recorded', runId: 'run-3' });
+    assert.equal(service.subjectIdentity('never-recorded'), null);
+  } finally {
+    cleanup();
+  }
+});
+
+test('the identity ledger is Enforcer-held evidence: one signed line per issuance, parent first (#20)', async () => {
+  const { ctx, agents, service, ledgerPath, cleanup } = await bootSigned({ ledger: true });
+  try {
+    assert.equal(service.identityLedgerPath(), ledgerPath);
+    agents.add('p');
+    agents.add('c', { parentSession: 'p', delegationDepth: 1 });
+    ctx.emit('subagent/start', { id: 'c', runId: 'r' });
+    service.attest('p');
+    service.attest('c');
+
+    const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    assert.equal(lines.length, 2, 'issued once each — the map is the memo, and a second boundary appends nothing');
+    assert.deepEqual(lines.map(l => l.subjectId), ['p', 'c'], 'the parent is written first: the chain is built in order');
+    for (const line of lines) {
+      assert.equal(line.kind, 'subject-certificate');
+      assert.equal(line.certDigest, sha256Hex(canonicalBytes(withoutField(line.cert, 'signature'))),
+        "the line's declared digest is re-derivable from the artifact it carries — that is what makes it evidence");
+      assert.equal(service.verifySubjectCert(line.cert).valid, true);
+    }
+    assert.equal(lines[1].parentCertDigest, lines[0].certDigest, 'child line binds the parent line');
+    assert.equal(statSync(ledgerPath).mode & 0o777, 0o600, 'Enforcer state is owner-only');
+  } finally {
+    cleanup();
+  }
+});
+
+test('expiry and unknown keys are refused by name at the identity surface — the drill, not the assumption (#20)', async () => {
+  const { service, enforcer, cleanup } = await bootSigned();
+  try {
+    const subject = generateEd25519();
+    const expired = signSubjectCert({
+      subjectId: 'ghost', publicKey: subject.publicKey, scope: 'rehearsal', depth: 0,
+      expiresAt: new Date(Date.now() - 60_000).toISOString(), privateKey: enforcer.privateKeyPem,
+    });
+    const expiry = service.verifySubjectCert(expired);
+    assert.equal(expiry.valid, false, 'a stale identity is an alarm, not a truth to act on');
+    assert.match(expiry.reason, /expired/);
+
+    const stranger = generateEd25519();
+    const rogue = signSubjectCert({
+      subjectId: 'ghost', publicKey: subject.publicKey, scope: 'rehearsal', depth: 0,
+      privateKey: stranger.privateKeyPem,
+    });
+    const unknown = service.verifySubjectCert(rogue);
+    assert.equal(unknown.valid, false, "a certificate the annex key did not sign is another Member's claim");
+    assert.match(unknown.reason, /does not verify under the annex's enforcer key/);
+  } finally {
+    cleanup();
+  }
+});
+
+test('inquiry answers identity cryptographically: the certificate, its verdict, and the certified chain (#20)', async () => {
+  const { ctx, agents, service, cleanup } = await bootSigned();
+  try {
+    agents.add('root-1');
+    service.attest('root-1');
+    agents.add('kid', { parentSession: 'root-1', delegationDepth: 1 });
+    ctx.emit('subagent/start', { id: 'kid', runId: 'r' });
+
+    const answer = service.inquire('kid');
+    const cert = answer.identity.certificate;
+    assert.equal(cert.known, true);
+    assert.equal(cert.valid, true, 'the verdict is computed here against the annex key, never reported on trust');
+    assert.equal(cert.keyId, 'dev-test-enforcer');
+    assert.equal(cert.depth, 1);
+    assert.equal(cert.parentCertDigest, service.subjectIdentity('root-1').certDigest);
+    assert.equal(cert.conveysStanding, false);
+    assert.equal(answer.authority.chain[0].certDigest, cert.certDigest,
+      'the authority chain carries each link certificate, not only the header word');
+
+    const rendered = renderInquiry(answer);
+    assert.match(rendered, /certificate: [0-9a-f]{12}… — VERIFIES under enforcer key dev-test-enforcer/);
+    assert.match(rendered, /development keyring, conveys no standing/);
+    assert.match(rendered, /depth 1 · chained to parent certificate [0-9a-f]{12}… \(parent root-1\)/);
+    assert.match(rendered, /cert [0-9a-f]{12}…/, 'the rendered chain shows the digests');
+    assert.match(rendered, /Reasoning is not disclosed by inquiry \(R-10\)/);
+  } finally {
+    cleanup();
+  }
+});
+
+test('an incompletely bound child is reported as such, never as a verified link (#20)', async () => {
+  const { ctx, agents, service, cleanup } = await bootSigned();
+  try {
+    // the durable header names a parent whose session this runtime cannot
+    // read — the issuance-time reality of a parent that is gone
+    agents.add('orphan-child', { parentSession: 'vanished', delegationDepth: 1 });
+    ctx.emit('subagent/start', { id: 'orphan-child', runId: 'r' });
+    const cert = service.subjectIdentity('orphan-child').cert;
+    assert.equal(cert.parentSubjectId, 'vanished');
+    assert.equal(cert.parentCertDigest, undefined, 'no digest is fabricated for a parent whose certificate is unreachable');
+    const answer = service.inquire('orphan-child');
+    assert.equal(answer.identity.certificate.valid, true,
+      'the certificate itself verifies — it is the LINK that is unproven, and the two are reported apart');
+    assert.match(renderInquiry(answer), /names parent vanished but binds no parent digest — this link CANNOT be verified offline/);
+  } finally {
+    cleanup();
+  }
+});
+
+test('without an annex, inquiry declares the missing identity surface instead of implying a check (#20)', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  const answer = answerInquiry(ctx, { about: 's1' });
+  assert.equal(answer.identity.certificate.known, false);
+  assert.match(answer.identity.certificate.note, /no enforcer identity is composed/);
+  assert.ok(!/VERIFIES/.test(renderInquiry(answer)), 'no verification is claimed where none happened');
+
+  // an annex that simply never issued THIS Member's certificate says that too
+  const surface = { of: () => null, verify: () => ({ valid: false }), keyId: () => 'dev-test-enforcer' };
+  const issued = answerInquiry(ctx, { about: 's1', identities: surface });
+  assert.equal(issued.identity.certificate.known, false);
+  assert.match(issued.identity.certificate.note, /no certificate was issued for this Member/);
 });

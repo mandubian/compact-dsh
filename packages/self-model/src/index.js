@@ -37,7 +37,8 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
-import { readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import {
@@ -81,39 +82,99 @@ export function apply(ctx, config = {}) {
   // Subject session identities (I-1 rehearsal): an ephemeral keypair per
   // session, certified by the enforcer key, lineage bound as data
   // ({depth, parentSubjectId, parentCertDigest}) — identity lineage mirrors
-  // MA-1's delegation lineage. Issued at the first attestation boundary.
+  // MA-1's delegation lineage. Issued at the spawn boundary (#20) for
+  // delegated children, and at the first attestation boundary for the lead
+  // session (or for a child whose spawn edge this runtime never saw).
   const subjects = new Map(); // sessionId -> { cert, certDigest, publicKey, privateKeyPem }
+  // The identity ledger: Enforcer-held evidence written BESIDE the chains
+  // (never into the session log, which is the Subject's own record) so the
+  // offline auditor can verify the certified lineage with no cooperation from
+  // this runtime (I-7). The signed cert inside each line is the artifact; the
+  // line's own fields are framing, and the auditor re-derives them from it.
+  const ledgerPath = config.enforcer?.ledgerPath ?? null;
+  if (enforcer && !ledgerPath) {
+    ctx.logger?.warn?.(
+      'compact-self-model: an enforcer annex is declared but no identity ledger path is configured — subject ' +
+      'certificates will be issued in memory only, so the offline auditor cannot verify the certified lineage (I-8)');
+  }
+
+  const appendLedger = (line) => {
+    if (!ledgerPath) return;
+    try {
+      // the ledger lives beside the chains; its directory may not exist yet
+      // in a composition that has never flushed a chain
+      mkdirSync(dirname(ledgerPath), { recursive: true, mode: 0o700 });
+      appendFileSync(ledgerPath, `${JSON.stringify(line)}\n`, { mode: 0o600 });
+    } catch (error) {
+      // evidence that cannot be written is LOUD (I-8) — but it must never
+      // break the boundary it was issued at
+      ctx.logger?.warn?.(
+        `compact-self-model: could not append the subject-identity ledger at ${ledgerPath}: ${error.message} — ` +
+        'the offline auditor will not see this certificate');
+    }
+  };
+
+  /**
+   * Issue ONE certified identity for a Subject, at whichever boundary learns
+   * of it first, and write it to the ledger. The parent is certified first
+   * when its lineage is readable, so a child's certificate binds to a digest
+   * the auditor can actually resolve — the chain is built at issuance, never
+   * repaired afterwards (a link nobody can check is not a link).
+   *
+   * A parent whose header this runtime cannot read yields a child certificate
+   * that NAMES its parent without binding a digest: an honestly incomplete
+   * link the auditor reports as a warning, rather than a fabricated one that
+   * would verify (D-7: say the gap, never fill it).
+   */
+  const ensureSubject = (sid, lineage = { parent: null, delegationDepth: 0 }, seen = new Set()) => {
+    if (!enforcer || seen.has(sid)) return null;
+    seen.add(sid);
+    const existing = subjects.get(sid);
+    if (existing) return existing;
+    let parent;
+    const parentId = lineage.parent != null ? String(lineage.parent) : null;
+    if (parentId != null && parentId !== sid) {
+      const parentLineage = lineageOf(ctx, parentId);
+      parent = subjects.get(parentId)
+        ?? (parentLineage.known ? ensureSubject(parentId, parentLineage, seen) : null);
+    }
+    const kp = generateEd25519();
+    const cert = signSubjectCert({
+      subjectId: sid,
+      publicKey: kp.publicKey,
+      scope: 'rehearsal',
+      depth: lineage.delegationDepth ?? 0,
+      ...(parentId != null ? { parentSubjectId: parentId } : {}),
+      ...(parent ? { parentCertDigest: parent.certDigest } : {}),
+      privateKey: enforcer.privateKey,
+    });
+    const certDigest = sha256Hex(canonicalBytes(withoutField(cert, 'signature')));
+    subjects.set(sid, { cert, certDigest, publicKey: kp.publicKey, privateKeyPem: kp.privateKeyPem });
+    appendLedger({
+      kind: 'subject-certificate',
+      subjectId: sid,
+      certDigest,
+      issuedAt: cert.issuedAt,
+      ...(cert.parentSubjectId ? { parentSubjectId: cert.parentSubjectId } : {}),
+      ...(cert.parentCertDigest ? { parentCertDigest: cert.parentCertDigest } : {}),
+      cert,
+    });
+    return subjects.get(sid);
+  };
 
   const attestFor = (sessionId, now = Date.now()) => {
     const att = composeAttestation(ctx, { sessionId, now, staleAfterMs, signed: enforcer != null });
     if (enforcer && sessionId != null) {
       const sid = String(sessionId);
-      if (!subjects.has(sid)) {
-        const lineage = att.subject.lineage;
-        const parent = lineage.parent ? subjects.get(String(lineage.parent)) : undefined;
-        const kp = generateEd25519();
-        const cert = signSubjectCert({
-          subjectId: sid,
-          publicKey: kp.publicKey,
-          scope: 'rehearsal',
-          depth: lineage.delegationDepth ?? 0,
-          ...(lineage.parent ? { parentSubjectId: String(lineage.parent) } : {}),
-          ...(parent ? { parentCertDigest: parent.certDigest } : {}),
-          privateKey: enforcer.privateKey,
-        });
-        subjects.set(sid, {
-          cert,
-          certDigest: sha256Hex(canonicalBytes(withoutField(cert, 'signature'))),
-          publicKey: kp.publicKey,
-          privateKeyPem: kp.privateKeyPem,
-        });
-      }
+      ensureSubject(sid, att.subject.lineage);
       const identity = subjects.get(sid);
       att.subject.identity = {
         certDigest: identity.certDigest,
         enforcerKeyId: enforcer.keyId,
         subjectPublicKey: identity.cert.publicKey,
         depth: identity.cert.depth,
+        ...(identity.cert.parentSubjectId ? { parentSubjectId: identity.cert.parentSubjectId } : {}),
+        ...(identity.cert.parentCertDigest ? { parentCertDigest: identity.cert.parentCertDigest } : {}),
         conveysStanding: false,
       };
     }
@@ -152,6 +213,31 @@ export function apply(ctx, config = {}) {
     return { signed: true, valid: ok, keyId: enforcer.keyId, basis: 'dev-keyring', annexDigest: enforcer.annexDigest };
   };
 
+  /** Verify a subject certificate against the annex key (R-13's answer, cryptographic). */
+  const verifyCert = (cert) => {
+    if (!enforcer) return { valid: false, reason: 'no enforcer annex is composed' };
+    try {
+      verifySubjectCert({ cert, enforcerKey: enforcer.enforcerKey });
+      return { valid: true, keyId: enforcer.keyId, basis: 'dev-keyring', conveysStanding: false };
+    } catch (e) {
+      return { valid: false, reason: e.message };
+    }
+  };
+
+  // The certified lineage, as inquiry's identity limb reads it (#20): what
+  // this Enforcer issued for a Member, and whether it verifies under its own
+  // key — R-13's "who that Member is" answered from a signature rather than
+  // from a session header's word for itself. `of` is deliberately a lookup
+  // only: the answer can never originate here.
+  const identitySurface = {
+    of: (id) => {
+      const s = id == null ? undefined : subjects.get(String(id));
+      return s ? { cert: s.cert, certDigest: s.certDigest } : null;
+    },
+    verify: verifyCert,
+    keyId: () => enforcer?.keyId ?? null,
+  };
+
   // 1. at the boundary of the Subject's own operation
   ctx.on?.('session/event', (session, event) => {
     if (event?.type !== 'turn/start') return;
@@ -164,6 +250,25 @@ export function apply(ctx, config = {}) {
         source: SOURCE,
       }));
     } catch { /* a failed attestation must never break the turn */ }
+  });
+
+  // 1b. THE SPAWN BOUNDARY (#20). A delegated child's keypair is issued and
+  // enforcer-certified HERE — at the edge where the Enforcer learns a child
+  // exists, while its parent is still live and its certificate resolvable —
+  // rather than at the child's first attestation, which may never come (a
+  // one-shot child refused before its first turn would have no identity at
+  // all), and would chain to a parent cert that may already be out of reach.
+  // Only a delegated child is issued here: without a `parentSession` in its
+  // durable header there is no lineage to bind, and inventing one would be the
+  // guess D-7 forbids — that session is certified at its own boundary instead.
+  ctx.on?.('subagent/start', (info) => {
+    try {
+      if (!enforcer || info?.id == null) return;
+      const sid = String(info.id);
+      const lineage = lineageOf(ctx, sid);
+      if (!lineage.known || !lineage.parent) return;
+      ensureSubject(sid, lineage);
+    } catch { /* issuance must never break the spawn */ }
   });
 
   // 2. on demand
@@ -217,6 +322,9 @@ export function apply(ctx, config = {}) {
       return renderInquiry(answerInquiry(ctx, {
         about: args?.agent_id,
         childState: childState && typeof childState.childrenOf === 'function' ? childState : null,
+        // R-13's identity limb, answered cryptographically: the certified
+        // lineage this Enforcer issued, verified here against its own key
+        identities: identitySurface,
       }));
     },
   });
@@ -246,20 +354,15 @@ export function apply(ctx, config = {}) {
       return s ? { cert: s.cert, certDigest: s.certDigest, publicKey: s.publicKey } : null;
     },
     /** Verify a subject certificate against the annex key (R-13's answer, cryptographic). */
-    verifySubjectCert: (cert) => {
-      if (!enforcer) return { valid: false, reason: 'no enforcer annex is composed' };
-      try {
-        verifySubjectCert({ cert, enforcerKey: enforcer.enforcerKey });
-        return { valid: true, keyId: enforcer.keyId, basis: 'dev-keyring', conveysStanding: false };
-      } catch (e) {
-        return { valid: false, reason: e.message };
-      }
-    },
+    verifySubjectCert: verifyCert,
     /** R-13, for an operator or auditor asking outside the tool surface. */
     inquire: (about) => answerInquiry(ctx, {
       about,
       childState: ctx.get?.('compact-specialists') ?? null,
+      identities: identitySurface,
     }),
+    /** The identity ledger this runtime appended to, when one is configured. */
+    identityLedgerPath: () => ledgerPath,
   };
   ctx.provide?.('compact-self-model', service);
   return service;

@@ -288,6 +288,15 @@ test('loader: a declared enforcer annex signs what the runtime says — attestat
   const identity = selfModel.subjectIdentity('loader-annex-subject');
   assert.ok(identity, 'a subject session identity was issued');
   assert.deepEqual(selfModel.verifySubjectCert(identity.cert).valid, true);
+  // …and it is LEDGERED beside the chains, so the offline auditor can verify
+  // the certified lineage without this runtime's cooperation (#20)
+  const ledger = readFileSync(join(f.env.COMPACT_CHAIN_DIR, 'subjects.jsonl'), 'utf8')
+    .trim().split('\n').map(line => JSON.parse(line));
+  assert.equal(ledger.length, 1, 'one issuance, one line — the identity is issued once');
+  assert.equal(ledger[0].kind, 'subject-certificate');
+  assert.equal(ledger[0].subjectId, 'loader-annex-subject');
+  assert.equal(ledger[0].certDigest, identity.certDigest,
+    'the ledger line names the same digest the runtime hands its Subject');
   // a session on the record is authored: anchors cover its chain head
   const session = ctx.sessions.prepare('loader-annex-live');
   const writer = await ctx.get('sessionPersistence').create(session.header);
