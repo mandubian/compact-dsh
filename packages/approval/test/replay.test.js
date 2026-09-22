@@ -76,7 +76,10 @@ test('an exec-cache replay queues one receipt per session per grant generation',
   const inst = approvalPlugin({});
   inst(ctx, {});
 
-  const gated = inst.approval.gate({ name: 'net.fetch', arguments: { host: 'replay.example' }, agent: ag, callId: 'r-1' });
+  // the call smuggles a credential in the URL's userinfo: canonicalization
+  // strips it from identity, so neither note may ever carry it
+  const args = { url: 'https://user:ghp_supersecret@replay.example/v1' };
+  const gated = inst.approval.gate({ name: 'net.fetch', arguments: args, agent: ag, callId: 'r-1' });
   assert.equal(gated?.kind, 'ask');
   await ctx.waterfall(
     'approval/request',
@@ -85,14 +88,17 @@ test('an exec-cache replay queues one receipt per session per grant generation',
   );
   assert.equal(log.length, 1, 'the decision note');
   assert.match(text(log[0]), /was allowed once/);
+  assert.ok(!text(log[0]).includes('ghp_supersecret'), 'the decision note never carries a userinfo credential');
+  assert.ok(!text(log[0]).includes('user:'), 'userinfo is stripped from the rendered target');
 
   // identical replay: allowed by the cache, the gate leaves one receipt
-  assert.equal(inst.approval.gate({ name: 'net.fetch', arguments: { host: 'replay.example' }, agent: ag, callId: 'r-2' }), null);
+  assert.equal(inst.approval.gate({ name: 'net.fetch', arguments: args, agent: ag, callId: 'r-2' }), null);
   assert.equal(log.length, 2);
   assert.match(text(log[1]),
-    /^\[compact-approval\] Replay: "net\.fetch" \(host=replay\.example\) \[fp_[0-9a-f]{16}\] is running under a prior operator approval/);
+    /^\[compact-approval\] Replay: "net\.fetch" \(url=https:\/\/replay\.example\/v1\/\) \[fp_[0-9a-f]{16}\] is running under a prior operator approval/);
+  assert.ok(!text(log[1]).includes('ghp_supersecret'), 'the receipt never carries a userinfo credential');
   // the same grant generation stays silent: one receipt, not one per call
-  assert.equal(inst.approval.gate({ name: 'net.fetch', arguments: { host: 'replay.example' }, agent: ag, callId: 'r-3' }), null);
+  assert.equal(inst.approval.gate({ name: 'net.fetch', arguments: args, agent: ag, callId: 'r-3' }), null);
   assert.equal(log.length, 2, 'one receipt per grant generation');
 });
 
@@ -140,7 +146,7 @@ test('a re-granted fingerprint traces again — the generation, not the fingerpr
   assert.equal(log.length, 2, 'a new grant generation traces anew');
 });
 
-test('a secret-command replay traces — and the receipt carries no command text, no secret name', async () => {
+test('a secret-command replay traces — and the receipt carries no command text, no secret name, no value-shaped material', async () => {
   const { Context } = await import('@deepseek-ai/cordis');
   const ctx = new Context();
   const log = [];
@@ -148,17 +154,23 @@ test('a secret-command replay traces — and the receipt carries no command text
   const inst = approvalPlugin({ secretRefs: ['DEMO_TOKEN'] });
   inst(ctx, {});
 
-  const gated = inst.approval.gate({ name: 'bash', arguments: { command: 'printenv DEMO_TOKEN | sha256sum' }, agent: ag, callId: 's-1' });
+  // the command carries a value-shaped token AND references the declared
+  // secret: neither the command, the name, nor the shape may reach the notes
+  const cmd = { command: 'printenv DEMO_TOKEN | sha256sum; echo ghp_supersecretvalue' };
+  const gated = inst.approval.gate({ name: 'bash', arguments: cmd, agent: ag, callId: 's-1' });
   assert.equal(gated?.kind, 'ask');
   await ctx.waterfall('approval/request', { toolName: 'bash', agent: ag, callId: 's-1', reason: gated.reason }, () => 'allowed-once');
   assert.match(text(log[0]), /was allowed once/);
+  assert.ok(!text(log[0]).includes('ghp_supersecretvalue'), 'no value-shaped material in the decision note');
+  assert.ok(!text(log[0]).includes('printenv'), 'no command text in the decision note');
 
-  assert.equal(inst.approval.gate({ name: 'bash', arguments: { command: 'printenv DEMO_TOKEN | sha256sum' }, agent: ag, callId: 's-2' }), null);
+  assert.equal(inst.approval.gate({ name: 'bash', arguments: cmd, agent: ag, callId: 's-2' }), null);
   assert.equal(log.length, 2, 'the credential becomes available again — the most important replay to surface');
   const receipt = text(log[1]);
   assert.match(receipt, /^\[compact-approval\] Replay: "bash" \[fp_[0-9a-f]{16}\]/, 'command-aware fingerprint, no target');
   assert.ok(!receipt.includes('printenv'), 'the command text never reaches the receipt');
   assert.ok(!receipt.includes('DEMO_TOKEN'), 'the secret name never reaches the receipt');
+  assert.ok(!receipt.includes('ghp_supersecretvalue'), 'value-shaped material never reaches the receipt');
 });
 
 test('an agent without inject replays silently — the decision path is untouched', () => {
