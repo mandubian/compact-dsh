@@ -257,15 +257,19 @@ function targetBitsOf(target) {
  * command text) never reaches the record, and this note is on the record.
  * The view is narrowed by the caller to exactly these fields, so the
  * no-arguments doctrine is structural, not discipline. One line, always
- * (see oneLine).
+ * (see oneLine). `execCacheDisabled` keeps the allowed-once phrasing honest
+ * when the runtime disabled the cache (ttl 0): there is no entry to expire,
+ * so the note teaches per-ask, never a replay that cannot happen.
  */
-export function approvalTranscriptNote({ tool, fingerprint, target }, outcome) {
+export function approvalTranscriptNote({ tool, fingerprint, target }, outcome, { execCacheDisabled = false } = {}) {
   const targetBits = targetBitsOf(target);
   const subject = `"${oneLine(tool) || 'unknown-tool'}"` + (targetBits ? ` (${targetBits})` : '') + ` [${oneLine(fingerprint) || 'no fingerprint'}]`;
   switch (outcome) {
     case 'allowed-once':
       return `[compact-approval] Gate decision: ${subject} was allowed once by the operator — ` +
-        `the identical operation replays without re-asking until the exec-cache entry expires; anything else asks again.`;
+        (execCacheDisabled
+          ? `the exec cache is disabled in this runtime, so the identical operation asks again.`
+          : `the identical operation replays without re-asking until the exec-cache entry expires; anything else asks again.`);
     case 'rejected':
       return `[compact-approval] Gate decision: ${subject} was denied by the operator — the call did not run.`;
     case 'cancelled':
@@ -307,6 +311,12 @@ export function replayTranscriptNote({ tool, fingerprint, target, grantedAt, exp
  * (cross-session), and the two exits are named (lapse, revocation).
  */
 function replayConsequence(ttlMs) {
+  // ttl 0 disables the exec cache entirely (cacheSet returns early): the
+  // honest sentence is the opposite of the grant one — approval covers this
+  // ask, full stop
+  if (ttlMs === 0) {
+    return `Approving covers this ask only: the exec cache is disabled in this runtime, so the identical operation asks again.`;
+  }
   return `Approving materializes an exec-cache entry: the identical operation replays without re-asking ` +
     `for ${humanTtl(ttlMs)}, across sessions of this runtime, until it lapses or is revoked — anything else asks again.`;
 }
@@ -368,6 +378,7 @@ async function answerRequest(approval, req, next) {
           content: [{ type: 'text', text: approvalTranscriptNote(
             { tool: view.tool, fingerprint: view.fingerprint, target: view.target },
             outcome,
+            { execCacheDisabled: approval.execCacheTtlMs === 0 },
           ) + (outcome === 'allowed-once' && (rec.secretRefs ?? []).length
             ? ` The approved injection grant${rec.secretRefs.length > 1 ? 's are' : ' is'} live for this session ` +
               `(${rec.secretRefs.map(r => '$' + r).join(', ')}), TTL-bounded.`

@@ -74,6 +74,14 @@ test('lint: the uncovered ask states what approval materializes, before the deci
   assert.match(outDef.reason, /for 24h, across sessions/, 'the runtime\'s CONFIGURED ttl is stated, not a hardcoded one');
 });
 
+test('lint: a disabled exec cache never claims a replay (ttl 0)', async () => {
+  const { run } = boot({ execCacheTtlMs: 0 });
+  const out = await run({ name: 'net.fetch', arguments: { host: 'askonly.example' }, agent: AGENT });
+  assert.match(out.reason, /Approving covers this ask only: the exec cache is disabled in this runtime, so the identical operation asks again\./);
+  assert.ok(!out.reason.includes('replays without re-asking'), 'no replay is claimed where none can happen');
+  assert.ok(!out.reason.includes('for disabled'), 'the disabled ttl never renders as a duration');
+});
+
 test('lint: the secret-use ask scopes the injection grant and states the replay consequence too', async () => {
   const { run } = boot({ secretRefs: ['DEMO_TOKEN'] });
   const out = await run({ name: 'bash', arguments: { command: 'printenv DEMO_TOKEN | sha256sum' }, agent: AGENT });

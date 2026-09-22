@@ -205,6 +205,11 @@ test('the note renders every outcome from envelope-grade facts only', async () =
   assert.match(approvalTranscriptNote(view, 'unavailable'), /closed unavailable.*fail-closed/);
   const targeted = approvalTranscriptNote({ tool: 'net.fetch', fingerprint: 'fp_x', target: { host: 'evil.example' } }, 'rejected');
   assert.match(targeted, /"net\.fetch" \(host=evil\.example\) \[fp_x\]/, 'the canonical target is on the note');
+  // a runtime with the cache disabled: the allowed-once note teaches per-ask,
+  // never a replay that cannot happen
+  const askOnly = approvalTranscriptNote(view, 'allowed-once', { execCacheDisabled: true });
+  assert.match(askOnly, /the exec cache is disabled in this runtime, so the identical operation asks again\./);
+  assert.ok(!askOnly.includes('replays without re-asking'));
 });
 
 test('a crafted target cannot forge message structure: the note is one line, always', async () => {
