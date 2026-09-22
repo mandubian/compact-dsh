@@ -198,6 +198,20 @@ test('grants-list enumerates live cache entries with target and lifetime', () =>
   assert.match(out.text, /fp_live  host=live\.example port=8443  granted=.* expires=/);
   assert.ok(!out.text.includes('fp_dead'));
 
+  // the gate declares its own defaults — good defaults are inspectable ones
+  // (secret refs surface as NAMES; a value could never be here to surface)
+  const def = approvalPlugin({});
+  const registeredDef = {};
+  def({ on: () => {}, emit: () => {}, provide: () => {}, inject(deps, fn) { fn({ commands: { register: (c) => { registeredDef[c.name] = c; } } }); } }, {});
+  assert.match(registeredDef['grants-list'].handler().text,
+    /gate: exec-cache ttl=24h, flood cap 50\/root, pending ttl 5min, secret refs none declared \(injection ABSENT\)/);
+  const tuned = approvalPlugin({ execCacheTtlMs: 120_000, maxPendingPerRoot: 7, pendingTtlMs: 30_000, secretRefs: ['GH_TOKEN'] });
+  const registeredTuned = {};
+  tuned({ on: () => {}, emit: () => {}, provide: () => {}, inject(deps, fn) { fn({ commands: { register: (c) => { registeredTuned[c.name] = c; } } }); } }, {});
+  assert.match(registeredTuned['grants-list'].handler().text,
+    /gate: exec-cache ttl=2min, flood cap 7\/root, pending ttl 30s, secret refs \$GH_TOKEN/);
+  assert.ok(!JSON.stringify(registeredTuned['grants-list'].handler()).includes('gh'));
+
   const empty = approvalPlugin({});
   const registered2 = {};
   empty({ on: () => {}, emit: () => {}, provide: () => {}, inject(deps, fn) { fn({ commands: { register: (c) => { registered2[c.name] = c; } } }); } }, {});

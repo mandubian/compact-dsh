@@ -518,6 +518,14 @@ function registerGrantCommands(ctx, approval) {
   // probe and would read as authority it no longer carries (#40)
   const liveCache = () => [...approval.store.cache.entries()]
     .filter(([, e]) => !e.expiresAt || e.expiresAt > Date.now());
+  // the gate declares its own defaults (names only for secret refs — never
+  // values): being good by default includes the defaults being inspectable
+  const humanTtl = (ms) => ms === 0 ? 'disabled'
+    : ms % 3_600_000 === 0 ? `${ms / 3_600_000}h`
+    : ms % 60_000 === 0 ? `${ms / 60_000}min`
+    : `${ms / 1_000}s`;
+  const gateLine = `gate: exec-cache ttl=${humanTtl(approval.execCacheTtlMs)}, flood cap ${approval.maxPendingPerRoot}/root, ` +
+    `pending ttl ${humanTtl(approval.pendingTtlMs)}, secret refs ${approval.secretRefs.length ? approval.secretRefs.map(r => '$' + r).join(', ') : 'none declared (injection ABSENT)'}`;
   ctx.commands?.register({
     name: 'grants-list',
     description: 'compact-dsh: list live approval grants and cached approvals',
@@ -533,7 +541,7 @@ function registerGrantCommands(ctx, approval) {
         (lines.length ? `:\n${lines.join('\n')}${cache.length > lines.length ? `\n  …and ${cache.length - lines.length} more` : ''}` : '');
       return { kind: 'success', text: (grants.length
         ? `${grants.length} live grant(s):\n${grants.join('\n')}`
-        : 'no live grants') + `\n${cacheText}` };
+        : 'no live grants') + `\n${cacheText}\n${gateLine}` };
     },
   });
   ctx.commands?.register({
