@@ -14,6 +14,10 @@ that answers wins, and every answer is recorded. The layers:
    deduplicate. The fingerprint is computed from a *canonicalized* call —
    same operation on the same target is the same call, however phrased.
    Entries carry a TTL (default ~24h, 0 disables). Concrete targets only.
+   The entry binds no session: an approval is a decision about an *exact
+   operation*, so the identical operation replays across sessions of the
+   runtime until the entry lapses or is revoked. "Allow once" names the
+   decision, never the grant's consumption.
 2. **Plan grants.** An approved plan envelope materializes standing grants
    for the acts it describes.
 3. **Session grants (target-level).** Scoped grants with pattern targets —
@@ -37,6 +41,18 @@ that answers wins, and every answer is recorded. The layers:
   canonicalization = grant confusion.
 - **Grants are scoped and expiring.** No blanket grants, no implicit
   escalation: widening requires a new grant through the gate.
+- **Scope breadth is proportional to grant breadth.** A pattern grant
+  (session, plan) covers unseen future calls, so it binds to a lineage and
+  a budget; an exact-operation grant (exec cache) covers one call, so it
+  binds to time; identity-bearing power (secret grants) binds to the
+  session. Each layer's scope encodes what the operator actually decided.
+- **Cross-session validity is earned by cross-session traceability.** A
+  replay runs without a new decision, so it leaves a receipt in the
+  replaying session — once per session, per fingerprint, per grant
+  generation — naming the prior approval it runs under and its expiry;
+  live cache entries are enumerable on demand, and revocation kills
+  covered entries. A capability whose basis is invisible to the session
+  exercising it is undeclared authority.
 
 ## Mapping to a runtime (host-agnostic)
 
