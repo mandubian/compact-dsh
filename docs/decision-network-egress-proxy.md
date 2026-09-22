@@ -60,10 +60,10 @@ The proxy is an HTTP/HTTPS forwarder (no other protocol has a route):
 | Surface | What the proxy does |
 |---|---|
 | plain HTTP | client sends the absolute URI; the proxy checks `host:port` + method class against **this session's** live grants, then resolves the name **itself** and forwards |
-| HTTPS | client sends `CONNECT host:port`; same check; on pass, a byte tunnel — TLS end-to-end, never terminated |
+| HTTPS | client sends `CONNECT host:port`; the authority is checked against this session's live grants (host+port — a tunnel's *class* cannot be observed without interception, see residuals), then a byte tunnel: TLS end-to-end, never terminated |
 | DNS | the container never resolves: the hostname travels to the proxy in the request line / `CONNECT` (verified below: on the internal bridge, `getent` fails) |
 | redirect | the proxy **never follows one** — the client's next request or `CONNECT` re-enters the check, so a cross-host redirect is refused with a named reason: *a new host is a new grant* |
-| method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7) |
+| method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7). Enforced per plain-HTTP request; a `CONNECT` is admitted under any live, classed grant for its authority — what rides inside an opaque tunnel is unobservable **by the decision not to intercept**, declared as residual 2 rather than pretended checked. Coverage is a lattice: a write grant covers the read to the same target, never the reverse |
 | TTL, revocation | the store is the single authority, checked per connection; an established tunnel is tracked against its grant, so **revocation closes mid-flight tunnels** — the route dies, not just the next attempt |
 | other protocols | no route exists at all (ICMP, UDP, raw sockets): unreachable by construction, not filtered |
 
