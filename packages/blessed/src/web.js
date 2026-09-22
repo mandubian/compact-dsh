@@ -82,7 +82,11 @@ export const workspaceRegistryPath = (stateDir) => join(stateDir, 'storages', 'w
 
 /**
  * Aside retention (#22): at most this many `.aside-<timestamp>` siblings of
- * the registry survive per boot family — the newest ones. The pruning is
+ * the registry survive per boot family — the newest ones. Ordering comes
+ * from the timestamp IN THE NAME (the moment the aside was created; the
+ * collision suffix orders within one millisecond) — mtime is only a fallback
+ * for a name this parser does not know, because mtime is when the corrupt
+ * registry was last written, not when it was moved aside. The pruning is
  * never silent: every pruned file is returned to the caller, whose boot log
  * names them. An aside is the previous corrupt registry, operator state by
  * definition; the retention bounds its accumulation without ever deleting
@@ -105,9 +109,17 @@ export function pruneAsides(path, keep = ASIDE_RETENTION) {
     .filter(f => f.startsWith(prefix))
     .map(f => {
       const full = join(dir, f);
-      return { full, mtime: statSync(full).mtimeMs };
+      // `<stamp>` or `<stamp>-<n>` (the same-millisecond collision suffix,
+      // larger n = created later). Unknown names fall to stamp -1 and order
+      // by mtime among themselves — prunable first, never preferred.
+      const parsed = /^(\d+)(?:-(\d+))?$/.exec(f.slice(prefix.length));
+      return {
+        full,
+        stamp: parsed ? Number(parsed[1]) : -1,
+        seq: parsed ? (parsed[2] !== undefined ? Number(parsed[2]) : 0) : statSync(full).mtimeMs,
+      };
     })
-    .sort((a, b) => b.mtime - a.mtime);
+    .sort((a, b) => (b.stamp - a.stamp) || (b.seq - a.seq));
   const pruned = [];
   for (const { full } of asides.slice(keep)) {
     unlinkSync(full);
@@ -136,7 +148,8 @@ export function pruneAsides(path, keep = ASIDE_RETENTION) {
  * workspace is added when none exists, and everything else (order, archive
  * set, matching records) is preserved untouched. Only a CORRUPT registry is
  * moved aside (timestamped; a bounded family — at most ASIDE_RETENTION most
- * recent survive, older ones pruned BY NAME IN THE BOOT LOG, never silently)
+ * recent survive by filename timestamp, older ones pruned, each NAMED IN THE
+ * BOOT LOG, never silently)
  * — and the boot log then says that the first session bootstrap may
  * re-register old directories, which the UI workspace settings can remove.
  *

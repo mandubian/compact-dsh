@@ -189,15 +189,17 @@ test('workspace registry: an uninitialized registry is left for the header boots
 test('aside retention (#22): the newest asides survive, the pruned are returned by name — never silent', (t) => {
   const { dir, write } = registryFixture(t);
   const path = workspaceRegistryPath(dir);
-  // four pre-existing asides with explicitly distinct mtimes (oldest first),
-  // plus the one this boot is about to create — a family of 5 against
-  // retention 3 prunes exactly the two oldest
+  // four pre-existing asides with DISTINCT mtimes set INVERTED against the
+  // name order — mtime says the oldest-named aside is the newest on disk;
+  // the name's timestamp is the retention key (when the aside was created),
+  // so a family of 5 against retention 3 prunes exactly the two oldest names
   const asides = [];
   const base = 1_000_000_000_000;
   for (let age = 1; age <= 4; age++) {
     const aside = `${path}.aside-${base + age}`;
     writeFileSync(aside, '{ not json');
-    utimesSync(aside, new Date(base + age), new Date(base + age)); // deterministic mtime ordering (Date = ms)
+    const inverted = new Date(base + (5 - age) * 1000); // name order ↛ mtime order
+    utimesSync(aside, inverted, inverted);
     asides.push(aside);
   }
   writeFileSync(path, '{ not json');

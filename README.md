@@ -602,10 +602,13 @@ must stay **outside the agent workspace**. Contents, verified layout:
 │                                  (0600; operator-owned, never in the record)
 ├── storages/                      dsh storage-json deployment state — a corrupt
 │                                  workspace.json is moved aside as
-│                                  workspace.json.aside-<timestamp> (the registry
-│                                  is UI state, not evidence); retention keeps the
-│                                  3 most recent asides and the boot log names
-│                                  every pruned file — deletion is never silent
+│                                  workspace.json.aside-<timestamp> (or
+│                                  workspace.json.aside-<timestamp>-<n> when two
+│                                  moves land in one millisecond); the registry is
+│                                  UI state, not evidence; retention keeps the 3
+│                                  most recent asides by their filename timestamp
+│                                  and the boot log names every pruned file —
+│                                  deletion is never silent
 ├── sessions/                      the record (COMPACT_RECORD_ROOT): one dir per
 │   └── <workspace-path>/          workspace, one dir per session — the session
 │       └── <session-id>/          dir's name IS the session id (ids look like
