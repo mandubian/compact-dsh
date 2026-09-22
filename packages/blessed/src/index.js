@@ -204,13 +204,15 @@ async function bounded(operation, timeoutMs, label) {
 /** The prompt section whose text upstream fills with an inert checkout path (#17). */
 export const HARNESS_SOURCE_SECTION = 'harness:source';
 
-// The claim as the boot bundle writes it: "…checkout is at <path>. The
+// The claim as the boot bundle writes it — the sentence anchored start to
+// finish: "The DeepSeek Harness implementation checkout is at <path>. The
 // checkout location and current working directory are separate values…".
-// Parsing the upstream sentence is how this composition learns WHICH path was
-// named without importing the bundle's private constant; a reworded upstream
-// sentence parses to nothing, and nothing is treated as unexposed (D-7: fail
-// closed, never guess a path into the prompt).
-const CHECKOUT_CLAIM = /checkout is at (.+?)\. The checkout location/;
+// Parsing upstream's exact sentence is how this composition learns WHICH path
+// was named without importing the bundle's private constant, and anchoring it
+// means a stray "checkout is at …" anywhere else in the section is NOT parsed
+// as the claim. A reworded upstream sentence parses to nothing, and nothing is
+// treated as unexposed (D-7: fail closed, never guess a path into the prompt).
+const CHECKOUT_CLAIM = /The DeepSeek Harness implementation checkout is at (.+?)\. The checkout location/;
 
 /** The checkout path the section claims, or null when it claims none. */
 export function claimedCheckoutPath(text) {
@@ -370,12 +372,16 @@ export async function apply(ctx, config = {}) {
   // #17: the prompt must never name a path the sandbox does not expose. The
   // section arrives from the boot bundle with its checkout path; here it is
   // rewritten to the workspace (or left alone when that path is genuinely
-  // mounted), and the operator is told once what was corrected.
-  ctx.on?.('system-prompt/assemble', harnessSourceHonesty(policy.workspaceRoot, (superseded) => {
+  // mounted), and the operator is told once what was corrected. The path
+  // NAMED is `declaredRoot` — the canonical one — because the provider binds
+  // `canonicalizeBestEffort(workspaceRoot)` as source AND target and sets the
+  // container's `-w` to it: when the configured path is a symlink, the
+  // non-canonical spelling is itself a path the container does not see.
+  ctx.on?.('system-prompt/assemble', harnessSourceHonesty(declaredRoot, (superseded) => {
     ctx.logger?.warn?.(
       `blessed: the "${HARNESS_SOURCE_SECTION}" prompt section named a path this composition does not expose` +
       `${superseded ? ` (${claimedCheckoutPath(superseded) ?? superseded})` : ''} — the section now names the ` +
-      `workspace (${policy.workspaceRoot}) instead; a prompt must not offer what the sandbox refuses (#17)`,
+      `workspace (${declaredRoot}) instead; a prompt must not offer what the sandbox refuses (#17)`,
     );
   }));
   // CF-1/workspace-anchor (#18): refuse calls from sessions naming another

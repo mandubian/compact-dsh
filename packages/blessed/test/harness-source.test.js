@@ -68,6 +68,11 @@ test('a claim this composition cannot parse fails closed into the honest text (D
     assert.equal(replaced, true, 'an unparseable claim is never guessed into the prompt');
     assert.equal(sections[0].text, harnessSourceText(WORKSPACE));
   }
+  assert.equal(
+    claimedCheckoutPath('the agent may read: checkout is at /elsewhere. The checkout location…'),
+    null,
+    'only upstream\'s own sentence is the claim — a stray "checkout is at …" elsewhere is not parsed',
+  );
 });
 
 test('a composition that carries no such section (headless) is left alone', () => {
