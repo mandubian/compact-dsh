@@ -61,6 +61,36 @@ test('lint: the uncovered ask carries rule ID + lawful next moves', async () => 
   assertEnvelope(out.kind, out.reason, 'uncovered ask');
 });
 
+test('lint: the uncovered ask states what approval materializes, before the decision (#40 posture)', async () => {
+  // the Subject is taught after (the decision note, the replay receipt);
+  // the operator is taught BEFORE, at the moment of deciding
+  const { run } = boot({ execCacheTtlMs: 120_000 });
+  const out = await run({ name: 'net.fetch', arguments: { host: 'consequence.example' }, agent: AGENT });
+  assert.match(out.reason,
+    /Approving materializes an exec-cache entry: the identical operation replays without re-asking for 2min, across sessions of this runtime, until it lapses or is revoked — anything else asks again\./,
+    'the ask names the grant, its configured TTL, its cross-session reach, and both exits');
+  const def = boot({});
+  const outDef = await def.run({ name: 'net.fetch', arguments: { host: 'consequence.example' }, agent: AGENT });
+  assert.match(outDef.reason, /for 24h, across sessions/, 'the runtime\'s CONFIGURED ttl is stated, not a hardcoded one');
+});
+
+test('lint: a disabled exec cache never claims a replay (ttl 0)', async () => {
+  const { run } = boot({ execCacheTtlMs: 0 });
+  const out = await run({ name: 'net.fetch', arguments: { host: 'askonly.example' }, agent: AGENT });
+  assert.match(out.reason, /Approving covers this ask only: the exec cache is disabled in this runtime, so the identical operation asks again\./);
+  assert.ok(!out.reason.includes('replays without re-asking'), 'no replay is claimed where none can happen');
+  assert.ok(!out.reason.includes('for disabled'), 'the disabled ttl never renders as a duration');
+});
+
+test('lint: the secret-use ask scopes the injection grant and states the replay consequence too', async () => {
+  const { run } = boot({ secretRefs: ['DEMO_TOKEN'] });
+  const out = await run({ name: 'bash', arguments: { command: 'printenv DEMO_TOKEN | sha256sum' }, agent: AGENT });
+  assert.equal(out.kind, 'ask');
+  assertEnvelope(out.kind, out.reason, 'secret ask');
+  assert.match(out.reason, /session-scoped, TTL-bounded, revocable/, 'the injection grant\'s scope is on the ask');
+  assert.match(out.reason, /Approving materializes an exec-cache entry/, 'the secret path caches too — the ask says so');
+});
+
 test('lint: the dedup-pending ask carries the envelope too', async () => {
   const { run } = boot({});
   await run({ name: 'net.fetch', arguments: { host: 'dedup.example' }, agent: AGENT });

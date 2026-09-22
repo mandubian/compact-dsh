@@ -257,15 +257,19 @@ function targetBitsOf(target) {
  * command text) never reaches the record, and this note is on the record.
  * The view is narrowed by the caller to exactly these fields, so the
  * no-arguments doctrine is structural, not discipline. One line, always
- * (see oneLine).
+ * (see oneLine). `execCacheDisabled` keeps the allowed-once phrasing honest
+ * when the runtime disabled the cache (ttl 0): there is no entry to expire,
+ * so the note teaches per-ask, never a replay that cannot happen.
  */
-export function approvalTranscriptNote({ tool, fingerprint, target }, outcome) {
+export function approvalTranscriptNote({ tool, fingerprint, target }, outcome, { execCacheDisabled = false } = {}) {
   const targetBits = targetBitsOf(target);
   const subject = `"${oneLine(tool) || 'unknown-tool'}"` + (targetBits ? ` (${targetBits})` : '') + ` [${oneLine(fingerprint) || 'no fingerprint'}]`;
   switch (outcome) {
     case 'allowed-once':
       return `[compact-approval] Gate decision: ${subject} was allowed once by the operator — ` +
-        `the identical operation replays without re-asking until the exec-cache entry expires; anything else asks again.`;
+        (execCacheDisabled
+          ? `the exec cache is disabled in this runtime, so the identical operation asks again.`
+          : `the identical operation replays without re-asking until the exec-cache entry expires; anything else asks again.`);
     case 'rejected':
       return `[compact-approval] Gate decision: ${subject} was denied by the operator — the call did not run.`;
     case 'cancelled':
@@ -297,6 +301,36 @@ export function replayTranscriptNote({ tool, fingerprint, target, grantedAt, exp
     (targetBits ? ` (${targetBits})` : '') + ` [${oneLine(fingerprint) || 'no fingerprint'}]` +
     ` is running under a prior operator approval — granted ${granted}, expires ${expires ?? 'never'} — ` +
     `no new decision was asked or made; revoke or let it lapse to be asked again.`;
+}
+
+/**
+ * The decision-time half of the #40 posture: the transcript teaches the
+ * Subject AFTER (the decision note, the replay receipt) — this sentence
+ * teaches the operator BEFORE, inside the ask itself. Envelope-grade facts:
+ * the TTL is the runtime's configured one, the reach is stated plainly
+ * (cross-session), and the two exits are named (lapse, revocation).
+ */
+function replayConsequence(ttlMs) {
+  // ttl 0 disables the exec cache entirely (cacheSet returns early): the
+  // honest sentence is the opposite of the grant one — approval covers this
+  // ask, full stop
+  if (ttlMs === 0) {
+    return `Approving covers this ask only: the exec cache is disabled in this runtime, so the identical operation asks again.`;
+  }
+  return `Approving materializes an exec-cache entry: the identical operation replays without re-asking ` +
+    `for ${humanTtl(ttlMs)}, across sessions of this runtime, until it lapses or is revoked — anything else asks again.`;
+}
+
+/**
+ * Human-honest durations for the surfaces that declare the gate's posture
+ * (the ask envelopes, grants-list): whole hours and minutes stay whole, the
+ * rest reads in seconds — never a rounded lie.
+ */
+function humanTtl(ms) {
+  return ms === 0 ? 'disabled'
+    : ms % 3_600_000 === 0 ? `${ms / 3_600_000}h`
+    : ms % 60_000 === 0 ? `${ms / 60_000}min`
+    : `${ms / 1_000}s`;
 }
 
 /**
@@ -344,6 +378,7 @@ async function answerRequest(approval, req, next) {
           content: [{ type: 'text', text: approvalTranscriptNote(
             { tool: view.tool, fingerprint: view.fingerprint, target: view.target },
             outcome,
+            { execCacheDisabled: approval.execCacheTtlMs === 0 },
           ) + (outcome === 'allowed-once' && (rec.secretRefs ?? []).length
             ? ` The approved injection grant${rec.secretRefs.length > 1 ? 's are' : ' is'} live for this session ` +
               `(${rec.secretRefs.map(r => '$' + r).join(', ')}), TTL-bounded.`
@@ -427,8 +462,9 @@ export function approvalPlugin(opts = {}) {
         try { ctx.emit?.(REFUSAL_EVENT, refusalPayload({ kind: 'ask', verdict: 'ask', ruleId: 'I-5/secret-use', tool, fingerprint: fp, root, session })); } catch { /* accounting must not break enforcement */ }
         const env = buildEnvelope({ gate: 'AG', ruleId: 'I-5/secret-use',
           reason: `"${tool}" references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
-            `approving it materializes the injection grant and the credential is available to this command inside the ` +
-            `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints`,
+            `approving it materializes the injection grant — session-scoped, TTL-bounded, revocable — and the credential is available to this command inside the ` +
+            `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints. ` +
+            replayConsequence(approval.execCacheTtlMs),
           lawfulNextMoves: ['rephrase without the secret reference', 'escalate to your Principal'] });
         return { kind: 'ask', reason: env.text };
       }
@@ -465,9 +501,10 @@ export function approvalPlugin(opts = {}) {
         reason: `"${tool}" is not covered by this runtime's grant layers` +
           (secretRefs.length
             ? ` — this call references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
-              `approving it materializes a secret grant and the credential is injected into the confined execution ` +
+              `approving it materializes a session-scoped, TTL-bounded, revocable secret grant and the credential is injected into the confined execution ` +
               `without entering this conversation`
-            : ''),
+            : '') +
+          `. ${replayConsequence(approval.execCacheTtlMs)}`,
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };
     };
@@ -520,10 +557,6 @@ function registerGrantCommands(ctx, approval) {
     .filter(([, e]) => !e.expiresAt || e.expiresAt > Date.now());
   // the gate declares its own defaults (names only for secret refs — never
   // values): being good by default includes the defaults being inspectable
-  const humanTtl = (ms) => ms === 0 ? 'disabled'
-    : ms % 3_600_000 === 0 ? `${ms / 3_600_000}h`
-    : ms % 60_000 === 0 ? `${ms / 60_000}min`
-    : `${ms / 1_000}s`;
   const gateLine = `gate: exec-cache ttl=${humanTtl(approval.execCacheTtlMs)}, flood cap ${approval.maxPendingPerRoot}/root, ` +
     `pending ttl ${humanTtl(approval.pendingTtlMs)}, secret refs ${approval.secretRefs.length ? approval.secretRefs.map(r => '$' + r).join(', ') : 'none declared (injection ABSENT)'}`;
   ctx.commands?.register({
