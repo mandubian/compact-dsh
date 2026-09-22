@@ -5,7 +5,7 @@
 // loader.web.dsh.test.js, which needs Docker like its headless sibling.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -184,4 +184,46 @@ test('workspace registry: an uninitialized registry is left for the header boots
   const aligned = alignWorkspaceRegistry(dir, '/repo');
   assert.notEqual(aligned.aside, null, 'a corrupt registry moves aside');
   assert.ok(aligned.foreign[0].includes('re-register'), 'the boot names the bootstrap consequence');
+});
+
+test('aside retention (#22): the newest asides survive, the pruned are returned by name — never silent', (t) => {
+  const { dir, write } = registryFixture(t);
+  const path = workspaceRegistryPath(dir);
+  // four pre-existing asides with explicitly distinct mtimes (oldest first),
+  // plus the one this boot is about to create — a family of 5 against
+  // retention 3 prunes exactly the two oldest
+  const asides = [];
+  const base = 1_000_000_000_000;
+  for (let age = 1; age <= 4; age++) {
+    const aside = `${path}.aside-${base + age}`;
+    writeFileSync(aside, '{ not json');
+    utimesSync(aside, new Date(base + age), new Date(base + age)); // deterministic mtime ordering (Date = ms)
+    asides.push(aside);
+  }
+  writeFileSync(path, '{ not json');
+  const aligned = alignWorkspaceRegistry(dir, '/repo');
+  assert.notEqual(aligned.aside, null, 'the corrupt registry still moves aside');
+  assert.deepEqual([...aligned.pruned].sort(), [asides[0], asides[1]], 'exactly the two oldest asides are pruned (retention 3)');
+  assert.ok(!existsSync(asides[0]) && !existsSync(asides[1]), 'the pruned asides are gone');
+  assert.ok(existsSync(asides[2]) && existsSync(asides[3]), 'the newest pre-existing asides survive');
+  assert.ok(existsSync(aligned.aside), 'this boot\u2019s aside survives (the newest of the family)');
+});
+
+test('aside naming (#22): a same-millisecond aside never clobbers an existing one', (t) => {
+  const { dir, write } = registryFixture(t);
+  const path = workspaceRegistryPath(dir);
+  const realNow = Date.now;
+  Date.now = () => 1_234_567_890_123; // both moves derive the SAME stamp
+  try {
+    writeFileSync(path, '{ not json');
+    const first = alignWorkspaceRegistry(dir, '/repo');
+    assert.equal(first.aside, `${path}.aside-1234567890123`);
+    writeFileSync(path, '{ not json');
+    const second = alignWorkspaceRegistry(dir, '/repo');
+    assert.equal(second.aside, `${path}.aside-1234567890123-1`, 'the colliding name is suffixed, not reused');
+    assert.ok(existsSync(first.aside), 'the first aside was not clobbered');
+    assert.deepEqual(second.pruned, [], 'a young family prunes nothing');
+  } finally {
+    Date.now = realNow;
+  }
 });

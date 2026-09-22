@@ -29,8 +29,8 @@
 //    independent; the preset keeps the model-facing catalog honest.
 
 import { randomUUID } from 'node:crypto';
-import { basename, join } from 'node:path';
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { lstat, mkdir, readlink, realpath, symlink } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -81,6 +81,42 @@ export const presetCompositionPath = () => join(presetRoot(), PRESET_ID, 'agent.
 export const workspaceRegistryPath = (stateDir) => join(stateDir, 'storages', 'workspace.json');
 
 /**
+ * Aside retention (#22): at most this many `.aside-<timestamp>` siblings of
+ * the registry survive per boot family — the newest ones. The pruning is
+ * never silent: every pruned file is returned to the caller, whose boot log
+ * names them. An aside is the previous corrupt registry, operator state by
+ * definition; the retention bounds its accumulation without ever deleting
+ * quietly.
+ */
+export const ASIDE_RETENTION = 3;
+
+function nextAsidePath(path) {
+  const stamp = Date.now();
+  let aside = `${path}.aside-${stamp}`;
+  for (let i = 0; existsSync(aside); i++) aside = `${path}.aside-${stamp}-${i + 1}`;
+  return aside;
+}
+
+/** Prune the oldest asides past the retention; returns the pruned absolute paths. */
+export function pruneAsides(path, keep = ASIDE_RETENTION) {
+  const prefix = `${basename(path)}.aside-`;
+  const dir = dirname(path);
+  const asides = readdirSync(dir)
+    .filter(f => f.startsWith(prefix))
+    .map(f => {
+      const full = join(dir, f);
+      return { full, mtime: statSync(full).mtimeMs };
+    })
+    .sort((a, b) => b.mtime - a.mtime);
+  const pruned = [];
+  for (const { full } of asides.slice(keep)) {
+    unlinkSync(full);
+    pruned.push(full);
+  }
+  return pruned;
+}
+
+/**
  * Align the dsh workspace registry with this boot's exposure.
  *
  * The registry persists across boots (storages/workspace.json), and the
@@ -99,33 +135,35 @@ export const workspaceRegistryPath = (stateDir) => join(stateDir, 'storages', 'w
  * records naming other directories are removed, a record for the boot
  * workspace is added when none exists, and everything else (order, archive
  * set, matching records) is preserved untouched. Only a CORRUPT registry is
- * moved aside (timestamped, never deleted) — and the boot log then says that
- * the first session bootstrap may re-register old directories, which the UI
- * workspace settings can remove.
+ * moved aside (timestamped; a bounded family — at most ASIDE_RETENTION most
+ * recent survive, older ones pruned BY NAME IN THE BOOT LOG, never silently)
+ * — and the boot log then says that the first session bootstrap may
+ * re-register old directories, which the UI workspace settings can remove.
  *
- * @returns {{aside: string|null, foreign: string[], realigned: boolean}}
+ * @returns {{aside: string|null, foreign: string[], realigned: boolean, pruned: string[]}}
  */
 export function alignWorkspaceRegistry(stateDir, workspace) {
   const path = workspaceRegistryPath(stateDir);
-  if (!existsSync(path)) return { aside: null, foreign: [], realigned: false };
+  if (!existsSync(path)) return { aside: null, foreign: [], realigned: false, pruned: [] };
   let registry;
   try {
     registry = JSON.parse(readFileSync(path, 'utf8'));
   } catch {
-    const aside = `${path}.aside-${Date.now()}`;
+    const aside = nextAsidePath(path);
     renameSync(path, aside);
-    return { aside, foreign: ['(unreadable — the first boot may re-register directories from session history; remove them in the UI workspace settings)'], realigned: false };
+    const pruned = pruneAsides(path);
+    return { aside, foreign: ['(unreadable — the first boot may re-register directories from session history; remove them in the UI workspace settings)'], realigned: false, pruned };
   }
   const workspaces = registry?.tables?.workspaces;
   if (registry?.global?.initialized !== true || typeof workspaces !== 'object' || workspaces === null) {
     // a fresh, uninitialized registry bootstraps from session headers by
     // design; there is nothing to align without forging dsh state
-    return { aside: null, foreign: [], realigned: false };
+    return { aside: null, foreign: [], realigned: false, pruned: [] };
   }
   const ids = Array.isArray(registry.global.workspaceIds) ? registry.global.workspaceIds : [];
   const foreign = ids.map(id => workspaces[id]).filter(w => w?.path !== workspace).map(w => w?.path ?? '(no path)');
   const keptIds = ids.filter(id => workspaces[id]?.path === workspace);
-  if (foreign.length === 0 && keptIds.length > 0) return { aside: null, foreign: [], realigned: false };
+  if (foreign.length === 0 && keptIds.length > 0) return { aside: null, foreign: [], realigned: false, pruned: [] };
   for (const id of ids) {
     if (workspaces[id]?.path !== workspace) delete workspaces[id];
   }
@@ -142,7 +180,7 @@ export function alignWorkspaceRegistry(stateDir, workspace) {
   }
   registry.global.workspaceIds = keptIds;
   writeFileSync(path, JSON.stringify(registry, null, 2) + '\n', { mode: 0o600 });
-  return { aside: null, foreign, realigned: true };
+  return { aside: null, foreign, realigned: true, pruned: [] };
 }
 
 /** The checkout's dependency root — the install anchor the launcher points at. */

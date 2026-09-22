@@ -138,7 +138,7 @@ async function main() {
 
   const { boot, loadOverlayPatches, installFailLoud } = await import('@deepseek-ai/dsh-app-boot');
   const { provideCmdline } = await import('@deepseek-ai/dsh-cmdline');
-  const { webRows, PRESET_ID, ensureInstallAnchor, alignWorkspaceRegistry } = await import('compact-dsh-blessed/web');
+  const { webRows, PRESET_ID, ASIDE_RETENTION, ensureInstallAnchor, alignWorkspaceRegistry } = await import('compact-dsh-blessed/web');
   if (values.web) {
     ensureInstallAnchor(stateDir);
     // one boot, one exposed workspace: a registry naming another directory
@@ -149,6 +149,9 @@ async function main() {
     }
     if (aligned.aside) {
       console.error(`${binName}: the workspace registry was unreadable and moved to ${aligned.aside}; the first session bootstrap may re-register directories from session history — remove them in the UI workspace settings`);
+      if (aligned.pruned?.length > 0) {
+        console.error(`${binName}: registry-aside retention kept the ${ASIDE_RETENTION} most recent; pruned ${aligned.pruned.length}: ${aligned.pruned.join(', ')}`);
+      }
     }
   }
   const bundle = name => loadOverlayPatches(binName, fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve(`${name}/package.json`))));
