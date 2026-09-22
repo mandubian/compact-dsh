@@ -7,6 +7,8 @@
 // allow-once materializes the exec-cache replay.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { Context, Service } from '@deepseek-ai/cordis';
 import { ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools';
 import ApprovalService from '@deepseek-ai/dsh-user-approval';
@@ -16,9 +18,12 @@ import { createOperatorPrompter, operatorAnswerer } from './operator-answerer.mj
 
 // behavior: a literal answer string, 'eof' (close before answering), or
 // 'sigint' (^C). transcript captures everything written to the fake stderr.
+// The fake input counts unref() calls — the prompter must release the loop
+// hold on stdin once a prompt settles (#36).
 function fakeReadline(behavior, transcript = []) {
+  const input = { isTTY: false, unrefCalls: 0, unref() { input.unrefCalls += 1; } };
   return {
-    input: { isTTY: false },
+    input,
     output: { write: s => (transcript.push(s), true) },
     createInterface() {
       const rl = {
@@ -78,6 +83,15 @@ test('prompter: malformed input denies with a note (no re-prompt loop)', async (
   assert.ok(transcript.join('').includes('defaulting to deny'), 'the denial is announced');
 });
 
+test('prompter: a settled prompt unrefs stdin — the answered ask must not hold the process open (#36)', async () => {
+  for (const behavior of ['2', '', 'eof', 'sigint']) {
+    const deps = fakeReadline(behavior);
+    const prompt = createOperatorPrompter(deps);
+    await prompt(REQ);
+    assert.equal(deps.input.unrefCalls, 1, `behavior ${JSON.stringify(behavior)}: stdin unref'd exactly once`);
+  }
+});
+
 test('answerer: compact envelope asks go to the prompter; anything else delegates (fail-closed)', async () => {
   const asked = [];
   const ctx = new Context();
@@ -96,6 +110,53 @@ test('answerer: a rogue prompter return is normalized to rejected', async () => 
   operatorAnswerer(ctx, async () => 'allowed-always');
   const outcome = await ctx.waterfall(null, 'approval/request', { toolName: 't', reason: '[AG/x] r' }, () => Promise.resolve('unavailable'));
   assert.equal(outcome, 'rejected');
+});
+
+// ---- the real hang (#36): a child that prompts on REAL piped stdin ----------
+
+const childSource = `
+import { setInterval as keepAlive, clearInterval } from 'node:timers';
+import { createOperatorPrompter } from ${JSON.stringify(fileURLToPath(new URL('./operator-answerer.mjs', import.meta.url)))};
+// mirror the launcher: a ref'd keep-alive interval stands in for every
+// session-living handle (model stream, web server) — the unref'd stdin must
+// still deliver while these exist, and stop holding the process once gone
+const ka = keepAlive(() => {}, 60_000);
+const prompt = createOperatorPrompter();
+const req = { toolName: 'net_probe', reason: '[AG/fp-test] uncovered call' };
+process.stderr.write('PROMPT_READY\\n');
+const first = await prompt(req);
+process.stderr.write('OUTCOME:' + first + '\\n');
+const second = await prompt(req);
+process.stderr.write('OUTCOME:' + second + '\\n');
+clearInterval(ka);
+// ends here — the session handles are gone: the process must exit on its own
+`;
+
+test('settle: with the stdin pipe held open, the answered child still exits — and a second ask still delivers (#36)', async () => {
+  const child = spawn(process.execPath, ['--input-type=module', '--eval', childSource], {
+    stdio: ['pipe', 'ignore', 'pipe'],
+  });
+  const t0 = Date.now();
+  const result = await new Promise(resolve => {
+    let stderr = '';
+    let stage = 0;
+    const finish = how => resolve({ how, stderr, ms: Date.now() - t0 });
+    const timer = setTimeout(() => { child.kill('SIGKILL'); finish('hung'); }, 5_000);
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+      if (stage === 0 && stderr.includes('PROMPT_READY')) {
+        stage = 1;
+        child.stdin.write('2\n'); // allow once — the pipe then stays OPEN, as the live harness keeps it
+      } else if (stage === 1 && stderr.includes('OUTCOME:allowed-once')) {
+        stage = 2;
+        child.stdin.write('1\n'); // a later ask must still deliver after the unref
+      }
+    });
+    child.on('exit', code => { clearTimeout(timer); finish(code === 0 ? 'exited' : `exited(${code})`); });
+  });
+  assert.equal(result.how, 'exited', `the child must exit on its own — got ${result.how} after ${result.ms}ms; stderr:\n${result.stderr}`);
+  assert.ok(result.stderr.includes('OUTCOME:allowed-once'), 'the first ask was answered');
+  assert.ok(result.stderr.includes('OUTCOME:rejected'), 'the second ask was answered too — the unref\u2019d stdin still delivers while the session lives');
 });
 
 // ---- composed: through the real ApprovalService + ToolRuntime chain --------

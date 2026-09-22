@@ -30,6 +30,14 @@ export function createOperatorPrompter({ input = process.stdin, output = process
         if (settled) return;
         settled = true;
         rl.close();
+        // rl.close() releases the INTERFACE, not the input stream: an open
+        // stdin fd stays ref'd on the loop, so an attended run whose harness
+        // (or terminal) never EOFs stdin hangs forever after the task
+        // completes (#36). unref the stream once the prompt is settled — the
+        // launcher's keep-alive interval and the in-flight model stream keep
+        // the loop ref'd while the session lives, later asks still deliver
+        // input, and at drain time stdin no longer holds the process open.
+        input.unref?.();
         resolve(outcome);
       };
       rl.on('SIGINT', () => done('rejected'));
