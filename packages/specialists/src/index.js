@@ -7,7 +7,12 @@
 //
 //   persona prose  → config.persona    (shadows the deployment persona for the child)
 //   excluded_tools → config.toolFilter.deny  (scoped tools.restrict(): invisible AND refuses)
-//   no-recursive-spawn / depth bounds → config.maxDepth (leaves 0; leads capped)
+//   no-recursive-spawn / depth bounds → config.maxDepth + toolFilter.deny
+//     (specialists capped at 1: the child a parent spawns sits at depth 1 —
+//     0 would refuse the first spawn, not recursion. The "leaves" half of the
+//     doctrine is the surface property: the child's own spawn tools are denied
+//     via toolFilter.deny, so no grandchild is ever attempted — and depth 2
+//     refuses at the provider regardless. Leads stay capped at leadMaxDepth.)
 //
 // Every spawn through these tools is a recorded tool call naming the persona,
 // and the child is session-backed with a durable descriptor — spawn under
@@ -74,6 +79,14 @@ export function specialistsPlugin(opts = {}) {
     const provider = config.provider ?? opts.provider ?? 'spawn';
     const backgroundMode = config.backgroundMode ?? opts.backgroundMode ?? 'one-shot';
     const leadMaxDepth = config.leadMaxDepth ?? opts.leadMaxDepth ?? 3;
+    // The mounted tool's maxDepth caps the SPAWNED CHILD's depth (provider
+    // arithmetic: child depth = parent depth + 1, refused past maxDepth). A
+    // top-level parent spawning a specialist produces a depth-1 child, so the
+    // cap for a non-lead row is 1 — 0 would refuse the very first spawn
+    // (#37). That a specialist never spawns is enforced on its own surface
+    // (deny: subagent, subagent_fork); maxDepth 1 is the provider-side backstop.
+    const specialistMaxDepth = 1;
+    const mountedMaxDepth = (p) => (p.descriptor.kind === 'lead' ? leadMaxDepth : specialistMaxDepth);
 
     // MA-3: the Enforcer's picture of every delegation, written from the host
     // lifecycle edges and pushed to the parent on each transition (never
@@ -96,7 +109,7 @@ export function specialistsPlugin(opts = {}) {
         description: p.descriptor.description,
         preset: p.descriptor.preset,
         spawns: p.descriptor.spawns,
-        maxDepth: p.descriptor.kind === 'lead' ? leadMaxDepth : 0,
+        maxDepth: mountedMaxDepth(p),
         deny: p.descriptor.deny,
         source: p.descriptor.source,
       })),
@@ -127,7 +140,7 @@ export function specialistsPlugin(opts = {}) {
         backgroundMode,
         persona: composePersona(p),
         toolFilter: { deny: [...p.descriptor.deny] },
-        maxDepth: p.descriptor.kind === 'lead' ? leadMaxDepth : 0,
+        maxDepth: mountedMaxDepth(p),
       });
     }
 

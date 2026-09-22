@@ -119,9 +119,10 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > delegation-tool row carrying its **composed persona prompt** (unique prose +
 > canonical sections + the taught output contract + marked phase gates),
 > its **deny filter** (the `excluded_tools` port over real dsh tool names —
-> a denied tool is invisible AND refuses), and its **depth cap** — leaves 0
-> with the spawn tools denied (**no-recursive-spawn is a surface property**),
-> leads capped (default 3). Spawning rides the real ToolRuntime: every spawn
+> a denied tool is invisible AND refuses), and its **depth cap** — specialists
+> capped at 1 (spawnable at depth 1; their own surface denies the spawn tools,
+> so **no-recursive-spawn is a surface property**, and a depth-2 grandchild
+> refuses at the provider regardless), leads capped (default 3). Spawning rides the real ToolRuntime: every spawn
 > is a recorded tool call naming the persona, the child is session-backed
 > with a durable descriptor (MA-1), and the provider enforces the depth cap
 > at every start (MA-2) — both now `enforced` in the register, and the

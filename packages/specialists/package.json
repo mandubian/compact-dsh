@@ -11,6 +11,9 @@
     "@deepseek-ai/dsh-tool-subagent": "^0.1.5-rc.1",
     "compact-envelope": "0.1.0"
   },
+  "devDependencies": {
+    "@deepseek-ai/dsh-subagent": "~0.1.5-rc.1"
+  },
   "scripts": {
     "test": "node --test \"test/*.test.js\""
   },
