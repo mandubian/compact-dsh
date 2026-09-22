@@ -135,6 +135,11 @@ export function createApproval(opts = {}) {
     // decision, so an operator answerer can show WHAT is being decided, not
     // just that something is.
     deciding: new Map(),
+    // #40 replay traces already delivered: `${session}/${fp}/${grantedAt}` →
+    // noted at. The grant generation (grantedAt) is part of the key: a
+    // fingerprint the operator approved AGAIN traces again. Bounded by a
+    // coarse clear (worst case after a clear: one extra trace per live pair).
+    replayNotes: new Map(),
     // ask↔decision correlation: agent object → toolName → FIFO of ask records.
     // The host request carries NO tool arguments, so a single rec per
     // (agent, tool) would let a LATER ask overwrite an EARLIER one — and the
@@ -179,8 +184,60 @@ export function createApproval(opts = {}) {
       if (idx < 0) idx = 0;
       return q.splice(idx, 1)[0];
     },
+    /**
+     * #40: the exec-cache replay's receipt. A replay is a decision the
+     * operator already made paying out in a session that never saw it — this
+     * queues the one-line trace (once per session, per fingerprint, per grant
+     * generation) so the Subject's transcript names the basis. The entry (and
+     * its generation) is the caller's — the one the replay actually ran
+     * under, never a re-read that could cross an expiry boundary. The noted
+     * key is recorded only AFTER inject succeeds: a transient inject failure
+     * must not burn the generation's receipt — the next replay retries. An
+     * agent without inject (test shapes) skips silently; a throwing inject
+     * must never take the gate down.
+     */
+    noteReplay: (agent, session, tool, fp, entry, now = Date.now()) => {
+      if (!entry) entry = approval.store.cacheGet(fp, now);
+      if (!entry) return;
+      if (typeof agent?.inject !== 'function') return;
+      const key = `${session ?? 'root'}/${fp}/${entry.grantedAt}`;
+      if (approval.replayNotes.has(key)) return;
+      if (approval.replayNotes.size >= 2048) approval.replayNotes.clear();
+      try {
+        agent.inject(createUserMessage({
+          content: [{ type: 'text', text: replayTranscriptNote({
+            tool, fingerprint: fp, target: entry.target ?? {},
+            grantedAt: entry.grantedAt, expiresAt: entry.expiresAt,
+          }) }],
+          source: { kind: 'plugin', plugin: 'compact-approval' },
+        }));
+        approval.replayNotes.set(key, now);
+      } catch { /* the trace is a receipt, never a gate — and not yet spent */ }
+    },
   };
   return approval;
+}
+
+/**
+ * The one-line guarantee shared by every transcript note (#25, #40): a note
+ * is injected as a user message, and the values it carries are tool-argument
+ * material — `canonicalTarget` lowercases the host and stringifies the port
+ * without stripping control characters, so a crafted `host`/`port` could
+ * otherwise ride the interpolation into a multi-line forged message. Every
+ * value is flattened (control characters and whitespace runs → one space)
+ * before it touches a note: the fact stays on the record, the message
+ * structure cannot be forged by the fact's subject.
+ */
+function oneLine(v) {
+  return String(v ?? '').replace(/[\u0000-\u001f\u007f\s]+/g, ' ').trim();
+}
+
+function targetBitsOf(target) {
+  return Object.entries(target ?? {})
+    .map(([k, v]) => [k, oneLine(v)])
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(' ');
 }
 
 /**
@@ -199,24 +256,12 @@ export function createApproval(opts = {}) {
  * Deliberately NOT the deciding preview — what the operator saw (the masked
  * command text) never reaches the record, and this note is on the record.
  * The view is narrowed by the caller to exactly these fields, so the
- * no-arguments doctrine is structural, not discipline.
- *
- * ONE LINE, ALWAYS: the note is injected as a user message, and its target
- * values are tool-argument material — `canonicalTarget` lowercases the host
- * and stringifies the port without stripping control characters, so a crafted
- * `host`/`port` could otherwise ride the interpolation into a multi-line
- * forged message. Every value is flattened (control characters and whitespace
- * runs → one space) before it touches the note: the fact stays on the record,
- * the message structure cannot be forged by the fact's subject.
+ * no-arguments doctrine is structural, not discipline. One line, always
+ * (see oneLine).
  */
 export function approvalTranscriptNote({ tool, fingerprint, target }, outcome) {
-  const oneline = (v) => String(v ?? '').replace(/[\u0000-\u001f\u007f\s]+/g, ' ').trim();
-  const targetBits = Object.entries(target ?? {})
-    .map(([k, v]) => [k, oneline(v)])
-    .filter(([, v]) => v)
-    .map(([k, v]) => `${k}=${v}`)
-    .join(' ');
-  const subject = `"${oneline(tool) || 'unknown-tool'}"` + (targetBits ? ` (${targetBits})` : '') + ` [${oneline(fingerprint) || 'no fingerprint'}]`;
+  const targetBits = targetBitsOf(target);
+  const subject = `"${oneLine(tool) || 'unknown-tool'}"` + (targetBits ? ` (${targetBits})` : '') + ` [${oneLine(fingerprint) || 'no fingerprint'}]`;
   switch (outcome) {
     case 'allowed-once':
       return `[compact-approval] Gate decision: ${subject} was allowed once by the operator — ` +
@@ -228,6 +273,30 @@ export function approvalTranscriptNote({ tool, fingerprint, target }, outcome) {
     default:
       return `[compact-approval] Gate decision: ${subject} closed ${outcome ?? 'unavailable'} — no operator answer; the call did not run (fail-closed).`;
   }
+}
+
+/**
+ * The transcript note for an exec-cache REPLAY (#40). The exec-cache is
+ * cross-session by design — the operator approved one exact operation, and
+ * "once" names the decision, not the grant's consumption — but cross-session
+ * validity must be earned by cross-session traceability: the replaying
+ * session inherits a capability whose basis lives in a prior session's
+ * record, and without a trace it sees only the tool run. This note is the
+ * payout's receipt where the Subject lives: same channel, same envelope-grade
+ * discipline — tool, canonical target, fingerprint, when the underlying
+ * approval was granted and when it lapses — and, like the decision note,
+ * ONE LINE, ALWAYS (see oneLine).
+ */
+export function replayTranscriptNote({ tool, fingerprint, target, grantedAt, expiresAt }) {
+  const targetBits = targetBitsOf(target);
+  // null/undefined, never truthiness: epoch 0 is a time, not an absence
+  const when = (ts) => { if (ts == null) return null; try { return new Date(ts).toISOString(); } catch { return null; } };
+  const granted = when(grantedAt) ?? 'an unrecorded time';
+  const expires = when(expiresAt);
+  return `[compact-approval] Replay: "${oneLine(tool) || 'unknown-tool'}"` +
+    (targetBits ? ` (${targetBits})` : '') + ` [${oneLine(fingerprint) || 'no fingerprint'}]` +
+    ` is running under a prior operator approval — granted ${granted}, expires ${expires ?? 'never'} — ` +
+    `no new decision was asked or made; revoke or let it lapse to be asked again.`;
 }
 
 /**
@@ -345,7 +414,13 @@ export function approvalPlugin(opts = {}) {
       if (Object.keys(canonicalTarget(args)).length === 0) {
         if (secretRefs.length === 0) return null;
         const fp = commandAwareFingerprint(tool, args);
-        if (approval.store.cacheHit(fp, Date.now())) return null;   // the identical secret command replays
+        const secretEntry = approval.store.cacheGet(fp, Date.now());
+        if (secretEntry) {
+          // the identical secret command replays — and its replay traces (#40):
+          // the credential becomes available again without a new decision
+          approval.noteReplay(exec?.agent, session, tool, fp, secretEntry);
+          return null;
+        }
         if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp, root, session, args, callId: exec.callId, secretRefs });
         approval.store.recordPending(root);
         // LoopGuard cooperation, same contract as the target-bearing path
@@ -358,7 +433,15 @@ export function approvalPlugin(opts = {}) {
         return { kind: 'ask', reason: env.text };
       }
       const v = approval.evaluate({ tool, args, root, session, now: Date.now() });
-      if (v.verdict === 'allowed') return null;
+      if (v.verdict === 'allowed') {
+        // an exec-cache replay traces once per session per grant generation
+        // (#40): the call runs, and the Subject learns a prior approval paid
+        // for it — under the exact entry the evaluation answered from. Plan/
+        // session-grant allows are the grant layers' own record (pattern
+        // grants list in grants-list) — not this note's business.
+        if (v.layer === 'exec-cache') approval.noteReplay(exec?.agent, session, tool, v.fingerprint, v.entry);
+        return null;
+      }
       const report = (kind) => {
         // LoopGuard cooperation — a throwing listener must never take the
         // gate down with it (the gate's answer stands either way)
@@ -431,14 +514,34 @@ function patternText(pattern) {
 
 function registerGrantCommands(ctx, approval) {
   const live = () => approval.store.sessionGrants.filter(g => !g.revokedAt && (!g.expiresAt || g.expiresAt > Date.now()));
+  // live cache entries only: an expired entry is lazily deleted on its next
+  // probe and would read as authority it no longer carries (#40)
+  const liveCache = () => [...approval.store.cache.entries()]
+    .filter(([, e]) => !e.expiresAt || e.expiresAt > Date.now());
+  // the gate declares its own defaults (names only for secret refs — never
+  // values): being good by default includes the defaults being inspectable
+  const humanTtl = (ms) => ms === 0 ? 'disabled'
+    : ms % 3_600_000 === 0 ? `${ms / 3_600_000}h`
+    : ms % 60_000 === 0 ? `${ms / 60_000}min`
+    : `${ms / 1_000}s`;
+  const gateLine = `gate: exec-cache ttl=${humanTtl(approval.execCacheTtlMs)}, flood cap ${approval.maxPendingPerRoot}/root, ` +
+    `pending ttl ${humanTtl(approval.pendingTtlMs)}, secret refs ${approval.secretRefs.length ? approval.secretRefs.map(r => '$' + r).join(', ') : 'none declared (injection ABSENT)'}`;
   ctx.commands?.register({
     name: 'grants-list',
     description: 'compact-dsh: list live approval grants and cached approvals',
     handler: () => {
       const grants = live().map(g => `${g.id}  ${patternText(g.pattern)}  root=${g.root ?? '-'} session=${g.session ?? '-'}${g.expiresAt ? ' expires=' + new Date(g.expiresAt).toISOString() : ''}${g.maxUses ? ` uses=${g.uses}/${g.maxUses}` : ''}`);
-      return { kind: 'success', text: grants.length
-        ? `${grants.length} live grant(s):\n${grants.join('\n')}\n${approval.store.cache.size} cached approval(s)`
-        : `no live grants\n${approval.store.cache.size} cached approval(s)` };
+      const cache = liveCache();
+      // #40: the cache is enumerated, not counted — an operator audits what
+      // is replayable right now (fingerprint, target, lifetime). Target
+      // values are one-line flattened: command output is recorded.
+      const lines = cache.slice(0, 50).map(([fp, e]) =>
+        `  ${fp}  ${targetBitsOf(e.target) || '(command-aware)'}  granted=${new Date(e.grantedAt).toISOString()}${e.expiresAt ? ` expires=${new Date(e.expiresAt).toISOString()}` : ' never'}`);
+      const cacheText = `${cache.length} live cached approval(s)` +
+        (lines.length ? `:\n${lines.join('\n')}${cache.length > lines.length ? `\n  …and ${cache.length - lines.length} more` : ''}` : '');
+      return { kind: 'success', text: (grants.length
+        ? `${grants.length} live grant(s):\n${grants.join('\n')}`
+        : 'no live grants') + `\n${cacheText}\n${gateLine}` };
     },
   });
   ctx.commands?.register({

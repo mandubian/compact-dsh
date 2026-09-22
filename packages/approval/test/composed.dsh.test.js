@@ -129,15 +129,14 @@ test('composed: deny→ask→approve→replay-hit cycle in the real runtime', as
   assert.equal(asked.count, 2);
 });
 
-test('composed: every decided ask leaves a transcript note (#25)', async () => {
-  const { tools } = await boot({ operator: 'allowed-once' });
+test('composed: every decided ask leaves a transcript note (#25), every replay a receipt (#40)', async () => {
+  const { tools, asked } = await boot({ operator: 'allowed-once' });
   tools.register(probe);
   executed = 0;
   const agent = makeAgent();
 
-  await run(tools, agent, 'noted.example');                 // ask → allow → note
-  await run(tools, agent, 'noted.example');                 // replay → no ask, no note
-  assert.equal(agent.injected.length, 1, 'one note for one decision — a replay is silent');
+  await run(tools, agent, 'noted.example');                 // ask → allow → decision note
+  assert.equal(agent.injected.length, 1);
   const note = agent.injected[0];
   assert.equal(note.source?.kind, 'plugin');
   assert.equal(note.source?.plugin, 'compact-approval');
@@ -145,7 +144,22 @@ test('composed: every decided ask leaves a transcript note (#25)', async () => {
   assert.match(text, /\[fp_[0-9a-f]{16}\] was allowed once/);
   assert.match(text, /host=noted\.example/, 'the canonical target is envelope-grade and on the note');
 
-  // the record keeps its own pair; the note is the transcript copy, not a
+  // the exec-cache replay is not silent (#40): the replaying session gets a
+  // one-line receipt naming the prior approval it runs under — once per
+  // session per grant generation, and the operator is still not re-asked
+  await run(tools, agent, 'noted.example');
+  assert.equal(executed, 2);
+  assert.equal(asked.count, 1, 'the receipt never re-asks');
+  assert.equal(agent.injected.length, 2, 'the replay leaves exactly one receipt');
+  const receipt = agent.injected[1];
+  assert.equal(receipt.source?.plugin, 'compact-approval');
+  const receiptText = receipt.content?.[0]?.text ?? '';
+  assert.match(receiptText, /^\[compact-approval\] Replay: "net_probe" \(host=noted\.example\) \[fp_[0-9a-f]{16}\]/);
+  assert.match(receiptText, /granted \d{4}-\d{2}-\d{2}T.*Z, expires \d{4}-\d{2}-\d{2}T.*Z — no new decision was asked or made/);
+  await run(tools, agent, 'noted.example');                 // same grant generation: no new receipt
+  assert.equal(agent.injected.length, 2, 'one receipt per grant generation');
+
+  // the record keeps its own pair; the notes are the transcript copy, not a
   // replacement for the audit events
   const types = [];
   for (let seq = 0; seq < agent.session.seq; seq++) types.push(agent.session.eventAt(seq)?.type);

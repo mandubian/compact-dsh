@@ -106,6 +106,11 @@ export class GrantStore {
     if (e.expiresAt != null && e.expiresAt <= now) { this.cache.delete(fp); return false; }
     return true;
   }
+  /** The live entry behind a cacheHit — a replay's trace names what it replays under. */
+  cacheGet(fp, now) {
+    if (!this.cacheHit(fp, now)) return null;
+    return this.cache.get(fp);
+  }
 
   // -- flood bookkeeping ----------------------------------------------------
   countPending(root) { return this.floodByRoot.get(root) ?? 0; }
