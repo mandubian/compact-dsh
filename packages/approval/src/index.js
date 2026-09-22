@@ -200,10 +200,23 @@ export function createApproval(opts = {}) {
  * command text) never reaches the record, and this note is on the record.
  * The view is narrowed by the caller to exactly these fields, so the
  * no-arguments doctrine is structural, not discipline.
+ *
+ * ONE LINE, ALWAYS: the note is injected as a user message, and its target
+ * values are tool-argument material — `canonicalTarget` lowercases the host
+ * and stringifies the port without stripping control characters, so a crafted
+ * `host`/`port` could otherwise ride the interpolation into a multi-line
+ * forged message. Every value is flattened (control characters and whitespace
+ * runs → one space) before it touches the note: the fact stays on the record,
+ * the message structure cannot be forged by the fact's subject.
  */
 export function approvalTranscriptNote({ tool, fingerprint, target }, outcome) {
-  const targetBits = Object.entries(target ?? {}).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(' ');
-  const subject = `"${tool ?? 'unknown-tool'}"` + (targetBits ? ` (${targetBits})` : '') + ` [${fingerprint ?? 'no fingerprint'}]`;
+  const oneline = (v) => String(v ?? '').replace(/[\u0000-\u001f\u007f\s]+/g, ' ').trim();
+  const targetBits = Object.entries(target ?? {})
+    .map(([k, v]) => [k, oneline(v)])
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(' ');
+  const subject = `"${oneline(tool) || 'unknown-tool'}"` + (targetBits ? ` (${targetBits})` : '') + ` [${oneline(fingerprint) || 'no fingerprint'}]`;
   switch (outcome) {
     case 'allowed-once':
       return `[compact-approval] Gate decision: ${subject} was allowed once by the operator — ` +
