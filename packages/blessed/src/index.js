@@ -45,6 +45,19 @@ export function resolveConfig(config) {
   object(config.approval, 'approval');
   text(config.approval.persistPath, 'approval.persistPath');
   object(config.sandbox, 'sandbox');
+  // the egress posture is the SANDBOX's declaration, never an approval knob:
+  // an approval-config posture could contradict the wire the sandbox actually
+  // runs and make the envelope dishonest (#38)
+  if (config.approval.egress !== undefined) {
+    throw new TypeError('blessed: approval.egress is not a composition knob — the egress posture is the sandbox declaration ' +
+      '(sandbox.network) and the ask reads it from there; two sources of posture are two truths and only one of them is the wire');
+  }
+  // an EXPLICITLY undefined network spreads over the default and would
+  // otherwise read as undeclared at ask time while docker runs its
+  // `?? 'none'` default — normalize at the config boundary, loudly
+  if (config.sandbox.network !== undefined && (typeof config.sandbox.network !== 'string' || !config.sandbox.network.trim())) {
+    throw new TypeError('blessed: sandbox.network must be a non-empty docker network name when present');
+  }
   text(config.sandbox.image, 'sandbox.image');
   if (!Array.isArray(config.sandbox.imageProvenance) || !normalizeProvenanceRecords(config.sandbox.imageProvenance).has(config.sandbox.image)) {
     throw new TypeError('blessed: sandbox.imageProvenance must declare the configured image');
@@ -132,7 +145,7 @@ export function resolveConfig(config) {
   return {
     allowlist: [...allowlist],
     approval: { ...config.approval, secretRefs: secrets },
-    sandbox: { ...DEFAULTS.sandbox, ...config.sandbox, maskedPaths: masked, protectedPaths },
+    sandbox: { ...DEFAULTS.sandbox, ...config.sandbox, network: config.sandbox.network ?? DEFAULTS.sandbox.network, maskedPaths: masked, protectedPaths },
     protectedState: [...config.protectedState],
     secrets,
     specialists,
@@ -293,7 +306,19 @@ export async function apply(ctx, config = {}) {
   await mount('compact-loopguard', applyLoopguard);
   await mount('compact-promotion', promotionPlugin(), {}, ['tools']);
   await mount('compact-allowlist-gate', applyAllowlist, { allowlist: options.allowlist }, ['tools']);
-  await mount('compact-approval', approvalPlugin({ persistPath: options.approval.persistPath, secretRefs: options.secrets }), options.approval, ['approval', 'commands']);
+  // #38 phase 1: the approval ask must speak the composition's egress posture
+  // honestly — consent at the gate is not connectivity on the wire. Blessed
+  // KNOWS the posture (its sandbox declaration — resolveConfig normalized
+  // network to a non-empty name, 'none' by default), so it wires it through:
+  // 'none' is the no-egress posture; any other docker network name grants
+  // egress and reads as 'open'. The derived value rides the mount config too
+  // (the apply path is authoritative), so no approval-level config can make
+  // the envelope claim a posture the sandbox does not run.
+  await mount('compact-approval', approvalPlugin({
+    persistPath: options.approval.persistPath,
+    secretRefs: options.secrets,
+    egress: options.sandbox.network === 'none' ? 'none' : 'open',
+  }), { ...options.approval, egress: options.sandbox.network === 'none' ? 'none' : 'open' }, ['approval', 'commands']);
   await mount('compact-remote-access', applyRemoteAccess, {}, ['compact-approval']);
   await mount('compact-sandbox', applySandbox, options.sandbox, ['tools', 'approval', 'compact-approval']);
   requireServices(ctx, ['sandbox']);

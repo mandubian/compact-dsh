@@ -65,3 +65,29 @@ test('secrets are declared as env-var NAMES — values never enter the compositi
   const defaulted = BASE();
   assert.deepEqual(resolveConfig(defaulted).secrets, [], 'the absent posture: nothing declared, nothing injectable');
 });
+
+test('the egress posture is the sandbox declaration — approval.egress is not a knob (#38)', () => {
+  const config = BASE();
+  config.approval.egress = 'open';
+  assert.throws(() => resolveConfig(config), /approval\.egress[\s\S]*two truths[\s\S]*one of them is the wire/,
+    'an approval-level posture could contradict the wire the sandbox runs — refuse, never pick a side');
+});
+
+test('an explicitly undefined sandbox.network resolves to the docker default (none), never a posture of egress', () => {
+  const config = BASE();
+  config.sandbox.network = undefined;
+  const resolved = resolveConfig(config);
+  assert.equal(resolved.sandbox.network, 'none',
+    'the spread of {network: undefined} would undo the default while docker runs `?? \'none\'` — normalize at the boundary');
+});
+
+test('sandbox.network must be a non-empty docker network name when present', () => {
+  for (const bad of [42, '', '  ', {}]) {
+    const config = BASE();
+    config.sandbox.network = bad;
+    assert.throws(() => resolveConfig(config), /sandbox\.network/);
+  }
+  const config = BASE();
+  config.sandbox.network = 'host';
+  assert.equal(resolveConfig(config).sandbox.network, 'host');
+});

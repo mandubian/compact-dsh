@@ -91,6 +91,28 @@ test('lint: the secret-use ask scopes the injection grant and states the replay 
   assert.match(out.reason, /Approving materializes an exec-cache entry/, 'the secret path caches too — the ask says so');
 });
 
+test('lint: the network act\'s ask is honest about consent vs connectivity (#38 phase 1)', async () => {
+  // 'none': the composition declares no egress, and the ask firing proves no
+  // grant layer covered the target — the connect WILL fail, and the ask says so
+  const none = boot({ egress: 'none' });
+  const outNone = await none.run({ name: 'net.fetch', arguments: { host: 'wireless.example' }, agent: AGENT });
+  assert.match(outNone.reason, /This gate's approval is consent, not connectivity/);
+  assert.match(outNone.reason, /no network egress and no network grant covers this target — the command will fail at connect/);
+  assert.match(outNone.reason, /A session grant changes this gate's answer, not the container's network\./);
+
+  // 'open': egress is the sandbox's declared posture (CF-2), never a claim
+  const open = boot({ egress: 'open' });
+  const outOpen = await open.run({ name: 'net.fetch', arguments: { host: 'wireful.example' }, agent: AGENT });
+  assert.match(outOpen.reason, /open network posture \(CF-2\)/);
+  assert.ok(!outOpen.reason.includes('fail at connect'), 'an open posture never claims the connect fails');
+
+  // undeclared (standalone plugin): the neutral line — nothing claimed
+  const bare = boot({});
+  const outBare = await bare.run({ name: 'net.fetch', arguments: { host: 'wireless.example' }, agent: AGENT });
+  assert.match(outBare.reason, /the runtime's posture, not this approval's effect/);
+  assert.ok(!outBare.reason.includes('fail at connect'));
+});
+
 test('lint: the dedup-pending ask carries the envelope too', async () => {
   const { run } = boot({});
   await run({ name: 'net.fetch', arguments: { host: 'dedup.example' }, agent: AGENT });
