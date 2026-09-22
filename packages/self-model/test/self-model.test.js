@@ -479,6 +479,10 @@ test('a delegated child is certified at the SPAWN edge — chained to its parent
     const rendered = renderAttestation(att);
     assert.match(rendered, /cert [0-9a-f]{12}…, depth 1/);
     assert.match(rendered, new RegExp(`chained to parent cert ${service.subjectIdentity('parent-1').certDigest.slice(0, 12)}…`));
+    const blockLines = rendered.split('\n');
+    const identityAt = blockLines.findIndex(l => l.startsWith('Session identity:'));
+    assert.ok(identityAt > 0 && blockLines[identityAt + 1].startsWith('Standing:'),
+      'the identity line is followed directly by Standing — a stray empty element would put a blank line between them');
   } finally {
     cleanup();
   }

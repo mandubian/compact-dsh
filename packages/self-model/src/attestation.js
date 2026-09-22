@@ -253,7 +253,7 @@ export function renderAttestation(att) {
              ? `, parent ${att.subject.identity.parentSubjectId} unchained (no parent digest available at issuance)`
              : '') +
          ` — development keyring, no standing outside this runtime)`]
-      : []),,
+      : []),
     `Standing: ${att.subject.standing.claimed} — ${att.subject.standing.reason}`,
     `Law: ${att.law.status ?? 'unknown'}, digest ${att.law.digest ? att.law.digest.slice(0, 16) : 'unknown'}`,
     '',
