@@ -34,7 +34,7 @@
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 import { createHash } from 'node:crypto';
-import { GrantStore, coveringGrants } from './grants.js';
+import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget } from './fingerprint.js';
@@ -42,7 +42,7 @@ import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope } from 'compact-envelope';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
-export { GrantStore, PersistentGrantStore, coveringGrants, evaluate, fingerprint, canonicalTarget, parseAllowlistLikePattern, DEFAULTS };
+export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, evaluate, fingerprint, canonicalTarget, parseAllowlistLikePattern, DEFAULTS };
 
 export const name = 'compact-approval';
 export const inject = ['approval'];
@@ -130,12 +130,16 @@ export function createApproval(opts = {}) {
     // absence is enforced by the same lookup that would inject.
     secretRefs: [...(opts.secretRefs ?? [])],
     secretGrantTtlMs: opts.secretGrantTtlMs ?? (opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs),
+    // #38 phase 3: the TTL of a materialized egress grant — same doctrine as
+    // every other grant in the store (scoped and expiring, never blanket)
+    egressGrantTtlMs: opts.egressGrantTtlMs ?? DEFAULTS.egressGrantTtlMs,
     // #38 phase 1 — the composition's egress posture, as far as THIS gate can
     // truthfully speak: 'none' (no network composed) | 'open' (declared open
-    // posture, CF-2) | undefined (standalone: posture unknown, claim nothing).
-    // Blessed wires it from its sandbox declaration; the envelope honesty in
-    // the ask reads it.
-    egress: opts.egress === 'none' || opts.egress === 'open' ? opts.egress : undefined,
+    // posture, CF-2) | 'proxy' (mediated: approval DELIVERS as an egress
+    // grant the mediator enforces) | undefined (standalone: posture unknown,
+    // claim nothing). Blessed wires it from its sandbox declaration; the
+    // envelope honesty in the ask reads it.
+    egress: opts.egress === 'none' || opts.egress === 'open' || opts.egress === 'proxy' ? opts.egress : undefined,
     // asks currently waiting on the decider downstream: callId → preview.
     // Populated by the recorded answerer for exactly the duration of the
     // decision, so an operator answerer can show WHAT is being decided, not
@@ -344,6 +348,12 @@ function egressHonesty(egress) {
       return `This gate's approval is consent, not connectivity: the composition declares no network egress ` +
         `and no network grant covers this target — the command will fail at connect. ` +
         `A session grant changes this gate's answer, not the container's network.`;
+    case 'proxy':
+      return `This gate's approval is consent that a mediator can deliver: approving materializes a session-scoped, ` +
+        `TTL-bounded, revocable egress grant for this target's host, port and method class, and the mediator outside ` +
+        `the container delivers exactly that — a different host, a different method class, an expired or revoked grant ` +
+        `is refused at the wire with its reason. Anything the grant covers can still carry data out: the record keeps ` +
+        `what was sent (never scrubbed), and revoking the grant kills the route.`;
     case 'open':
       return `This gate's approval is consent, not connectivity: the composition runs an open network posture ` +
         `(CF-2) — egress follows the sandbox's declaration, not this approval.`;
@@ -351,6 +361,34 @@ function egressHonesty(egress) {
       return `This gate's approval is consent, not connectivity: whether the sandbox grants egress is the ` +
         `runtime's posture, not this approval's effect.`;
   }
+}
+
+/**
+ * The egress pattern for a canonical target (#38 phase 3). A connection is a
+ * (host, port) fact, so: URL findings become HostAndPort on their scheme's
+ * port (explicit port kept), an explicit host+port keeps both, and a bare
+ * host stays HOST-SCOPED (ExactHost — the analyzer found the host and said
+ * nothing about ports; the mediator reads that kind as covering any port it
+ * names, because narrowing below the shown unit is a grant the operator never
+ * made). Unparsable/absent target → null: nothing to grant.
+ */
+export function egressPatternFor(target) {
+  if (typeof target?.url === 'string') {
+    try {
+      const u = new URL(target.url);
+      return {
+        kind: 'HostAndPort',
+        value: { host: u.hostname.toLowerCase(), port: String(u.port || (u.protocol === 'https:' ? '443' : '80')) },
+      };
+    } catch { return null; }
+  }
+  if (typeof target?.host === 'string') {
+    if (target.port != null && target.port !== '') {
+      return { kind: 'HostAndPort', value: { host: target.host.toLowerCase(), port: String(target.port) } };
+    }
+    return { kind: 'ExactHost', value: target.host.toLowerCase() };
+  }
+  return null;
 }
 
 /**
@@ -399,6 +437,22 @@ async function answerRequest(approval, req, next) {
           ttlMs: approval.secretGrantTtlMs, now: Date.now(),
         });
       }
+      // #38 phase 3 — under the MEDIATED posture an approval actually
+      // delivers: the allowed decision materializes the egress grant the
+      // mediator enforces per connection (host/port + method class,
+      // session-scoped, TTL'd, revocable — the secret-grant shape over the
+      // network family). No derivable method class → NO grant: an
+      // unclassifiable act gets no coverage (D-7), and the ask already said
+      // so before the operator decided.
+      if (approval.egress === 'proxy' && rec.methodClass) {
+        const pattern = egressPatternFor(canonicalTarget(rec.args));
+        if (pattern) {
+          approval.store.addSessionGrant({
+            pattern, session: rec.session, methodClass: rec.methodClass,
+            ttlMs: approval.egressGrantTtlMs, now: Date.now(),
+          });
+        }
+      }
     }
     // #25: the decision's visible trace where the Subject lives — asked and
     // answered, for every outcome, on the browser and terminal paths alike
@@ -436,7 +490,7 @@ export function approvalPlugin(opts = {}) {
     if (config?.maxPendingPerRoot !== undefined) approval.maxPendingPerRoot = config.maxPendingPerRoot;
     if (config?.pendingTtlMs !== undefined) approval.pendingTtlMs = config.pendingTtlMs;
     if (config?.secretRefs !== undefined) approval.secretRefs = [...config.secretRefs];
-    if (config?.egress !== undefined) approval.egress = config.egress === 'none' || config.egress === 'open' ? config.egress : undefined;
+    if (config?.egress !== undefined) approval.egress = config.egress === 'none' || config.egress === 'open' || config.egress === 'proxy' ? config.egress : undefined;
 
     /**
      * The full pre-execute decision as a reusable function (Phase 2 routing):
@@ -528,7 +582,7 @@ export function approvalPlugin(opts = {}) {
       // the answerer's decision correlation (needs the agent object: the host
       // denies asks without one before any approval dispatch). callId lets the
       // correlation survive concurrent asks for the same tool.
-      if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args, callId: exec.callId, secretRefs });
+      if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args, callId: exec.callId, secretRefs, methodClass: args?.methodClass ?? null });
       report('ask');
       const env = buildEnvelope({ gate: 'AG', ruleId: v.ruleId,
         reason: `"${tool}" is not covered by this runtime's grant layers` +
@@ -537,7 +591,11 @@ export function approvalPlugin(opts = {}) {
               `approving it materializes a session-scoped, TTL-bounded, revocable secret grant and the credential is injected into the confined execution ` +
               `without entering this conversation`
             : '') +
-          `. ${replayConsequence(approval.execCacheTtlMs)} ${egressHonesty(approval.egress)}`,
+          `. ${replayConsequence(approval.execCacheTtlMs)} ${egressHonesty(approval.egress)}` +
+          (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'methodClass') && args.methodClass == null
+            ? ` This target's method class could not be derived statically, so NO egress grant will materialize from ` +
+              `approving — the mediator refuses its connections by name (D-7).`
+            : ''),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };
     };

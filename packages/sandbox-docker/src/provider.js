@@ -63,6 +63,23 @@ export class DockerSandboxProvider extends SandboxProvider {
     this.digestResolver = config.digestResolver ?? defaultDigestResolver;
     this.dockerCommand = config.dockerCommand ?? 'docker';
     this.network = config.network ?? 'none';
+    // #38 phase 3: the MEDIATED posture. 'proxy' attaches to the internal
+    // mediation network and hands the container only its own session's
+    // listener. Declared without a network name, with 'none', or without the
+    // mediator factory → refuse HERE: a posture that cannot deliver is not
+    // composed, and it never degrades silently to raw egress or to no path at
+    // all (D-7, CF-1).
+    this.egress = config.egress ?? 'none';
+    this.proxyEnvFor = config.proxyEnvFor;
+    if (this.egress === 'proxy') {
+      if (!config.network || config.network === 'none') {
+        throw new Error('sandbox-docker: egress posture "proxy" needs the internal mediation network NAME (never "none") — refusing (D-7)');
+      }
+      if (typeof this.proxyEnvFor !== 'function') {
+        throw new Error('sandbox-docker: egress posture "proxy" needs proxyEnvFor(sessionId) — the mediator IS the posture; ' +
+          'attaching to the mediation network without it would hand the container a path nobody enforces (D-7)');
+      }
+    }
     this.probeTimeoutMs = config.probeTimeoutMs ?? 5_000;
     this.probe = config.probe ?? defaultProbe;             // injectable: tests never require a daemon
     this.uid = config.uid ?? process.getuid?.() ?? 0;
@@ -112,6 +129,10 @@ export class DockerSandboxProvider extends SandboxProvider {
       resolved: this.resolveDigest(this.image),
       network: this.network,
       networkGrants: this.networkGrantsFor(policy?.sessionId),
+      // #38: under the mediated posture the network is internal — no route
+      // exists, so the open-posture rule has no excess to answer; grants are
+      // enforced per connection at the mediator instead
+      mediated: this.egress === 'proxy',
     });
     if (refusal) throw refusal;
   }
@@ -169,6 +190,19 @@ export class DockerSandboxProvider extends SandboxProvider {
         continue;
       }
       run.push('--env', `${ref}=${value}`);
+    }
+    // #38 phase 3: under the mediated posture the container gets exactly ONE
+    // path — its own session's listener on the internal network. No listener
+    // means no confinement: never a fall-back to raw (an unenforced route),
+    // never a silent fall-back to none (the posture was declared; a posture
+    // that cannot deliver must say so, D-7).
+    if (this.egress === 'proxy') {
+      const env = this.proxyEnvFor(policy.sessionId);
+      if (!env) {
+        throw new Error(`sandbox-docker: the mediator has no listener for session ${policy.sessionId ?? '(none)'} — ` +
+          'refusing to confine under an egress posture that cannot deliver (D-7)');
+      }
+      for (const [key, value] of Object.entries(env)) run.push('--env', `${key}=${value}`);
     }
     run.push('-w', root, this.image, ...argv);
     return { argv: run, enforcement: 'full', denialSignatures: DENIAL_SIGNATURES, runnerFailureRules: RUNNER_FAILURE_RULES };

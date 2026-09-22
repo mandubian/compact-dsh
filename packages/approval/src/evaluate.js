@@ -7,6 +7,7 @@ export const DEFAULTS = {
   execCacheTtlMs: 24 * 60 * 60 * 1000, // 24h; 0 disables
   maxPendingPerRoot: 50,               // flood cap
   pendingTtlMs: 5 * 60 * 1000,         // a pending ask older than this is forgotten (flood capacity self-heals)
+  egressGrantTtlMs: 60 * 60 * 1000,    // materialized egress grants (#38): one hour, like every session grant
 };
 
 /**

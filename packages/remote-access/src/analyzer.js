@@ -49,6 +49,51 @@ const VERB_INSPECTORS = new Set(['command', 'which', 'type', 'whence', 'man', 'w
 
 const URL_RE = /https?:\/\/[^\s'"`<>()\[\]{}|\\;]+/gi;      // matchAll only (global = stateful)
 const URL_ONCE = /https?:\/\/[^\s'"`<>()\[\]{}|\\;]+/i;      // .test only
+
+// -- method class (#26's network half, folded into #38) --------------------
+// The risk axis the grant must carry: derived from the SAME analysis that
+// found the target, at the granularity static analysis can honestly give.
+// Direction matters: a false 'write' over-ASKS (the operator is shown a
+// bigger act than runs — safe), a false 'read' would OVERCLAIM consent (the
+// defect #26 names), and an underivable class returns null — which
+// materializes no egress grant at all, so the mediator refuses that target's
+// connections by name (D-7: no class, no coverage — never read-by-default).
+const WRITE_SIGNALS = [
+  /(?:^|\s)-(?:X)\s*(?:POST|PUT|PATCH|DELETE)\b/,
+  /(?:^|\s)--request\s+(?:POST|PUT|PATCH|DELETE)\b/i,
+  /(?:^|\s)(?:--data-raw|--data-binary|--data-ascii|--data-urlencode|--data|--form|-F|-d)(?:\s|=|@)/,
+  /(?:^|\s)--(?:post-data|post-file|upload-file|put-file)(?:\s|=)/,
+  /(?:^|\s)git\s+push\b/,
+  /(?:^|\s)npm\s+(?:publish|unpublish|deprecate|star|unstar|unlike)\b/,
+  /(?:^|\s)rsync\b[^;&|]*\s--upload-file(?:\s|=)/,
+];
+const READER_SIGNALS = [
+  /(?:^|\s)(?:curl|wget)\b/,
+  /(?:^|\s)git\s+(?:clone|fetch|pull|ls-remote|submodule|show|diff|log)\b/,
+  /(?:^|\s)(?:apt-get|apt|dnf|yum|pacman|apk)\s+(?:install|update|upgrade|refresh)\b/,
+  /(?:^|\s)(?:pip3?|pipx)\s+(?:install|download)\b/,
+  /(?:^|\s)(?:npm|pnpm|yarn|bun)\s+(?:install|ci|add|i|update|outdated)\b/,
+  /(?:^|\s)(?:cargo|go|gem)\s+(?:add|install|get|fetch|update)\b/,
+  /(?:^|\s)(?:ping|traceroute|mtr|dig|nslookup|host|whois)\b/,
+];
+
+/**
+ * The method class of a gated network call — 'read' | 'write' | null.
+ * Structured tools would declare it from their schema; the pilot's network
+ * surface is bash (its fetch rows are refused by composition), so the command
+ * is the authority. A bare URL literal with no recognizable verb yields null:
+ * no class is invented for a target static analysis only happened to see.
+ */
+export function methodClassOf(args) {
+  for (const key of DEFAULT_COMMAND_ARG_KEYS) {
+    const command = args?.[key];
+    if (typeof command !== 'string' || !command.trim()) continue;
+    if (WRITE_SIGNALS.some((re) => re.test(command))) return 'write';
+    if (READER_SIGNALS.some((re) => re.test(command))) return 'read';
+    return null;
+  }
+  return null;
+}
 const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const SCP_LIKE_RE = /^[\w.-]+@([\w.-]+):/; // git@github.com:org/repo
 // shell-naive tokenization: separators are their own matches so command

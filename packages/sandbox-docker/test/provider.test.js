@@ -144,3 +144,46 @@ test('fail-closed: daemon unavailable throws SANDBOX_UNAVAILABLE, never passthro
   p2.confine(['true'], POLICY('read-only', '/ws'));
   assert.equal(probed, 1);
 });
+
+// -- #38 phase 3: the mediated posture ----------------------------------------
+
+const MEDIATED = {
+  network: 'compact-egress', egress: 'proxy',
+  proxyEnvFor: (sessionId) => ({
+    HTTP_PROXY: 'http://172.30.0.1:31234', HTTPS_PROXY: 'http://172.30.0.1:31234',
+    NO_PROXY: 'localhost,127.0.0.1',
+  }),
+};
+
+test('#38 mediated posture: the internal network AND only the session\'s listener — nothing else reaches', () => {
+  const p = makeProvider(MEDIATED);
+  const c = p.confine(['bash', '-c', 'curl https://example.com'], POLICY('workspace-write', '/ws', 'session-1'));
+  const s = c.argv.join(' ');
+  assert.ok(s.includes('--network compact-egress'), 'attached to the mediation network');
+  assert.ok(!s.includes('--network none'), 'and never to a network with no path at all — the posture was declared');
+  assert.ok(s.includes('--env HTTP_PROXY=http://172.30.0.1:31234'), 'the container is told where its mediator is');
+  assert.ok(s.includes('--env HTTPS_PROXY=http://172.30.0.1:31234'));
+  assert.ok(s.includes('--env NO_PROXY=localhost,127.0.0.1'));
+  // CF-2 under mediation: no live run-time network grant is needed, because
+  // the posture supplies NO ROUTE — the refusal below fires only for OPEN ones
+  assert.ok(s.includes('--network compact-egress'), 'supply-chain check passed with zero network grants');
+});
+
+test('#38: no listener for the session → no confinement (never raw, never silently none)', () => {
+  const p = makeProvider({ ...MEDIATED, proxyEnvFor: () => null });
+  assert.throws(
+    () => p.confine(['bash', '-c', 'true'], POLICY('workspace-write', '/ws', 'session-x')),
+    /the mediator has no listener for session session-x — refusing to confine/);
+});
+
+test('#38: a mediated posture declared without its pieces refuses at construction (D-7)', () => {
+  assert.throws(() => makeProvider({ egress: 'proxy' }),
+    /needs the internal mediation network NAME \(never "none"\)/);
+  assert.throws(() => makeProvider({ egress: 'proxy', network: 'none' }),
+    /never "none"/);
+  assert.throws(() => makeProvider({ egress: 'proxy', network: 'compact-egress' }),
+    /needs proxyEnvFor\(sessionId\)/);
+  // and the default posture still constructs with no mediator in sight
+  const plain = makeProvider({});
+  assert.equal(plain.egress, 'none');
+});

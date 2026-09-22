@@ -19,6 +19,13 @@ export function canonicalTarget({ host, port, url } = {}) {
 
 export function fingerprint(tool, args) {
   const t = canonicalTarget(args);
-  const payload = JSON.stringify({ tool: String(tool), ...t });
+  // Consent identity is risk identity (#26, folded into #38): when the caller
+  // DECLARES a method class, it joins the identity, so approving a read never
+  // covers the state-changing act to the same target (GET→GET replays,
+  // GET→POST asks). Absent the class the payload is exactly what it always
+  // was — every pre-existing fingerprint still matches (no mass re-ask on
+  // upgrade).
+  const methodClass = args?.methodClass;
+  const payload = JSON.stringify({ tool: String(tool), ...t, ...(methodClass ? { methodClass } : {}) });
   return 'fp_' + createHash('sha256').update(payload).digest('hex').slice(0, 16);
 }

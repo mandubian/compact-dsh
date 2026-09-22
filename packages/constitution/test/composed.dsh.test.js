@@ -13,6 +13,7 @@ import { approvalPlugin } from 'compact-dsh-approval';
 import { loopguardPlugin } from 'compact-dsh-loopguard';
 import { promotionPlugin } from 'compact-dsh-promotion';
 import * as sandbox from 'compact-dsh-sandbox-docker';
+import { apply as egressProxy } from 'compact-dsh-egress-proxy';
 
 // CF-2 (Phase 6): the sandbox plugin refuses to start on an image with no
 // declared acquisition history, so the blessed composition declares one. The
@@ -111,6 +112,10 @@ async function bootBlessed(opts = {}) {
   allowlistGate.apply(ctx, { allowlist: ['api.example.com'] });
   approvalPlugin({})(ctx, {});
   remoteAccess.apply(ctx, {});
+  // #38: the mediator's enforced register row must resolve here too — with no
+  // posture declared it mounts INERT (no docker call, no socket), exactly as
+  // a default boot does
+  await egressProxy(ctx, {});
   sandbox.apply(ctx, { ...SANDBOX_PROVENANCE, ...opts });
   capabilityGate.apply(ctx, {});
   ctx.plugin(JsonlSessionPersistence, { root: mkdtempSync(join(tmpdir(), 'compact-const-sessions-')), compression: 'none' });
@@ -168,6 +173,9 @@ test('composed: applying the constitution before the async sandbox service mount
   allowlistGate.apply(ctx, { allowlist: ['api.example.com'] });
   approvalPlugin({})(ctx, {});
   remoteAccess.apply(ctx, {});
+  // #38: the mediator's enforced row resolves here too — inert without a
+  // declared posture (no docker call, no socket), as in a default boot
+  await egressProxy(ctx, {});
   sandbox.apply(ctx, { ...SANDBOX_PROVENANCE });
   capabilityGate.apply(ctx, {});
   ctx.plugin(JsonlSessionPersistence, { root: mkdtempSync(join(tmpdir(), 'compact-const-sessions-')), compression: 'none' });

@@ -132,7 +132,12 @@
           ledgerPath: !!js 'process.env.COMPACT_CHAIN_DIR ? process.env.COMPACT_CHAIN_DIR + "/subjects.jsonl" : undefined'
         sandbox:
           image: !!js process.env.COMPACT_SANDBOX_IMAGE
-          network: none
+          # #38 phase 3: opt into the MEDIATED posture — the container gets no
+          # route of its own, only its session's listener on an internal
+          # network, and every connection is delivered per live grant.
+          # Default: absent (COMPACT_EGRESS unset → 'none', as before).
+          egress: !!js 'process.env.COMPACT_EGRESS === "proxy" ? "proxy" : undefined'
+          network: !!js 'process.env.COMPACT_EGRESS === "proxy" ? (process.env.COMPACT_EGRESS_NETWORK || "compact-egress") : "none"'
           imageProvenance:
             - ref: !!js process.env.COMPACT_SANDBOX_IMAGE
               digest: !!js process.env.COMPACT_SANDBOX_IMAGE_DIGEST

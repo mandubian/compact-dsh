@@ -114,3 +114,30 @@ test('the subject-identity ledger rides the enforcer block — beside the chains
   const annexless = { ...config, enforcer: { ledgerPath: config.enforcer.ledgerPath } };
   assert.equal(resolveConfig(annexless).enforcer, undefined);
 });
+
+test('#38: the mediated posture is opt-in, named, and needs its network (D-7 at the config seam)', () => {
+  // default: absent — a composition that says nothing runs the posture it has
+  const plain = resolveConfig(BASE());
+  assert.equal(plain.sandbox.egress, undefined, 'no declaration, no mediator: the default boot carries no egress capability');
+  assert.equal(plain.sandbox.network, 'none');
+
+  // declared properly: both halves survive into the resolved config
+  const mediated = BASE();
+  mediated.sandbox = { ...mediated.sandbox, egress: 'proxy', network: 'compact-egress' };
+  const resolved = resolveConfig(mediated);
+  assert.equal(resolved.sandbox.egress, 'proxy');
+  assert.equal(resolved.sandbox.network, 'compact-egress');
+
+  // declared badly: named refusals, never a silently composed posture
+  const noNetwork = BASE();
+  noNetwork.sandbox = { ...noNetwork.sandbox, egress: 'proxy' };
+  assert.throws(() => resolveConfig(noNetwork), /requires sandbox\.network to name the INTERNAL mediation network \(never "none"\)/);
+
+  const noneNetwork = BASE();
+  noneNetwork.sandbox = { ...noneNetwork.sandbox, egress: 'proxy', network: 'none' };
+  assert.throws(() => resolveConfig(noneNetwork), /never "none"/);
+
+  const unknown = BASE();
+  unknown.sandbox = { ...unknown.sandbox, egress: 'wide-open', network: 'compact-egress' };
+  assert.throws(() => resolveConfig(unknown), /sandbox\.egress must be 'proxy'/);
+});

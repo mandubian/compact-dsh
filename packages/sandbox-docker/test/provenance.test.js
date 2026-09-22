@@ -232,3 +232,18 @@ test('an ordinary missing path is still terminally refused as missing', async ()
   assert.match(err, /does not exist/);
   assert.match(err, /never grantable/);
 });
+
+test('#38: the mediated posture answers the open-network rule with the mediation, not a grant', () => {
+  const base = { ref: 'img:1', record: REC(), resolved: ok(), network: 'compact-egress', networkGrants: [] };
+  // open posture, no grant: still refused — the original rule is untouched
+  const open = checkSupplyChain({ ...base, mediated: false });
+  assert.ok(open, 'an open posture with no live run-time grant is still excess');
+  assert.equal(open.ruleId, 'CF-2/uninherited-network');
+  // mediated posture, no grant: the network is internal (no route) and the
+  // grants live at the mediator — there is no excess for THIS rule to answer
+  assert.equal(checkSupplyChain({ ...base, mediated: true }), null);
+  // mediated WITH grants: same answer — the grant axis is not consulted here
+  assert.equal(checkSupplyChain({ ...base, mediated: true, networkGrants: [{ id: 'sg_x' }] }), null);
+  // mediation never excuses the image rules: an undeclared image still refuses
+  assert.equal(checkSupplyChain({ ...base, mediated: true, record: undefined }).ruleId, 'CF-2/undeclared-image');
+});
