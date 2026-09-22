@@ -293,7 +293,16 @@ export async function apply(ctx, config = {}) {
   await mount('compact-loopguard', applyLoopguard);
   await mount('compact-promotion', promotionPlugin(), {}, ['tools']);
   await mount('compact-allowlist-gate', applyAllowlist, { allowlist: options.allowlist }, ['tools']);
-  await mount('compact-approval', approvalPlugin({ persistPath: options.approval.persistPath, secretRefs: options.secrets }), options.approval, ['approval', 'commands']);
+  // #38 phase 1: the approval ask must speak the composition's egress posture
+  // honestly — consent at the gate is not connectivity on the wire. Blessed
+  // KNOWS the posture (its sandbox declaration), so it wires it through;
+  // 'none' is the declared-absent composition, anything else reads as the
+  // declared-open posture (CF-2's binary for the envelope).
+  await mount('compact-approval', approvalPlugin({
+    persistPath: options.approval.persistPath,
+    secretRefs: options.secrets,
+    egress: options.sandbox?.network === 'none' ? 'none' : 'open',
+  }), options.approval, ['approval', 'commands']);
   await mount('compact-remote-access', applyRemoteAccess, {}, ['compact-approval']);
   await mount('compact-sandbox', applySandbox, options.sandbox, ['tools', 'approval', 'compact-approval']);
   requireServices(ctx, ['sandbox']);

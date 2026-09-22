@@ -130,6 +130,12 @@ export function createApproval(opts = {}) {
     // absence is enforced by the same lookup that would inject.
     secretRefs: [...(opts.secretRefs ?? [])],
     secretGrantTtlMs: opts.secretGrantTtlMs ?? (opts.execCacheTtlMs ?? DEFAULTS.execCacheTtlMs),
+    // #38 phase 1 — the composition's egress posture, as far as THIS gate can
+    // truthfully speak: 'none' (no network composed) | 'open' (declared open
+    // posture, CF-2) | undefined (standalone: posture unknown, claim nothing).
+    // Blessed wires it from its sandbox declaration; the envelope honesty in
+    // the ask reads it.
+    egress: opts.egress === 'none' || opts.egress === 'open' ? opts.egress : undefined,
     // asks currently waiting on the decider downstream: callId → preview.
     // Populated by the recorded answerer for exactly the duration of the
     // decision, so an operator answerer can show WHAT is being decided, not
@@ -312,6 +318,32 @@ function replayConsequence(ttlMs) {
 }
 
 /**
+ * #38 phase 1 — envelope honesty at the network act's ask. The gate's
+ * "allow" is CONSENT; whether the wire exists is the composition's egress
+ * posture, and the ask must not let an operator mistake one for the other
+ * (I-8: a declared pathway must deliver — and must not overclaim). 'none':
+ * no egress is composed and — because the ask fires only when NO grant layer
+ * covered the target — no network grant covers it either, so the command
+ * will fail at connect. 'open': egress follows the sandbox's declaration
+ * (CF-2 posture), not this approval. Undeclared (standalone plugin): the
+ * neutral line — posture unknown, nothing claimed either way.
+ */
+function egressHonesty(egress) {
+  switch (egress) {
+    case 'none':
+      return `This gate's approval is consent, not connectivity: the composition declares no network egress ` +
+        `and no network grant covers this target — the command will fail at connect. ` +
+        `A session grant changes this gate's answer, not the container's network.`;
+    case 'open':
+      return `This gate's approval is consent, not connectivity: the composition runs an open network posture ` +
+        `(CF-2) — egress follows the sandbox's declaration, not this approval.`;
+    default:
+      return `This gate's approval is consent, not connectivity: whether the sandbox grants egress is the ` +
+        `runtime's posture, not this approval's effect.`;
+  }
+}
+
+/**
  * Human-honest durations for the surfaces that declare the gate's posture
  * (the ask envelopes, grants-list): whole hours and minutes stay whole, the
  * rest reads in seconds — never a rounded lie.
@@ -393,6 +425,7 @@ export function approvalPlugin(opts = {}) {
     if (config?.maxPendingPerRoot !== undefined) approval.maxPendingPerRoot = config.maxPendingPerRoot;
     if (config?.pendingTtlMs !== undefined) approval.pendingTtlMs = config.pendingTtlMs;
     if (config?.secretRefs !== undefined) approval.secretRefs = [...config.secretRefs];
+    if (config?.egress !== undefined) approval.egress = config.egress === 'none' || config.egress === 'open' ? config.egress : undefined;
 
     /**
      * The full pre-execute decision as a reusable function (Phase 2 routing):
@@ -493,7 +526,7 @@ export function approvalPlugin(opts = {}) {
               `approving it materializes a session-scoped, TTL-bounded, revocable secret grant and the credential is injected into the confined execution ` +
               `without entering this conversation`
             : '') +
-          `. ${replayConsequence(approval.execCacheTtlMs)}`,
+          `. ${replayConsequence(approval.execCacheTtlMs)} ${egressHonesty(approval.egress)}`,
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };
     };
