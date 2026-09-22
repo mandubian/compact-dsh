@@ -61,7 +61,7 @@ fingerprints, `approvals.json`, and attestation lines persists exactly the
 material canonicalization exists to keep out. **Accepted, therefore, with the
 abstraction declared**: replay identity is canonical target identity — and the
 surfaces must say "the same canonical target replays", not "the identical
-operation", wherever an URL with a query was what the operator was shown. The
+operation", wherever a URL with a query was what the operator was shown. The
 operator preview already shows the actual URL (query included); the deciding
 envelope and the notes use the canonical phrasing. (Adopting position 1
 narrows the residual further: the method class travels with the identity even
