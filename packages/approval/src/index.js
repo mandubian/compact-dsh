@@ -188,18 +188,21 @@ export function createApproval(opts = {}) {
      * #40: the exec-cache replay's receipt. A replay is a decision the
      * operator already made paying out in a session that never saw it — this
      * queues the one-line trace (once per session, per fingerprint, per grant
-     * generation) so the Subject's transcript names the basis. An agent
-     * without inject (test shapes) skips silently; a throwing inject must
-     * never take the gate down.
+     * generation) so the Subject's transcript names the basis. The entry (and
+     * its generation) is the caller's — the one the replay actually ran
+     * under, never a re-read that could cross an expiry boundary. The noted
+     * key is recorded only AFTER inject succeeds: a transient inject failure
+     * must not burn the generation's receipt — the next replay retries. An
+     * agent without inject (test shapes) skips silently; a throwing inject
+     * must never take the gate down.
      */
-    noteReplay: (agent, session, tool, fp) => {
-      const entry = approval.store.cacheGet(fp, Date.now());
+    noteReplay: (agent, session, tool, fp, entry, now = Date.now()) => {
+      if (!entry) entry = approval.store.cacheGet(fp, now);
       if (!entry) return;
       if (typeof agent?.inject !== 'function') return;
       const key = `${session ?? 'root'}/${fp}/${entry.grantedAt}`;
       if (approval.replayNotes.has(key)) return;
       if (approval.replayNotes.size >= 2048) approval.replayNotes.clear();
-      approval.replayNotes.set(key, Date.now());
       try {
         agent.inject(createUserMessage({
           content: [{ type: 'text', text: replayTranscriptNote({
@@ -208,7 +211,8 @@ export function createApproval(opts = {}) {
           }) }],
           source: { kind: 'plugin', plugin: 'compact-approval' },
         }));
-      } catch { /* the trace is a receipt, never a gate */ }
+        approval.replayNotes.set(key, now);
+      } catch { /* the trace is a receipt, never a gate — and not yet spent */ }
     },
   };
   return approval;
@@ -285,7 +289,8 @@ export function approvalTranscriptNote({ tool, fingerprint, target }, outcome) {
  */
 export function replayTranscriptNote({ tool, fingerprint, target, grantedAt, expiresAt }) {
   const targetBits = targetBitsOf(target);
-  const when = (ts) => { try { return ts ? new Date(ts).toISOString() : null; } catch { return null; } };
+  // null/undefined, never truthiness: epoch 0 is a time, not an absence
+  const when = (ts) => { if (ts == null) return null; try { return new Date(ts).toISOString(); } catch { return null; } };
   const granted = when(grantedAt) ?? 'an unrecorded time';
   const expires = when(expiresAt);
   return `[compact-approval] Replay: "${oneLine(tool) || 'unknown-tool'}"` +
@@ -409,10 +414,11 @@ export function approvalPlugin(opts = {}) {
       if (Object.keys(canonicalTarget(args)).length === 0) {
         if (secretRefs.length === 0) return null;
         const fp = commandAwareFingerprint(tool, args);
-        if (approval.store.cacheGet(fp, Date.now())) {
+        const secretEntry = approval.store.cacheGet(fp, Date.now());
+        if (secretEntry) {
           // the identical secret command replays — and its replay traces (#40):
           // the credential becomes available again without a new decision
-          approval.noteReplay(exec?.agent, session, tool, fp);
+          approval.noteReplay(exec?.agent, session, tool, fp, secretEntry);
           return null;
         }
         if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp, root, session, args, callId: exec.callId, secretRefs });
@@ -430,9 +436,10 @@ export function approvalPlugin(opts = {}) {
       if (v.verdict === 'allowed') {
         // an exec-cache replay traces once per session per grant generation
         // (#40): the call runs, and the Subject learns a prior approval paid
-        // for it. Plan/session-grant allows are the grant layers' own record
-        // (pattern grants list in grants-list) — not this note's business.
-        if (v.layer === 'exec-cache') approval.noteReplay(exec?.agent, session, tool, v.fingerprint);
+        // for it — under the exact entry the evaluation answered from. Plan/
+        // session-grant allows are the grant layers' own record (pattern
+        // grants list in grants-list) — not this note's business.
+        if (v.layer === 'exec-cache') approval.noteReplay(exec?.agent, session, tool, v.fingerprint, v.entry);
         return null;
       }
       const report = (kind) => {

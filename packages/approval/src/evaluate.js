@@ -22,8 +22,10 @@ export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs
   // decisions that never reached the store must not hold flood capacity forever
   store.sweepPending(now, pendingTtlMs ?? DEFAULTS.pendingTtlMs);
 
-  // 1. exec cache
-  if (store.cacheHit(fp, now)) return { verdict: 'allowed', layer: 'exec-cache', ruleId: fp, fingerprint: fp };
+  // 1. exec cache — the entry rides the verdict so a replay receipt (#40)
+  //    names the exact grant generation that answered, not a re-read
+  const cached = store.cacheGet(fp, now);
+  if (cached) return { verdict: 'allowed', layer: 'exec-cache', ruleId: fp, fingerprint: fp, entry: cached };
 
   const { session: sessionHits, plan: planHits } = coveringGrants(store, target, now);
 
