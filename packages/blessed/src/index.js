@@ -201,6 +201,101 @@ async function bounded(operation, timeoutMs, label) {
   }
 }
 
+/** The prompt section whose text upstream fills with an inert checkout path (#17). */
+export const HARNESS_SOURCE_SECTION = 'harness:source';
+
+// The claim as the boot bundle writes it: "…checkout is at <path>. The
+// checkout location and current working directory are separate values…".
+// Parsing the upstream sentence is how this composition learns WHICH path was
+// named without importing the bundle's private constant; a reworded upstream
+// sentence parses to nothing, and nothing is treated as unexposed (D-7: fail
+// closed, never guess a path into the prompt).
+const CHECKOUT_CLAIM = /checkout is at (.+?)\. The checkout location/;
+
+/** The checkout path the section claims, or null when it claims none. */
+export function claimedCheckoutPath(text) {
+  const match = typeof text === 'string' ? CHECKOUT_CLAIM.exec(text) : null;
+  return match ? match[1] : null;
+}
+
+/**
+ * Is a path actually reachable from the confined commands? Only paths at or
+ * under the boot's workspace are mounted into the container; anything else is
+ * a name without a capability behind it.
+ */
+function pathIsExposed(path, workspaceRoot) {
+  if (path == null) return false;
+  const inner = canonicalizeBestEffort(path);
+  const outer = canonicalizeBestEffort(workspaceRoot);
+  return inner === outer || inner.startsWith(outer.endsWith('/') ? outer : `${outer}/`);
+}
+
+/** The honest text: it names what the sandbox exposes and nothing else. */
+export function harnessSourceText(workspaceRoot) {
+  return [
+    `This runtime exposes exactly one working directory: the workspace at ${workspaceRoot}.`,
+    'It is bind-mounted into the container every command runs in, and confined bash is the only file surface here — no host-side file tools are mounted.',
+    'Any other path named anywhere in this conversation (including a DeepSeek Harness checkout) lies outside that boundary: it is not mounted, so a command cannot read or write it.',
+    'Use pwd to determine the current working directory.',
+  ].join(' ');
+}
+
+/**
+ * The harness-source section (#17). The web boot appends a global prompt
+ * section naming ITS OWN implementation checkout — "use this checkout only to
+ * inspect or extend DSH itself" — while this composition exposes only the
+ * workspace: bash runs in a container that bind-mounts exactly that path, and
+ * the host file tools are not mounted at all. The model was observed reporting
+ * that inert path as a place it operates in (live `self_describe` run), which
+ * is the label/reality gap the pilot otherwise avoids (#12's family): a prompt
+ * must not offer what the sandbox refuses.
+ *
+ * Suppression is not available at the source: the bundle's `surfaceContext`
+ * switch owns this section together with the Web-GUI section, so dropping it
+ * would silence an honest one too. The section keeps its name and placement
+ * (upstream owns both) and its TEXT becomes the composition's — rewritten only
+ * when the path it names is genuinely outside the workspace. A checkout the
+ * workspace does expose is left alone: there the original claim is true.
+ *
+ * @param sections - the assembled section list (name/order/text).
+ * @param workspaceRoot - the boot's exposed workspace.
+ * @returns {{sections: object[], replaced: boolean, original: string|null}} —
+ *   `original` is the superseded text, for the operator's log.
+ */
+export function rewriteHarnessSourceSection(sections, workspaceRoot) {
+  if (!Array.isArray(sections)) return { sections, replaced: false, original: null };
+  let replaced = false;
+  let original = null;
+  const rewritten = sections.map((section) => {
+    if (section?.name !== HARNESS_SOURCE_SECTION) return section;
+    if (pathIsExposed(claimedCheckoutPath(section.text), workspaceRoot)) return section;
+    replaced = true;
+    original = typeof section.text === 'string' ? section.text : null;
+    return { ...section, text: harnessSourceText(workspaceRoot) };
+  });
+  return { sections: rewritten, replaced, original };
+}
+
+/**
+ * The `system-prompt/assemble` listener that applies the rewrite, built once
+ * so `onRewrite` (the operator's loud notice) fires on the FIRST rewrite of a
+ * boot and never again — a per-step prompt is not a per-step alarm.
+ */
+export function harnessSourceHonesty(workspaceRoot, onRewrite = () => {}) {
+  let noticed = false;
+  return async function honestHarnessSource(assembly, context, next) {
+    const assembled = await next();
+    if (!Array.isArray(assembled?.sections)) return assembled;
+    const { sections, replaced, original } = rewriteHarnessSourceSection(assembled.sections, workspaceRoot);
+    if (!replaced) return assembled;
+    if (!noticed) {
+      noticed = true;
+      onRewrite(original);
+    }
+    return { ...assembled, sections };
+  };
+}
+
 /**
  * The workspace anchor (#18). A session REOPENED under this boot may carry a
  * `header.cwd` recorded by an earlier boot — and the dsh layer resolves BOTH
@@ -272,6 +367,17 @@ export async function apply(ctx, config = {}) {
     policy.resolve = confinedPolicy;
     return () => { policy.resolve = resolve; };
   });
+  // #17: the prompt must never name a path the sandbox does not expose. The
+  // section arrives from the boot bundle with its checkout path; here it is
+  // rewritten to the workspace (or left alone when that path is genuinely
+  // mounted), and the operator is told once what was corrected.
+  ctx.on?.('system-prompt/assemble', harnessSourceHonesty(policy.workspaceRoot, (superseded) => {
+    ctx.logger?.warn?.(
+      `blessed: the "${HARNESS_SOURCE_SECTION}" prompt section named a path this composition does not expose` +
+      `${superseded ? ` (${claimedCheckoutPath(superseded) ?? superseded})` : ''} — the section now names the ` +
+      `workspace (${policy.workspaceRoot}) instead; a prompt must not offer what the sandbox refuses (#17)`,
+    );
+  }));
   // CF-1/workspace-anchor (#18): refuse calls from sessions naming another
   // workspace BEFORE any other gate runs. First divergence is named on the
   // operator's log, loudly (I-8) — the UI file tree of such a session is the
