@@ -40,6 +40,7 @@ import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget } from './fingerprint.js';
 import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope } from 'compact-envelope';
+import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
 export { GrantStore, PersistentGrantStore, coveringGrants, evaluate, fingerprint, canonicalTarget, parseAllowlistLikePattern, DEFAULTS };
 
@@ -183,6 +184,53 @@ export function createApproval(opts = {}) {
 }
 
 /**
+ * The transcript note for a decided approval (#25). The host appends the
+ * `approval/asked` + `approval/decided` pair to the durable record, but the
+ * surface the Subject lives in showed nothing: in web the browser card
+ * vanishes on the decision, and an ALLOWED call is invisible — the Subject
+ * only sees the tool run (or, after a denial, its envelope), never that a
+ * gate fired and was answered. The note is the composition's copy of the
+ * decision in the only channel it owns — a plugin-sourced user message, the
+ * same channel dsh itself uses (user-approval's policy-change notice, the
+ * subagent driver's settlement notices) — queued for the agent's next model
+ * step, so the transcript carries the gate's firing wherever it is rendered.
+ *
+ * ENVELOPE-GRADE FACTS ONLY: tool, canonical target, fingerprint, outcome.
+ * Deliberately NOT the deciding preview — what the operator saw (the masked
+ * command text) never reaches the record, and this note is on the record.
+ * The view is narrowed by the caller to exactly these fields, so the
+ * no-arguments doctrine is structural, not discipline.
+ *
+ * ONE LINE, ALWAYS: the note is injected as a user message, and its target
+ * values are tool-argument material — `canonicalTarget` lowercases the host
+ * and stringifies the port without stripping control characters, so a crafted
+ * `host`/`port` could otherwise ride the interpolation into a multi-line
+ * forged message. Every value is flattened (control characters and whitespace
+ * runs → one space) before it touches the note: the fact stays on the record,
+ * the message structure cannot be forged by the fact's subject.
+ */
+export function approvalTranscriptNote({ tool, fingerprint, target }, outcome) {
+  const oneline = (v) => String(v ?? '').replace(/[\u0000-\u001f\u007f\s]+/g, ' ').trim();
+  const targetBits = Object.entries(target ?? {})
+    .map(([k, v]) => [k, oneline(v)])
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(' ');
+  const subject = `"${oneline(tool) || 'unknown-tool'}"` + (targetBits ? ` (${targetBits})` : '') + ` [${oneline(fingerprint) || 'no fingerprint'}]`;
+  switch (outcome) {
+    case 'allowed-once':
+      return `[compact-approval] Gate decision: ${subject} was allowed once by the operator — ` +
+        `the identical operation replays without re-asking until the exec-cache entry expires; anything else asks again.`;
+    case 'rejected':
+      return `[compact-approval] Gate decision: ${subject} was denied by the operator — the call did not run.`;
+    case 'cancelled':
+      return `[compact-approval] Gate decision: ${subject} closed cancelled — no operator answer arrived; the call did not run (fail-closed).`;
+    default:
+      return `[compact-approval] Gate decision: ${subject} closed ${outcome ?? 'unavailable'} — no operator answer; the call did not run (fail-closed).`;
+  }
+}
+
+/**
  * The answerer: claim our ask, delegate the decision downstream, then
  * materialize. Registered before operator answerers are composed, so
  * `next()` reaches the real decider; if none exists the outcome is the
@@ -216,6 +264,24 @@ async function answerRequest(approval, req, next) {
           ttlMs: approval.secretGrantTtlMs, now: Date.now(),
         });
       }
+    }
+    // #25: the decision's visible trace where the Subject lives — asked and
+    // answered, for every outcome, on the browser and terminal paths alike
+    // (this wrapper sees both). An agent without inject (test shapes) skips
+    // the note; a throwing inject must never take the decision path down.
+    if (typeof agent?.inject === 'function') {
+      try {
+        agent.inject(createUserMessage({
+          content: [{ type: 'text', text: approvalTranscriptNote(
+            { tool: view.tool, fingerprint: view.fingerprint, target: view.target },
+            outcome,
+          ) + (outcome === 'allowed-once' && (rec.secretRefs ?? []).length
+            ? ` The approved injection grant${rec.secretRefs.length > 1 ? 's are' : ' is'} live for this session ` +
+              `(${rec.secretRefs.map(r => '$' + r).join(', ')}), TTL-bounded.`
+            : '') }],
+          source: { kind: 'plugin', plugin: 'compact-approval' },
+        }));
+      } catch { /* the note is a trace, never a gate */ }
     }
     return outcome;
   } finally {
