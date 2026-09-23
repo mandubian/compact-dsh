@@ -19,9 +19,9 @@
 
 import { buildEnvelope } from 'compact-envelope';
 import { REFUSAL_EVENT } from 'compact-dsh-approval';
-import { createAnalyzer, methodClassOf } from './analyzer.js';
+import { createAnalyzer, methodClassOf, egressDeliveryOf } from './analyzer.js';
 
-export { createAnalyzer, methodClassOf };
+export { createAnalyzer, methodClassOf, egressDeliveryOf };
 
 export const name = 'compact-remote-access';
 export const inject = ['compact-approval'];
@@ -51,9 +51,13 @@ export function apply(ctx, config) {
         // asks) and, under the mediated posture (#38), is the axis the allowed
         // decision materializes an egress grant along. null = underivable:
         // the ask says no grant will materialize, and the proxy refuses.
+        // The DELIVERY rides beside it (#57): whether THIS act speaks the
+        // mediator's surface (plain HTTP / CONNECT) — null = it does not, or
+        // static analysis cannot pin it, and the ask says approving
+        // materializes no usable connectivity BEFORE the operator decides.
         const d = approval.gate({
           name: exec?.name ?? 'unknown-tool',
-          arguments: { ...f.target, methodClass: methodClassOf(exec?.arguments ?? {}) },
+          arguments: { ...f.target, methodClass: methodClassOf(exec?.arguments ?? {}), delivery: egressDeliveryOf(f) },
           agent: exec?.agent,
           callId: exec?.callId,
         });

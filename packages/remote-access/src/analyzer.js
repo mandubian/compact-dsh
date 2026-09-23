@@ -94,6 +94,25 @@ export function methodClassOf(args) {
   }
   return null;
 }
+
+// -- egress delivery (#57) --------------------------------------------------
+// The mediator speaks exactly one protocol surface: plain HTTP and CONNECT —
+// carried by clients that honor the proxy environment. The same analysis that
+// found the target answers whether THIS act rides that surface: 'mediator' or
+// null. Direction is fail-closed (D-7): a transport static analysis cannot
+// pin to the surface is null — approving materializes NO grant and the ask
+// says so BEFORE the decision — never a row that pretends coverage the wire
+// will not carry (ssh, scp, nc, ftp, ICMP/DNS verbs have no route at all; a
+// bare IP literal has no pinned transport; git's scp-form remote is SSH by
+// construction, and git over https arrives as a URL finding instead).
+const MEDIATOR_CLIENTS = new Set(['curl', 'wget', ...Object.keys(PACKAGE_VERBS)]);
+
+export function egressDeliveryOf(finding) {
+  if (finding?.kind === 'url') return finding.target ? 'mediator' : null;
+  if (finding?.kind !== 'host') return null;
+  if (MEDIATOR_CLIENTS.has(finding.verb)) return finding.target ? 'mediator' : null;
+  return null;
+}
 const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const SCP_LIKE_RE = /^[\w.-]+@([\w.-]+):/; // git@github.com:org/repo
 // shell-naive tokenization: separators are their own matches so command

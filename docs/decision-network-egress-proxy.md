@@ -148,7 +148,17 @@ the operator was shown:
 network target, in a composition whose egress posture is `proxy`, materializes
 a session-scoped, TTL-bounded, revocable grant for `(host, port, method-class)`
 in the same store — disclosed before it exists (below), recorded when it does,
-revocable afterwards.
+revocable afterwards. **And only when the act speaks the mediator's surface**
+(named by the phase-3 review, #57): the mediator is an HTTP/HTTPS forwarder —
+plain HTTP and `CONNECT`, carried by clients that honor the proxy environment —
+so the same analysis that found the target also answers whether THIS act rides
+that surface. A URL finding, `curl`/`wget`, or a package manager delivers
+through the mediator; `ssh`, `scp`, `nc`, `ftp`, the ICMP/DNS verbs, git's
+scp-form remote (SSH by construction), and a bare IP literal (transport
+unpinned) do not — an `allowed-once` on such an act materializes NOTHING, and
+the ask says so before the decision (D-7, the classless precedent extended:
+no delivery, no grant — never a row that pretends coverage the wire will not
+carry).
 
 ## What the ask must then say — the fourth posture
 
@@ -157,10 +167,12 @@ Phase 1 added three `egressHonesty` postures (`none`, `open`, undeclared).
 
 > approving materializes a live egress grant — host, port, method class, this
 > session, TTL-bounded, revocable — and the mediator will deliver connectivity
-> under exactly that grant and nothing beyond it. Anything the grant covers can
-> still carry data out; the record keeps what was sent (it is never scrubbed),
-> the credential-shape detector watches it, and revoking the grant kills the
-> route.
+> under exactly that grant and nothing beyond it. The mediator speaks plain
+> HTTP and CONNECT only: an act whose transport it cannot carry records
+> consent but materializes NO usable connectivity, and this ask says so when
+> that is the case. Anything the grant covers can still carry data out; the
+> record keeps what was sent (it is never scrubbed), the credential-shape
+> detector watches it, and revoking the grant kills the route.
 
 The disclosure keeps the phase-1 discipline honest: consent still is not raw
 connectivity, and the residual that *does* exist under a live grant (below) is
