@@ -75,6 +75,51 @@ the container can name another session's grants: there is no token to replay,
 and a command that rewrites its proxy env reaches only its own listener — or a
 dead port.
 
+## Why a mediator of our own — the build-vs-reuse adjudication
+
+The obvious objection to everything above: forward proxies are a solved
+problem — Squid, Envoy, mitmproxy, tinyproxy — so why ~350 lines of our own?
+Adjudicated during the phase-3 review (2026-09-23), recorded here so the
+choice reads as decided, not defaulted:
+
+- **The policy is the product, not the plumbing.** What the mediator enforces
+  — the session-scoped, TTL-bounded, revocable grant table read *directly*
+  from the approval store, the method-class lattice (#26), the per-connection
+  re-check, mid-flight tunnel kill on revocation, and refusals that are
+  Compact envelopes naming their cause and lawful next moves — is the CF
+  grant family expressing itself at the wire. No shipped proxy has these
+  concepts; each offers a config-time ACL engine instead, and the ask and the
+  wire would say different things.
+- **Every integration path re-creates the auth service anyway.** Squid's
+  external-ACL helpers and Envoy's `ext_authz` exist precisely to delegate
+  per-connection decisions to an external authority — and that authority is
+  this package's logic in full, plus an IPC protocol to secure, plus someone
+  else's refusal surface to fight (static error pages are not Compact
+  envelopes, and revocation would be pushed through an admin API rather than
+  read from the store where the revocation lands).
+- **Provenance (CF-2).** A downloaded binary in the enforcement path is a
+  second supply-chain surface to declare, digest-pin and re-resolve at every
+  confine — the exact reasoning that made the mediator-container profile the
+  decided fallback (Platform evidence, below). Code already inside the audited
+  tree, pinned by
+  `verify-pin` like every other package, carries no such surface.
+- **The parser is not ours.** The genuinely risky surface — parsing untrusted
+  bytes — is Node's `llhttp`, the same battle-tested parser every Node HTTP
+  service in this repository already stands behind. What is custom is the
+  policy glue, which is precisely the part no off-the-shelf proxy supplies.
+  Squid's parser has its own CVE history; maturity does not exempt a proxy
+  from the parser problem, it only relocates it.
+
+**The adjudicated concession.** If the mediator-container profile is ever
+promoted to default, an Envoy + `ext_authz` split becomes defensible: a
+sandboxed, battle-tested parser whose authorization decisions remain ours.
+The decision recorded here is that the auth service is the irreducible core —
+one pinned package is the smaller dependency than a config language around a
+binary. The phase-3 review findings #55 (resolved-IP validation) and #56
+(tunnel opacity) are the parser-adjacent gaps this adjudication accepts as
+the cost of ownership — declared in the residuals below (2 and 6), with their
+named fixes pending, said rather than pretended away.
+
 ## Grant identity: `(host, port, method-class, session, TTL, revocable)`
 
 Consent identity is risk identity (#26), and the grant must carry the identity
@@ -206,10 +251,17 @@ ran).
    *what was sent* (completeness forbids scrubbing); the credential-shape
    detector watches tool output; revocation kills the route. Declared, never
    pretended away.
-2. **HTTPS bodies are opaque to the proxy** (no interception, by decision):
-   the detector sees what enters the record, not what crosses the wire. The
-   wire's privacy is the Subject's; the record's completeness is the
-   operator's; neither is traded for the other.
+2. **Tunnels are opaque — class AND protocol** (generalized by the phase-3
+   review, #56): HTTPS bodies stay unintercepted, by decision — the detector
+   sees what enters the record, not what crosses the wire. And a `CONNECT` is
+   admitted under any live, classed grant covering its authority, so what
+   rides inside — bodies, or a non-HTTP protocol tunneled deliberately
+   (`curl --proxytunnel`, SSH over CONNECT) — is unobservable too: the
+   method-class axis (#26) and any protocol distinction hold only outside a
+   tunnel; "no other protocol has a route" is true of clients that do not
+   tunnel, not of the enforced capability. The wire's privacy is the
+   Subject's; the record's completeness is the operator's; neither is traded
+   for the other.
 3. **Host services on the mediator's interface are reachable** from the
    mediation network (on native Linux: whatever the host binds to that
    gateway). The launcher already refuses `0.0.0.0` for the pilot's own web
@@ -221,6 +273,15 @@ ran).
    configuration if the native cell fails — at the cost of its image joining
    CF-2's provenance declaration, which is why it is the fallback and not the
    default.
+6. **Grants match the name; the wire dials the address** (named by the
+   phase-3 review, #55): the grant check reads the hostname from the request
+   line or `CONNECT` authority, while the upstream dial follows whatever that
+   name resolves to — a rebinding answer can point a granted name at
+   loopback, link-local or host-internal space, reaching residual 3's host
+   services under a name the consent identity (#26) checked but the connection
+   then ignored. The named fix — resolve host-side, validate the address
+   against a denylist, dial the validated IP, refuse with a new EG rule — is
+   pending; until it lands, this is a declared gap, never a non-existent one.
 
 ## Phase 3 — the implementation slice, specified so it lands mechanically
 
