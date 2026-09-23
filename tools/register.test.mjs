@@ -8,8 +8,10 @@ import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { audit } from '../auditor/audit.mjs';
+import { enforcementPackages, enforcementPattern, guard } from './baseline-guard.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
+const REGISTER = JSON.parse(readFileSync(join(ROOT, 'docs/register/register.json'), 'utf8'));
 
 test('verify-register passes on the real repository', () => {
   const out = execFileSync(process.execPath, ['tools/verify-register.mjs'], { cwd: ROOT, encoding: 'utf8' });
@@ -140,4 +142,80 @@ test('the auditor flags the crash tail: an ask never decided, a log ending mid-t
   assert.equal(att.verdict, 'conforming', 'warnings are not violations');
   assert.ok(att.findings.some(f => f.severity === 'warning' && f.detail.includes('never decided')));
   assert.ok(att.findings.some(f => f.severity === 'warning' && f.detail.includes('open turn')));
+});
+
+// --- baseline-guard (#58): the enforcement scope is derived from the register ---
+
+test('the derived enforcement scope covers every register-cited package path', () => {
+  const pattern = enforcementPattern(REGISTER);
+  assert.ok(pattern, 'a non-empty register derives a pattern');
+  for (const e of REGISTER.entries) {
+    for (const kind of ['enforcedBy', 'verifiers']) {
+      for (const p of e[kind] ?? []) {
+        if (p.startsWith('packages/')) {
+          assert.ok(pattern.test(p), `the guard must watch ${p} (${e.clause}, ${kind})`);
+        }
+      }
+    }
+  }
+});
+
+test('the derived scope names the packages the first hardcoded list silently dropped (#58)', () => {
+  const pkgs = enforcementPackages(REGISTER);
+  for (const dropped of ['envelope', 'blessed', 'egress-proxy']) {
+    assert.ok(pkgs.includes(dropped), `${dropped} is register-cited and must be watched`);
+  }
+});
+
+test('a new enforced package joins the watched scope through its register rows alone', () => {
+  const next = {
+    meta: REGISTER.meta,
+    entries: [...REGISTER.entries, {
+      clause: 'I-4',
+      kind: 'enforced',
+      plugin: 'compact-namespace-next',
+      service: 'compact-namespace-next',
+      enforcedBy: ['packages/namespace-next/src/index.js'],
+      verifiers: ['packages/namespace-next/test/index.test.js'],
+    }],
+  };
+  const pattern = enforcementPattern(next);
+  assert.ok(pattern.test('packages/namespace-next/src/anything.js'), 'the row is the scope — no guard edit, no gap');
+});
+
+test('the guard classifies an undeclared amendment of conduct and names its remedy', () => {
+  const files = ['packages/exit/src/reasons.js', 'docs/register/register.json', 'README.md'];
+  const refused = guard({ title: 'feat(exit): new ground', register: REGISTER, files });
+  assert.equal(refused.ok, false);
+  assert.match(refused.reason, /\[baseline-update\]/);
+  assert.ok(guard({ title: '[baseline-update] feat(exit): new ground', register: REGISTER, files }).ok, 'the declared form passes');
+});
+
+test('the guard stays silent when only one side of the sentinel moves', () => {
+  const register = REGISTER;
+  assert.ok(guard({ title: 'feat(exit): code only', register, files: ['packages/exit/src/reasons.js'] }).ok);
+  assert.ok(guard({ title: 'docs(register): rows only', register, files: ['docs/register/register.json'] }).ok);
+  assert.ok(guard({ title: 'docs: prose', register, files: ['README.md', 'docs/concept-the-record.md'] }).ok);
+  // conduct also lives outside src/ and test/ — a cited package is watched whole
+  assert.equal(guard({ title: 'feat(blessed): patch', register, files: ['packages/blessed/cordis.patch.yml', 'docs/register/register.json'] }).ok, false);
+});
+
+test('the guard refuses rather than passes on an unreadable or empty law', () => {
+  assert.equal(guard({ title: 'x', register: null, files: [] }).ok, false);
+  assert.equal(guard({ title: 'x', register: { entries: [] }, files: ['packages/x/src/a.js'] }).ok, false, 'an empty derived scope watches nothing — refuse');
+});
+
+test('the guard CLI emits the ::error remedy and exits non-zero on an undeclared amendment', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-baseline-guard-'));
+  const list = join(dir, 'files.txt');
+  writeFileSync(list, 'packages/record/src/chain.js\ndocs/register/register.json\n');
+  const bad = spawnSync(process.execPath, ['tools/baseline-guard.mjs', '--files', list, '--title', 'feat(record): rewrite history'], { cwd: ROOT, encoding: 'utf8' });
+  assert.notEqual(bad.status, 0);
+  assert.match(bad.stderr, /::error::/);
+  assert.match(bad.stderr, /\[baseline-update\]/);
+
+  writeFileSync(list, 'README.md\n');
+  const ok = spawnSync(process.execPath, ['tools/baseline-guard.mjs', '--files', list, '--title', 'docs: prose'], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(ok.status, 0);
+  assert.match(ok.stdout, /baseline-guard ok/);
 });
