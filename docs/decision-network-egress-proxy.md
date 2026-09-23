@@ -321,3 +321,37 @@ HTTP/2 upgrades (an upgrade rides the same request-line check — noted, not
 specified); UDP/QUIC/ICMP (unreachable by construction); the mediator-container
 fallback profile (only if the native cell fails); and #26's bash effect-class
 half, which keeps its own record and adjudication.
+
+### SSH/SCP under the mediator — the extension path, recorded (#57 review)
+
+When SSH/SCP delivery is wanted, the answer is wiring and honesty, **not a new
+plugin** — recorded here so the reasoning survives the review that produced
+it. The `CONNECT` relay is protocol-agnostic TCP to a granted `host:port`, and
+SSH clients already speak forward-proxies natively (`ProxyCommand` /
+`ProxyJump`, or `corkscrew`): the mediator sees encrypted bytes to `host:22`,
+and SSH host-key verification keeps working end-to-end — no interception, by
+decision. Three seams carry the support:
+
+1. **Delivery vocabulary** (`egressDeliveryOf`, remote-access): ssh/scp and
+   git's scp-form remote flip from `null` to `'mediator'` — one set
+   membership; the ask, the grant materialization, and the method-class axis
+   (git push = write, clone = read — already derived from the verbs) flow
+   unchanged.
+2. **Confine-time client config** (sandbox-docker/blessed): the provider
+   already injects `HTTP_PROXY`; SSH needs its equivalent — inject
+   `GIT_SSH_COMMAND` or mount an `ssh_config` whose `ProxyCommand` points at
+   the session's listener. The injection seam exists; this is a new passenger
+   on it.
+3. **A record amendment** (`[baseline-update]`): the delivery surface widens,
+   so this record's residuals and the register evidence move with it — and
+   the #56 adjudication (tunnel port discipline) is a **prerequisite**, since
+   admitting SSH widens the population of opaque tunnels: class is enforced
+   at the gate (push = write, clone = read), the wire stays opaque, residual 2
+   said so first.
+
+Explicitly out, by the same decision that refuses the planted CA: a
+protocol-aware SSH mediator — terminating SSH to inspect commands, scp paths,
+or host keys crosses the trust boundary the Compact has no authority over. If
+`ProxyCommand` ever proves too awkward for a client, the additive fallback is
+a SOCKS5 listener inside the same `egress-proxy` package — same plugin, same
+grant store, same per-connection checks.
