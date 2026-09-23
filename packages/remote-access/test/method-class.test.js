@@ -5,7 +5,7 @@
 // command yields null, which materializes no egress grant at all.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { methodClassOf, createAnalyzer } from '../src/analyzer.js';
+import { methodClassOf, egressDeliveryOf, createAnalyzer } from '../src/analyzer.js';
 
 test('reader verbs are read-class — the fetch act, however phrased', () => {
   for (const command of [
@@ -64,7 +64,6 @@ test('class claims only where a network finding exists — RA consults it only f
 
 // -- egress delivery (#57): the mediator speaks plain HTTP and CONNECT only --
 
-import { egressDeliveryOf } from '../src/analyzer.js';
 
 test('acts that speak the proxy environment deliver through the mediator', () => {
   const a = createAnalyzer();

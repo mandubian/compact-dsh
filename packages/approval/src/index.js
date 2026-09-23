@@ -597,7 +597,7 @@ export function approvalPlugin(opts = {}) {
               `approving it materializes a session-scoped, TTL-bounded, revocable secret grant and the credential is injected into the confined execution ` +
               `without entering this conversation`
             : '') +
-          `        . ${replayConsequence(approval.execCacheTtlMs)} ${egressHonesty(approval.egress)}` +
+          `. ${replayConsequence(approval.execCacheTtlMs)} ${egressHonesty(approval.egress)}` +
           (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'methodClass') && args.methodClass == null
             ? ` This target's method class could not be derived statically, so NO egress grant will materialize from ` +
               `approving — the mediator refuses its connections by name (D-7).`
