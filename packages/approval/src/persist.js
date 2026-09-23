@@ -76,8 +76,17 @@ export class PersistentGrantStore extends GrantStore {
     });
     const tmp = `${this.path}.tmp-${process.pid}`;
     try {
-      mkdirSync(dirname(this.path), { recursive: true });
-      const fd = openSync(tmp, 'w');
+      // the store is operator trust root (#63's declared residual: canonical
+      // targets can carry credential-shaped paths) — created dirs and the
+      // file itself are owner-only, matching the launcher's 0700 state root
+      // and the generated boot root's 0600. The rename preserves the tmp
+      // file's mode, so every flush re-asserts it (a store relocated by
+      // COMPACT_APPROVAL_PERSIST_PATH cannot inherit a laxer directory's
+      // habits). This is defense in depth against relocation and dir-mode
+      // regressions — the 0700 state root remains the real boundary; no
+      // file mode defends against the operator's own uid or root.
+      mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
+      const fd = openSync(tmp, 'w', 0o600);
       try {
         writeSync(fd, payload);
         fsyncSync(fd);            // the data must be on disk BEFORE the rename

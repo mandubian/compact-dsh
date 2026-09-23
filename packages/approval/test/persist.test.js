@@ -5,7 +5,7 @@
 // could resurrect revoked grants).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PersistentGrantStore } from '../src/persist.js';
@@ -124,4 +124,22 @@ test('flush is atomic: the store directory holds exactly the target file', () =>
   const files = readdirSync(join(dir, 'nested'));
   assert.deepEqual(files, ['grants.json'], 'no tmp residue beside the store');
   assert.ok(readFileSync(path, 'utf8').includes('x.example'));
+});
+
+test('the store file and its created directories are owner-only (0600/0700)', () => {
+  const dir = freshDir();
+  const path = join(dir, 'relocated', 'deep', 'grants.json');
+  const s = new PersistentGrantStore(path);
+  s.addSessionGrant({ pattern: { kind: 'ExactHost', value: 'x.example' }, root: 'r', ttlMs: 0, now: NOW });
+
+  const fileMode = statSync(path).mode & 0o777;
+  assert.equal(fileMode, 0o600, `the store file is 0600, got ${fileMode.toString(8)}`);
+  const deepMode = statSync(join(dir, 'relocated', 'deep')).mode & 0o777;
+  assert.equal(deepMode, 0o700, `persist-created dirs are 0700, got ${deepMode.toString(8)}`);
+
+  // every flush re-asserts the mode: a pre-existing laxer file is tightened
+  // by the next durable write (rename preserves the tmp file's mode)
+  chmodSync(path, 0o644);
+  s.addSessionGrant({ pattern: { kind: 'ExactHost', value: 'y.example' }, root: 'r', ttlMs: 0, now: NOW });
+  assert.equal(statSync(path).mode & 0o777, 0o600, 'a flush tightens a laxer file back to 0600');
 });
