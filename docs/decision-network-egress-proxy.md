@@ -324,6 +324,10 @@ half, which keeps its own record and adjudication.
 
 ### SSH/SCP under the mediator — the extension path, recorded (#57 review)
 
+(#57 — the phase-3 review finding that approvals materialized grants the
+mediator's HTTP/CONNECT surface can never carry; fixed in the same slice by
+the no-delivery rule: an act the mediator cannot carry materializes no grant.)
+
 When SSH/SCP delivery is wanted, the answer is wiring and honesty, **not a new
 plugin** — recorded here so the reasoning survives the review that produced
 it. The `CONNECT` relay is protocol-agnostic TCP to a granted `host:port`, and
@@ -344,10 +348,11 @@ decision. Three seams carry the support:
    on it.
 3. **A record amendment** (`[baseline-update]`): the delivery surface widens,
    so this record's residuals and the register evidence move with it — and
-   the #56 adjudication (tunnel port discipline) is a **prerequisite**, since
+   the #56 adjudication (the pending decision over which grants open
+   `CONNECT` tunnels, and on which ports) is a **prerequisite**, since
    admitting SSH widens the population of opaque tunnels: class is enforced
-   at the gate (push = write, clone = read), the wire stays opaque, residual 2
-   said so first.
+   at the gate (push = write, clone = read), the wire stays opaque — residual
+   2, the declared tunnel opacity in the residuals above, said so first.
 
 Explicitly out, by the same decision that refuses the planted CA: a
 protocol-aware SSH mediator — terminating SSH to inspect commands, scp paths,
