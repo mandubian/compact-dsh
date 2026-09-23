@@ -1,8 +1,11 @@
 // The mediator itself (#38 phase 3; spec: docs/decision-network-egress-proxy.md).
 //
 // One instance serves ONE session's container: the listener's socket IS the
-// session identity, so a grant can never be reached from a sibling session
-// and nothing in the container holds a credential to replay. Every
+// session identity — its grant closure reads only that session's rows, and
+// nothing in the container holds a credential to replay. (Declared residual,
+// I-8: the pool's listeners share the mediation network's gateway address, so
+// a sibling container on that network can reach another session's listener by
+// port-scanning it — per-session networks close it; see index.js.) Every
 // CONNECTION re-reads the grant rows — coverage, liveness, class — so a TTL
 // that lapses or a revocation that lands closes what is already open (live
 // tunnels are tracked against the grant that opened them and destroyed when
@@ -190,7 +193,11 @@ export function authorityOf(req) {
   if (typeof hostHeader !== 'string' || !hostHeader) return null;
   const [h, p] = splitAuthority(hostHeader, '80');
   if (!h) return null;
-  return { host: h, port: p, url: `http://${hostHeader}${raw}`, path: raw, secure: false };
+  // the UrlPrefix question is answered against the CANONICAL form (pattern.js
+  // lowercases the authority and keeps an explicit port only when non-default)
+  // — never against the raw Host header, whose case a client controls
+  const portPart = p === '80' ? '' : `:${p}`;
+  return { host: h, port: p, url: `http://${h}${portPart}${raw}`, path: raw, secure: false };
 }
 
 const HOP_BY_HOP = new Set(['proxy-authorization', 'proxy-connection', 'connection', 'keep-alive', 'transfer-encoding', 'upgrade']);

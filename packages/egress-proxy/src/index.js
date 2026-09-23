@@ -15,9 +15,13 @@
 //     instead of failing the first command (D-7).
 //   - SESSION IDENTITY IS THE SOCKET. A slot is assigned to a session once;
 //     its grant closure reads only that session's rows, and the container
-//     receives only its own listener's URL — no credential to replay, no
-//     sibling coverage, an explicit pool ceiling whose exhaustion refuses
-//     confinement by name rather than sharing one listener across sessions.
+//     receives only its own listener's URL — no credential to replay, an
+//     explicit pool ceiling whose exhaustion refuses confinement by name
+//     rather than sharing one listener across sessions. Declared residual
+//     (I-8): all listeners share the mediation network's gateway address, so
+//     a sibling container on that network can reach another session's
+//     listener by port-scanning it — per-session mediation networks are the
+//     closure a deployment needs; never pretended unreachable.
 //   - ABSENT UNTIL DECLARED. The plugin mounts only when the composition
 //     declares the mediated posture (blessed passes `network`), so the
 //     default boot still carries NO network capability at all (CF-1).

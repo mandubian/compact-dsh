@@ -17,8 +17,12 @@ const execFileAsync = promisify(execFile);
  *   `docker …` runner (tests); defaults to the real CLI.
  * @returns {Promise<{name: string, gateway: string, driver: string, id: string}>}
  */
-export async function ensureEgressNetwork({ name, run } = {}) {
-  if (typeof name !== 'string' || !name.trim() || name === 'none') {
+export async function ensureEgressNetwork({ name: requested, run } = {}) {
+  // normalize ONCE: the trimmed value is what every docker call and the
+  // refusal below see (a padded "none" or whitespace name refuses like its
+  // bare form — the posture check reads the name the daemon will get)
+  const name = typeof requested === 'string' ? requested.trim() : requested;
+  if (typeof name !== 'string' || !name || name === 'none') {
     throw new Error(
       `compact-dsh-egress-proxy: the mediation network must be a docker network NAME (never "none"), got ` +
       `${JSON.stringify(name)} — an egress posture with no network is a declared capability that cannot deliver (D-7)`);
