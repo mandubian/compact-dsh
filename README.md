@@ -584,7 +584,12 @@ npm run compact -- --attended --workspace /absolute/path/to/project "Inspect the
 Notes for these runs: `ubuntu:24.04` is a bare shell — set
 `COMPACT_SANDBOX_IMAGE` to a locally prepared image if the project needs
 tooling (the launcher inspects its local digest, never pulls); bash has
-**network off** by design, so fetches deny with the AG-1 envelope; use an
+**network off** by design: a fetch in a bash command is caught by the
+remote-access analyzer and raised as an approval ask for its host (refused
+when nobody can answer, i.e. without `--attended`/`--web`), and even an
+approved fetch fails at connect, because approval is consent, not
+connectivity (the AG-1 allowlist envelope is for tools that carry a
+`url`/`host` argument, not for bash); use an
 explicit `cd` inside bash for subdirectories rather than the workdir option;
 `COMPACT_SECRETS='["NAME"]'` declares env-var NAMES the confined bash may be
 granted (values stay in your shell, injection only under an approved grant).
