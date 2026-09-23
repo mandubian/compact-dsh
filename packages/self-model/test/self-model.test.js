@@ -154,6 +154,21 @@ test('the attestation renders a credential path masked (#8 G3): the row keeps th
     'the attestation is injected every turn — it carries no path credential');
 });
 
+test('structured pattern kinds render whole, and still ride the redaction (#8 G3)', async () => {
+  const { ctx } = await boot();
+  const store = new GrantStore();
+  store.addSessionGrant({ pattern: { kind: 'PathPrefix', value: { path: '/home/op/project', ceiling: 'ro' } }, session: 's1', ttlMs: 60_000, now: 1 });
+  store.addSessionGrant({ pattern: { kind: 'UrlPrefix', value: 'https://discord.com/api/webhooks/123456/abc-token/' }, session: 's1', ttlMs: 60_000, now: 1 });
+  ctx.plugin(stubService('compact-approval', { store }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+
+  const b = budgetsOf(ctx, 's1', 2);
+  assert.equal(b.grants.find(g => g.pattern === 'PathPrefix')?.target, '/home/op/project (ro)',
+    'an ordinary mount path renders verbatim — no shape-guessing beyond the closed rules');
+  assert.match(b.grants.find(g => g.pattern === 'UrlPrefix')?.target, /webhooks\/\*\*\*/,
+    'the structured branch renders redacted too — every branch builds the string, redaction is applied once');
+});
+
 test('the approval gate\'s own declared gap reaches the attestation (#8 G2)', async () => {
   const { ctx } = await boot();
   ctx.plugin(stubService('compact-approval', { declaredGaps: ['no content-level secret detection over tool output (G2)'] }));

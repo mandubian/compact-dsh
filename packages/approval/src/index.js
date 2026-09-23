@@ -683,14 +683,17 @@ export function approvalPlugin(opts = {}) {
 }
 
 function patternText(pattern) {
-  switch (pattern.kind) {
-    case 'HostAndPort': return `HostAndPort:${pattern.value.host}:${pattern.value.port}`;
-    case 'PathPrefix': return `PathPrefix:${pattern.value.path}(${pattern.value.ceiling})`;
-    // #8 G3: the rendered pattern rides the same redaction as every other
-    // rendering — a UrlPrefix grant materialized from a credential path
-    // displays masked; the ROW keeps the true value (it is the matching form)
-    default: return `${pattern.kind}:${redactEmbeddedSecrets(String(pattern.value))}`;
-  }
+  // #8 G3: every rendering rides the redaction, whichever branch builds it —
+  // the rendered string is what grants-list prints and what /grants-grant
+  // echoes into the recorded command/done
+  const text = (() => {
+    switch (pattern.kind) {
+      case 'HostAndPort': return `HostAndPort:${pattern.value.host}:${pattern.value.port}`;
+      case 'PathPrefix': return `PathPrefix:${pattern.value.path}(${pattern.value.ceiling})`;
+      default: return `${pattern.kind}:${pattern.value}`;
+    }
+  })();
+  return redactEmbeddedSecrets(String(text));
 }
 
 function registerGrantCommands(ctx, approval) {
