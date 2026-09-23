@@ -76,10 +76,15 @@ export class GrantStore {
   // (docs/concept-approval-layers.md — no blanket grants) — a falsy ttlMs is
   // replaced by the default hour, never by a permanent grant. Plan grants
   // below are the exception: their bound is the session itself.
-  addSessionGrant({ pattern, root, session, ttlMs, maxUses = null, now }) {
+  addSessionGrant({ pattern, root, session, ttlMs, maxUses = null, methodClass = null, now }) {
     const grant = {
       id: 'sg_' + Math.random().toString(16).slice(2, 10),
       pattern, root: root ?? null, session: session ?? null,
+      // methodClass (#26/#38): the risk axis the operator was shown, carried
+      // on the row so the mediator enforces it per connection. null = a grant
+      // made without a derivable class — it still counts for CF-2's posture
+      // check but covers no connection at the proxy.
+      methodClass,
       createdAt: now, expiresAt: now + (ttlMs || 60 * 60 * 1000),
       maxUses, uses: 0, revokedAt: null,
     };
@@ -208,4 +213,38 @@ export function coveringGrants(store, target, now) {
     session: live(store.sessionGrants).filter(g => patternMatches(g.pattern, target)),
     plan: live(store.planGrants).filter(g => patternMatches(g.pattern, target)),
   };
+}
+
+/** Network-pattern session kinds — the family the mediator reads (#38). */
+export const NETWORK_PATTERN_KINDS = ['ExactHost', 'HostSuffix', 'HostAndPort', 'UrlPrefix'];
+
+/**
+ * Every network-family session grant whose SCOPE covers this session — rows
+ * exactly as stored, live or not, classed or not (#38). The mediator reads
+ * this one, so it can NAME why a row does not cover a connection: expired
+ * (with its timestamp), revoked (with its timestamp), or classless. Scoping
+ * is one rule, shared with the live view below.
+ */
+export function networkGrantsForSession(store, sessionId) {
+  const sid = sessionId != null ? String(sessionId) : null;
+  return (store?.sessionGrants ?? []).filter(g =>
+    NETWORK_PATTERN_KINDS.includes(g.pattern?.kind) &&
+    ((g.session != null) ? g.session === sid
+      : (g.root != null) ? (sid === g.root || (sid ?? '').startsWith(g.root + '/'))
+      : true));
+}
+
+/**
+ * Live EGRESS grants for one session — the network family as a coverage
+ * question (#38 phase 3): scoped as above AND live AND carrying a method
+ * class. The class is the clause: a network grant WITHOUT one still counts
+ * as evidence for CF-2's posture check (its row was lawfully made) but covers
+ * NO connection at the proxy — an unclassifiable grant is no coverage, never
+ * read-by-default (D-7).
+ */
+export function egressGrantsFor(store, sessionId, now = Date.now()) {
+  return networkGrantsForSession(store, sessionId).filter(g =>
+    g.methodClass != null &&
+    !g.revokedAt && (!g.expiresAt || g.expiresAt > now) &&
+    (g.maxUses == null || g.uses < g.maxUses));
 }

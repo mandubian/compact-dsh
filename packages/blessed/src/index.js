@@ -9,6 +9,7 @@ import { apply as applyPetition } from 'compact-dsh-petition';
 import { promotionPlugin } from 'compact-dsh-promotion';
 import { apply as applyRemoteAccess } from 'compact-dsh-remote-access';
 import { apply as applySandbox, normalizeProvenanceRecords } from 'compact-dsh-sandbox-docker';
+import { apply as applyEgressProxy } from 'compact-dsh-egress-proxy';
 import { apply as applySelfModel } from 'compact-dsh-self-model';
 import { apply as applySpecialists } from 'compact-dsh-specialists';
 import { canonicalizeBestEffort } from 'compact-dsh-sandbox-docker';
@@ -57,6 +58,20 @@ export function resolveConfig(config) {
   // `?? 'none'` default — normalize at the config boundary, loudly
   if (config.sandbox.network !== undefined && (typeof config.sandbox.network !== 'string' || !config.sandbox.network.trim())) {
     throw new TypeError('blessed: sandbox.network must be a non-empty docker network name when present');
+  }
+  // #38 phase 3: the MEDIATED posture. 'proxy' is the only egress value (the
+  // other postures read from sandbox.network: 'none' is absent, a named
+  // network is open), and it requires a mediation network NAME — attaching a
+  // container to 'none' under this flag would be a posture that cannot
+  // deliver, which the composition refuses to compose (D-7, CF-1).
+  if (config.sandbox.egress !== undefined) {
+    if (config.sandbox.egress !== 'proxy') {
+      throw new TypeError(`blessed: sandbox.egress must be 'proxy' (the mediated posture), got ${JSON.stringify(config.sandbox.egress)} — ` +
+        "'none' is sandbox.network (absent) and any other named network reads as open; a posture this composition cannot name is a posture it cannot run (D-7)");
+    }
+    if (config.sandbox.network === undefined || typeof config.sandbox.network !== 'string' || !config.sandbox.network.trim() || config.sandbox.network === 'none') {
+      throw new TypeError('blessed: sandbox.egress "proxy" requires sandbox.network to name the INTERNAL mediation network (never "none") — the mediator lives there (D-7)');
+    }
   }
   text(config.sandbox.image, 'sandbox.image');
   if (!Array.isArray(config.sandbox.imageProvenance) || !normalizeProvenanceRecords(config.sandbox.imageProvenance).has(config.sandbox.image)) {
@@ -429,17 +444,39 @@ export async function apply(ctx, config = {}) {
   // honestly — consent at the gate is not connectivity on the wire. Blessed
   // KNOWS the posture (its sandbox declaration — resolveConfig normalized
   // network to a non-empty name, 'none' by default), so it wires it through:
-  // 'none' is the no-egress posture; any other docker network name grants
-  // egress and reads as 'open'. The derived value rides the mount config too
-  // (the apply path is authoritative), so no approval-level config can make
-  // the envelope claim a posture the sandbox does not run.
+  // 'none' is the no-egress posture; any other docker network name reads as
+  // 'open'; the MEDIATED posture ('proxy') reads as 'proxy', the one where
+  // approval delivers — an egress grant the mediator enforces per connection
+  // (#38 phase 3). The derived value rides the mount config too (the apply
+  // path is authoritative), so no approval-level config can make the envelope
+  // claim a posture the sandbox does not run.
+  const egress = options.sandbox.network === 'none' ? 'none' : options.sandbox.egress === 'proxy' ? 'proxy' : 'open';
   await mount('compact-approval', approvalPlugin({
     persistPath: options.approval.persistPath,
     secretRefs: options.secrets,
-    egress: options.sandbox.network === 'none' ? 'none' : 'open',
-  }), { ...options.approval, egress: options.sandbox.network === 'none' ? 'none' : 'open' }, ['approval', 'commands']);
+    egress,
+  }), { ...options.approval, egress }, ['approval', 'commands']);
   await mount('compact-remote-access', applyRemoteAccess, {}, ['compact-approval']);
-  await mount('compact-sandbox', applySandbox, options.sandbox, ['tools', 'approval', 'compact-approval']);
+  // #38 phase 3: the mediator composes ALWAYS (its enforced register row must
+  // resolve at boot — F-5), while the CAPABILITY it carries wakes only under
+  // the declared posture: without a network name it provides an inert service
+  // that names its own absence, binds nothing, and never touches docker. The
+  // sandbox receives the session→listener lookup ONLY when the posture is
+  // declared, so a default boot still runs `--network none` exactly as before
+  // (CF-1 absent by composition).
+  const mediated = options.sandbox.egress === 'proxy';
+  await mount('compact-egress-proxy', applyEgressProxy,
+    { network: mediated ? options.sandbox.network : undefined }, ['compact-approval']);
+  const egressProxy = ctx.get('compact-egress-proxy');
+  if (mediated) {
+    ctx.logger?.warn?.(
+      `blessed: egress posture is BOUND (mediated, #38) — the container carries no route of its own; every connection ` +
+      `is delivered per live grant by compact-egress-proxy on the internal network "${options.sandbox.network}"`);
+  }
+  await mount('compact-sandbox', applySandbox, {
+    ...options.sandbox,
+    ...(mediated ? { proxyEnvFor: (sessionId) => egressProxy.envFor(sessionId) } : {}),
+  }, ['tools', 'approval', 'compact-approval']);
   requireServices(ctx, ['sandbox']);
   // D-8 declaration: the secret-injection posture is on the record at boot —
   // BOUND (refs declared, injection only ever under a live SecretGrant) or

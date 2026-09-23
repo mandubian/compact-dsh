@@ -425,6 +425,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/allowlist-gate/` | First plugin: a `tools/pre-execute` deny-by-allowlist gate issuing Compact-shaped denial envelopes (rule ID + lawful next moves, R-3) |
 | `packages/approval/` | **Phase 1, slices 1–3**: the five-layer approval evaluator (exec cache → plan grants → session grants → pending dedup → flood cap) with scoped, expiring, budgeted (`maxUses`), revocable grants; the `approval/request` answerer materializes `allowed-once` as exec-cache entries (replay hits); `grants-grant`/`grants-list`/`grants-revoke` commands; JSON+fsync persistence (corrupt store = loud boot failure); revocation kills covered cache entries; fingerprint golden vectors; denial-envelope lint; `PathPrefix` mount-grant patterns; provides the `compact-approval` service; gates identifiable targets only |
 | `packages/sandbox-docker/` | **Phase 2, slice 1** + **Phase 6 (CF-2)**: docker `SandboxProvider` (per-call confinement, no-network default, masked-path deny-list, honest enforcement, fail-closed) + `sandbox_request_mount` tool — mount grants (canonical `PathPrefix`, ro ceiling, TTL, revocable) cured through the Phase 1 approval store; **image provenance** (digest-keyed acquisition history, undeclared image refuses the boot, digest re-resolved per confine, build approvals never a run-time entitlement) |
+| `packages/egress-proxy/` | **#38 phase 3**: the network mediator — the confined container never carries a route; it attaches only to an `--internal` mediation network (inspect-or-create at boot; a non-internal network refuses) and gets exactly one path: its **own session's** proxy listener from a boot-time pool. The mediator enforces live grants per connection (host+port+method class, TTL, mid-flight revocation), resolves DNS host-side, refuses cross-host redirects as new grants, and filters `CONNECT` without interception; refusals are Compact envelopes under gate `EG`. Mounts only when the posture is declared (`COMPACT_EGRESS=proxy`) |
 | `packages/remote-access/` | **Phase 2, slice 2**: static network-access analysis of shell args — findings (URL, remote, package-registry, IP) route through the Phase 1 grant layers (approvable per-host); opaque findings fail closed with an envelope |
 | `packages/loopguard/` | **Phase 3**: the 12-trip LoopGuard state machine (progress/failure accounting, command-aware fingerprints, refusal-seam + agent/error feeds; behavioral latches with repair budget 3, deterministic deny-all) + response validation (`tools/post-execute` block on invalid results) |
 | `packages/promotion/` | **Phase 3**: the promotion evidence gate — `pass=true` mechanically rejected with any error/critical finding or unevidenced warning, enforced in the waterfall before the tool body; no waiver boolean |
@@ -576,6 +577,14 @@ tooling (the launcher inspects its local digest, never pulls); bash has
 explicit `cd` inside bash for subdirectories rather than the workdir option;
 `COMPACT_SECRETS='["NAME"]'` declares env-var NAMES the confined bash may be
 granted (values stay in your shell, injection only under an approved grant).
+`COMPACT_EGRESS=proxy` opts into the **mediated egress posture** (#38,
+[the decision record](docs/decision-network-egress-proxy.md) — default: off,
+`--network none` as before): the container gets no route at all, only its own
+session's listener on the internal `COMPACT_EGRESS_NETWORK` (default
+`compact-egress`, created `--internal` on first boot), and the mediator
+delivers each connection under a live grant — refusing by name without one, on
+expiry, on revocation, or across method classes. A host that cannot carry the
+posture refuses the boot with its reason rather than degrading it.
 Afterwards, audit the session offline (see the rehearsal section below for
 the full signature-checking form):
 

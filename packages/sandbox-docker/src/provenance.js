@@ -136,9 +136,13 @@ export function defaultDigestResolver({ dockerCommand = 'docker', ref, timeoutMs
  * @param resolved - {ok, digest} | {ok:false, detail} from the digest resolver
  * @param network - the provider's docker network posture ('none' confines it)
  * @param networkGrants - live RUN-TIME network grants for the calling session
+ * @param mediated - the container is attached to the INTERNAL mediation
+ *   network (#38): the posture supplies no route of its own, so the
+ *   open-posture rule below has no excess to answer — grants are enforced per
+ *   connection at the mediator instead (the CF-1 grant-gated exception)
  * @returns null when the supply chain holds, else a SupplyChainRefusal
  */
-export function checkSupplyChain({ ref, record, resolved, network, networkGrants = [] }) {
+export function checkSupplyChain({ ref, record, resolved, network, networkGrants = [], mediated = false }) {
   if (!record) {
     return refuse({
       ruleId: 'CF-2/undeclared-image',
@@ -173,7 +177,11 @@ export function checkSupplyChain({ ref, record, resolved, network, networkGrants
   }
   // Build approval is not a runtime entitlement. An open network posture is a
   // run-time demand; it is answered by live run-time grants or not at all.
-  if (network !== 'none' && networkGrants.length === 0) {
+  // The MEDIATED posture is not an open demand: the network is internal (no
+  // route exists — asserted when it was provisioned), and the grant that
+  // matters is enforced at the mediator per connection, where this check has
+  // no view and needs none (#38).
+  if (!mediated && network !== 'none' && networkGrants.length === 0) {
     return refuse({
       ruleId: 'CF-2/uninherited-network',
       reason: `the confinement would run with docker network "${network}" while the calling session holds no live network grant — ` +

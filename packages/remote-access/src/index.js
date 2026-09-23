@@ -19,9 +19,9 @@
 
 import { buildEnvelope } from 'compact-envelope';
 import { REFUSAL_EVENT } from 'compact-dsh-approval';
-import { createAnalyzer } from './analyzer.js';
+import { createAnalyzer, methodClassOf } from './analyzer.js';
 
-export { createAnalyzer };
+export { createAnalyzer, methodClassOf };
 
 export const name = 'compact-remote-access';
 export const inject = ['compact-approval'];
@@ -45,8 +45,18 @@ export function apply(ctx, config) {
           try { ctx.emit?.(REFUSAL_EVENT, { kind: 'deny', verdict: 'opaque-network', ruleId: 'D-7/opaque-network', tool: exec?.name ?? 'unknown-tool', fingerprint: null, root: null, session: null, at: Date.now() }); } catch { /* accounting must not break enforcement */ }
           return { kind: 'deny', reason: env.text };
         }
-        // route the finding through the five grant layers (approvable per-host)
-        const d = approval.gate({ name: exec?.name ?? 'unknown-tool', arguments: f.target, agent: exec?.agent, callId: exec?.callId });
+        // route the finding through the five grant layers (approvable per-host).
+        // The method class rides the call: it JOINS THE FINGERPRINT (consent
+        // identity is risk identity — #26, so GET→GET replays and GET→POST
+        // asks) and, under the mediated posture (#38), is the axis the allowed
+        // decision materializes an egress grant along. null = underivable:
+        // the ask says no grant will materialize, and the proxy refuses.
+        const d = approval.gate({
+          name: exec?.name ?? 'unknown-tool',
+          arguments: { ...f.target, methodClass: methodClassOf(exec?.arguments ?? {}) },
+          agent: exec?.agent,
+          callId: exec?.callId,
+        });
         if (d) return d;
       }
       return next();

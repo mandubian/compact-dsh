@@ -26,6 +26,7 @@ function fakeCtx({ services = {}, missing = [] } = {}) {
 
 const ALL_SERVICES = {
   'compact-approval': { name: 'approval' },
+  'compact-egress-proxy': { name: 'egress-proxy' },
   'compact-loopguard': { name: 'loopguard' },
   'compact-promotion': { name: 'promotion' },
   'compact-sandbox': { name: 'sandbox' },
