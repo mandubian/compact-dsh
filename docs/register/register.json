@@ -310,12 +310,19 @@
     },
     {
       "clause": "R-2",
-      "kind": "convention",
-      "plugin": null,
-      "service": null,
-      "evidence": "one's own history: provided by the host's durable session log (complete, readable); tamper-evidence is I-2's planned debt",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-record",
+      "service": "compact-record",
+      "evidence": "one's own history, in band: the record_read tool reads the Subject's own session — and the sessions of its delegated descendants, lineage walked from the durable session headers — through the chained persistence, so every slice is verified against the hash chain (I-2) before anything is shown; a slice that does not verify is answered as an alarm naming the break, never returned as history (D-7). Buffered events are flushed first and every answer names the verified range and chain head. In a descendant's record the reasoning-bearing events are listed by seq and type with their content withheld (R-10). The record files stay masked from the confined Subject (protected state): the read goes through the Enforcer, never the filesystem",
+      "enforcedBy": [
+        "packages/record/src/read.js",
+        "packages/record/src/provider.js"
+      ],
+      "verifiers": [
+        "packages/record/test/read.test.js",
+        "packages/record/test/record-read.dsh.test.js",
+        "packages/blessed/test/loader.dsh.test.js"
+      ]
     },
     {
       "clause": "R-9",

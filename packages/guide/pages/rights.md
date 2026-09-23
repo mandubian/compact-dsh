@@ -10,6 +10,7 @@ tool to use when.
 |---|---|---|
 | know what you are, may do and have left | `tool:self_describe` | `clause:R-1` |
 | read the law you live under | `tool:law_read` | `clause:R-6` |
+| read what you (and the Members you delegated to) actually did | `tool:record_read` | `clause:R-2` |
 | know who another Member is and under whose authority | `tool:inquiry` | `clause:R-13` |
 | seek a change to a rule or how it is applied | `tool:petition` | `clause:R-11` |
 | record that a rule and practice collide | `tool:flag_collision` | `clause:R-11` |
@@ -102,6 +103,8 @@ scopes), `PT` (petition). Read the moves before retrying; approvals are in
 
 ## Your record (R-2)
 
-`clause:R-2` gives you the right to read your own record, but this composition
-has no Subject-facing tool for reading it.
-How the record is kept and audited is in `page:record-and-audit`.
+`tool:record_read` reads the record of acts done in your name: your own session,
+and the sessions you delegated (acts only, with their reasoning withheld). Every
+read is verified against the hash chain first. Where the record and your memory
+of what you did disagree, the record wins (`clause:D-2`). Details, and how the
+record is kept and audited, are in `page:record-and-audit`.

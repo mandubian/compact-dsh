@@ -6,6 +6,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { verifyAnnex, SealError } from 'compact-dsh-seals';
 import { COMPACT_DIGEST } from 'compact-dsh-constitution';
+import { defineTool } from '@deepseek-ai/dsh-tools';
+import { RECORD_TOOL, readRecord } from './read.js';
 import {
   ChainStore, chainedPersistence, DECLARED_GAPS, genesisHash,
   signAnchor, genesisAnchor, appendAnchors, readAnchors, anchorHashOf, verifyAnchorChain,
@@ -251,6 +253,43 @@ async function* install(ctx, config) {
     },
   });
   for (const gap of declaredGaps) ctx.logger.warn(`record: ${gap}`);
+
+  // R-2 in band (#67): the Subject's read of its own record, through this
+  // provider's chained persistence — verified on every read, never the
+  // filesystem the composition masks from it (see read.js)
+  const headOf = (sessionId) => {
+    const { links, lastSeq } = store.load(sessionId);
+    return lastSeq < 0 ? genesisHash(String(sessionId)) : links.get(lastSeq);
+  };
+  const recordRead = defineTool({
+    name: RECORD_TOOL,
+    description:
+      'Read your own record (R-2): the acts done in your name — and, for sessions you delegated, on your behalf — ' +
+      'verified against the hash chain before anything is shown. With no arguments, your own session\'s latest events ' +
+      'and a count by type. `session` reads a descendant\'s record (acts only; reasoning withheld, R-10); `from_seq` and ' +
+      '`limit` page; `types` filters by prefix (e.g. "tool/,approval/"); `full` shows events untruncated. The record is ' +
+      'authoritative over your memory of what you did (D-2).',
+    parameters: {
+      session: { type: 'string', description: 'a session id: yours (default) or one delegated from yours' },
+      from_seq: { type: 'number', description: 'first event seq to show (default: the latest events)' },
+      limit: { type: 'number', description: 'how many events to show (default 30, max 200; max 10 with full)' },
+      types: { type: 'string', description: 'comma-separated type prefixes to show, e.g. "tool/,approval/"' },
+      full: { type: 'boolean', description: 'show events untruncated (at most 10)' },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    async execute(args, exec) {
+      const caller = exec?.agent?.session?.id ?? exec?.agent?.id;
+      return readRecord({
+        persistence,
+        head: headOf,
+        flush: async (sessionId) => { const w = writers.get(sessionId); if (w) await flushWriter(w.handle); },
+      }, {
+        caller: caller != null ? String(caller) : null,
+        session: args?.session, fromSeq: args?.from_seq, limit: args?.limit, types: args?.types, full: args?.full === true,
+      });
+    },
+  });
+  ctx.inject(['tools'], (scope) => { scope.tools.register(recordRead); });
 }
 
 export default { name, Config, apply };
