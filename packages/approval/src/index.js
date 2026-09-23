@@ -635,7 +635,7 @@ export function approvalPlugin(opts = {}) {
         try { ctx.emit?.(REFUSAL_EVENT, refusalPayload({ kind: 'ask', verdict: 'ask', ruleId: 'I-5/secret-use', tool, fingerprint: fp, root, session })); } catch { /* accounting must not break enforcement */ }
         const env = buildEnvelope({ gate: 'AG', ruleId: 'I-5/secret-use',
           reason: `"${tool}" references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
-            `approving it materializes the injection grant — session-scoped, TTL-bounded, revocable — and the credential is available to this command inside the ` +
+            `approving it materializes the injection grant — session-scoped, TTL-bounded, revocable (grants-revoke) — and the credential is available to this command inside the ` +
             `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints. ` +
             replayConsequence(approval.execCacheTtlMs),
           lawfulNextMoves: ['rephrase without the secret reference', 'escalate to your Principal'] });
@@ -674,7 +674,7 @@ export function approvalPlugin(opts = {}) {
         reason: `"${tool}" is not covered by this runtime's grant layers` +
           (secretRefs.length
             ? ` — this call references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
-              `approving it materializes a session-scoped, TTL-bounded, revocable secret grant and the credential is injected into the confined execution ` +
+              `approving it materializes a session-scoped, TTL-bounded, revocable (grants-revoke) secret grant and the credential is injected into the confined execution ` +
               `without entering this conversation`
             : '') +
           `. ${replayConsequence(cacheTtlFor(approval, args), { egressBound: egressBound(approval, args) })} ${egressHonesty(approval.egress)}` +
