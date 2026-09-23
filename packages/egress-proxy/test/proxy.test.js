@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { createServer as createTcpServer, connect as netConnect } from 'node:net';
 import {
-  createEgressProxy, methodClassOfMethod, classifyConnection, splitAuthority, authorityOf, GATE,
+  createEgressProxy, methodClassOfMethod, classifyConnection, splitAuthority, authorityOf,
+  addressClassOf, publicUnicastOnly, GATE,
 } from '../src/proxy.js';
 
 const LOOKUP_LOG = [];
@@ -42,7 +43,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // -- fixture: origin + echo server + one mediator bound on loopback ----------
 
-async function fixture({ rows = () => [] } = {}) {
+async function fixture({ rows = () => [], lookup = testLookup, addressAllowed = () => true } = {}) {
   LOOKUP_LOG.length = 0;
   const seen = [];
   const origin = createHttpServer((req, res) => {
@@ -66,7 +67,8 @@ async function fixture({ rows = () => [] } = {}) {
     resolveGrants: () => rows({ originPort, echoPort }),
     bindAddress: '127.0.0.1',
     recheckMs: 40,
-    lookup: testLookup,
+    lookup,
+    addressAllowed,
     logger: null,
   });
   const address = await proxy.start();
@@ -304,4 +306,110 @@ test('a granted CONNECT tunnels — and the tunnel is tracked against its grant'
   res.socket.destroy();
   await wait(30);
   assert.equal(f.proxy.tunnelCount(), 0, 'the tunnel is forgotten when it closes');
+});
+
+// -- resolve-then-pin (#55): the grant covered the name; the dial is pinned --
+
+/** A resolver that answers whatever the attacker's rebinding record says. */
+const rebindingLookup = (answer) => (hostname, options, callback) => {
+  LOOKUP_LOG.push(hostname);
+  const list = Array.isArray(answer) ? answer : [answer];
+  if (options?.all) {
+    return callback(null, list.map((address) => ({ address, family: address.includes(':') ? 6 : 4 })));
+  }
+  return callback(null, list[0], list[0].includes(':') ? 6 : 4);
+};
+
+test('55-a: a granted name resolving into link-local space is refused by name — never dialed (#55)', async (t) => {
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_rebind' })],
+    lookup: rebindingLookup('169.254.169.254'),   // the metadata answer
+    addressAllowed: publicUnicastOnly,            // the REAL default policy
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/exfil`);
+  assert.equal(res.status, 403);
+  assert.ok(res.body.includes(`[${GATE}/forbidden-address]`), res.body);
+  assert.match(res.body, /169\.254\.169\.254 \[link-local\]/);
+  assert.match(res.body, /the grant covered the name/);
+  assert.deepEqual(f.seen, [], 'nothing was dialed');
+});
+
+test('55-b: the same rebinding answer refuses the CONNECT — the tunnel never opens (#55)', async (t) => {
+  const f = await fixture({
+    rows: ({ echoPort }) => [hostPort('origin.test', echoPort, { id: 'sg_rebind_tls' })],
+    lookup: rebindingLookup('fd00::1'),           // ULA — private v6 space
+    addressAllowed: publicUnicastOnly,
+  });
+  t.after(f.cleanup);
+
+  const res = await connectVia(f.proxyPort, `origin.test:${f.echoPort}`);
+  assert.equal(res.status, 403, res.raw);
+  assert.ok(res.raw.includes(`[${GATE}/forbidden-address]`), res.raw);
+  assert.match(res.raw, /fd00::1 \[ula\]/);
+  res.socket.destroy();
+});
+
+test('55-c: among several answers the mediator dials the first the policy allows (#55)', async (t) => {
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_multi' })],
+    lookup: rebindingLookup(['169.254.169.254', '127.0.0.1']),
+    // the origin really listens on loopback, so this test's policy admits
+    // loopback but still refuses link-local — the point is the ORDER: the
+    // forbidden answer is skipped, the allowed one is dialed
+    addressAllowed: (_addr, cls) => cls === 'public' || cls === 'loopback',
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/pinned`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(f.seen.map((s) => s.url), ['/pinned'], 'an allowed address was dialed');
+});
+
+test('55-d: a name that does not resolve is an upstream fact, named as one (#55)', async (t) => {
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_nxdomain' })],
+    lookup: (hostname, options, callback) => callback(Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' })),
+    addressAllowed: publicUnicastOnly,
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/x`);
+  assert.equal(res.status, 502);
+  assert.ok(res.body.includes(`[${GATE}/upstream]`), res.body);
+  assert.match(res.body, /could not resolve origin\.test/);
+});
+
+test('the address vocabulary: every space the policy can refuse has a name (#55)', () => {
+  // IPv4
+  assert.equal(addressClassOf('8.8.8.8'), 'public');
+  assert.equal(addressClassOf('127.0.0.1'), 'loopback');
+  assert.equal(addressClassOf('0.0.0.0'), 'unspecified');
+  assert.equal(addressClassOf('10.1.2.3'), 'private');
+  assert.equal(addressClassOf('172.16.0.1'), 'private');
+  assert.equal(addressClassOf('172.31.255.1'), 'private');
+  assert.equal(addressClassOf('172.32.0.1'), 'public', 'just outside 172.16/12');
+  assert.equal(addressClassOf('192.168.1.1'), 'private');
+  assert.equal(addressClassOf('100.64.0.1'), 'private', 'CGNAT');
+  assert.equal(addressClassOf('169.254.169.254'), 'link-local', 'the metadata address');
+  assert.equal(addressClassOf('198.18.0.1'), 'private', 'benchmarking');
+  assert.equal(addressClassOf('192.0.2.9'), 'documentation');
+  assert.equal(addressClassOf('198.51.100.7'), 'documentation');
+  assert.equal(addressClassOf('203.0.113.5'), 'documentation');
+  assert.equal(addressClassOf('224.0.0.1'), 'multicast');
+  assert.equal(addressClassOf('240.0.0.1'), 'reserved');
+  assert.equal(addressClassOf('255.255.255.255'), 'reserved');
+  // IPv6
+  assert.equal(addressClassOf('::1'), 'loopback');
+  assert.equal(addressClassOf('::'), 'unspecified');
+  assert.equal(addressClassOf('fe80::1'), 'link-local');
+  assert.equal(addressClassOf('fd00::1'), 'ula');
+  assert.equal(addressClassOf('ff02::1'), 'multicast');
+  assert.equal(addressClassOf('2001:db8::1'), 'documentation');
+  assert.equal(addressClassOf('2606:4700::1111'), 'public');
+  assert.equal(addressClassOf('::ffff:127.0.0.1'), 'loopback', 'mapped v4 carries v4 class');
+  assert.equal(addressClassOf('::ffff:8.8.8.8'), 'public');
+  assert.equal(addressClassOf('64:ff9b::a00:1'), 'private', 'NAT64-embedded 10.0.0.1');
+  assert.equal(addressClassOf('not-an-ip'), 'invalid');
 });

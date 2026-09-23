@@ -24,9 +24,15 @@
 //     grant.
 //   - resolve names for the container. The hostname arrives in the request
 //     line / CONNECT authority and THIS process resolves it — the container
-//     never runs a resolver against the mediation network.
+//     never runs a resolver against the mediation network. And the dial is
+//     PINNED to a validated address (#55): the grant was checked against the
+//     name, but the wire dials what the name RESOLVES to, so every answer
+//     the resolver gives is classified first — only public unicast is
+//     dialable by default; a rebinding answer that would carry the tunnel
+//     into loopback, link-local or host-internal space is refused with its
+//     address classes named (`forbidden-address`), never dialed.
 import { createServer as createHttpServer, request as httpRequest } from 'node:http';
-import { connect as dial } from 'node:net';
+import { connect as dial, isIP } from 'node:net';
 import { lookup as dnsLookup } from 'node:dns';
 import { buildEnvelope } from 'compact-envelope';
 import { patternMatches } from 'compact-dsh-approval';
@@ -202,6 +208,106 @@ export function authorityOf(req) {
   return { host: h, port: p, url: `http://${h}${portPart}${raw}`, path: raw, secure: false };
 }
 
+// -- resolve-then-pin (#55) --------------------------------------------------
+// The grant is checked against a NAME; the wire dials an ADDRESS. These are
+// the seams that keep those two facts from drifting apart: classify every
+// address the resolver answers with, and dial only what the policy allows.
+
+/**
+ * The class of one resolved address — the vocabulary the dial policy reads
+ * (#55). Pure and string-based: no resolver, no I/O. IPv4-mapped and
+ * well-known-NAT64 IPv6 answers carry their embedded IPv4's class, so a
+ * mapped `127.0.0.1` is loopback, not public.
+ */
+export function addressClassOf(ip) {
+  const raw = String(ip ?? '').trim();
+  if (isIP(raw) === 4) return ipv4ClassOf(raw);
+  if (isIP(raw) === 6) return ipv6ClassOf(raw);
+  return 'invalid';
+}
+
+function ipv4ClassOf(raw) {
+  const b = raw.split('.').map(Number);
+  const [a, s, t] = b;
+  if (a === 0) return 'unspecified';                                    // 0.0.0.0/8 — "this host"
+  if (a === 127) return 'loopback';
+  if (a === 10 || (a === 172 && s >= 16 && s <= 31) || (a === 192 && s === 168)) return 'private';
+  if (a === 100 && s >= 64 && s <= 127) return 'private';               // 100.64/10 — CGNAT
+  if (a === 169 && s === 254) return 'link-local';                      // includes the metadata address
+  if (a === 198 && s >= 18 && s <= 19) return 'private';                // 198.18/15 — benchmarking
+  if (a === 192 && s === 0) return t === 0 ? 'reserved' : 'documentation'; // 192.0.0/24 vs 192.0.2/24
+  if ((a === 198 && s === 51 && t === 100) || (a === 203 && s === 0 && t === 113)) return 'documentation';
+  if (a >= 224 && a <= 239) return 'multicast';
+  if (a >= 240) return 'reserved';
+  return 'public';
+}
+
+const HEXTET = /^[0-9a-f]{1,4}$/;
+const V4_OCTET = /^\d{1,3}$/;
+
+/**
+ * Expand an IPv6 literal to its 16 bytes (or null when it does not parse).
+ * An embedded dotted-quad tail (`::ffff:127.0.0.1`) is folded into its two
+ * hextets, as RFC 4291 allows.
+ */
+function ipv6Bytes(raw) {
+  const halves = raw.split('::');
+  if (halves.length > 2) return null;
+  const piecesOf = (part) => {
+    const pieces = part ? part.split(':') : [];
+    if (pieces.length && pieces[pieces.length - 1].includes('.')) {
+      const octets = pieces.pop().split('.');
+      if (octets.length !== 4 || octets.some((o) => !V4_OCTET.test(o) || Number(o) > 255)) return null;
+      const [w, x, y, z] = octets.map(Number);
+      pieces.push(((w << 8) | x).toString(16), ((y << 8) | z).toString(16));
+    }
+    return pieces;
+  };
+  const head = piecesOf(halves[0]) ?? null;
+  if (head === null) return null;
+  const tail = halves.length === 2 ? (piecesOf(halves[1]) ?? null) : [];
+  if (tail === null) return null;
+  if (halves.length === 1 && head.length !== 8) return null;
+  if ([...head, ...tail].some((h) => !HEXTET.test(h))) return null;
+  const gap = 8 - head.length - tail.length;
+  if (gap < 0) return null;
+  const groups = [...head, ...Array(gap).fill('0'), ...tail].map((h) => parseInt(h, 16));
+  const bytes = new Uint8Array(16);
+  groups.forEach((g, i) => { bytes[i * 2] = g >> 8; bytes[i * 2 + 1] = g & 0xff; });
+  return bytes;
+}
+
+function ipv6ClassOf(raw) {
+  const b = ipv6Bytes(raw);
+  if (!b) return 'invalid';
+  const g = (i) => (b[i * 2] << 8) | b[i * 2 + 1];
+  const v4 = () => `${b[12]}.${b[13]}.${b[14]}.${b[15]}`;
+  if (b.every((x) => x === 0)) return 'unspecified';                     // ::/128
+  if (b.slice(0, 15).every((x) => x === 0) && b[15] === 1) return 'loopback'; // ::1/128
+  if (g(0) === 0 && g(1) === 0 && g(2) === 0 && g(3) === 0 && g(4) === 0 && g(5) === 0xffff) return ipv4ClassOf(v4()); // ::ffff:0:0/96 — mapped
+  if (g(0) === 0x64 && g(1) === 0xff9b) return ipv4ClassOf(v4());        // 64:ff9b::/96 — well-known NAT64
+  if (g(0) >= 0xfe80 && g(0) <= 0xfebf) return 'link-local';             // fe80::/10
+  if (b[0] === 0xfc || b[0] === 0xfd) return 'ula';                      // fc00::/7
+  if (g(0) >= 0xff00) return 'multicast';                                // ff00::/8
+  if (g(0) === 0x2001 && g(1) === 0x0db8) return 'documentation';        // 2001:db8::/32
+  if (g(0) === 0) return 'reserved';                                     // ::/8 remainder
+  return 'public';
+}
+
+/**
+ * The default dial policy (#55): only PUBLIC unicast is dialable. The
+ * mediation plane exists to deliver internet egress under grant — a name
+ * that resolves into loopback, link-local (the metadata address included),
+ * host-private, ULA or reserved space is a rebinding answer or a misgrant,
+ * and it is refused with its classes named rather than dialed. A deployment
+ * that genuinely needs mediated access INTO such space extends the policy
+ * explicitly (`addressAllowed` at composition) — an exception declared at
+ * the seam that owns it, never a silent default.
+ */
+export function publicUnicastOnly(_address, cls) {
+  return cls === 'public';
+}
+
 const HOP_BY_HOP = new Set(['proxy-authorization', 'proxy-connection', 'connection', 'keep-alive', 'transfer-encoding', 'upgrade']);
 
 /**
@@ -216,6 +322,7 @@ export function createEgressProxy({
   port = 0,
   recheckMs = 1_000,
   lookup = dnsLookup,
+  addressAllowed = publicUnicastOnly,
   now = () => Date.now(),
   logger = null,
 } = {}) {
@@ -230,7 +337,46 @@ export function createEgressProxy({
   const decide = ({ host, port: targetPort, methodClass, url, tunnel }) =>
     classifyConnection(rowsFor(), { host, port: targetPort, methodClass, url, tunnel, now: now() });
 
-  const server = createHttpServer((req, res) => {
+  /**
+   * Resolve-then-pin (#55): resolve the NAME host-side (the container never
+   * does), classify EVERY address the resolver answers with, and settle on
+   * the first the policy allows. Rejection carries `code` so the refusal
+   * names its cause: `upstream-dns` (the name did not resolve — an upstream
+   * fact) or `forbidden-address` (it resolved somewhere the policy will not
+   * dial — a policy fact, named with the classes).
+   */
+  const resolvePinned = (host) => new Promise((resolve, reject) => {
+    lookup(host, { all: true }, (error, addresses) => {
+      if (error) {
+        return reject(Object.assign(new Error(`${error.code ?? error.message}`), { code: 'upstream-dns' }));
+      }
+      const answers = (Array.isArray(addresses) ? addresses : [{ address: addresses }])
+        .map((entry) => String(entry?.address ?? entry));
+      const refused = [];
+      for (const address of answers) {
+        const cls = addressClassOf(address);
+        if (addressAllowed(address, cls)) return resolve({ address, cls });
+        refused.push(`${address} [${cls}]`);
+      }
+      reject(Object.assign(
+        new Error(`every address ${host} resolves to is outside the dial policy: ${refused.join(', ')}`),
+        { code: 'forbidden-address', detail: refused.join(', ') }));
+    });
+  });
+
+  /** The named refusal for a resolution the policy refused or that failed. */
+  const resolveRefusal = (host, port, error) => buildEnvelope({
+    gate: GATE,
+    ruleId: error.code === 'forbidden-address' ? 'forbidden-address' : 'upstream',
+    reason: error.code === 'forbidden-address'
+      ? `${host}:${port} resolves only to addresses the mediator refuses to dial (${error.detail}) — the grant covered ` +
+        `the name, and the wire will not quietly follow it into loopback, link-local or host-internal space (#55); ` +
+        `consent identity is risk identity for the address too`
+      : `the mediator could not resolve ${host}:${port}: ${error.message}`,
+    lawfulNextMoves: LAWFUL_MOVES,
+  });
+
+  const server = createHttpServer(async (req, res) => {
     try {
       const authority = authorityOf(req);
       if (!authority) {
@@ -258,14 +404,22 @@ export function createEgressProxy({
       const verdict = decide({ host: authority.host, port: authority.port, methodClass, url: authority.url, tunnel: false });
       if (!verdict.ok) return refuse(res, verdict.envelope, verdict.status);
 
+      // the grant covered the NAME; the dial goes to the PINNED address (#55)
+      let pinned;
+      try {
+        pinned = await resolvePinned(authority.host);
+      } catch (error) {
+        return refuse(res, resolveRefusal(authority.host, authority.port, error),
+          error.code === 'forbidden-address' ? 403 : 502);
+      }
+
       const headers = Object.fromEntries(Object.entries(req.headers).filter(([k]) => !HOP_BY_HOP.has(k.toLowerCase())));
       const upstream = httpRequest({
-        host: authority.host,
+        host: pinned.address,         // the VALIDATED address — the name already rides in path/Host
         port: Number(authority.port),
         method: req.method,
         path: authority.path,
         headers,
-        lookup,                       // the MEDICATOR resolves — the container never does
       }, (upstreamRes) => {
         res.writeHead(upstreamRes.statusCode, upstreamRes.headers);
         upstreamRes.pipe(res);
@@ -289,7 +443,7 @@ export function createEgressProxy({
   });
 
   // CONNECT: the HTTPS path — filter the authority, tunnel the bytes.
-  server.on('connect', (req, clientSocket, head) => {
+  server.on('connect', async (req, clientSocket, head) => {
     const [host, targetPort] = splitAuthority(req.url, '443');
     if (!host || !targetPort) {
       return rawRefuse(clientSocket, buildEnvelope({
@@ -301,7 +455,16 @@ export function createEgressProxy({
     const verdict = decide({ host, port: targetPort, methodClass: null, url: null, tunnel: true });
     if (!verdict.ok) return rawRefuse(clientSocket, verdict.envelope);
 
-    const upstream = dial({ host, port: Number(targetPort), lookup }, () => {
+    // the grant covered the NAME; the tunnel goes to the PINNED address (#55)
+    let pinned;
+    try {
+      pinned = await resolvePinned(host);
+    } catch (error) {
+      return rawRefuse(clientSocket, resolveRefusal(host, targetPort, error),
+        error.code === 'forbidden-address' ? 'HTTP/1.1 403 Forbidden' : 'HTTP/1.1 502 Bad Gateway');
+    }
+
+    const upstream = dial({ host: pinned.address, port: Number(targetPort) }, () => {
       clientSocket.write('HTTP/1.1 200 Connection Established\r\nproxy-agent: compact-dsh-egress-proxy\r\n\r\n');
       if (head?.length) upstream.write(head);
       tunnels.set(upstream, { host, port: targetPort, grantId: verdict.grant.id });
