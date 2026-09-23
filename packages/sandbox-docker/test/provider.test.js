@@ -122,6 +122,26 @@ test('secret injection: a live grant puts -e REF=value in the confine argv; no g
   }
 });
 
+test('#64: after revocation the next confine carries no value (the revoke→confine cycle)', () => {
+  process.env.SB_TEST_TOKEN = 'sb-value-123';
+  try {
+    // the store is the truth the provider reads: revocation ends the
+    // agreement at the very next confine, with no restart and no TTL wait
+    const store = new GrantStore();
+    const g = store.addSecretGrant({ ref: 'SB_TEST_TOKEN', root: 'r', session: 'sess-1', ttlMs: 3_600_000, now: Date.now() });
+    const secretsFor = (sessionId) => store.secretGrantsFor(sessionId).map(x => ({ ref: x.ref }));
+    const p = makeProvider({ secretsFor });
+    const before = p.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
+    assert.ok(before.includes('--env SB_TEST_TOKEN=sb-value-123'), 'the live grant injects');
+
+    store.revokeSecretGrant(g.id, Date.now() + 1);
+    const after = p.confine(['true'], POLICY('read-only', '/ws', 'sess-1')).argv.join(' ');
+    assert.ok(!after.includes('SB_TEST_TOKEN'), 'the revoked grant injects nothing — no restart, no TTL wait');
+  } finally {
+    delete process.env.SB_TEST_TOKEN;
+  }
+});
+
 test('a granted ref missing from the Enforcer environment is skipped, never invented', () => {
   delete process.env.SB_TEST_MISSING;
   const p = makeProvider({ secretsFor: () => [{ ref: 'SB_TEST_MISSING' }] });

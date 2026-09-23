@@ -60,9 +60,11 @@ test('the detection catalogue and the injection agreement agree on what a secret
 
 function fakeCtx() {
   const listeners = {};
+  const registered = {};
   return {
-    listeners,
+    listeners, registered,
     on: (ev, fn) => { (listeners[ev] ??= []).push(fn); },
+    commands: { register: (c) => { registered[c.name] = c; } },
     inject: () => {},
     provide: () => {},
     emit: () => {},
@@ -198,4 +200,65 @@ test('allow-once covers exactly the bare-name command that was approved', async 
   assert.equal(replay, null, 'the identical bare-name command replays from the cache');
   const other = approval.gate({ name: 'bash', arguments: { command: 'printenv DEMO_TOKEN | wc -c' }, agent: AGENT, callId: 'r3' });
   assert.equal(other.kind, 'ask', 'a different bare-name command is a new agreement');
+});
+
+// --- #64: the revocation promise is machine-honored, not aspirational ---
+
+test('grants-list enumerates live secret grants (id, ref, scope, expiry — never a value)', async () => {
+  const ctx = fakeCtx();
+  ctx.inject = (deps, fn) => fn({ commands: { register: (c) => { ctx.registered[c.name] = c; } } });
+  const apply = approvalPlugin({ secretRefs: ['DEMO_TOKEN'] });
+  apply(ctx, {});
+  const approval = apply.approval;
+  approval.store.addSecretGrant({ ref: 'DEMO_TOKEN', root: 'r1', session: 's1', ttlMs: 60_000, now: Date.now() });
+
+  const out = ctx.registered['grants-list'].handler();
+  assert.match(out.text, /live secret grant\(s\)/, 'the injection grant is enumerated, not hidden');
+  assert.match(out.text, /sec_[0-9a-f]+  secret \$DEMO_TOKEN  session=s1 expires=/, 'id, ref, scope, expiry');
+  assert.ok(!out.text.includes('ghp_'), 'a value has nowhere to render from — and none appears');
+
+  approval.store.revokeSecretGrant(approval.store.secretGrants[0].id, Date.now());
+  assert.doesNotMatch(ctx.registered['grants-list'].handler().text, /secret \$DEMO_TOKEN/, 'a revoked grant is not listed as live');
+});
+
+test('grants-revoke revokes the injection grant; the next confine resolves no value', async () => {
+  const ctx = fakeCtx();
+  ctx.inject = (deps, fn) => fn({ commands: { register: (c) => { ctx.registered[c.name] = c; } } });
+  const apply = approvalPlugin({ secretRefs: ['DEMO_TOKEN'] });
+  apply(ctx, {});
+  const approval = apply.approval;
+  const answerer = (req) => ctx.listeners['approval/request'][0](req, async () => 'allowed-once');
+
+  const command = { command: 'printenv DEMO_TOKEN | sha256sum' };
+  const first = approval.gate({ name: 'bash', arguments: command, agent: AGENT, callId: 'x1' });
+  assert.equal(first.kind, 'ask');
+  assert.match(first.reason, /revocable \(grants-revoke\)/, 'the ask names the revocation channel');
+  await answerer({ toolName: 'bash', agent: AGENT, callId: 'x1' });
+  const g = approval.store.secretGrantsFor('s1')[0];
+  assert.ok(g, 'approved: the injection grant is live');
+
+  const out = ctx.registered['grants-revoke'].handler({ rawInput: g.id });
+  assert.equal(out.kind, 'success');
+  assert.match(out.text, /secret grant/, 'the message names what was revoked');
+  assert.match(out.text, /the approved command asks again/, 'and states the replay consequence');
+  assert.deepEqual(approval.store.secretGrantsFor('s1'), [], 'the agreement is over: the next confine carries no value');
+
+  // the creating command's cache entry dies with the grant (#69): the exact
+  // command asks again — the only lawful way back to injection — rather than
+  // replaying without its credential
+  const replay = approval.gate({ name: 'bash', arguments: command, agent: AGENT, callId: 'x2' });
+  assert.equal(replay?.kind, 'ask', 'the exact command asks again');
+  assert.deepEqual(approval.store.secretGrantsFor('s1'), [], 'nothing re-materialized without a decision');
+});
+
+test('revocation persists: a restart does not resurrect the injection grant', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-secret-revoke-'));
+  const path = join(dir, 'approvals.json');
+  const a = new PersistentGrantStore(path);
+  const g = a.addSecretGrant({ ref: 'DEMO_TOKEN', root: 'r', session: 's', ttlMs: 60_000, now: Date.now() });
+  a.revokeSecretGrant(g.id, Date.now() + 1);
+
+  const b = new PersistentGrantStore(path);
+  assert.equal(b.secretGrantsFor('s').length, 0, 'the revoked grant stays revoked across a restart');
+  assert.equal(b.secretGrants[0].revokedAt != null, true, 'the row remains, marked — never silently dropped');
 });
