@@ -1,0 +1,23 @@
+
+[compact-dsh] approval requested
+  tool: bash
+  command: curl https://api.example.com/v1/data
+  target: url=https://api.example.com/v1/data host=api.example.com
+  fingerprint: fp_1d357c1f763926ae
+  [AG/fp_1d357c1f763926ae] "bash" is not covered by this runtime's
+    grant layers.
+  Approving materializes an exec-cache entry: the identical
+    operation replays without re-asking for 24h, across sessions of
+    this runtime, until it lapses or is revoked — anything else asks
+    again.
+    This gate's approval is consent, not connectivity: the
+    composition declares no network egress and no network grant
+    covers this target — the command will fail at connect.
+    A session grant changes this gate's answer, not the container's
+    network.
+  Lawful next moves:
+  — request a scoped session grant for this target
+  — use an approved alternative
+  — escalate to your Principal
+  1) deny (default)
+  2) allow once

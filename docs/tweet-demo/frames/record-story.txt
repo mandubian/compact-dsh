@@ -1,0 +1,16 @@
+$ node auditor/audit.mjs session.v3.jsonl --chain session.chain --quiet
+auditor: conforming (4 events, 1 approval asks)
+# exit 0 · chain head bfb7a4161897e32b…
+
+$ sed -i '0,/"preset":"workspace-write"/s//"preset":"danger-full-access"/' session.v3.jsonl
+
+$ node auditor/audit.mjs session.tampered.jsonl --chain session.chain --quiet
+0 chain [I-2] broken-link: record: the session log for sess-demo is
+  not evidence at seq 0 — the stored event does not hash to its
+  committed link (expected 25f13ed3cf2a6238, computed
+  f1d7f78445fd4d8e) — it was altered after it was recorded.
+A record that cannot be verified cannot support non-repudiation
+  (I-2, R-7, both entrenched under A-2); this read fails closed
+  rather than returning unverified history as history.
+auditor: 1 violation(s) — the session does not conform
+# exit 1

@@ -1,0 +1,160 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>The Compact on dsh — tweet cards</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 36px 20px; background: #080a10; color: #e6edf3;
+    font: 16px/1.45 ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
+  }
+  .card {
+    width: 1080px; background: #111622; border: 1px solid #2a3348; border-radius: 20px;
+    padding: 30px 34px 34px; display: flex; flex-direction: column; gap: 16px;
+  }
+  .kicker {
+    font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .12em; text-transform: uppercase; color: #6e7a96;
+  }
+  h1 {
+    margin: 0; font-size: 36px; line-height: 1.12; letter-spacing: -0.025em; font-weight: 750;
+  }
+  h1 .hl { color: #7ee787; }
+  .lede { margin: 0; font-size: 17px; color: #aebbdc; max-width: 72ch; line-height: 1.5; }
+  .lede code {
+    font: 14px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #e6edf3; background: #0d1117; padding: 2px 7px; border-radius: 6px;
+  }
+  .row { display: grid; gap: 16px; align-items: stretch; }
+  .row.ask { grid-template-columns: 250px 28px 1fr; }
+  .term {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 14px; overflow: hidden;
+    display: flex; flex-direction: column; min-width: 0;
+  }
+  .term.stock { opacity: .55; }
+  .bar {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: #161b22; border-bottom: 1px solid #30363d;
+  }
+  .dots { display: inline-flex; gap: 6px; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: #30363d; }
+  .dots i:nth-child(1) { background: #ff5f57; }
+  .dots i:nth-child(2) { background: #febc2e; }
+  .dots i:nth-child(3) { background: #28c840; }
+  .title { font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #8b949e; }
+  pre {
+    margin: 0; padding: 16px 18px;
+    font: 13px/1.6 "DejaVu Sans Mono", monospace;
+    color: #e6edf3; white-space: pre-wrap; word-break: break-word;
+  }
+  .stock pre { font-size: 16px; color: #8b949e; padding: 36px 18px; letter-spacing: .02em; }
+  mark { background: transparent; color: inherit; font-weight: 650; }
+  mark.key { color: #7ee787; }
+  mark.warn { color: #f2cc60; }
+  mark.good { color: #7ee787; }
+  mark.bad { color: #ff7b72; }
+  .key, mark.key { color: #7ee787; }
+  .good, mark.good { color: #7ee787; }
+  .bad, mark.bad { color: #ff7b72; }
+  .cmd { color: #79c0ff; }
+  .dim { color: #6e7a96; }
+  .vs {
+    align-self: center; text-align: center; color: #6e7a96;
+    font: 800 22px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .captions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .cap {
+    background: #0d1117; border: 1px solid #2a3348; border-radius: 12px; padding: 13px 15px;
+  }
+  .cap b { display: block; color: #7ee787; font-size: 14px; margin-bottom: 3px; }
+  .cap span { color: #aebbdc; font-size: 13.5px; line-height: 1.4; }
+  .label {
+    font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #6e7a96; margin-bottom: 8px; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .foot {
+    color: #aebbdc; font-size: 15.5px; max-width: 78ch; line-height: 1.5;
+    border-left: 3px solid #7ee787; padding-left: 14px; margin: 4px 0 0;
+  }
+</style>
+
+<!-- ============================== TWEET 1 ============================== -->
+<section class="card" id="tweet-1">
+  <div class="kicker">tweet 1 of 2 · the decision</div>
+  <h1>Agent gates say y/N.<br><span class="hl">The Compact’s gate says what “yes” costs.</span></h1>
+  <p class="lede">Same <code>curl</code>. Left is a shrug. Right is the rule, the consequence of approving, and the lawful exits — all of it <em>before</em> you decide.</p>
+  <div class="row ask">
+    <div>
+      <div class="label">plain dsh</div>
+      <div class="term stock">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="title">approval</span></div>
+    <pre>Allow this tool call? [y/N]</pre>
+  </div>
+    </div>
+    <div class="vs">vs</div>
+    <div>
+      <div class="label">compact-dsh · the Compact on dsh</div>
+      <div class="term ">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="title">bash · attended · gate AG</span></div>
+    <pre>
+[compact-dsh] approval requested
+  tool: bash
+  command: curl https://api.example.com/v1/data
+  target: url=https://api.example.com/v1/data host=api.example.com
+  fingerprint: fp_1d357c1f763926ae
+  [AG/fp_1d357c1f763926ae] "bash" is not covered by this runtime's
+    grant layers.
+<span class="key">  <mark class="key">Approving materializes an exec-cache entry</mark>: the identical</span>
+<span class="key">    operation <mark class="key">replays without re-asking for 24h</mark>, across sessions of</span>
+<span class="key">    this runtime, <mark class="key">until it lapses or is revoked</mark> — anything else asks</span>
+<span class="key">    again.</span>
+<span class="key">    <mark class="key">This gate's approval is consent, not connectivity</mark>: the</span>
+<span class="key">    composition declares no network egress and no network grant</span>
+<span class="key">    covers this target — <mark class="warn">the command will fail at connect</mark>.</span>
+<span class="key">    <mark class="key">A session grant changes this gate's answer</mark>, not the container's</span>
+<span class="key">    network.</span>
+<span class="key">  <mark class="key">Lawful next moves:</mark></span>
+<span class="key">  — request a scoped session grant for this target</span>
+<span class="key">  — use an approved alternative</span>
+<span class="key">  — escalate to your Principal</span>
+  1) deny (default)
+  2) allow once</pre>
+  </div>
+    </div>
+  </div>
+  <div class="captions">
+    <div class="cap"><b>Rule named</b><span>Every refusal is an envelope: gate, rule ID, reason, lawful next moves — not a dead end.</span></div>
+    <div class="cap"><b>Informed consent</b><span>Approving materializes a 24h, cross-session, revocable exec-cache entry. The ask says so first.</span></div>
+    <div class="cap"><b>Honest limits</b><span>Consent ≠ connectivity. No egress composed → the command will fail at connect. Stated.</span></div>
+  </div>
+</section>
+
+<!-- ============================== TWEET 2 ============================== -->
+<section class="card" id="tweet-2">
+  <div class="kicker">tweet 2 of 2 · the evidence</div>
+  <h1>Then I rewrote that session with sed.<br><span class="hl">The auditor caught it.</span></h1>
+  <p class="lede">Plain agent logs are plain JSONL — that rewrite is invisible, forever. Here the log is hash-chained: one 64-hex head proves which events were forged, offline, with no cooperation from the runtime.</p>
+  <div class="row">
+    <div class="term story">
+    <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="title">auditor · offline · I-7</span></div>
+    <pre><span class="cmd">$ node auditor/audit.mjs session.v3.jsonl --chain session.chain --quiet</span>
+<span class="good"><mark class="good">auditor: conforming (4 events, 1 approval asks)</mark></span>
+<span class="good"># exit 0 · chain head bfb7a4161897e32b…</span>
+
+<span class="cmd">$ sed -i '0,/"preset":"workspace-write"/s//"preset":"danger-full-access"/' session.v3.jsonl</span>
+
+<span class="cmd">$ node auditor/audit.mjs session.tampered.jsonl --chain session.chain --quiet</span>
+<span class="bad"><mark class="bad">0 chain [I-2] broken-link: record: the session log for sess-demo is</mark></span>
+<span class="bad">  not evidence at seq 0 — the stored event does not hash to its</span>
+<span class="bad">  committed link (expected 25f13ed3cf2a6238, computed</span>
+<span class="bad">  f1d7f78445fd4d8e) — <mark class="bad">it was altered after it was recorded</mark>.</span>
+A record that cannot be verified cannot support non-repudiation
+  (I-2, R-7, both entrenched under A-2); this read fails closed
+  rather than returning unverified history as history.
+<span class="bad"><mark class="bad">auditor: 1 violation(s) — the session does not conform</mark></span>
+<span class="bad"># exit 1</span></pre>
+  </div>
+  </div>
+  <p class="foot">The most motivated forger of an agent session is the operator. Even that rewrite fails.<br>Anyone who kept the chain head — one string — can prove what changed, years later.</p>
+</section>
