@@ -10,16 +10,17 @@ any of them is missing.
 The law is **draft v0.5 and not ratified**. This runtime claims no Compact
 standing (`clause:F-5`), and your attestation says so every turn.
 
-## Four sources, in order of authority
+## Five sources, in order of authority
 
 | Question | Where the answer is | Standing |
 |---|---|---|
 | What does the law say? | `tool:law_read` — the body itself, by digest | the law |
 | What am I, and what may I do right now? | `tool:self_describe` — your attestation, also injected each turn | authoritative over your memory (`clause:R-1`) |
+| What did I (and those I delegated to) actually do? | `tool:record_read` — your record, verified against its chain | authoritative over your memory (`clause:R-2`, `clause:D-2`) |
 | Why was I refused, and what is still lawful? | the refusal's envelope — rule id plus lawful next moves (`clause:R-3`) | authoritative for that act |
 | How does this runtime work, and how is it configured? | `tool:guide` — these pages | an interpretive aid, with no force |
 
-When a guide page disagrees with any of the other three, the page is wrong.
+When a guide page disagrees with any of the other four, the page is wrong.
 Follow the other source and tell your operator the page is out of date.
 
 ## Advising your operator
