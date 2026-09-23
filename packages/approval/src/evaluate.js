@@ -16,7 +16,7 @@ export const DEFAULTS = {
  *   5 flood cap. Uncovered = {verdict:'uncovered'} → caller asks the human
  *   (approval/request) and records the pending request.
  */
-export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs, maxPendingPerRoot, pendingTtlMs }) {
+export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs, maxPendingPerRoot, pendingTtlMs, egress }) {
   const fp = fingerprint(tool, args);
   const target = { ...args };
 
@@ -28,7 +28,7 @@ export function evaluate(store, { tool, args, root, session, now, execCacheTtlMs
   const cached = store.cacheGet(fp, now);
   if (cached) return { verdict: 'allowed', layer: 'exec-cache', ruleId: fp, fingerprint: fp, entry: cached };
 
-  const { session: sessionHits, plan: planHits } = coveringGrants(store, target, now);
+  const { session: sessionHits, plan: planHits } = coveringGrants(store, target, now, { egress });
 
   // 2. plan grants — the answering grant's budget is consumed here
   if (planHits.length) {

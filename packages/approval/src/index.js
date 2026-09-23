@@ -159,13 +159,20 @@ export function createApproval(opts = {}) {
     // the records live exactly as long as the asking agent does.
     asks: new WeakMap(),
     fingerprint: (tool, args) => fingerprint(tool, args),
-    grantSession: ({ pattern, root, session, ttlMs = 60 * 60 * 1000, maxUses = null, now = Date.now() }) =>
-      approval.store.addSessionGrant({ pattern: parseAllowlistLikePattern(pattern), root, session, ttlMs, maxUses, now }),
+    grantSession: ({ pattern, root, session, ttlMs = 60 * 60 * 1000, maxUses = null, methodClass = null, now = Date.now() }) =>
+      approval.store.addSessionGrant({ pattern: parseAllowlistLikePattern(pattern), root, session, ttlMs, maxUses, methodClass, now }),
     grantPlan: ({ pattern, planRef, ttlMs, maxUses = null, now = Date.now() }) =>
       approval.store.addPlanGrant({ pattern: parseAllowlistLikePattern(pattern), planRef, ttlMs, maxUses, now }),
-    revoke: (id, now = Date.now()) => approval.store.revokeSessionGrant(id, now),
+    // one id space for the operator (#64): sg_… session/egress grants and
+    // sec_… secret grants both revoke here — a grant advertised revocable
+    // that no command can reach is not revocable
+    revoke: (id, now = Date.now()) =>
+      approval.store.revokeSessionGrant(id, now) ?? approval.store.revokeSecretGrant(id, now),
+    /** The exec-cache TTL an approval of this act materializes (#65). */
+    replayTtlFor: (args) => cacheTtlFor(approval, args),
     evaluate: (call) => evaluate(approval.store, {
       execCacheTtlMs: approval.execCacheTtlMs,
+      egress: approval.egress,
       maxPendingPerRoot: approval.maxPendingPerRoot,
       pendingTtlMs: approval.pendingTtlMs,
       ...call,
@@ -320,7 +327,25 @@ export function replayTranscriptNote({ tool, fingerprint, target, grantedAt, exp
  * the TTL is the runtime's configured one, the reach is stated plainly
  * (cross-session), and the two exits are named (lapse, revocation).
  */
-function replayConsequence(ttlMs) {
+/**
+ * The exec-cache TTL an approval of this act materializes (#65). Normally the
+ * runtime's cache TTL; under the mediated posture, an act that materializes
+ * an egress grant caches no longer than that grant lives — both are written
+ * on the same clock, so the replay and the wire lapse together and the next
+ * identical call asks again, which re-materializes the grant.
+ */
+function cacheTtlFor(approval, args) {
+  const ttl = approval.execCacheTtlMs;
+  if (ttl === 0 || !egressBound(approval, args)) return ttl;
+  return Math.min(ttl, approval.egressGrantTtlMs);
+}
+
+/** Does approving this act materialize an egress grant? (proxy + derivable class + a network target) */
+function egressBound(approval, args) {
+  return approval.egress === 'proxy' && args?.methodClass != null && egressPatternFor(canonicalTarget(args)) != null;
+}
+
+function replayConsequence(ttlMs, { egressBound: bound = false } = {}) {
   // ttl 0 disables the exec cache entirely (cacheSet returns early): the
   // honest sentence is the opposite of the grant one — approval covers this
   // ask, full stop
@@ -328,7 +353,8 @@ function replayConsequence(ttlMs) {
     return `Approving covers this ask only: the exec cache is disabled in this runtime, so the identical operation asks again.`;
   }
   return `Approving materializes an exec-cache entry: the identical operation replays without re-asking ` +
-    `for ${humanTtl(ttlMs)}, across sessions of this runtime, until it lapses or is revoked — anything else asks again.`;
+    `for ${humanTtl(ttlMs)}${bound ? ' (no longer than the egress grant it materializes, so both lapse together)' : ''}, ` +
+    `across sessions of this runtime, until it lapses or is revoked — anything else asks again.`;
 }
 
 /**
@@ -427,14 +453,18 @@ async function answerRequest(approval, req, next) {
     if (outcome === 'allowed-once') {
       // the only native grant: an exec-cache entry — same operation replays
       // without re-asking until the TTL, across sessions of this runtime
-      approval.store.cacheSet(rec.fp, Date.now(), approval.execCacheTtlMs, canonicalTarget(rec.args));
+      // #65: under the mediated posture the entry lives no longer than the
+      // egress grant it rides with — a replay the wire can no longer deliver
+      // would be a gate that says yes over a mediator that says 'expired'
+      const now = Date.now();
+      approval.store.cacheSet(rec.fp, now, cacheTtlFor(approval, rec.args), canonicalTarget(rec.args));
       // the injection agreement: an approved call that referenced declared
       // secrets materializes one session-scoped grant per ref — TTL-bounded,
       // revocable, covering only this session's confined calls
       for (const ref of rec.secretRefs ?? []) {
         approval.store.addSecretGrant({
           ref, root: rec.root, session: rec.session,
-          ttlMs: approval.secretGrantTtlMs, now: Date.now(),
+          ttlMs: approval.secretGrantTtlMs, now, fp: rec.fp,
         });
       }
       // #38 phase 3 — under the MEDIATED posture an approval actually
@@ -449,7 +479,7 @@ async function answerRequest(approval, req, next) {
         if (pattern) {
           approval.store.addSessionGrant({
             pattern, session: rec.session, methodClass: rec.methodClass,
-            ttlMs: approval.egressGrantTtlMs, now: Date.now(),
+            ttlMs: approval.egressGrantTtlMs, now,
           });
         }
       }
@@ -591,7 +621,7 @@ export function approvalPlugin(opts = {}) {
               `approving it materializes a session-scoped, TTL-bounded, revocable secret grant and the credential is injected into the confined execution ` +
               `without entering this conversation`
             : '') +
-          `. ${replayConsequence(approval.execCacheTtlMs)} ${egressHonesty(approval.egress)}` +
+          `. ${replayConsequence(cacheTtlFor(approval, args), { egressBound: egressBound(approval, args) })} ${egressHonesty(approval.egress)}` +
           (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'methodClass') && args.methodClass == null
             ? ` This target's method class could not be derived statically, so NO egress grant will materialize from ` +
               `approving — the mediator refuses its connections by name (D-7).`
@@ -642,6 +672,9 @@ function patternText(pattern) {
 
 function registerGrantCommands(ctx, approval) {
   const live = () => approval.store.sessionGrants.filter(g => !g.revokedAt && (!g.expiresAt || g.expiresAt > Date.now()));
+  // #64: secret grants are listed by NAME (never a value) with their id, so
+  // the revocation the ask promised is reachable by the operator
+  const liveSecrets = () => approval.store.secretGrants.filter(g => !g.revokedAt && g.expiresAt > Date.now());
   // live cache entries only: an expired entry is lazily deleted on its next
   // probe and would read as authority it no longer carries (#40)
   const liveCache = () => [...approval.store.cache.entries()]
@@ -654,7 +687,8 @@ function registerGrantCommands(ctx, approval) {
     name: 'grants-list',
     description: 'compact-dsh: list live approval grants and cached approvals',
     handler: () => {
-      const grants = live().map(g => `${g.id}  ${patternText(g.pattern)}  root=${g.root ?? '-'} session=${g.session ?? '-'}${g.expiresAt ? ' expires=' + new Date(g.expiresAt).toISOString() : ''}${g.maxUses ? ` uses=${g.uses}/${g.maxUses}` : ''}`);
+      const grants = live().map(g => `${g.id}  ${patternText(g.pattern)}${g.methodClass ? ` class=${g.methodClass}` : ''}  root=${g.root ?? '-'} session=${g.session ?? '-'}${g.expiresAt ? ' expires=' + new Date(g.expiresAt).toISOString() : ''}${g.maxUses ? ` uses=${g.uses}/${g.maxUses}` : ''}`);
+      const secrets = liveSecrets().map(g => `${g.id}  secret $${g.ref}  session=${g.session ?? '-'} expires=${new Date(g.expiresAt).toISOString()}`);
       const cache = liveCache();
       // #40: the cache is enumerated, not counted — an operator audits what
       // is replayable right now (fingerprint, target, lifetime). Target
@@ -663,27 +697,42 @@ function registerGrantCommands(ctx, approval) {
         `  ${fp}  ${targetBitsOf(e.target) || '(command-aware)'}  granted=${new Date(e.grantedAt).toISOString()}${e.expiresAt ? ` expires=${new Date(e.expiresAt).toISOString()}` : ' never'}`);
       const cacheText = `${cache.length} live cached approval(s)` +
         (lines.length ? `:\n${lines.join('\n')}${cache.length > lines.length ? `\n  …and ${cache.length - lines.length} more` : ''}` : '');
+      const secretText = secrets.length ? `\n${secrets.length} live secret grant(s):\n${secrets.join('\n')}` : '';
       return { kind: 'success', text: (grants.length
         ? `${grants.length} live grant(s):\n${grants.join('\n')}`
-        : 'no live grants') + `\n${cacheText}\n${gateLine}` };
+        : 'no live grants') + secretText + `\n${cacheText}\n${gateLine}` };
     },
   });
   ctx.commands?.register({
     name: 'grants-grant',
-    description: 'compact-dsh: grant a target pattern for this session — /grants-grant <pattern> [ttlMinutes] [maxUses]',
+    description: 'compact-dsh: grant a target pattern for this session — /grants-grant <pattern> [ttlMinutes] [maxUses] [read|write]',
     handler: (inv) => {
-      const [pattern, ttlMin, uses] = (inv.rawInput ?? '').trim().split(/\s+/);
-      if (!pattern) return { kind: 'error', text: 'usage: /grants-grant <pattern> [ttlMinutes] [maxUses] — pattern like api.example.com, *.example.org, host:443, https://host/path/' };
+      // the method class (#66) may sit anywhere after the pattern; the
+      // numbers keep their order (ttl, then uses)
+      const [pattern, ...rest] = (inv.rawInput ?? '').trim().split(/\s+/).filter(Boolean);
+      const methodClass = rest.find(t => t === 'read' || t === 'write') ?? null;
+      const [ttlMin, uses] = rest.filter(t => t !== 'read' && t !== 'write');
+      if (!pattern) return { kind: 'error', text: 'usage: /grants-grant <pattern> [ttlMinutes] [maxUses] [read|write] — pattern like api.example.com, *.example.org, host:443, https://host/path/' };
+      let parsed;
+      try { parsed = parseAllowlistLikePattern(pattern); } catch (e) { return { kind: 'error', text: String(e?.message ?? e) }; }
+      // under the mediated posture a classless network grant is refused by
+      // the mediator ('classless-grant') and would only suppress the ask that
+      // materializes a deliverable one — so it is not minted at all
+      if (approval.egress === 'proxy' && methodClass == null && NETWORK_PATTERN_KINDS.includes(parsed.kind)) {
+        return { kind: 'error', text: `under the mediated egress posture a network grant needs a method class: ` +
+          `/grants-grant ${patternText(parsed)} [ttlMinutes] [maxUses] read|write — "write" also covers reads (D-7: no class, no coverage)` };
+      }
       const { root, session } = identityOf(inv.agent);
       const ttlMs = ttlMin != null ? Math.max(1, Number(ttlMin)) * 60_000 : 60 * 60_000;
       if (!Number.isFinite(ttlMs)) return { kind: 'error', text: `ttl must be a number of minutes, got "${ttlMin}"` };
       const maxUses = uses != null ? Math.max(1, Math.floor(Number(uses))) : null;
       if (maxUses !== null && !Number.isFinite(maxUses)) return { kind: 'error', text: `maxUses must be a number, got "${uses}"` };
-      const g = approval.grantSession({ pattern, root, session, ttlMs, maxUses });
+      const g = approval.grantSession({ pattern, root, session, ttlMs, maxUses, methodClass });
       // echo the PARSED pattern, never the raw operator input: a token in a
       // URL's userinfo is stripped by canonicalization — echoing the input
       // would leak it into the durable session log (command/done is recorded)
-      return { kind: 'success', text: `grant ${g.id} covers ${patternText(g.pattern)} for session ${session} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''} (recorded: command/run + command/done)` };
+      return { kind: 'success', text: `grant ${g.id} covers ${patternText(g.pattern)}${methodClass ? ` (${methodClass})` : ''} for session ${session} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''}` +
+        `${approval.egress === 'none' && NETWORK_PATTERN_KINDS.includes(g.pattern.kind) ? ' — this changes the gate\'s answer, not the container\'s network (no egress is composed)' : ''} (recorded: command/run + command/done)` };
     },
   });
   ctx.commands?.register({
@@ -694,6 +743,7 @@ function registerGrantCommands(ctx, approval) {
       if (!id) return { kind: 'error', text: `usage: /grants-revoke <grantId> — see /grants-list` };
       const g = approval.revoke(id);
       if (!g) return { kind: 'error', text: `no grant ${id}` };
+      if (g.ref) return { kind: 'success', text: `secret grant ${id} ($${g.ref}) revoked — the next confined call carries no injection; the approved command asks again` };
       return { kind: 'success', text: `grant ${id} revoked; covered cached approvals killed` };
     },
   });
