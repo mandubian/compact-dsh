@@ -66,6 +66,16 @@ test('#64: /grants-revoke reaches a secret grant, ends injection, and the comman
   assert.equal(run('grants-revoke', g.id).kind, 'error', 'a revoked grant is not revoked twice');
 });
 
+test('#64: a legacy secret grant (no recorded fingerprint) revokes without promising a re-ask', () => {
+  const { approval, run } = boot({ secretRefs: ['GH_TOKEN'] });
+  const g = approval.store.addSecretGrant({ ref: 'GH_TOKEN', session: 's1', ttlMs: 60_000, now: Date.now() });
+  const out = run('grants-revoke', g.id);
+  assert.equal(out.kind, 'success');
+  assert.doesNotMatch(out.text, /asks again/, 'the re-ask cannot be guaranteed, so it is not claimed');
+  assert.match(out.text, /predates command tracking.*may still replay, without the credential/);
+  assert.deepEqual(approval.store.secretGrantsFor('s1'), [], 'the injection still ends');
+});
+
 test('#64: session grants still revoke exactly as before', () => {
   const { run } = boot({});
   const made = run('grants-grant', 'api.example.com 10');

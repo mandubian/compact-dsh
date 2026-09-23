@@ -743,7 +743,12 @@ function registerGrantCommands(ctx, approval) {
       if (!id) return { kind: 'error', text: `usage: /grants-revoke <grantId> — see /grants-list` };
       const g = approval.revoke(id);
       if (!g) return { kind: 'error', text: `no grant ${id}` };
-      if (g.ref) return { kind: 'success', text: `secret grant ${id} ($${g.ref}) revoked — the next confined call carries no injection; the approved command asks again` };
+      // the re-ask is promised only where it holds: a grant from before #64
+      // carries no fingerprint, so its command's cached approval cannot be
+      // found — that command may still replay, now without the credential
+      if (g.ref) return { kind: 'success', text: `secret grant ${id} ($${g.ref}) revoked — the next confined call carries no injection; ` +
+        (g.fp ? 'the approved command asks again'
+          : 'this grant predates command tracking, so its command\'s cached approval could not be found: an identical command may still replay, without the credential — see /grants-list for the cached approvals') };
       return { kind: 'success', text: `grant ${id} revoked; covered cached approvals killed` };
     },
   });
