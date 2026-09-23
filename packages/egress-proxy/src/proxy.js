@@ -220,7 +220,7 @@ export function authorityOf(req) {
  * mapped `127.0.0.1` is loopback, not public.
  */
 export function addressClassOf(ip) {
-  const raw = String(ip ?? '').trim();
+  const raw = String(ip ?? '').trim().toLowerCase();   // isIP accepts uppercase hextets — classify the canonical form
   if (isIP(raw) === 4) return ipv4ClassOf(raw);
   if (isIP(raw) === 6) return ipv6ClassOf(raw);
   return 'invalid';

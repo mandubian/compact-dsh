@@ -405,6 +405,11 @@ test('the address vocabulary: every space the policy can refuse has a name (#55)
   assert.equal(addressClassOf('::'), 'unspecified');
   assert.equal(addressClassOf('fe80::1'), 'link-local');
   assert.equal(addressClassOf('fd00::1'), 'ula');
+  assert.equal(addressClassOf('FD00::1'), 'ula', 'uppercase hextets classify like their lowercase form');
+  assert.equal(addressClassOf('FE80::1'), 'link-local');
+  assert.equal(addressClassOf('::FFFF:127.0.0.1'), 'loopback', 'uppercase mapped form too');
+  assert.equal(addressClassOf('2001:DB8::1'), 'documentation');
+  assert.equal(addressClassOf('FF02::1'), 'multicast');
   assert.equal(addressClassOf('ff02::1'), 'multicast');
   assert.equal(addressClassOf('2001:db8::1'), 'documentation');
   assert.equal(addressClassOf('2606:4700::1111'), 'public');
