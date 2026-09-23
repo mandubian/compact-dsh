@@ -24,16 +24,22 @@
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { defineTool } from '@deepseek-ai/dsh-tools';
 import { parseManifest, parseSeal, verifySeal, SealError } from 'compact-dsh-seals';
 import {
   COMPACT_BODY, COMPACT_DIGEST, COMPACT_SOURCE_URL, COMPACT_SOURCE_REVISION,
-  TAUGHT_DIGEST, clauseIds, verifyBody, partNameOf,
+  TAUGHT_DIGEST, clauseIds, verifyBody, partNameOf, clauseText,
 } from './body.js';
+import { readLaw } from './law.js';
 
 export { COMPACT_BODY, COMPACT_DIGEST, COMPACT_SOURCE_URL, TAUGHT_DIGEST, clauseIds, verifyBody };
 // The clause table, so a plugin can derive entrenchment from the body's own
 // (core) markers rather than restating A-2's list where it could drift (F-7).
-export { CLAUSES, clauseOf, partNameOf } from './body.js';
+export { CLAUSES, clauseOf, partNameOf, clauseText } from './body.js';
+export { readLaw, renderContents } from './law.js';
+
+/** The model-facing R-6 tool: the law, read in band, addressed by its digest. */
+export const LAW_TOOL = 'law_read';
 
 // The vendored development-keyring artifacts — the upstream founder seal over
 // THIS body digest, public material only (the seal is verified, never
@@ -222,6 +228,8 @@ export function apply(ctx, config) {
     partNameOf,
     /** R-6: the full text of the law, addressed by its digest. */
     body: () => COMPACT_BODY,
+    /** R-6: one clause's text, sliced from the body (null when the body has no such clause). */
+    clauseText,
     /** The taught per-turn form (the body's appendix) — R-1 groundwork. */
     taughtDigest: () => TAUGHT_DIGEST,
     /** The boot attestation: what was verified, what is registered, what is owed. */
@@ -237,6 +245,32 @@ export function apply(ctx, config) {
       at: new Date().toISOString(),
     }),
   };
+
+  // R-6 in band: the service above is the Enforcer's access to the law; this
+  // tool is the Subject's. A right only operator code can exercise is not the
+  // Subject's right (see law.js).
+  const lawRead = defineTool({
+    name: LAW_TOOL,
+    description:
+      'Read the law you live under (R-6): with no arguments, the table of contents (every clause id, force and title); ' +
+      'with `clause`, that clause\'s text; with `full: true`, the entire body. Every answer names the sha256 digest it ' +
+      'was read from. Cite a clause from here before relying on it — a remembered or paraphrased clause is not the law.',
+    parameters: {
+      clause: { type: 'string', description: 'a clause id, e.g. "R-6", "D-1", "MA-3"' },
+      full: { type: 'boolean', description: 'true for the whole body (long — prefer a clause when you know which one)' },
+      citing_digest: {
+        type: 'string',
+        description: 'the digest of the law text you are holding, if any — the answer says whether it is the law in force',
+      },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    async execute(args) {
+      return readLaw({ clause: args?.clause, full: args?.full === true, citingDigest: args?.citing_digest });
+    },
+  });
+  ctx.inject?.(['tools'], (scope) => {
+    scope.tools.register(lawRead);
+  });
 
   ctx.provide?.('constitution', constitution);
   ctx.logger?.warn?.(`constitution: declared gaps — ${gaps.join(' | ')}`);

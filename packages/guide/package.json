@@ -1,0 +1,11 @@
+{
+  "name": "compact-dsh-guide",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — the ecosystem guide: curated, machine-checked pages the Subject reads to explain the runtime to its operator and to itself. An interpretive aid with no force; the law, the attestation and the envelope prevail.",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.1.5-rc.1" },
+  "dependencies": { "compact-dsh-constitution": "0.1.0" },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" }
+}

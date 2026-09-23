@@ -244,13 +244,16 @@
       "kind": "enforced",
       "plugin": "compact-constitution",
       "service": "constitution",
-      "evidence": "access to the law: the bundled body, addressed by its digest, is exposed by the constitution service",
+      "evidence": "access to the law, in band: the Subject reads the bundled body — boot-verified against its pinned digest — through the model-facing law_read tool (table of contents, one clause sliced from the body, or the full text), every answer naming the digest it was read from and a mismatched cited digest raising an alarm; the constitution service's body() is the Enforcer's own access and was, alone, not the Subject's right",
       "enforcedBy": [
         "packages/constitution/src/body.js",
+        "packages/constitution/src/law.js",
         "packages/constitution/src/index.js"
       ],
       "verifiers": [
-        "packages/constitution/test/constitution.test.js"
+        "packages/constitution/test/constitution.test.js",
+        "packages/constitution/test/law.dsh.test.js",
+        "packages/blessed/test/loader.dsh.test.js"
       ]
     },
     {

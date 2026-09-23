@@ -113,6 +113,13 @@ test('loader: base and blessed patches boot real host services, deny tools and p
   for (const name of ['systemPrompt', 'tools', 'subagents', 'sessions', 'sessionPersistence', 'compact-record', 'constitution', 'compact-ready']) {
     assert.ok(ctx.get(name), name);
   }
+  // R-6 in band, and the guide: both are model-facing tools of the LOADED
+  // composition — and every tool a guide page names is live here, so the
+  // guide cannot teach an operator a tool this runtime does not mount
+  assert.ok(ctx.tools.get('law_read'), 'R-6: the Subject can read the law');
+  assert.ok(ctx.tools.get('guide'), 'the ecosystem guide is mounted');
+  const unmounted = ctx.get('compact-guide').citedTools().filter(tool => !ctx.tools.get(tool));
+  assert.deepEqual(unmounted, [], 'guide pages cite tools the loaded composition does not mount');
   assert.deepEqual(ctx.sandboxPolicy.resolve(), { mode: 'workspace-write', workspaceRoot: process.cwd() });
   assert.equal(ctx.approval.config.policy, 'ask');
   assert.deepEqual(ctx.permissionPresets.names, ['read-only', 'workspace-write']);
