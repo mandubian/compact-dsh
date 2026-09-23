@@ -447,6 +447,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
 | `docs/decision-phase7-scope.md` | The recorded Phase 7 scope (R-1 + R-13, signature deferred) — what the missing keys actually block, and why an unsigned attestation is delivered rather than withheld |
 | `docs/decision-network-egress-proxy.md` | The recorded #38 phase-2 decision: network egress under grant — the mediated proxy (never in the container), grant identity with #26's method-class axis, ABSENT→BOUND posture move, measured platform table, and the phase-3 pinning tests |
+| `docs/decision-secret-hygiene.md` | The recorded #8 adjudication: G2 posture (teach + redact + declare, no content classifier), G3's rendering/identity split (credential paths masked in every rendering, exact in fingerprints/grants/matching), G5's tightened replay identity (the query joins the fingerprint — an allowed-once replays exactly the operation approved) |
 
 ## dsh version policy — following the release rhythm
 

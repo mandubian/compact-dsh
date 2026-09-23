@@ -6,7 +6,7 @@
 // counting it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createApproval, approvalPlugin, replayTranscriptNote } from '../src/index.js';
+import { createApproval, approvalPlugin, replayTranscriptNote, evaluate, GrantStore, fingerprint, canonicalTarget, redactTarget } from '../src/index.js';
 
 const NOW = 1_700_000_000_000;
 const injectable = (id, log = []) => ({ id, session: { id, header: {} }, inject(m) { log.push(m); } });
@@ -217,4 +217,62 @@ test('grants-list enumerates live cache entries with target and lifetime', () =>
   empty({ on: () => {}, emit: () => {}, provide: () => {}, inject(deps, fn) { fn({ commands: { register: (c) => { registered2[c.name] = c; } } }); } }, {});
   const out2 = registered2['grants-list'].handler();
   assert.match(out2.text, /no live grants\n0 live cached approval\(s\)/);
+});
+
+// --- #8 secret-hygiene adjudication (docs/decision-secret-hygiene.md) ---
+
+test('G5: a query variant is a different operation — the cache never replays it', () => {
+  const base = { tool: 'net.fetch', args: { url: 'https://api.example.com/v1/data' }, root: 'r', session: 's1', now: NOW };
+  const v1 = evaluate(new GrantStore(), { ...base, execCacheTtlMs: 60_000 });
+  assert.equal(v1.verdict, 'pending-approval', 'uncovered: the ask goes out');
+  const a = createApproval({});
+  a.store.cacheSet(v1.fingerprint, NOW, 60_000, canonicalTarget(base.args));
+  // the exact operation replays
+  const same = evaluate(a.store, { ...base, now: NOW + 1 });
+  assert.equal(same.verdict, 'allowed');
+  assert.equal(same.layer, 'exec-cache');
+  // `?key=ANYTHING` does NOT: the pre-adjudication identity let this replay
+  // silently for the TTL — the asymmetry G5 closed
+  const variant = evaluate(a.store, { ...base, args: { url: 'https://api.example.com/v1/data?key=ANYTHING' }, now: NOW + 1 });
+  assert.equal(variant.verdict, 'pending-approval', 'a different query re-asks');
+  assert.notEqual(variant.fingerprint, same.fingerprint);
+  // parameter order is phrasing, not operation
+  const orderA = fingerprint('net.fetch', { url: 'https://api.example.com/v1/data?x=1&y=2' });
+  const orderB = fingerprint('net.fetch', { url: 'https://api.example.com/v1/data?y=2&x=1' });
+  assert.equal(orderA, orderB, 'reordering collapses');
+});
+
+test('G3: renderings carry the redacted target; identity keeps the true path', () => {
+  // the replay note for a webhook approval shows the family, never the secret
+  const note = replayTranscriptNote({
+    tool: 'net.fetch', fingerprint: 'fp_hook',
+    target: canonicalTarget({ url: 'https://hooks.example.com/services/T00/B00/SECRET' }),
+    grantedAt: NOW, expiresAt: NOW + 86_400_000,
+  });
+  assert.match(note, /url=https:\/\/hooks\.example\.com\/services\/\*\*\*/);
+  assert.ok(!note.includes('T00') && !note.includes('SECRET'), 'no path credential survives into the record or the model context');
+
+  // grants-list — recorded command output — renders the masked form
+  const registered = {};
+  const fake = {
+    on: () => {}, emit: () => {}, provide: () => {},
+    inject(deps, fn) { fn({ commands: { register: (c) => { registered[c.name] = c; } } }); },
+  };
+  const inst = approvalPlugin({});
+  inst(fake, {});
+  const trueTarget = canonicalTarget({ url: 'https://hooks.example.com/services/T00/B00/SECRET' });
+  inst.approval.store.cacheSet('fp_hook', Date.now(), 60_000, trueTarget);
+  const out = registered['grants-list'].handler();
+  assert.match(out.text, /services\/\*\*\*/, 'the listed target is masked');
+  assert.ok(!out.text.includes('T00'), 'the true path is not in the command output (command/done is recorded)');
+  // while the STORED target — the matching/revocation form — stays exact
+  assert.equal([...inst.approval.store.cache.values()][0].target.url, trueTarget.url);
+});
+
+test('G2: the gate declares its secret-hygiene posture as a gap (I-8), never silently', () => {
+  const gate = createApproval({});
+  assert.ok(Array.isArray(gate.declaredGaps));
+  assert.ok(
+    gate.declaredGaps.some(g => /no content-level secret detection/.test(g) && /G2/.test(g)),
+    'the posture is declared, with its clause anchors');
 });

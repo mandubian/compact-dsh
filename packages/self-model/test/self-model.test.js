@@ -135,6 +135,33 @@ test('budgets report what is LEFT, and an unlimited grant says so rather than a 
   assert.equal(b.grants.find(g => g.target === 'b.example').remaining, 'unlimited');
 });
 
+test('the attestation renders a credential path masked (#8 G3): the row keeps the matching form', async () => {
+  const { ctx } = await boot();
+  const store = new GrantStore();
+  // the grant row IS the matching form: a UrlPrefix materialized from a
+  // webhook URL carries its full path in the store — and renders masked
+  store.addSessionGrant({ pattern: { kind: 'UrlPrefix', value: 'https://hooks.example.com/services/' }, session: 's1', ttlMs: 60_000, now: 1 });
+  store.addSessionGrant({ pattern: { kind: 'UrlPrefix', value: 'https://hooks.example.com/services/T00/B00/SECRET/' }, session: 's1', ttlMs: 60_000, now: 1 });
+  ctx.plugin(stubService('compact-approval', { store }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+
+  const b = budgetsOf(ctx, 's1', 2);
+  const clean = b.grants.find(g => g.target === 'https://hooks.example.com/services/');
+  assert.ok(clean, 'a path that carries no credential renders verbatim');
+  const secreted = b.grants.find(g => /services\/\*\*\*/.test(g.target));
+  assert.ok(secreted, 'the credential path renders masked');
+  assert.ok(!b.grants.some(g => g.target.includes('T00') || g.target.includes('SECRET')),
+    'the attestation is injected every turn — it carries no path credential');
+});
+
+test('the approval gate\'s own declared gap reaches the attestation (#8 G2)', async () => {
+  const { ctx } = await boot();
+  ctx.plugin(stubService('compact-approval', { declaredGaps: ['no content-level secret detection over tool output (G2)'] }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+  const gaps = gapsOf(ctx);
+  assert.ok(gaps.some(g => /G2/.test(g)), 'the posture is declared where the governed party reads it (I-8)');
+});
+
 test('the declared gaps include the unsigned basis — the limit travels with the claim', async () => {
   const { ctx } = await boot();
   const gaps = gapsOf(ctx);

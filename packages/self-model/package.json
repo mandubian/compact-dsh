@@ -17,6 +17,7 @@
     "compact-dsh-approval": "0.4.1"
   },
   "dependencies": {
+    "compact-dsh-approval": "0.4.1",
     "compact-dsh-constitution": "0.1.0",
     "compact-dsh-seals": "0.1.0"
   }
