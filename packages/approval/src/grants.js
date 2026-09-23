@@ -38,10 +38,16 @@ export class GrantStore {
   // anything printed is kept by the record — not a detection defect; widening
   // detection to "any command that could read the environment" is a
   // content-classifier's job (D-7 territory), not a name match.
-  addSecretGrant({ ref, root, session, ttlMs, now }) {
+  //
+  // REVOCATION (#64): `fp` is the fingerprint of the approved command whose
+  // allow-once materialized the grant. Revoking the grant kills that exec-
+  // cache entry too — otherwise the identical command would replay WITHOUT
+  // the credential (a silent, confusing failure) instead of asking again,
+  // which is the only lawful way back to injection.
+  addSecretGrant({ ref, root, session, ttlMs, now, fp = null }) {
     const grant = {
       id: 'sec_' + Math.random().toString(16).slice(2, 10),
-      ref, root: root ?? null, session: session ?? null,
+      ref, root: root ?? null, session: session ?? null, fp,
       createdAt: now, expiresAt: now + (ttlMs || 60 * 60 * 1000),
       revokedAt: null,
     };
@@ -63,6 +69,7 @@ export class GrantStore {
     const g = this.secretGrants.find(x => x.id === id);
     if (!g || g.revokedAt) return null;
     g.revokedAt = now;
+    if (g.fp) this.cache.delete(g.fp);
     return g;
   }
 
@@ -205,14 +212,35 @@ export function patternMatches(pattern, target) {
 }
 
 /** Which live grants cover this target? (never expired, never revoked, never spent) */
-export function coveringGrants(store, target, now) {
+export function coveringGrants(store, target, now, { egress } = {}) {
   const live = list => list.filter(g =>
     (!g.expiresAt || g.expiresAt > now) && !g.revokedAt &&
     (g.maxUses == null || g.uses < g.maxUses));
+  const covers = g => patternMatches(g.pattern, target) && classCovers(g, target, egress);
   return {
-    session: live(store.sessionGrants).filter(g => patternMatches(g.pattern, target)),
-    plan: live(store.planGrants).filter(g => patternMatches(g.pattern, target)),
+    session: live(store.sessionGrants).filter(covers),
+    plan: live(store.planGrants).filter(covers),
   };
+}
+
+/**
+ * The method-class axis at the GATE (#66), so the gate never says yes where
+ * the mediator says no. Applies only to a classed act — a network finding the
+ * remote-access analyzer routed with a `methodClass` key (null = not
+ * derivable); every other target (mounts, url/host tool args) is unaffected.
+ *
+ *   - a classed grant covers the act when it covers the act's class, exactly
+ *     the mediator's rule: 'write' covers both, 'read' covers reads only, and
+ *     an act whose class could not be derived is covered by 'write' alone;
+ *   - under the mediated posture a CLASSLESS network grant covers no classed
+ *     act: the mediator refuses it by name ('classless-grant'), so letting it
+ *     answer at the gate would suppress the very ask whose approval
+ *     materializes the grant the wire can deliver. The act asks instead.
+ */
+export function classCovers(grant, target, egress) {
+  if (!target || !Object.hasOwn(target, 'methodClass')) return true;
+  if (grant.methodClass != null) return grant.methodClass === 'write' || grant.methodClass === target.methodClass;
+  return !(egress === 'proxy' && NETWORK_PATTERN_KINDS.includes(grant.pattern?.kind));
 }
 
 /** Network-pattern session kinds — the family the mediator reads (#38). */

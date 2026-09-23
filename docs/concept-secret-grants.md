@@ -28,7 +28,11 @@ The Subject never holds the secret; it holds a **reference**:
    materializes a **SecretGrant** — session-scoped, TTL-bounded, revocable —
    in the same grant store as every other grant. The operator therefore
    agrees to exactly one thing: "this session's confined calls may receive
-   this credential, for this long."
+   this credential, for this long." Revocable means reachable (#64):
+   `/grants-list` shows each live SecretGrant by id and ref name, and
+   `/grants-revoke <sec_…>` ends it. Revoking also kills the exec-cache entry
+   of the command whose approval created the grant, so that command asks
+   again rather than replaying without its credential.
 3. **The injection (CF-1).** At confine time the provider resolves each live
    ref from the Enforcer's environment and adds `--env REF=<value>` to the
    container argv. The value transits provider→daemon only.

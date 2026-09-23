@@ -49,7 +49,8 @@ whatever the outcome.
 
 **Allowed once** creates an exec-cache entry. The identical operation replays
 without asking for 24h, across sessions of this runtime, until the entry lapses
-or a revocation kills it. Anything else asks again. Each decision leaves a
+or a revocation kills it. Under the mediated posture, an act that creates an
+egress grant caches only as long as that grant lives (1h), and the ask says so. Anything else asks again. Each decision leaves a
 one-line `[compact-approval] Gate decision:` note in the transcript. A replay
 leaves a `[compact-approval] Replay:` note once per session.
 
@@ -65,9 +66,9 @@ interactive follow-up.
 
 | Command | Usage |
 |---|---|
-| `command:/grants-list` | Lists the live session grants (id, pattern, scope, expiry, uses), the live cached approvals, and the gate's defaults: exec-cache TTL, flood cap, pending TTL, declared secret refs. |
-| `command:/grants-grant` | `/grants-grant <pattern> [ttlMinutes] [maxUses]`. The TTL defaults to 60 min. `maxUses` is a budget: a spent grant stops covering. The grant covers the session you type it in. |
-| `command:/grants-revoke` | `/grants-revoke <grantId>`. Revokes the grant and kills the cached approvals its pattern covered. |
+| `command:/grants-list` | Lists the live session grants (id, pattern, method class, scope, expiry, uses), the live secret grants (id, secret name, session, expiry), the live cached approvals, and the gate's defaults: exec-cache TTL, flood cap, pending TTL, declared secret refs. |
+| `command:/grants-grant` | `/grants-grant <pattern> [ttlMinutes] [maxUses] [read\|write]`. The TTL defaults to 60 min. `maxUses` is a budget: a spent grant stops covering. The class may go anywhere after the pattern. It is required for network patterns under the mediated posture (`page:network`). The grant covers the session you type it in. |
+| `command:/grants-revoke` | `/grants-revoke <grantId>`. Revokes a session grant and kills the cached approvals its pattern covered. It also revokes a secret grant (`sec_…` ids): injection stops at the next confined call, and the command that created the grant asks again (`page:secrets`). |
 
 Patterns:
 

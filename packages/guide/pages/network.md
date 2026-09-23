@@ -49,10 +49,10 @@ Refusals come back as envelopes under gate `EG`. Their rule names say why: `no-g
 To let the agent `git clone https://github.com/org/repo` under the mediated posture:
 
 1. Launch with `env:COMPACT_EGRESS` set to `proxy`, and with `flag:--attended` or `flag:--web` so asks have someone to answer them.
-2. The agent runs the command with a literal URL. The analyzer asks. Approve it once. That creates an egress grant scoped to this session: `HostAndPort` on `github.com:443`, class `read`, lasting 1 hour. It also creates an exec-cache entry so the identical command replays without asking again.
+2. The agent runs the command with a literal URL. The analyzer asks. Approve it once. That creates an egress grant scoped to this session: `HostAndPort` on `github.com:443`, class `read`, lasting 1 hour. It also creates an exec-cache entry so the identical command replays without asking again. The entry lives no longer than the egress grant, so when the hour is up the identical command asks again, and approving it creates a fresh grant.
 3. To inspect or cut it short, use `command:/grants-list` and `command:/grants-revoke`.
 
-**Do not pre-grant hosts with `command:/grants-grant` under the mediated posture.** Its grants carry no method class. They satisfy the gate, so the ask never happens and no classed grant is created. The mediator then refuses with `classless-grant`. `command:/grants-grant` changes only the gate's answer. Under `none`, it never creates connectivity.
+**Pre-granting under the mediated posture needs a method class.** Type `/grants-grant github.com:443 read 120` (or `write`, which also covers reads). Without a class, the command is refused and names the repair: a classless grant would satisfy the gate, suppress the ask, and then be refused by the mediator with `classless-grant`. The gate applies the mediator's own rule, so a `read` grant does not cover a write, and that call asks. Under `none`, `command:/grants-grant` changes only the gate's answer and never creates connectivity.
 
 `env:COMPACT_ALLOWLIST` is a different mechanism. It applies to tool calls that carry a `url`/`host` argument, and it does not apply to `tool:bash`, whose argument is a command string. See `page:approvals`.
 

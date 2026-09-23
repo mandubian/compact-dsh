@@ -32,7 +32,7 @@ COMPACT_SECRETS='["GH_TOKEN"]' npm run compact -- --attended --workspace /path/t
 
 ## Revoking and inspecting
 
-`command:/grants-list` shows which secret names are declared, but it does not list live secret grants. `command:/grants-revoke` acts on session grants, and secret grants are stored separately. **No operator command in this runtime revokes a secret grant.** It lapses at its TTL. To stop injection sooner, launch without the variable in your environment.
+`command:/grants-list` shows the declared secret names and every live secret grant: its `sec_…` id, the secret's name, its session and its expiry. `command:/grants-revoke` with that id ends the grant. The next confined call carries no injection, and the command whose approval created the grant asks again rather than replaying without its credential. Otherwise the grant lapses at its TTL.
 
 ## The leak detector
 
