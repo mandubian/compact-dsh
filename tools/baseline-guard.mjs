@@ -107,18 +107,24 @@ function main() {
     process.exit(1);
   }
 
+  // fail closed: a sentinel that dies on a raw stack trace teaches people to
+  // re-run it instead of reading it — every refusal carries the ::error:: mark
   let files;
-  const filesFrom = flag('--files');
-  if (filesFrom) {
-    files = readFileSync(filesFrom, 'utf8').split('\n').filter(Boolean);
-  } else {
-    const positional = argv.filter((a, i) => !a.startsWith('--') && argv[i - 1] !== '--title' && argv[i - 1] !== '--register' && argv[i - 1] !== '--files');
-    if (positional.length !== 2) {
-      console.error('::error::baseline-guard expects <base-sha> <head-sha> (or --files <listfile> for tests)');
-      process.exit(1);
+  try {
+    const filesFrom = flag('--files');
+    if (filesFrom) {
+      files = readFileSync(filesFrom, 'utf8').split(/\r?\n/).map(s => s.trimEnd()).filter(Boolean);
+    } else {
+      const positional = argv.filter((a, i) => !a.startsWith('--') && argv[i - 1] !== '--title' && argv[i - 1] !== '--register' && argv[i - 1] !== '--files');
+      if (positional.length !== 2) {
+        throw new Error('expects <base-sha> <head-sha> (or --files <listfile> for tests)');
+      }
+      files = execFileSync('git', ['diff', '--name-only', positional[0], positional[1]], { encoding: 'utf8' })
+        .split('\n').filter(Boolean);
     }
-    files = execFileSync('git', ['diff', '--name-only', positional[0], positional[1]], { encoding: 'utf8' })
-      .split('\n').filter(Boolean);
+  } catch (e) {
+    console.error(`::error::baseline-guard could not determine the changed files: ${e.message}`);
+    process.exit(1);
   }
 
   const outcome = guard({ title, register, files });

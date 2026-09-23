@@ -218,4 +218,15 @@ test('the guard CLI emits the ::error remedy and exits non-zero on an undeclared
   const ok = spawnSync(process.execPath, ['tools/baseline-guard.mjs', '--files', list, '--title', 'docs: prose'], { cwd: ROOT, encoding: 'utf8' });
   assert.equal(ok.status, 0);
   assert.match(ok.stdout, /baseline-guard ok/);
+
+  // the acquisition itself fails closed: a missing list is a ::error::, not a stack trace
+  const missing = spawnSync(process.execPath, ['tools/baseline-guard.mjs', '--files', join(dir, 'absent.txt'), '--title', 'x'], { cwd: ROOT, encoding: 'utf8' });
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /::error::baseline-guard could not determine the changed files/);
+
+  // CRLF lists parse the same way
+  writeFileSync(list, 'packages/record/src/chain.js\r\ndocs/register/register.json\r\n');
+  const crlf = spawnSync(process.execPath, ['tools/baseline-guard.mjs', '--files', list, '--title', 'feat(record): rewrite history'], { cwd: ROOT, encoding: 'utf8' });
+  assert.notEqual(crlf.status, 0, 'a CRLF list still flags the amendment');
+  assert.match(crlf.stderr, /\[baseline-update\]/);
 });

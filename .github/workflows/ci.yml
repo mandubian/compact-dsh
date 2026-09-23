@@ -54,6 +54,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # the guard is a node script: pin the same line the gates job pins, so a
+      # runner's preinstalled node cannot make the sentinel flaky
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: enforcement code + register in one PR requires [baseline-update]
         run: |
           node tools/baseline-guard.mjs \
