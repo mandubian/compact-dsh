@@ -37,12 +37,12 @@ import { createHash } from 'node:crypto';
 import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
-import { fingerprint, canonicalTarget } from './fingerprint.js';
+import { fingerprint, canonicalTarget, canonicalQuery } from './fingerprint.js';
 import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope } from 'compact-envelope';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
-export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, evaluate, fingerprint, canonicalTarget, parseAllowlistLikePattern, DEFAULTS };
+export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, evaluate, fingerprint, canonicalTarget, canonicalQuery, parseAllowlistLikePattern, DEFAULTS };
 
 export const name = 'compact-approval';
 export const inject = ['approval'];
@@ -88,8 +88,43 @@ export function redactEmbeddedSecrets(text) {
     .replace(/(authorization\s*:\s*)([^'"\n]*)/gi, '$1***')
     .replace(/\b([A-Z0-9_]*(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|ACCESS_KEY)[A-Z0-9_]*)\s*=\s*([^\s&|;'"]+)/gi, '$1=***')
     .replace(/([?&][\w.-]*(?:key|token|secret|password|sig(?:nature)?)[\w.-]*=)[^&\s]+/gi, '$1***')
+    // #8 G3 (decision: docs/decision-secret-hygiene.md): a credential embedded
+    // in the URL PATH — the webhook/token path families where the path IS the
+    // credential (Slack `/services/T00/B00/XXX`-shaped) — is masked from the
+    // family segment onward, in every RENDERING. The same known-shape doctrine
+    // as every rule above: a closed list of credential path families, never an
+    // entropy guess. IDENTITY keeps the true path — fingerprints, grant rows
+    // and matching would collide distinct credentials under redaction, and one
+    // webhook's approval replaying for another is strictly worse than a stored
+    // secret (the residuals — approvals.json targets, the raw argv the act is
+    // recorded under — are declared in the decision record, not hidden).
+    .replace(/(https?:\/\/[^\s"'&?#]*\/(?:services?|webhooks?|hooks?|tokens?|keys?|secrets?|credentials?|oauth2?)\/)[^\s"'&?#]+/gi, '$1***')
     .replace(/(https?:\/\/)([^\s/@]+)@/g, '$1***@')
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '***private-key***');
+}
+
+/**
+ * #8 G3: the rendering split. Identity surfaces (fingerprints, grant rows,
+ * cache targets, matching) keep the true canonical target; RENDERINGS — the
+ * deciding view, transcript notes, replay receipts, grants-list, the
+ * attestation — carry the redacted form, so the model context and the record
+ * hold no more of the target than the deciding human saw (the userinfo
+ * masking set this precedent). Canonical URL values only; host and port bits
+ * pass through untouched by the narrow rules above.
+ */
+export function redactTarget(target) {
+  const out = {};
+  for (const [k, v] of Object.entries(target ?? {})) {
+    if (v == null || v === '') continue;
+    if (typeof v !== 'string') { out[k] = v; continue; }
+    // flattened FIRST (the oneLine guarantee — a crafted value must not ride
+    // an interpolation into message structure), then redacted on the flat
+    // form; a value that flattens to nothing takes the no-bit fallback
+    const flat = oneLine(v);
+    if (!flat) continue;
+    out[k] = redactEmbeddedSecrets(flat);
+  }
+  return out;
 }
 
 /**
@@ -225,6 +260,20 @@ export function createApproval(opts = {}) {
       } catch { /* the trace is a receipt, never a gate — and not yet spent */ }
     },
   };
+  // #8 G2 — the secret-hygiene posture, declared where the governed party can
+  // read it (I-8): the composition teaches the discipline and keeps the
+  // Enforcer's own renderings from multiplying credential material into model
+  // context (G3's redaction split), but builds NO content-level detector over
+  // tool output. The gate is target-blind (R-10); a classifier over content is
+  // a different machinery (D-7 territory), and a warn-only scanner would train
+  // the operator to ignore warnings. Declared, not silent.
+  approval.declaredGaps = [
+    'no content-level secret detection over tool output (G2): the approval gate is target-blind (R-10) and a ' +
+    'content classifier is a different machinery (D-7 territory) — the posture is teaching plus rendering ' +
+    'hygiene; the credential material the Enforcer itself renders is redacted (G3), and the residuals ' +
+    '(persisted canonical targets in the operator trust root, the argv an act is recorded under) are ' +
+    'declared in docs/decision-secret-hygiene.md (I-8)',
+  ];
   return approval;
 }
 
@@ -243,9 +292,7 @@ function oneLine(v) {
 }
 
 function targetBitsOf(target) {
-  return Object.entries(target ?? {})
-    .map(([k, v]) => [k, oneLine(v)])
-    .filter(([, v]) => v)
+  return Object.entries(redactTarget(target))
     .map(([k, v]) => `${k}=${v}`)
     .join(' ');
 }
@@ -422,7 +469,10 @@ async function answerRequest(approval, req, next) {
   // its own preview.
   const key = req.callId != null ? String(req.callId) : `${agent?.id ?? '?'}:${toolName}`;
   const view = { tool: toolName, callId: req.callId ?? null, fingerprint: rec.fp,
-    target: canonicalTarget(rec.args), command: commandPreview(rec.args) };
+    // #8 G3: the deciding view renders the redacted target (host, path
+    // family, command shape) — the operator decides on the same rendering
+    // every other surface carries; the userinfo masking set the precedent
+    target: redactTarget(canonicalTarget(rec.args)), command: commandPreview(rec.args) };
   approval.deciding.set(key, view);
   try {
     const outcome = await next();
@@ -643,11 +693,17 @@ export function approvalPlugin(opts = {}) {
 }
 
 function patternText(pattern) {
-  switch (pattern.kind) {
-    case 'HostAndPort': return `HostAndPort:${pattern.value.host}:${pattern.value.port}`;
-    case 'PathPrefix': return `PathPrefix:${pattern.value.path}(${pattern.value.ceiling})`;
-    default: return `${pattern.kind}:${pattern.value}`;
-  }
+  // #8 G3: every rendering rides the redaction, whichever branch builds it —
+  // the rendered string is what grants-list prints and what /grants-grant
+  // echoes into the recorded command/done
+  const text = (() => {
+    switch (pattern.kind) {
+      case 'HostAndPort': return `HostAndPort:${pattern.value.host}:${pattern.value.port}`;
+      case 'PathPrefix': return `PathPrefix:${pattern.value.path}(${pattern.value.ceiling})`;
+      default: return `${pattern.kind}:${pattern.value}`;
+    }
+  })();
+  return redactEmbeddedSecrets(String(text));
 }
 
 function registerGrantCommands(ctx, approval) {

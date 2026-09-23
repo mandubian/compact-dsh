@@ -375,6 +375,16 @@ jurisdiction of [the Compact](https://github.com/mandubian/compact).
 > substrate exists (A-1, A-7).
 >
 > **Phase 8 slice 3 total: 37 clauses enforced, up from 35 — the CURRENT total.**
+>
+> **R-6 made exercisable, and the ecosystem guide.** R-6 was registered as
+> enforced on the strength of the constitution service's `body()` — access the
+> Enforcer had and the Subject did not, with the host file tools disabled and
+> the body outside the workspace. `law_read` puts the law in band, addressed
+> by its digest. Beside it, `compact-dsh-guide` answers the question no
+> attestation or envelope holds — *how does this runtime work, and how does my
+> operator drive it?* — from pages whose every cited name is machine-checked.
+> Why autonoetic's wiki was ported only in part:
+> [docs/concept-the-guide.md](docs/concept-the-guide.md).
 
 > **The active roster is the basic five** — `architect`, `auditor`, `coder`,
 > `debugger`, `researcher` — the personas that earn their keep on dsh today.
@@ -429,7 +439,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `packages/remote-access/` | **Phase 2, slice 2**: static network-access analysis of shell args — findings (URL, remote, package-registry, IP) route through the Phase 1 grant layers (approvable per-host); opaque findings fail closed with an envelope |
 | `packages/loopguard/` | **Phase 3**: the 12-trip LoopGuard state machine (progress/failure accounting, command-aware fingerprints, refusal-seam + agent/error feeds; behavioral latches with repair budget 3, deterministic deny-all) + response validation (`tools/post-execute` block on invalid results) |
 | `packages/promotion/` | **Phase 3**: the promotion evidence gate — `pass=true` mechanically rejected with any error/critical finding or unevidenced warning, enforced in the waterfall before the tool body; no waiver boolean |
-| `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law |
+| `packages/constitution/` | **Phase 4**: the meta-layer — bundled Compact body (digest-pinned), boot verification, composition coupling (refuse-to-start), the rule registry, the boot attestation with declared gaps, R-6 access to the law **in band** — the `law_read` tool (table of contents, one clause sliced from the body, or the full text, every answer naming its digest) |
 | `packages/specialists/` | **Phase 5**: the specialist roster — active: the **basic five** (`architect`, `auditor`, `coder`, `debugger`, `researcher`) as dsh subagent personas (one delegation-tool row each: composed persona prompt, deny filter, depth cap) + a roster-card prompt section for parent routing; 13 more personas **archived** in `personas/archived/` (revive = move back); the trim-dedup lint as a boot gate; provides the `compact-specialists` service (MA-1/MA-2) |
 | `packages/capability-gate/` | **Phase 6**: Part VI's own enforcement — every capability trigger present in the composition must have a binding service (refuse-to-start; a late trigger latches a breach denying every tool call; clause-granularity check against the constitution's registry), and a capability declared absent is mechanically refused (`schedule_create`, SCH-1) rather than merely intended |
 | `packages/emergency/` | **Phase 8**: the state of exception — bounded declarations only (scope, cause, fixed expiry), a floor no declaration reaches (entrenchment derived from the body, plus exit/refusal/record/verification), derived expiry, mechanical renewal classification, every act marked, no declaration tool on the agent surface (A-8); the narrowing surfaced in the attestation (R-5) |
@@ -440,6 +450,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `docs/register/register.json` | **Phase 4**: the enforcement register — every clause of the body registered, planned, declared convention, or declared unadopted; `tools/verify-register.mjs` is the CI gate (also `npm run verify-register`) |
 | `auditor/` | **Phase 4** + **Phase 6**: the offline verification CLI (I-7) — replays session logs, checks the approval pair discipline, turn enclosure, outcome vocabulary; with `--chain <id>.chain` it verifies the record's integrity itself, without the Enforcer's cooperation; always attests which trust basis it used |
 | `packages/envelope/` | Shared Compact denial-envelope builder (R-3/I-4) |
+| `packages/guide/` | The ecosystem guide — the `guide` tool serves curated pages the Subject reads to explain the runtime to its operator (launching, approvals, sandbox, network, secrets, delegation, remedies, record and audit) and to itself; every tool/command/env/flag/clause/file a page names is resolved against the code by its suite (tools also against the live composition); an interpretive aid with no force, no write path, not coupled on — see [docs/concept-the-guide.md](docs/concept-the-guide.md) |
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
@@ -447,6 +458,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
 | `docs/decision-phase7-scope.md` | The recorded Phase 7 scope (R-1 + R-13, signature deferred) — what the missing keys actually block, and why an unsigned attestation is delivered rather than withheld |
 | `docs/decision-network-egress-proxy.md` | The recorded #38 phase-2 decision: network egress under grant — the mediated proxy (never in the container), grant identity with #26's method-class axis, ABSENT→BOUND posture move, measured platform table, and the phase-3 pinning tests |
+| `docs/decision-secret-hygiene.md` | The recorded #8 adjudication: G2 posture (teach + redact + declare, no content classifier), G3's rendering/identity split (credential paths masked in every rendering, exact in fingerprints/grants/matching), G5's tightened replay identity (the query joins the fingerprint — an allowed-once replays exactly the operation approved) |
 
 ## dsh version policy — following the release rhythm
 
@@ -573,7 +585,12 @@ npm run compact -- --attended --workspace /absolute/path/to/project "Inspect the
 Notes for these runs: `ubuntu:24.04` is a bare shell — set
 `COMPACT_SANDBOX_IMAGE` to a locally prepared image if the project needs
 tooling (the launcher inspects its local digest, never pulls); bash has
-**network off** by design, so fetches deny with the AG-1 envelope; use an
+**network off** by design: a fetch in a bash command is caught by the
+remote-access analyzer and raised as an approval ask for its host (refused
+when nobody can answer, i.e. without `--attended`/`--web`), and even an
+approved fetch fails at connect, because approval is consent, not
+connectivity (the AG-1 allowlist envelope is for tools that carry a
+`url`/`host` argument, not for bash); use an
 explicit `cd` inside bash for subdirectories rather than the workdir option;
 `COMPACT_SECRETS='["NAME"]'` declares env-var NAMES the confined bash may be
 granted (values stay in your shell, injection only under an approved grant).

@@ -4,6 +4,7 @@ import { apply as applyCapabilityGate } from 'compact-dsh-capability-gate';
 import { apply as applyConstitution, DEFAULT_REQUIRES } from 'compact-dsh-constitution';
 import { apply as applyEmergency } from 'compact-dsh-emergency';
 import { apply as applyExit } from 'compact-dsh-exit';
+import { apply as applyGuide } from 'compact-dsh-guide';
 import { apply as applyLoopguard } from 'compact-dsh-loopguard';
 import { apply as applyPetition } from 'compact-dsh-petition';
 import { promotionPlugin } from 'compact-dsh-promotion';
@@ -497,6 +498,10 @@ export async function apply(ctx, config = {}) {
   await mount('compact-exit', applyExit, {}, ['tools']);
   await mount('compact-petition', applyPetition, {}, ['tools']);
   await mount('compact-emergency', applyEmergency, {}, ['tools']);
+  // the ecosystem guide: no clause is enforced here — it is what the Subject
+  // reads to explain this runtime to its operator (and to itself) — so it is
+  // mounted, never coupled on; its honesty is the citation check in its suite
+  await mount('compact-guide', applyGuide, {}, ['tools']);
   await mount('constitution', applyConstitution, { trustRoot: options.trustRoot }, DEFAULT_REQUIRES);
   const gate = ctx.get('compact-capability-gate');
   if (gate.breach() || gate.unregisteredClauses()) {

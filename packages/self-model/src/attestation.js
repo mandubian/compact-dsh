@@ -33,6 +33,8 @@
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 /** How long an attestation may be relied on before it is an alarm. */
+import { redactEmbeddedSecrets } from 'compact-dsh-approval';
+
 export const DEFAULT_STALE_AFTER_MS = 5 * 60 * 1000;
 
 /** Read a service without letting an absent one break the attestation. */
@@ -112,9 +114,17 @@ export function budgetsOf(ctx, sessionId, now) {
 function describePattern(pattern) {
   if (!pattern) return null;
   const v = pattern.value;
-  if (pattern.kind === 'PathPrefix') return `${v?.path} (${v?.ceiling})`;
-  if (pattern.kind === 'HostAndPort') return `${v?.host}:${v?.port}`;
-  return typeof v === 'string' ? v : JSON.stringify(v);
+  // #8 G3: the attestation is a RENDERING — it is injected into the Subject's
+  // context every turn, so EVERY rendered pattern rides the approval gate's
+  // redaction (host, path family, masked credential), whichever branch builds
+  // it. The grant ROW keeps the matching form; the attestation reports the
+  // masked one.
+  const text = (() => {
+    if (pattern.kind === 'PathPrefix') return `${v?.path} (${v?.ceiling})`;
+    if (pattern.kind === 'HostAndPort') return `${v?.host}:${v?.port}`;
+    return typeof v === 'string' ? v : JSON.stringify(v);
+  })();
+  return redactEmbeddedSecrets(String(text));
 }
 
 /**
@@ -128,7 +138,7 @@ export function gapsOf(ctx, signed = false) {
   const gaps = [];
   const constitution = svc(ctx, 'constitution');
   for (const g of constitution?.attestation?.()?.gaps ?? []) gaps.push(g);
-  for (const name of ['compact-sandbox', 'compact-record']) {
+  for (const name of ['compact-sandbox', 'compact-record', 'compact-approval']) {
     for (const g of svc(ctx, name)?.declaredGaps ?? []) gaps.push(g);
   }
   gaps.push(signed
