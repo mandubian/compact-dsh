@@ -27,12 +27,28 @@ test('URL query secrets and userinfo are masked; plain queries survive', () => {
   assert.equal(
     redactEmbeddedSecrets('curl https://h.example/api?page=2'),
     'curl https://h.example/api?page=2', 'non-credential query params are untouched');
-  // KNOWN RESIDUAL (issue #8, G3): a credential embedded in the URL PATH
-  // survives in the operator preview — path stripping is grant semantics,
-  // a decision filed, not slipped into a regex
+});
+
+test('URL path credentials are masked from the family segment onward (#8 G3)', () => {
+  // was pinned as the G3 residual ("a decision filed"); the decision
+  // (docs/decision-secret-hygiene.md) splits rendering from identity: the
+  // webhook/token path families render masked, the path in fingerprints,
+  // grant rows and matching stays exact
   assert.equal(
     redactEmbeddedSecrets('curl "https://hooks.example.com/services/T00/B00/SECRET"'),
-    'curl "https://hooks.example.com/services/T00/B00/SECRET"');
+    'curl "https://hooks.example.com/services/***"', 'the Slack-shaped webhook path is masked');
+  assert.equal(
+    redactEmbeddedSecrets('curl https://discord.com/api/webhooks/123456/abc-token'),
+    'curl https://discord.com/api/webhooks/***', 'an api-prefixed webhook family is masked');
+  assert.equal(
+    redactEmbeddedSecrets('curl https://h.example/api/v1/tokens/abcdef123456'),
+    'curl https://h.example/api/v1/tokens/***', 'token families mask from the segment onward');
+  assert.equal(
+    redactEmbeddedSecrets('curl https://h.example/api/v1/items?page=2'),
+    'curl https://h.example/api/v1/items?page=2', 'ordinary API paths are untouched');
+  assert.equal(
+    redactEmbeddedSecrets('git clone https://h.example/repo.git'),
+    'git clone https://h.example/repo.git', 'paths without a credential family are untouched');
 });
 
 test('sk- tokens and PEM private-key blocks are masked', () => {

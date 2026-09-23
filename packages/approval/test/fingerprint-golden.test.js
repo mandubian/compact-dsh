@@ -10,19 +10,36 @@ import { fingerprint, canonicalTarget } from '../src/index.js';
 import { parseAllowlistLikePattern } from '../src/pattern.js';
 import { patternMatches } from '../src/grants.js';
 
-const same = (a, b) => assert.equal(fingerprint('net.fetch', a), fingerprint('net.fetch', b), `must collapse: ${JSON.stringify(a)} ~ ${JSON.stringify(b)}`);
-const differs = (a, b) => assert.notEqual(fingerprint('net.fetch', a), fingerprint('net.fetch', b), `must differ: ${JSON.stringify(a)} !~ ${JSON.stringify(b)}`);
+const same = (a, b, label) => assert.equal(fingerprint('net.fetch', a), fingerprint('net.fetch', b), `must collapse: ${label ?? `${JSON.stringify(a)} ~ ${JSON.stringify(b)}`}`);
+const differs = (a, b, label) => assert.notEqual(fingerprint('net.fetch', a), fingerprint('net.fetch', b), `must differ: ${label ?? `${JSON.stringify(a)} !~ ${JSON.stringify(b)}`}`);
 
 test('host case never changes identity', () => {
   same({ host: 'api.example.com' }, { host: 'API.EXAMPLE.COM' });
   same({ host: 'Api.Example.Com' }, { host: 'api.example.com' });
 });
 
-test('URL: trailing slashes and query strings are one prefix identity', () => {
+test('URL: trailing slashes are one prefix identity', () => {
   same({ url: 'https://api.example.com/v1' }, { url: 'https://api.example.com/v1/' });
   same({ url: 'https://api.example.com/v1///' }, { url: 'https://api.example.com/v1/' });
-  same({ url: 'https://api.example.com/v1?key=secret' }, { url: 'https://api.example.com/v1' });
   same({ url: 'https://api.example.com' }, { url: 'https://api.example.com/' });
+});
+
+test('URL: the query joins the replay identity (#8 G5, tightened)', () => {
+  // was pinned equal before the adjudication; the decision record is the
+  // security rationale for moving this pin: a query is operation parameters,
+  // not target spelling, and an approval never replays a variant it did not
+  // show the operator
+  differs({ url: 'https://api.example.com/v1?key=secret' }, { url: 'https://api.example.com/v1' });
+  differs({ url: 'https://api.example.com/v1?key=one' }, { url: 'https://api.example.com/v1?key=two' });
+  same({ url: 'https://api.example.com/v1' }, { url: 'https://api.example.com/v1?' }, 'present-but-empty query is absent');
+  same({ url: 'https://api.example.com/v1?a=1&b=2' }, { url: 'https://api.example.com/v1?b=2&a=1' }, 'parameter order is not identity');
+  same({ url: 'https://api.example.com/v1?a=2&a=1' }, { url: 'https://api.example.com/v1?a=1&a=2' }, 'repeated names collapse by sorted name=value');
+  differs({ url: 'https://api.example.com/v1?a=1' }, { url: 'https://api.example.com/v1?a=1&a=2' }, 'an added parameter is a different operation');
+  // the query variant asymmetry is what G5 closed: one allowed-once on the
+  // bare target must NOT authorize `?key=ANYTHING` until the TTL
+  differs({ url: 'https://api.example.com/v1?key=REAL' }, { url: 'https://api.example.com/v1?key=ANYTHING' });
+  // host-only targets are untouched: no url, no query component
+  same({ host: 'api.example.com' }, { host: 'api.example.com' });
 });
 
 test('URL: credentials in the userinfo never reach the identity', () => {

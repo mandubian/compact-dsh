@@ -218,6 +218,27 @@ Semantics decisions (reviewed, each with a regression test):
   headers** — the clause list cannot drift from the law. The digest is
   pinned (sha256), not signed: the Compact has published no amendment keys,
   and the gap is declared in every boot attestation (I-8), not silent.
+- **G2 (workspace credential files): the composition teaches the discipline
+  and redacts its own renderings; it builds no content-level detector over
+  tool output** — the gate is target-blind (R-10) and a classifier is D-7
+  territory; a warn-only scanner would train the operator to dismiss
+  warnings. The posture is a declared gap on the approval service, read by
+  every attestation (I-8) — never a silent absence.
+- **G3 (URL path-embedded credentials): identity keeps the true path;
+  renderings lose it.** Fingerprints, grant rows, cache targets and
+  matching stay exact (a redacted identity would collide distinct webhook
+  credentials — one approval replaying for another is the worse defect);
+  the deciding view, transcript notes, replay receipts, grants-list and the
+  attestation mask the credential path families. Residuals declared:
+  persisted canonical targets in the operator trust root (0700), and the
+  argv an act is recorded under (R-7 records the act).
+- **G5 (exec-cache query variants): the query string joins the replay
+  identity.** An allowed-once replays exactly the operation the operator
+  was shown; a variant or added query re-asks; parameter order is phrasing,
+  not identity. Wide coverage remains possible — as a grant's explicit act
+  (UrlPrefix matching is unchanged). Upgrade cost: old cache entries lapse
+  within the TTL, fail-closed.
+  Recorded at [docs/decision-secret-hygiene.md](../docs/decision-secret-hygiene.md).
 
 ## 3. Role mapping (draft)
 
