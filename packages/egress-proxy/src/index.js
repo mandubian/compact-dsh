@@ -33,7 +33,7 @@ import { createEgressProxy } from './proxy.js';
 import { ensureEgressNetwork } from './network.js';
 
 export { createEgressProxy, ensureEgressNetwork };
-export { methodClassOfMethod, classifyConnection, authorityOf, splitAuthority, GATE } from './proxy.js';
+export { methodClassOfMethod, classifyConnection, authorityOf, splitAuthority, addressClassOf, publicUnicastOnly, GATE } from './proxy.js';
 
 export const name = 'compact-egress-proxy';
 export const inject = ['compact-approval'];
@@ -90,6 +90,7 @@ export async function apply(ctx, config = {}) {
       port: 0,
       recheckMs: config.recheckMs,
       lookup: config.lookup,
+      addressAllowed: config.addressAllowed,
       now: config.now,
       logger: ctx.logger,
       resolveGrants: () => (slot.sessionId ? networkGrantsForSession(store, slot.sessionId) : []),

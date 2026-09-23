@@ -61,7 +61,7 @@ The proxy is an HTTP/HTTPS forwarder (no other protocol has a route):
 |---|---|
 | plain HTTP | client sends the absolute URI; the proxy checks `host:port` + method class against **this session's** live grants, then resolves the name **itself** and forwards |
 | HTTPS | client sends `CONNECT host:port`; the authority is checked against this session's live grants (host+port — a tunnel's *class* cannot be observed without interception, see residuals), then a byte tunnel: TLS end-to-end, never terminated |
-| DNS | the container never resolves: the hostname travels to the proxy in the request line / `CONNECT` (verified below: on the internal bridge, `getent` fails) |
+| DNS | the container never resolves: the hostname travels to the proxy in the request line / `CONNECT` (verified below: on the internal bridge, `getent` fails); the proxy resolves, classifies the answer and dials the validated address — public unicast only by default, a rebinding answer refused by name (`#55`'s resolve-then-pin) |
 | redirect | the proxy **never follows one** — the client's next request or `CONNECT` re-enters the check, so a cross-host redirect is refused with a named reason: *a new host is a new grant* |
 | method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7). Enforced per plain-HTTP request; a `CONNECT` is admitted under any live, classed grant for its authority — what rides inside an opaque tunnel is unobservable **by the decision not to intercept**, declared as residual 2 rather than pretended checked. Coverage is a lattice: a write grant covers the read to the same target, never the reverse |
 | TTL, revocation | the store is the single authority, checked per connection; an established tunnel is tracked against its grant, so **revocation closes mid-flight tunnels** — the route dies, not just the next attempt |
@@ -274,14 +274,21 @@ ran).
    CF-2's provenance declaration, which is why it is the fallback and not the
    default.
 6. **Grants match the name; the wire dials the address** (named by the
-   phase-3 review, #55): the grant check reads the hostname from the request
-   line or `CONNECT` authority, while the upstream dial follows whatever that
-   name resolves to — a rebinding answer can point a granted name at
-   loopback, link-local or host-internal space, reaching residual 3's host
-   services under a name the consent identity (#26) checked but the connection
-   then ignored. The named fix — resolve host-side, validate the address
-   against a denylist, dial the validated IP, refuse with a new EG rule — is
-   pending; until it lands, this is a declared gap, never a non-existent one.
+   phase-3 review, #55; **closed** by the resolve-then-pin follow-up): the
+   grant check reads the hostname from the request line or `CONNECT`
+   authority, while the upstream dial follows whatever that name resolves to
+   — a rebinding answer could point a granted name at loopback, link-local or
+   host-internal space, reaching residual 3's host services under a name the
+   consent identity (#26) checked but the connection then ignored. The fix
+   landed as the record prescribes: the mediator resolves host-side, classifies
+   every address the resolver answers with (`addressClassOf` — loopback,
+   unspecified, private, ULA, link-local, multicast, reserved, documentation
+   each named), and dials only an address the composed policy allows — by
+   default **public unicast only**; anything else is refused with the address
+   classes named (`[EG/forbidden-address]`), live tunnels included. A
+   deployment that genuinely needs mediated access INTO private space must
+   extend the policy explicitly at composition (`addressAllowed`) — an
+   exception declared at the seam that owns it, never a silent default.
 
 ## Phase 3 — the implementation slice, specified so it lands mechanically
 
