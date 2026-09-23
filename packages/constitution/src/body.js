@@ -76,6 +76,28 @@ export function clauseIds() {
   return new Set(ID_INDEX.keys());
 }
 
+// Where each clause's text starts in the body, in body order — the span of a
+// clause runs from its own header to the next clause header, section heading
+// or horizontal rule, whichever comes first.
+const CLAUSE_STARTS = [...COMPACT_BODY.matchAll(HEADER_RE)].map(m => ({ id: m[1], at: m.index }));
+const HEADING_RE = /^(?:#{1,6} |---\s*$)/gm;
+
+/**
+ * R-6: the text of one clause, sliced from the body itself — never restated.
+ * Null for an id the body does not contain; the caller says so rather than
+ * offering a near match as if it were the law.
+ */
+export function clauseText(id) {
+  const i = CLAUSE_STARTS.findIndex(c => c.id === id);
+  if (i < 0) return null;
+  const start = CLAUSE_STARTS[i].at;
+  let end = CLAUSE_STARTS[i + 1]?.at ?? COMPACT_BODY.length;
+  HEADING_RE.lastIndex = start;
+  const heading = HEADING_RE.exec(COMPACT_BODY);
+  if (heading && heading.index < end) end = heading.index;
+  return COMPACT_BODY.slice(start, end).trim();
+}
+
 // Part VI's section headers name the capability parts:
 // `### CODE — Name · [C: the Enforcer …]`. The attestation renders the name
 // next to the part code so a Subject's authoritative self-description leaves
