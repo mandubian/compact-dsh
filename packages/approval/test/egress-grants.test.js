@@ -78,7 +78,7 @@ test('proxy posture: allowed-once materializes the egress grant — host, port, 
   const ag = agent('sess-a');
   const gated = inst.approval.gate({
     name: 'bash',
-    arguments: { url: 'https://api.example.com/v1/data', host: 'api.example.com', methodClass: 'read' },
+    arguments: { url: 'https://api.example.com/v1/data', host: 'api.example.com', methodClass: 'read', delivery: 'mediator' },
     agent: ag, callId: 'call-1',
   });
   assert.equal(gated?.kind, 'ask');
@@ -117,6 +117,42 @@ test('no derivable class → no grant, and the ask said so before the decision (
   assert.equal(await decide(ctx, { toolName: 'bash', agent: ag, callId: 'call-2', reason: gated.reason }), 'allowed-once');
   assert.equal(inst.approval.store.sessionGrants.length, 0,
     'an unclassifiable act gets no coverage — approval stayed consent, the wire stays closed');
+});
+
+test('no delivery path → no grant, and the ask said so before the decision (#57)', async () => {
+  const { ctx, inst } = await boot('proxy');
+  const ag = agent('sess-a');
+  // the shape remote-access gates for `ssh host` / `git clone git@host:repo`:
+  // classed (git clone reads), patternable (ExactHost), but NOT speakable by
+  // the mediator — approval must stay consent, never pretend connectivity
+  const gated = inst.approval.gate({
+    name: 'bash',
+    arguments: { host: 'github.com', methodClass: 'read', delivery: null },
+    agent: ag, callId: 'call-3',
+  });
+  assert.equal(gated?.kind, 'ask');
+  assert.match(gated.reason, /no delivery path under the mediated posture/);
+  assert.match(gated.reason, /plain HTTP and CONNECT only/);
+  assert.match(gated.reason, /materializes NO usable connectivity/);
+
+  assert.equal(await decide(ctx, { toolName: 'bash', agent: ag, callId: 'call-3', reason: gated.reason }), 'allowed-once');
+  assert.equal(inst.approval.store.sessionGrants.length, 0,
+    'a grant the wire can never carry is a pretend coverage — none materializes');
+});
+
+test('a deliverable act carries no undeliverable note and materializes (#57 regression)', async () => {
+  const { ctx, inst } = await boot('proxy');
+  const ag = agent('sess-a');
+  const gated = inst.approval.gate({
+    name: 'bash',
+    arguments: { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'read', delivery: 'mediator' },
+    agent: ag, callId: 'call-4',
+  });
+  assert.equal(gated?.kind, 'ask');
+  assert.doesNotMatch(gated.reason, /no delivery path under the mediated posture/,
+    'the honesty note names only the acts it is true of');
+  assert.equal(await decide(ctx, { toolName: 'bash', agent: ag, callId: 'call-4', reason: gated.reason }), 'allowed-once');
+  assert.equal(inst.approval.store.sessionGrants.length, 1);
 });
 
 test('without the mediated posture nothing materializes — the posture is the sandbox declaration', async () => {

@@ -399,7 +399,9 @@ function egressHonesty(egress) {
       return `This gate's approval is consent that a mediator can deliver: approving materializes a session-scoped, ` +
         `TTL-bounded, revocable egress grant for this target's host, port and method class, and the mediator outside ` +
         `the container delivers exactly that — a different host, a different method class, an expired or revoked grant ` +
-        `is refused at the wire with its reason. Anything the grant covers can still carry data out: the record keeps ` +
+        `is refused at the wire with its reason. The mediator speaks plain HTTP and CONNECT only: an act whose transport ` +
+        `it cannot carry (ssh, raw tcp, icmp) records consent but materializes NO usable connectivity, and this ask says ` +
+        `so when that is the case. Anything the grant covers can still carry data out: the record keeps ` +
         `what was sent (never scrubbed), and revoking the grant kills the route.`;
     case 'open':
       return `This gate's approval is consent, not connectivity: the composition runs an open network posture ` +
@@ -492,9 +494,13 @@ async function answerRequest(approval, req, next) {
       // mediator enforces per connection (host/port + method class,
       // session-scoped, TTL'd, revocable — the secret-grant shape over the
       // network family). No derivable method class → NO grant: an
-      // unclassifiable act gets no coverage (D-7), and the ask already said
-      // so before the operator decided.
-      if (approval.egress === 'proxy' && rec.methodClass) {
+      // unclassifiable act gets no coverage (D-7). No derivable DELIVERY →
+      // NO grant either (#57): an act that does not speak the mediator's
+      // surface (ssh, raw tcp, icmp — or a transport static analysis could
+      // not pin) would otherwise materialize a row the wire can never carry,
+      // a pretend coverage — the ask already said so before the operator
+      // decided.
+      if (approval.egress === 'proxy' && rec.methodClass && rec.args?.delivery === 'mediator') {
         const pattern = egressPatternFor(canonicalTarget(rec.args));
         if (pattern) {
           approval.store.addSessionGrant({
@@ -645,6 +651,10 @@ export function approvalPlugin(opts = {}) {
           (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'methodClass') && args.methodClass == null
             ? ` This target's method class could not be derived statically, so NO egress grant will materialize from ` +
               `approving — the mediator refuses its connections by name (D-7).`
+            : '') +
+          (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null
+            ? ` This act has no delivery path under the mediated posture — the mediator speaks plain HTTP and CONNECT ` +
+              `only (#57), so approving records consent but materializes NO usable connectivity.`
             : ''),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };

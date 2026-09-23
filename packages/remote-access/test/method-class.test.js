@@ -5,7 +5,7 @@
 // command yields null, which materializes no egress grant at all.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { methodClassOf, createAnalyzer } from '../src/analyzer.js';
+import { methodClassOf, egressDeliveryOf, createAnalyzer } from '../src/analyzer.js';
 
 test('reader verbs are read-class — the fetch act, however phrased', () => {
   for (const command of [
@@ -60,4 +60,43 @@ test('class claims only where a network finding exists — RA consults it only f
   assert.equal(methodClassOf({ command: 'curl https://api.example.com/v1' }), 'read');
   const ungated = analyzer.findings({ name: 'bash', arguments: { command: 'echo hello' } });
   assert.equal(ungated.length, 0, 'and an ungated command never reaches the class path at all');
+});
+
+// -- egress delivery (#57): the mediator speaks plain HTTP and CONNECT only --
+
+
+test('acts that speak the proxy environment deliver through the mediator', () => {
+  const a = createAnalyzer();
+  const find = (command) => a.findings({ arguments: { command } });
+  // URL findings are http/https by construction — the mediator's surface
+  assert.equal(egressDeliveryOf(find('curl https://example.com/x')[0]), 'mediator');
+  // clients that honor the proxy environment
+  assert.equal(egressDeliveryOf(find('wget example.com')[0]), 'mediator');
+  // the package managers speak https to their registries and honor the proxy
+  assert.equal(egressDeliveryOf(find('npm install left-pad')[0]), 'mediator');
+  assert.equal(egressDeliveryOf(find('apt-get install curl')[0]), 'mediator');
+  assert.equal(egressDeliveryOf(find('pip3 install requests')[0]), 'mediator');
+});
+
+test('acts the mediator cannot carry deliver NOTHING — named, never guessed (#57)', () => {
+  const a = createAnalyzer();
+  const find = (command) => a.findings({ arguments: { command } });
+  // ssh and friends: no proxy semantics, no route — null even though a
+  // host pattern would be derivable
+  assert.equal(egressDeliveryOf(find('ssh github.com')[0]), null);
+  assert.equal(egressDeliveryOf(find('ssh -p 2222 host.example')[0]), null);
+  // git over its scp-form remote is SSH by construction; git over https
+  // arrives as a URL finding instead
+  assert.equal(egressDeliveryOf(find('git clone git@github.com:org/repo')[0]), null);
+  assert.equal(egressDeliveryOf(find('git fetch https://github.com/org/repo')[0]), 'mediator');
+  // raw tcp and icmp: unreachable by construction in the mediation plane
+  assert.equal(egressDeliveryOf(find('nc -zv host.example 443')[0]), null);
+  assert.equal(egressDeliveryOf(find('ping -c 1 example.com')[0]), null);
+  assert.equal(egressDeliveryOf(find('dig example.com')[0]), null);
+  // a bare IP literal has no pinned transport
+  assert.equal(egressDeliveryOf({ kind: 'host', target: { host: '1.2.3.4' }, verb: undefined }), null);
+  // fail-closed shapes: no target, nothing at all
+  assert.equal(egressDeliveryOf({ kind: 'host', target: null, verb: 'curl' }), null);
+  assert.equal(egressDeliveryOf({ kind: 'url', target: null, verb: 'url' }), null);
+  assert.equal(egressDeliveryOf(undefined), null);
 });
