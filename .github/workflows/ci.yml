@@ -43,6 +43,10 @@ jobs:
   # Sentinel baseline guard (port plan Phase 4 item 5, A-4 discipline):
   # a PR that touches BOTH enforcement code and the register is a change to
   # what the clauses mean in practice — it must declare itself.
+  # The enforcement scope is derived from the register (tools/baseline-guard.mjs),
+  # not hardcoded here: the first hardcoded list drifted behind the register it
+  # guarded and let register-cited packages (envelope, blessed, seals, and then
+  # egress-proxy) change conduct alongside the register undeclared (#58).
   baseline-guard:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
@@ -50,18 +54,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # the guard is a node script: pin the same line the gates job pins, so a
+      # runner's preinstalled node cannot make the sentinel flaky
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: enforcement code + register in one PR requires [baseline-update]
         run: |
-          BASE="${{ github.event.pull_request.base.sha }}"
-          HEAD="${{ github.event.pull_request.head.sha }}"
-          files="$(git diff --name-only "$BASE" "$HEAD")"
-          echo "$files"
-          touches_enforcement=$(echo "$files" | grep -E '^packages/(allowlist-gate|approval|sandbox-docker|remote-access|loopguard|promotion|constitution|specialists|capability-gate|record|self-model|exit|petition|emergency)/(src|test)/' | wc -l)
-          touches_register=$(echo "$files" | grep -E '^docs/register/register\.json$' | wc -l)
-          if [ "$touches_enforcement" -gt 0 ] && [ "$touches_register" -gt 0 ]; then
-            title="${{ github.event.pull_request.title }}"
-            case "$title" in
-              "[baseline-update]"*) echo "baseline-update declared: ok" ;;
-              *) echo "::error::this PR changes enforcement code AND the register — a change to what the clauses mean in practice is an amendment of conduct (A-4). Retitle with the [baseline-update] prefix."; exit 1 ;;
-            esac
-          fi
+          node tools/baseline-guard.mjs \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            --title "${{ github.event.pull_request.title }}"
