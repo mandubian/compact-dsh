@@ -1,4 +1,6 @@
-// The mediator itself (#38 phase 3; spec: docs/decision-network-egress-proxy.md).
+// The mediator itself (#38 phase 3; spec: docs/decision-network-egress-proxy.md,
+// including "Why a mediator of our own" — the build-vs-reuse adjudication for
+// not standing Squid/Envoy/mitmproxy here).
 //
 // One instance serves ONE session's container: the listener's socket IS the
 // session identity — its grant closure reads only that session's rows, and
