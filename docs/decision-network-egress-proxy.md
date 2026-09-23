@@ -298,9 +298,73 @@ ran).
    each named), and dials only an address the composed policy allows — by
    default **public unicast only**; anything else is refused with the address
    classes named (`[EG/forbidden-address]`), live tunnels included. A
-   deployment that genuinely needs mediated access INTO private space must
-   extend the policy explicitly at composition (`addressAllowed`) — an
-   exception declared at the seam that owns it, never a silent default.
+    deployment that genuinely needs mediated access INTO private space must
+    extend the policy explicitly at composition (`addressAllowed`) — an
+    exception declared at the seam that owns it, never a silent default.
+
+## The tunnel-surface adjudication (#56) — DRAFTED, PENDING DECISION
+
+Status: the three options below are **drafted for adjudication, none adopted**
+(2026-09-23, phase-3 review). The record adopts one by amendment; the register
+evidence and, where the option says so, the enforcement move with it — never
+before.
+
+**The finding.** A `CONNECT` is admitted under *any* live, classed grant
+covering its authority, and the relay is protocol-blind: a **read** grant
+opens a full-duplex opaque channel to every port an `ExactHost` pattern
+reaches, and the wire cannot distinguish HTTPS from SSH from a deliberate
+raw-TCP tunnel (`curl --proxytunnel`, `ProxyCommand`). Residual 2 declares
+the opacity; what it does not yet decide is **which grants open tunnels at
+all, and on which ports**. "No other protocol has a route" is true of clients
+that do not tunnel, not of the enforced capability — the class axis (#26) and
+any protocol distinction hold only outside a tunnel.
+
+**Option A — tunnels only under port-explicit grants.** A `CONNECT` is
+admitted only under a grant whose pattern names the port (`HostAndPort`); a
+bare-host grant (`ExactHost`) keeps covering plain HTTP but opens no tunnel.
+The tunnel surface becomes consent-shaped: a tunnel opens only under a grant
+where the operator was *shown the port*, and the SSH extension path (below)
+rides it naturally — an ssh act materializes `HostAndPort:22`, the operator
+saw the 22. Cost: over-asks and one companion fix — the package managers
+find their registries as bare hosts (`{host}` → `ExactHost`), yet speak
+HTTPS, so the analyzer must derive the scheme port for them (`npm install`
+materializes `registry.npmjs.org:443`, not a portless row) or the mediated
+posture breaks its most common surface. Same for any bare-host act that
+facts pin to http/https.
+
+**Option B — a composition-level tunnel port allowlist.** The composition
+declares `tunnelPorts` (default `443`); a `CONNECT` to a port outside the
+allowlist is refused with its named reason regardless of grants. Grant shapes
+stay as they are. Cheapest honest step: arbitrary-port delivery (22, 1080,
+5432…) is closed by default with zero grant churn. Cost: the allowlist is a
+posture constant, not per-consent — an operator approving a bare host still
+cannot distinguish "web only" from "any allowlisted port", and it expresses
+no per-host nuance. The 443 tunnels it admits remain fully opaque (residual 2
+unchanged — HTTPS bodies were already beyond the mediator).
+
+**Option C — declare the generality, change nothing.** Residual 2 is amended
+to name the full truth — *any live classed grant plus `CONNECT` equals
+arbitrary-TCP delivery to that host on any port, class and protocol
+unobservable* — the register evidence carries it, and the no-delivery rule
+(#57) keeps the dead-row case away. Zero over-ask, zero churn, and the
+mediation plane stays maximally useful (an eventual SSH path needs no further
+adjudication). Cost: consent granularity on tunneled acts is host-only — the
+operator's "read" click admits a duplex channel, and the exfiltration
+residual becomes the whole story for everything inside a tunnel.
+
+| | over-asks | churn | tunnel consent shape | SSH path |
+|---|---|---|---|---|
+| **A** port-explicit tunnels | some (needs the registry-port companion) | grants + ask | operator saw the port | natural (`:22` shown) |
+| **B** port allowlist | no | composition config | posture-wide, not per-consent | allowlist edit |
+| **C** declare only | no | none | host-only | already there |
+
+**The recommendation, not the decision**: A, with the registry-port companion
+— it is the only option whose tunnel surface is consent-shaped, which is the
+direction the record's own identity doctrine (#26: the operator is shown what
+the grant covers) points. B is the defensible low-friction first step and
+composes with A later; C is the honest floor the record already stands on.
+The decision is the Principal's; whichever is adopted amends this record and
+moves the register evidence in the same slice that enforces it.
 
 ## Phase 3 — the implementation slice, specified so it lands mechanically
 
