@@ -81,7 +81,8 @@ test('composed: record_read reads the Subject\'s own record, verified, naming th
   assert.ok(tools.get(RECORD_TOOL), 'R-2 is exercisable by the Subject');
   const out = await call(tools, 'parent');
   assert.match(out, /\[R-2\] The record of "parent" — your own session\./);
-  assert.match(out, /Verified against its hash chain: events 0\.\.5 \(6\); chain head [0-9a-f]{64}\./);
+  assert.match(out, /The chain commits events 0\.\.5 \(6\); chain head [0-9a-f]{64}\./);
+  assert.match(out, /Verified against the chain: every event read, #0\.\.#5\./);
   assert.ok(out.includes(ctx.get('compact-record').head('parent')), 'the head named is the committed one');
   assert.match(out, /#2 tool\/call .*ls/);
   assert.match(out, /#3 tool\/call .*… \[\+\d+ chars — read it with from_seq=3, full=true\]/, 'long events are marked, not silently cut');
@@ -110,7 +111,8 @@ test('composed: the Subject reads up to its own latest act — buffered events a
   // the host's live path: a session/event is buffered by the provider's writer (200 ms)
   ctx.emit('session/event', { id: parent.id }, { type: 'turn/start', seq: 6, time: T0 + 6, data: { turn: 2 } });
   const out = await call(tools, 'parent');
-  assert.match(out, /events 0\.\.6 \(7\)/, 'the act buffered a moment ago is in the verified range');
+  assert.match(out, /The chain commits events 0\.\.6 \(7\)/, 'the act buffered a moment ago is committed');
+  assert.match(out, /every event read, #0\.\.#6/, 'and read, verified');
 });
 
 test('composed: a record that does not verify is answered as an alarm, never returned as history', async (t) => {

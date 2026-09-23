@@ -48,6 +48,7 @@ export const DEFAULT_LIMIT = 30;
 export const MAX_LIMIT = 200;
 export const FULL_LIMIT = 10;
 const EVENT_CHARS = 500;
+const SCAN_CHUNK = 500;
 const MAX_DEPTH = 64;
 
 /**
@@ -98,8 +99,8 @@ function renderEvent(event, { withheld, full }) {
 
 /**
  * Answer one record_read call, as text. `deps` is the record's own surface:
- * the chained persistence (verifies on read), the chain store (committed
- * range), the head, and a flush for the target's buffered writer.
+ * the chained persistence (verifies on read), `length` (events the chain
+ * commits), the head, and a flush for the target's buffered writer.
  */
 export async function readRecord(deps, { caller, session, fromSeq, limit, types, full } = {}) {
   if (caller == null) return '[R-2] No calling Subject is identifiable, so there is no "own record" to read.';
@@ -113,11 +114,51 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
 
   try { await deps.flush?.(target); } catch { /* a flush failure must not block the read; the range says what was read */ }
 
-  let events;
+  const withheldType = (type) => scope.relation === 'descendant' && REASONING_TYPES.has(type);
+  const filter = typeFilter(types);
+  const cap = full === true ? FULL_LIMIT : MAX_LIMIT;
+  const asked = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.floor(Number(limit)) : (full === true ? FULL_LIMIT : DEFAULT_LIMIT);
+  const n = Math.max(1, Math.min(cap, asked));
+  const hasFrom = fromSeq !== null && fromSeq !== undefined && Number.isFinite(Number(fromSeq));
+  const from = hasFrom ? Math.max(0, Math.floor(Number(fromSeq))) : null;
+  const committed = deps.length(target);
+
+  // BOUNDED READS. Only what the answer needs is read — and every event read
+  // is verified by the chained handle:
+  //   - no filter: the window itself. The tail read runs to the END OF THE
+  //     LOG (no length bound), so an event appended outside the chain still
+  //     trips `missing-link` rather than sitting unseen past the window;
+  //   - a type filter: a chunked scan holding at most `n` matches in memory.
+  let window;
+  let verified = null;   // [first, last] seq of everything read and verified
   try {
     const handle = await deps.persistence.open(target, 'read');
     try {
-      ({ events } = await handle.read(0));
+      const mark = (events) => {
+        if (!events.length) return;
+        verified = verified ? [Math.min(verified[0], events[0].seq), Math.max(verified[1], events.at(-1).seq)]
+          : [events[0].seq, events.at(-1).seq];
+      };
+      if (!filter) {
+        const { events } = hasFrom ? await handle.read(from, n) : await handle.read(Math.max(0, committed - n));
+        mark(events);
+        window = hasFrom ? events : events.slice(-n);
+      } else {
+        const matches = [];
+        let offset = hasFrom ? from : 0;
+        for (;;) {
+          const { events } = await handle.read(offset, SCAN_CHUNK);
+          mark(events);
+          for (const e of events) {
+            if (!filter(e.type)) continue;
+            matches.push(e);
+            if (!hasFrom && matches.length > n) matches.shift();
+          }
+          offset += events.length;
+          if (events.length < SCAN_CHUNK || (hasFrom && matches.length >= n)) break;
+        }
+        window = hasFrom ? matches.slice(0, n) : matches;
+      }
     } finally {
       await handle.close();
     }
@@ -130,32 +171,15 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
     return `[R-2] The record of "${target}" could not be read: ${String(error?.message ?? error)}.`;
   }
 
-  const withheldType = (type) => scope.relation === 'descendant' && REASONING_TYPES.has(type);
-  const filter = typeFilter(types);
-  const shown = filter ? events.filter(e => filter(e.type)) : events;
-  const cap = full === true ? FULL_LIMIT : MAX_LIMIT;
-  const n = Math.max(1, Math.min(cap, Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.floor(Number(limit)) : (full === true ? 1 : DEFAULT_LIMIT)));
-  let window;
-  if (Number.isFinite(Number(fromSeq)) && fromSeq !== null && fromSeq !== undefined) {
-    const from = Math.max(0, Math.floor(Number(fromSeq)));
-    window = shown.filter(e => e.seq >= from).slice(0, n);
-  } else {
-    window = shown.slice(-n);
-  }
-
-  const counts = new Map();
-  for (const e of events) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
-  const countLine = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t, c]) => `${t}×${c}`).join(', ');
   const withheldCount = window.filter(e => withheldType(e.type)).length;
-  const last = events.length ? events.at(-1).seq : -1;
   const whose = scope.relation === 'self' ? 'your own session' : `a session delegated from yours (depth ${scope.depth})`;
 
   const lines = [
     `[R-2] The record of "${target}" — ${whose}.`,
-    events.length
-      ? `Verified against its hash chain: events 0..${last} (${events.length}); chain head ${deps.head(target)}.`
-      : `Verified: the record holds no events yet; chain head ${deps.head(target)}.`,
-    countLine ? `By type: ${countLine}.` : null,
+    committed > 0
+      ? `The chain commits events 0..${committed - 1} (${committed}); chain head ${deps.head(target)}.`
+      : `The record holds no events yet; chain head ${deps.head(target)}.`,
+    verified ? `Verified against the chain: every event read, #${verified[0]}..#${verified[1]}.` : null,
     scope.relation === 'descendant'
       ? 'Acts only: reasoning-bearing events are listed by seq and type and their content withheld (R-10).'
       : null,

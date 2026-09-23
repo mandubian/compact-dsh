@@ -11,16 +11,20 @@ const e = (seq, type, data = {}) => ({ seq, type, time: T0 + seq, data });
 
 function fakeDeps(sessions, { broken = null } = {}) {
   const flushed = [];
+  const reads = [];
   return {
-    flushed,
+    flushed, reads,
     head: (id) => `head-of-${id}`,
+    length: (id) => sessions[id].events.length,
     flush: async (id) => { flushed.push(id); },
     persistence: {
       stat: async (id) => (sessions[id] ? { header: { id, parentSession: sessions[id].parent ?? undefined } } : undefined),
       open: async (id) => ({
-        read: async () => {
+        read: async (offset = 0, length) => {
+          reads.push({ id, offset, length });
           if (broken === id) throw new RecordIntegrityError({ sessionId: id, seq: 2, kind: 'broken-link', detail: 'altered' });
-          return { events: sessions[id].events };
+          const all = sessions[id].events;
+          return { events: all.slice(offset, length === undefined ? undefined : offset + length) };
         },
         close: async () => {},
       }),
@@ -40,7 +44,7 @@ test('own record: everything, including its own reasoning, with range, head and 
   const deps = fakeDeps(SESSIONS);
   const out = await readRecord(deps, { caller: 'root' });
   assert.match(out, /your own session/);
-  assert.match(out, /events 0\.\.3 \(4\); chain head head-of-root/);
+  assert.match(out, /The chain commits events 0\.\.3 \(4\); chain head head-of-root/);
   assert.match(out, /root thinks/);
   assert.doesNotMatch(out, /withheld/);
   assert.deepEqual(deps.flushed, ['root'], 'buffered acts are flushed before reading');
@@ -93,4 +97,40 @@ test('filter, paging and bounds', async () => {
 
 test('no identifiable caller: answered, not guessed', async () => {
   assert.match(await readRecord(fakeDeps(SESSIONS), {}), /No calling Subject is identifiable/);
+});
+
+// -- review (#73): bounded reads, and full's default ---------------------------
+
+const BIG = { big: { events: Array.from({ length: 1200 }, (_, i) => e(i, i % 100 === 0 ? 'approval/asked' : 'tool/call', { i })) } };
+
+test('bounded: the default tail reads only the window, to the end of the log', async () => {
+  const deps = fakeDeps(BIG);
+  const out = await readRecord(deps, { caller: 'big' });
+  assert.deepEqual(deps.reads, [{ id: 'big', offset: 1170, length: undefined }],
+    'one read of the last 30 — unbounded at the END so an event appended outside the chain still fails verification');
+  assert.match(out, /every event read, #1170\.\.#1199/);
+  assert.match(out, /Showing 30 event\(s\): #1170\.\.#1199/);
+});
+
+test('bounded: an explicit page reads exactly that page', async () => {
+  const deps = fakeDeps(BIG);
+  assert.match(await readRecord(deps, { caller: 'big', fromSeq: 500, limit: 5 }), /Showing 5 event\(s\): #500\.\.#504/);
+  assert.deepEqual(deps.reads, [{ id: 'big', offset: 500, length: 5 }]);
+});
+
+test('bounded: a filtered read scans in chunks, and a paged filtered read stops early', async () => {
+  const tail = fakeDeps(BIG);
+  const out = await readRecord(tail, { caller: 'big', types: 'approval/', limit: 3 });
+  assert.match(out, /Showing 3 event\(s\) matching "approval\/": #900\.\.#1100/);
+  assert.ok(tail.reads.every(r => r.length === 500), 'chunked, never the whole log in one read');
+  assert.match(out, /every event read, #0\.\.#1199/, 'the whole scan is verified and says so');
+  const paged = fakeDeps(BIG);
+  assert.match(await readRecord(paged, { caller: 'big', types: 'approval/', fromSeq: 0, limit: 2 }), /#0\.\.#100/);
+  assert.equal(paged.reads.length, 1, 'stops once the page is full');
+});
+
+test('full=true defaults to 10 events, never 1', async () => {
+  const out = await readRecord(fakeDeps(BIG), { caller: 'big', full: true });
+  assert.match(out, /Showing 10 event\(s\): #1190\.\.#1199/);
+  assert.match(await readRecord(fakeDeps(BIG), { caller: 'big', full: true, limit: 50 }), /Showing 10 event/, 'capped at 10');
 });

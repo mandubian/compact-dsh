@@ -265,8 +265,7 @@ async function* install(ctx, config) {
     name: RECORD_TOOL,
     description:
       'Read your own record (R-2): the acts done in your name — and, for sessions you delegated, on your behalf — ' +
-      'verified against the hash chain before anything is shown. With no arguments, your own session\'s latest events ' +
-      'and a count by type. `session` reads a descendant\'s record (acts only; reasoning withheld, R-10); `from_seq` and ' +
+      'verified against the hash chain before anything is shown. With no arguments, your own session\'s latest events. `session` reads a descendant\'s record (acts only; reasoning withheld, R-10); `from_seq` and ' +
       '`limit` page; `types` filters by prefix (e.g. "tool/,approval/"); `full` shows events untruncated. The record is ' +
       'authoritative over your memory of what you did (D-2).',
     parameters: {
@@ -274,7 +273,7 @@ async function* install(ctx, config) {
       from_seq: { type: 'number', description: 'first event seq to show (default: the latest events)' },
       limit: { type: 'number', description: 'how many events to show (default 30, max 200; max 10 with full)' },
       types: { type: 'string', description: 'comma-separated type prefixes to show, e.g. "tool/,approval/"' },
-      full: { type: 'boolean', description: 'show events untruncated (at most 10)' },
+      full: { type: 'boolean', description: 'show events untruncated (10 by default, at most 10)' },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
@@ -282,6 +281,7 @@ async function* install(ctx, config) {
       return readRecord({
         persistence,
         head: headOf,
+        length: (sessionId) => store.load(sessionId).lastSeq + 1,
         flush: async (sessionId) => { const w = writers.get(sessionId); if (w) await flushWriter(w.handle); },
       }, {
         caller: caller != null ? String(caller) : null,
