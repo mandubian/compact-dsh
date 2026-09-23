@@ -445,6 +445,7 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
 | `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
 | `docs/decision-phase7-scope.md` | The recorded Phase 7 scope (R-1 + R-13, signature deferred) — what the missing keys actually block, and why an unsigned attestation is delivered rather than withheld |
+| `docs/decision-network-egress-proxy.md` | The recorded #38 phase-2 decision: network egress under grant — the mediated proxy (never in the container), grant identity with #26's method-class axis, ABSENT→BOUND posture move, measured platform table, and the phase-3 pinning tests |
 
 ## dsh version policy — following the release rhythm
 

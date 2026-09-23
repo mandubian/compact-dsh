@@ -100,7 +100,9 @@ must be revisited (A-4 discipline).
 ## Non-goals
 
 - No mediation-layer semantics here — the host-side proxy and the CF grant
-  family are #38's phases 2–3; this record only fixes the identity those
-  grants must share ("fingerprint and grant must share the identity").
+  family are #38's phases 2–3, [decided there](decision-network-egress-proxy.md);
+  this record only fixes the identity those
+  grants must share ("fingerprint and grant must share the identity"), and that
+  record folds this one's method-class axis in for the network family.
 - No autonoetic credential vault — dsh's CredentialRef model stands; G2's
   output-side secret detection is its own adjudication.
