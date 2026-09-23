@@ -75,6 +75,49 @@ the container can name another session's grants: there is no token to replay,
 and a command that rewrites its proxy env reaches only its own listener — or a
 dead port.
 
+## Why a mediator of our own — the build-vs-reuse adjudication
+
+The obvious objection to everything above: forward proxies are a solved
+problem — Squid, Envoy, mitmproxy, tinyproxy — so why ~350 lines of our own?
+Adjudicated during the phase-3 review (2026-09-23), recorded here so the
+choice reads as decided, not defaulted:
+
+- **The policy is the product, not the plumbing.** What the mediator enforces
+  — the session-scoped, TTL-bounded, revocable grant table read *directly*
+  from the approval store, the method-class lattice (#26), the per-connection
+  re-check, mid-flight tunnel kill on revocation, and refusals that are
+  Compact envelopes naming their cause and lawful next moves — is the CF
+  grant family expressing itself at the wire. No shipped proxy has these
+  concepts; each offers a config-time ACL engine instead, and the ask and the
+  wire would say different things.
+- **Every integration path re-creates the auth service anyway.** Squid's
+  external-ACL helpers and Envoy's `ext_authz` exist precisely to delegate
+  per-connection decisions to an external authority — and that authority is
+  this package's logic in full, plus an IPC protocol to secure, plus someone
+  else's refusal surface to fight (static error pages are not Compact
+  envelopes, and revocation would be pushed through an admin API rather than
+  read from the store where the revocation lands).
+- **Provenance (CF-2).** A downloaded binary in the enforcement path is a
+  second supply-chain surface to declare, digest-pin and re-resolve at every
+  confine — the exact reasoning that made the mediator-container profile the
+  fallback above. Code already inside the audited tree, pinned by
+  `verify-pin` like every other package, carries no such surface.
+- **The parser is not ours.** The genuinely risky surface — parsing untrusted
+  bytes — is Node's llhttp, the same battle-tested parser every Node HTTP
+  service in this repository already stands behind. What is custom is the
+  policy glue, which is precisely the part no off-the-shelf proxy supplies.
+  Squid's parser has its own CVE history; maturity does not exempt a proxy
+  from the parser problem, it only relocates it.
+
+**The adjudicated concession.** If the mediator-container profile is ever
+promoted to default, an Envoy + `ext_authz` split becomes defensible: a
+sandboxed, battle-tested parser whose authorization decisions remain ours.
+The decision recorded here is that the auth service is the irreducible core —
+one pinned package is the smaller dependency than a config language around a
+binary. The phase-3 review findings #55 (resolved-IP validation) and #56
+(tunnel opacity) are the parser-adjacent gaps this adjudication accepts as
+the cost of ownership — declared, with their named fixes, not pretended away.
+
 ## Grant identity: `(host, port, method-class, session, TTL, revocable)`
 
 Consent identity is risk identity (#26), and the grant must carry the identity
