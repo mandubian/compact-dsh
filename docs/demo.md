@@ -392,10 +392,13 @@ What the demo claims, and how it is proven:
   stack — nothing the headless surface refuses is re-armed per session. The
   gates themselves ride the host waterfall every execution passes through.
 - **A live model-backed browser session now exists** — Demo 8 below runs the
-  prompt suite against exactly this boot and cites its captures. Still open
-  there: the approval precedence between a connected browser page and the
-  terminal fall-through (#19) — the record is complete either way, because the
-  recorded answerer claims every ask first.
+  prompt suite against exactly this boot and cites its captures. The approval
+  precedence (#19) is a pinned contract, no longer open: the recorded answerer
+  claims every ask first, a connected browser page decides, and the terminal
+  answerer is the no-page fall-through (`packages/approval/test/
+  web-precedence.dsh.test.js`; recorded in `docs/concept-approval-layers.md`,
+  "The answerer waterfall"). What a live capture adds is the UX face only —
+  the record is complete either way.
 
 ---
 

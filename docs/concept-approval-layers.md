@@ -60,3 +60,27 @@ The layers are pure decision logic over (call, grants, now) — testable
 without any host. The host provides: where the gate hooks (tool-call
 interception), where grants persist, and where envelopes are rendered.
 On dsh: `tools/pre-execute` waterfall + the grant store (port plan Phase 1).
+
+## The answerer waterfall: the recorded answerer claims, downstream decides
+
+Wherever the decider lives, the record stays complete: compact-approval's
+answerer PREPENDS itself upstream of every other `approval/request` listener —
+it claims the ask (the deciding view, the LoopGuard refusal seam), delegates
+via `next()`, and the verdict that returns is materialized and traced through
+the same wrapper, headless and web alike (#24's fix).
+
+The downstream precedence is the pilot contract, pinned by
+`packages/approval/test/web-precedence.dsh.test.js` (#19):
+
+- **web, a page connected** — the browser bridge (dsh-api-remotes) holds the
+  ask; the page's verdict resolves the chain and the terminal prompt never
+  appears. The Subject still sees the verdict as a one-line transcript note:
+  a browser decision is a decision, never a silent run.
+- **web, no page** — the bridge's dispatch falls through (the real bridge's
+  unqueued-dispatch limb) and the terminal operator decides, the same
+  answerer headless composes.
+- **a denial, from either decider** — materializes nothing and covers
+  nothing: the next identical ask re-consults the decider.
+
+The live capture with a model key and a real page (Demo 7) is the UX face of
+exactly this contract; the contract itself no longer depends on observing it.
