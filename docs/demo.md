@@ -395,9 +395,9 @@ What the demo claims, and how it is proven:
   prompt suite against exactly this boot and cites its captures. The approval
   precedence (#19) is a pinned contract, no longer open: the recorded answerer
   claims every ask first, a connected browser page decides, and the terminal
-  answerer is the no-page fall-through (`packages/approval/test/
-  web-precedence.dsh.test.js`; recorded in `docs/concept-approval-layers.md`,
-  "The answerer waterfall"). What a live capture adds is the UX face only —
+  answerer is the no-page fall-through — pinned by the approval suite's
+  `web-precedence.dsh.test.js` and recorded in `docs/concept-approval-layers.md`
+  ("The answerer waterfall"). What a live capture adds is the UX face only —
   the record is complete either way.
 
 ---

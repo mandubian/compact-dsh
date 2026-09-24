@@ -134,7 +134,7 @@ test('#19 web: a connected page wins the ask — the terminal is never consulted
   assert.equal(executed, 2, 'the replay ran');
   assert.equal(bridge.consultations, 1, 'the replay never re-asked anyone — not the page, not the terminal');
   assert.equal(asked.count, 0);
-  assert.equal(approval.store.cache.size, 1, 'the replay consumed the entry, never a second one');
+  assert.equal(approval.store.cache.size, 1, 'the replay re-used the same entry until TTL, never a second one');
   assert.ok(agent.injected.some(m => m.content?.some(c => String(c.text ?? '').includes('was allowed once by the operator'))),
     'the decision note reached the transcript — the Subject sees the browser verdict, not a silent run');
 });
@@ -164,7 +164,7 @@ test('#19 web: a page denial flows back through the recorded answerer — nothin
   const agent = makeAgent();
 
   bridge.pageConnected = true;
-  bridge.pageDecision = 'denied';
+  bridge.pageDecision = 'rejected';   // the host's decision vocabulary — a denial that WAS answered
   await run(tools, agent, 'denied.example');
   assert.equal(executed, 0, 'the denied call never ran');
   assert.equal(approval.store.cache.size, 0, 'no coverage materialized from a denial');
