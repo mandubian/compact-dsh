@@ -387,9 +387,15 @@ function cacheTtlFor(approval, args) {
   return Math.min(ttl, approval.egressGrantTtlMs);
 }
 
-/** Does approving this act materialize an egress grant? (proxy + derivable class + a network target) */
+/**
+ * Does approving this act materialize an egress grant? Exactly the answerer's
+ * own condition — proxy + derivable class + a mediator delivery path (#57) +
+ * a network target — so the cap and the ask's "no longer than the egress
+ * grant" never speak of a grant the answerer will not write.
+ */
 function egressBound(approval, args) {
-  return approval.egress === 'proxy' && args?.methodClass != null && egressPatternFor(canonicalTarget(args)) != null;
+  return approval.egress === 'proxy' && args?.methodClass != null && args?.delivery === 'mediator' &&
+    egressPatternFor(canonicalTarget(args)) != null;
 }
 
 function replayConsequence(ttlMs, { egressBound: bound = false } = {}) {
@@ -530,7 +536,7 @@ async function answerRequest(approval, req, next) {
       // not pin) would otherwise materialize a row the wire can never carry,
       // a pretend coverage — the ask already said so before the operator
       // decided.
-      if (approval.egress === 'proxy' && rec.methodClass && rec.args?.delivery === 'mediator') {
+      if (egressBound(approval, rec.args)) {
         const pattern = egressPatternFor(canonicalTarget(rec.args));
         if (pattern) {
           approval.store.addSessionGrant({

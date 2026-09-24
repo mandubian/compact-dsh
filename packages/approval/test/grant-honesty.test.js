@@ -33,8 +33,9 @@ function boot(opts = {}) {
 
 const AGENT = { id: 's1' };
 const SECRET_CALL = { command: 'curl -H "Authorization: Bearer $GH_TOKEN" https://api.example.com', url: 'https://api.example.com' };
-const READ = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'read' };
-const WRITE = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'write' };
+// the analyzer's shape under proxy: an HTTP(S) act carries delivery 'mediator' (#57)
+const READ = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'read', delivery: 'mediator' };
+const WRITE = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'write', delivery: 'mediator' };
 
 // -- #64: secret grants are revocable by the operator ------------------------
 
@@ -103,8 +104,15 @@ test('#65: under proxy the exec-cache entry lives no longer than the egress gran
   assert.equal(v.verdict, 'pending-approval', 'never allowed-then-refused-expired');
 });
 
-test('#65: without an egress grant the cache keeps its own TTL (none posture, classless act)', async () => {
-  for (const [opts, args] of [[{ egress: 'none' }, READ], [{ egress: 'proxy' }, { ...READ, methodClass: null }]]) {
+test('#65: without an egress grant the cache keeps its own TTL (none posture, classless act, undeliverable act)', async () => {
+  const cases = [
+    [{ egress: 'none' }, READ],
+    [{ egress: 'proxy' }, { ...READ, methodClass: null }],
+    // #57 × #65: an act the mediator cannot carry (ssh, raw tcp) materializes
+    // no egress grant, so neither the cap nor the ask may speak of one
+    [{ egress: 'proxy' }, { host: 'git.example.com', methodClass: 'write', delivery: null }],
+  ];
+  for (const [opts, args] of cases) {
     const { approval, answer } = boot({ ...opts, execCacheTtlMs: 24 * 3600_000 });
     const ask = approval.gate({ name: 'bash', arguments: args, agent: AGENT, callId: 'c1' });
     assert.match(ask.reason, /for 24h, across sessions/);
@@ -113,6 +121,7 @@ test('#65: without an egress grant the cache keeps its own TTL (none posture, cl
     await answer({ toolName: 'bash', agent: AGENT, callId: 'c1' });
     const [[, entry]] = [...approval.store.cache.entries()];
     assert.ok(entry.expiresAt >= before + 24 * 3600_000 - 5);
+    assert.equal(egressGrantsFor(approval.store, 's1').length, 0, 'and no egress grant was written');
   }
 });
 
