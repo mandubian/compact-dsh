@@ -106,3 +106,80 @@ must be revisited (A-4 discipline).
   record folds this one's method-class axis in for the network family.
 - No autonoetic credential vault — dsh's CredentialRef model stands; G2's
   output-side secret detection is its own adjudication.
+
+## The approval-at-rest adjudication (#75) — DRAFTED, PENDING DECISION
+
+Status: the three options below are **drafted for adjudication, none adopted**
+(2026-09-24, filed from the issue). The record adopts one by amendment; where
+the decision changes matching semantics or the store format, the register
+evidence moves with it (A-4, `[baseline-update]`) — never before.
+
+**The finding.** G3's adjudication kept the true URL path in the persisted
+canonical targets (`approvals.json` cache entries and `UrlPrefix` grant rows)
+because identity must stay exact — a redacted identity collides distinct
+credentials and lets one webhook's approval replay for another. The residual
+was declared (I-8), and the plumbing was hardened: the store file is `0600` on
+every flush (the rename re-asserts it), created dirs are `0700`. What those
+edits deliberately did NOT answer: **is there an at-rest design that removes
+the plaintext without corrupting matching semantics?** Recorded so it is
+adjudicated, not improvised — design decisions, not unilateral fixes.
+
+**The threat boundary, stated honestly first.** No file mode, and no
+encryption with a key that boots beside the data, defends against the
+operator's own uid or root — that class is out of reach by construction. The
+launcher's `0700` state root already excludes other local users, and the
+owner-only store file closes the relocation regressions. What remains exposed
+is **at-rest copies** — backups, snapshots, volume images of the state dir
+that travel without the operator's keyring. That is the only adversary any
+option below actually addresses.
+
+**Option A — encrypted vault (autonoetic's design).** Persist `vault:k:ref`
+placeholders; decrypt on load; hydrate true values in memory. What the vault
+bought there: secrets were *inputs the agent requested* — artifacts carried
+references because nothing matched against the value. Why it does not
+transplant: here a path credential is part of the operation's *identity* —
+allow-once replay, revocation sweeps, and `UrlPrefix` coverage all compare the
+live call against the stored form, so every consumer (matching, the egress
+mediator's per-connection reads, `describePattern`) needs reconstruction
+machinery. What it would buy here: protection of at-rest copies — and only if
+the operator splits the key onto other media; with the key in the same trust
+root (the default, F-5), it is ceremony wearing a lock. Cost: a store format
+bump (v3), a hydration layer, a key-management surface. (The record's
+"no autonoetic vault" non-goal stands — that refusal was the CredentialRef
+*delivery* model; this option is about the store's persisted *identity*, which
+is why it is adjudicated here rather than assumed.)
+
+**Option B — HMAC-encoded matching (no vault, no key distribution).** The
+secret always rides *live args* at ask/fingerprint time; the persisted form
+only ever needs to be **compared**, never reconstructed. Encode the persisted
+target as `{cleanPrefix, mac(tail)}` with a per-store salt; revocation
+matching becomes prefix-equality + mac-equality. What it buys: the plaintext
+genuinely leaves the file — at-rest copies included — with no key to co-locate
+or split. What it costs: it quietly downgrades `UrlPrefix` semantics
+(prefix-over-path becomes prefix + exact tail — the grant stops covering
+paths the operator's click implied), it touches the security-critical
+matching path (subtle-bug surface where none exists today), and it is a store
+format bump (v3) with migration, every renderer agreeing on the encoding.
+
+**Option C — declared residual (the current posture).** Keep plaintext, keep
+the declared residual, keep the owner-only plumbing. The store is Enforcer
+state (`protectedState`), operator-owned — the same trust class as
+`~/.ssh/id_rsa`. Zero churn, zero new machinery, and the G3 residual stays
+exactly as documented.
+
+| | at-rest copies | matching semantics | churn | new key surface |
+|---|---|---|---|---|
+| **A** encrypted vault | protected only with a split key — ceremony otherwise | unchanged, but every consumer reconstructs | store v3 + hydration | key management |
+| **B** HMAC matching | tail plaintext removed (clean prefix remains) | `UrlPrefix` downgraded to prefix + exact tail | store v3 + migration | per-store salt only |
+| **C** declared residual | exposed, as declared | unchanged | none | none |
+
+**The recommendation, not the decision**: C, with B as the honest upgrade
+path if at-rest copies ever become an adversary the composition actually
+declares — and B then lands with its `UrlPrefix` semantics change adjudicated
+in the same slice, never "quietly". A needs a key-placement design first;
+without the split key it claims protection its placement cannot prove. The
+doctrine the decision keeps in view either way: **an at-rest mechanism that
+cannot fail loudly should not claim more than its key placement proves** —
+whichever option is adopted, the residual that remains (copies that travel
+with the key, and the same-uid/root class) is stated in the same breath. The
+decision is the Principal's.
