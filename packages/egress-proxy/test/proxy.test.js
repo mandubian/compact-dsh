@@ -154,6 +154,9 @@ function uploadVia(proxyPort, url, { total = 40, size = 16, everyMs = 25 } = {})
     });
     req.on('error', () => done({ status: 0, sent, cut: true }));
     const t = setInterval(() => {
+      // a mid-flight cut destroys the request before the close event clears
+      // this timer — never write into a dead exchange (review #80)
+      if (settled || req.destroyed) return clearInterval(t);
       if (sent >= total * size) { clearInterval(t); return req.end(); }
       req.write('x'.repeat(size));
       sent += size;
