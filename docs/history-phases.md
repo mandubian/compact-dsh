@@ -237,7 +237,7 @@ The enforcement register moved with the conduct in the same changes (A-4):
 
 The Compact's
 amendment process is still in flight, so no identity keys are published.
-Re-derived against that constraint ([decision record](docs/decision-phase7-scope.md)),
+Re-derived against that constraint ([decision record](decision-phase7-scope.md)),
 only **I-1** and **A-1** are actually key-blocked; the port plan's capsule
 work is blocked almost entirely *and* answers to no clause, so it is not
 taken. What is unblocked and owed is the governed party's own half of the
@@ -423,7 +423,7 @@ by its digest. Beside it, `compact-dsh-guide` answers the question no
 attestation or envelope holds — *how does this runtime work, and how does my
 operator drive it?* — from pages whose every cited name is machine-checked.
 Why autonoetic's wiki was ported only in part:
-[docs/concept-the-guide.md](docs/concept-the-guide.md).
+[docs/concept-the-guide.md](concept-the-guide.md).
 
 ## The active roster — the basic five
 
@@ -436,11 +436,11 @@ when specialist-to-specialist delegation is wanted (the parent session is
 the orchestrator for a flat roster), and the routing-and-judging set —
 discovery, the watchdog pair, outcome-grader, credential-onboarding,
 executor — each carry their reason in
-[personas/archived/README.md](packages/specialists/personas/archived/README.md).
+[personas/archived/README.md](../packages/specialists/personas/archived/README.md).
 Rationale: every mounted persona costs the parent a delegation-tool row,
 and rows are description-identical — surface stays where it pays.
 The Phase 1 probe-gate decision (continue) is recorded at
-[docs/decision-phase1-probe-gate.md](docs/decision-phase1-probe-gate.md).
+[docs/decision-phase1-probe-gate.md](decision-phase1-probe-gate.md).
 Counted fidelity losses carried in the concept page: no per-persona write
 scoping (fs policy is host-plane), depth bounded but not breadth, phase
 gates rendered marked rather than enforced by prompt machinery.
