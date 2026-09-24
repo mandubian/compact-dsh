@@ -38,13 +38,26 @@ The issue's second conflation is the default posture on main today:
 - The cache TTL default is **24 hours** (`DEFAULTS.execCacheTtlMs`), and no
   composition layer overrides it.
 
-So one bash approval admits **every bash command for 24 hours, unasked** —
-the next call, whatever it is, evaluates `allowed, layer: 'exec-cache'` and
-runs. #26's caveat "once #24 lands the generalization becomes live" has
-overtaken itself: #24 landed as the fix that materializes the cache, and the
-conflation became live in the same slice. Confinement bounds the blast
-radius to the workspace — but the workspace is the operator's project, and
-#26 already said what that means: fatal within the walls is still fatal.
+So one bash approval admits **every network-less bash command for 24 hours,
+unasked** — `ls /` approved, `rm -rf <workspace>` replays — and any bash
+approval, even of a network-bearing command, materializes the same
+constant-fingerprint entry as a passenger. #26's caveat "once #24 lands the
+generalization becomes live" has overtaken itself: #24 landed as the fix that
+materializes the cache, and the conflation became live in the same slice.
+Confinement bounds the blast radius to the workspace — but the workspace is
+the operator's project, and #26 already said what that means: fatal within
+the walls is still fatal.
+
+**Precision: which gate, which fingerprint.** A bash call with a network
+finding runs two gate evaluations. The remote-access plugin routes each
+finding through the grant layers with synthetic arguments —
+`{...target, methodClass, delivery}` — whose fingerprints ARE target-scoped:
+the network half working exactly as adopted. The approval gate's own listener
+then evaluates the base call with the call's real arguments — `{command}` —
+under the constant fingerprint. The conflation therefore lives in the base
+gate, and it collapses precisely the network-less family (`ls`, `cat`,
+`git status`, `rm -rf` — the issue's cases). The network half is not
+defeated; an ungated layer runs beneath it.
 
 The masking is also visible in the record: the replay receipt reads
 `Replay: "bash" [fp_…]` with no target — an entry that names nothing cannot
@@ -118,9 +131,10 @@ is running the conflation knowingly. The decision is the Principal's.
    read the fingerprint, they do not care what is in it.
 2. Golden vectors gain the bash pins: identical command replays; different
    command asks; the secret branch's command-aware identity unchanged.
-3. The replay receipt wording — an entry that names a command it cannot
-   quote (the record must not carry command text into the notes) still says
-   more than `bash [fp]`; the receipt gains what the identity gains, no more.
+3. The replay receipt is left as it is: the fingerprint it already quotes
+   becomes command-distinctive under A, and command text itself must not
+   enter the notes (the secret-path pin holds — the receipt names the
+   identity, never the command).
 4. Register evidence moves with the adopting `[baseline-update]` (A-4), with
    I-5/R-3 conduct refinement per #26's direction 4 — no clause re-grading.
 
