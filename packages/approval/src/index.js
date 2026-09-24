@@ -691,6 +691,10 @@ export function approvalPlugin(opts = {}) {
           (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null
             ? ` This act has no delivery path under the mediated posture — the mediator speaks plain HTTP and CONNECT ` +
               `only (#57), so approving records consent but materializes NO usable connectivity.`
+            : '') +
+          (approval.egress === 'proxy' && args?.delivery === 'mediator' && args?.url == null && args?.port == null
+            ? ` The grant this approval materializes names the host only: it carries plain HTTP, while a tunneled act ` +
+              `(CONNECT) to it would be refused at the wire — a tunnel opens only where the operator was shown the port (#56).`
             : ''),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };

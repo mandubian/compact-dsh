@@ -138,10 +138,31 @@ export function classifyConnection(rows, { host, port, methodClass = null, url =
     };
   }
   if (tunnel) {
+    // CONNECT (#56, option A — port-explicit tunnels): what rides inside is
+    // opaque by decision (no interception) — the class AND the protocol are
+    // unobservable, so the tunnel surface is consent-shaped at the only seam
+    // that can carry it: the grant must NAME the port. A bare-host grant keeps
+    // covering plain HTTP but opens no tunnel — the operator was shown the
+    // host, never a port. Over-asks, never overclaims (the method-class
+    // lattice's own direction).
+    const portNamed = live.filter(g => g.pattern?.kind === 'HostAndPort');
+    if (portNamed.length === 0) {
+      return {
+        ok: false, status: 403,
+        envelope: buildEnvelope({
+          gate: GATE, ruleId: 'portless-grant',
+          reason: `a live grant covers ${host} but names no port — a tunnel opens only where the operator was shown the port (#56): ` +
+            `plain HTTP carries under the host grant, CONNECT does not. A port enters a grant through the evidence ` +
+            `(a URL's scheme port, an nc-style pairing) or a declared registry fact — never guessed`,
+          lawfulNextMoves: LAWFUL_MOVES,
+        }),
+      };
+    }
     // CONNECT: what rides inside is opaque by decision (no interception), so
-    // the class cannot be checked here — a live, classed grant for the host
-    // is what opens a tunnel, and that opacity is the declared residual.
-    return { ok: true, grant: live[0] };
+    // the class cannot be checked here — a live, classed, PORT-EXPLICIT grant
+    // is what opens a tunnel, and that opacity is the declared residual
+    // (residual 2: the port is what was consented, not the protocol).
+    return { ok: true, grant: portNamed[0] };
   }
   if (methodClass == null) {
     return {
