@@ -50,11 +50,13 @@ The masking is also visible in the record: the replay receipt reads
 `Replay: "bash" [fp_…]` with no target — an entry that names nothing cannot
 tell the operator what a prior approval is currently paying for.
 
-**The precedent the record already holds.** The secret-reference branch
-refuses this conflation by construction: `commandAwareFingerprint` hashes the
-command text, under the doctrine "allow-once covers exactly this command,
-never a blanket over the tool." The mechanism exists; it is applied to one
-branch only. The adjudication below is over how far to generalize it.
+**The precedent the record already holds.** The gate's secret-reference code
+path — `commandAwareFingerprint` in `packages/approval/src/index.js` (the
+targetless call that names a declared secret) — refuses this conflation by
+construction: it hashes the command text, under the doctrine "allow-once
+covers exactly this command, never a blanket over the tool." The mechanism
+exists; it is applied to that one path only. The adjudication below is over
+how far to generalize it.
 
 ## The options
 
