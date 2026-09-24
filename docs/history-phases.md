@@ -161,7 +161,7 @@ routes by role instead of guessing from tool names.
 
 ### CF-2 (supply-chain honesty)
 
-** The docker image IS the reused execution
+The docker image IS the reused execution
 environment, so the composition was in breach with one config field. Every
 image the provider may run must now carry a **declared, digest-keyed
 acquisition history** — an undeclared image refuses the boot (D-8: the clause
@@ -175,7 +175,7 @@ absence, and it is tested that way. The attestation basis is itself declared
 
 ### MA-3 (child-state honesty)
 
-** The host's own `subagent/start`/`subagent/end`
+The host's own `subagent/start`/`subagent/end`
 edges are folded into the Enforcer's picture of every delegation (the parent
 recovered from the child's durable session header), and each transition is
 **pushed** to the parent with `agent.inject()` — informed without any polling
@@ -185,7 +185,7 @@ notice tells the parent which of the two is authoritative (MA-3, D-2).
 
 ### MA-4 (consent-scoped address)
 
-** On dsh a Member reaches another Subject's
+On dsh a Member reaches another Subject's
 attention through exactly one surface — a tool call — so `send_message` and
 `interrupt_agent` are gated against the recipient's live consent scopes. The
 delegation edge declares the reciprocal scope (its basis is the MA-1 spawn
@@ -197,7 +197,7 @@ could enable nothing lawful.
 
 ### SCH-1 (no unsupervised escalation), discharged by declared absence
 
-** The
+The
 new `packages/capability-gate/` is Part VI's own enforcement: every
 capability trigger present in the composition must have a binding service or
 the composition **refuses to start**; a trigger that mounts *later* latches a
@@ -212,7 +212,7 @@ its own D-8 problem.
 
 ### I-2 / R-7 (the record), pulled forward from Phase 8
 
-** Both are `(core)`
+Both are `(core)`
 and both sit in A-2's entrenched set; A-2's own gloss is the argument
 ("non-repudiation without a tamper-evident record is a promise, not a
 right"). `packages/record/` decorates the deployment's `SessionPersistence`

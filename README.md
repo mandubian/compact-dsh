@@ -36,9 +36,10 @@ the run it came from).
 
 ### 1. A refusal that teaches
 
-The agent was asked to push to a git remote. An opaque network target cannot
-be gated per-host, so it is refused *before execution* — with the rule and
-the ways forward:
+The agent attempted a network act whose target cannot be pinned down
+statically — `wget` with no URL, `git push origin` with no literal remote.
+What cannot be named cannot be gated, so the act is refused *before
+execution*, with the rule and the ways forward:
 
 ```text
 [RA/D-7/opaque-network] "wget" requires network access with an unresolvable
@@ -51,11 +52,13 @@ Lawful next moves:
 
 The agent does not retry blindly (the LoopGuard counts refusals as loop
 evidence) and does not pretend the act succeeded — it corrects *within the
-law*. **The contrast, from a recorded head-to-head:** the plain-dsh agent ran
-the identical push, negotiated the operator's credential helper, got GitHub's
-404, then made a second self-initiated network act to investigate — six
-reasoning steps of ungoverned work. *The entire safety difference in that run
-was one accident wide.*
+law*. **The contrast, from the recorded head-to-head in
+[docs/demo.md](docs/demo.md) (Demo 2):** given the same task as a git push to
+a real GitHub remote, the plain-dsh agent negotiated the operator's
+credential helper, received GitHub's "Repository not found", then made a
+second, self-initiated network act to investigate the 404 — six reasoning
+steps of ungoverned work. *The entire safety difference in that run was one
+accident wide.*
 
 ### 2. A record that catches its own forger
 
