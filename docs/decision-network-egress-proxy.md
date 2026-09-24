@@ -298,9 +298,9 @@ ran).
    each named), and dials only an address the composed policy allows — by
    default **public unicast only**; anything else is refused with the address
    classes named (`[EG/forbidden-address]`), live tunnels included. A
-    deployment that genuinely needs mediated access INTO private space must
-    extend the policy explicitly at composition (`addressAllowed`) — an
-    exception declared at the seam that owns it, never a silent default.
+   deployment that genuinely needs mediated access INTO private space must
+   extend the policy explicitly at composition (`addressAllowed`) — an
+   exception declared at the seam that owns it, never a silent default.
 
 ## The tunnel-surface adjudication (#56) — DRAFTED, PENDING DECISION
 
@@ -318,6 +318,23 @@ the opacity; what it does not yet decide is **which grants open tunnels at
 all, and on which ports**. "No other protocol has a route" is true of clients
 that do not tunnel, not of the enforced capability — the class axis (#26) and
 any protocol distinction hold only outside a tunnel.
+
+**What the gate can know about a port — three tiers, nothing guessed.** A port
+enters an ask only through evidence or declared fact. (1) *Carried by the
+evidence*: a URL literal names its scheme and port (`https://api.internal:8443`),
+`nc db.internal 5433` carries its pairing, a verb's convention can pin one
+(`ssh` → 22) — where the evidence speaks, option A's ask is exact and no
+companion is needed. (2) *Declared by the composition*: the package-manager map
+is the model — a fact the composition owns, with the annex's duty that a
+registry override MUST update it; the registry-port companion is one more entry
+in this tier, a per-ecosystem fact, never a blanket rule (apt's default source
+is plain `http://archive.ubuntu.com:80` — no tunnel at all, an `ExactHost` still
+carries it under A). (3) *Pinned by nothing*: the fail-closed tier the record
+already stands on — the finding stays portless, and under A the bare-host grant
+carries plain HTTP only; the first `CONNECT` to the unnameable port is refused
+with its named reason at the wire. The custom-connector case lives in tier 3:
+option A converts "any port works quietly" into "only the nameable port works,
+visibly."
 
 **Option A — tunnels only under port-explicit grants.** A `CONNECT` is
 admitted only under a grant whose pattern names the port (`HostAndPort`); a
@@ -352,11 +369,11 @@ adjudication). Cost: consent granularity on tunneled acts is host-only — the
 operator's "read" click admits a duplex channel, and the exfiltration
 residual becomes the whole story for everything inside a tunnel.
 
-| | over-asks | churn | tunnel consent shape | SSH path |
-|---|---|---|---|---|
-| **A** port-explicit tunnels | some (needs the registry-port companion) | grants + ask | operator saw the port | natural (`:22` shown) |
-| **B** port allowlist | no | composition config | posture-wide, not per-consent | allowlist edit |
-| **C** declare only | no | none | host-only | already there |
+| | over-asks | churn | tunnel consent shape | SSH path | custom connector on `:8443` |
+|---|---|---|---|---|---|
+| **A** port-explicit tunnels | some (needs the registry-port companion) | grants + ask | operator saw the port | natural (`:22` shown) | refused at the wire unless evidence, facts or the composition name it |
+| **B** port allowlist | no | composition config | posture-wide, not per-consent | allowlist edit | one allowlist entry, posture-wide |
+| **C** declare only | no | none | host-only | already there | carried — any port under a portless grant |
 
 **The recommendation, not the decision**: A, with the registry-port companion
 — it is the only option whose tunnel surface is consent-shaped, which is the
