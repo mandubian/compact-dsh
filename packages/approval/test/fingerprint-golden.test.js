@@ -132,3 +132,24 @@ test('mount path patterns: canonical prefix coverage with a ro ceiling', () => {
   // non-path targets never match a path pattern
   assert.equal(patternMatches(ro, { host: 'data.example' }), false);
 });
+
+test('bash: a target-less call is command-scoped (#26 bash half, option A)', () => {
+  const bf = (args) => fingerprint('bash', args);
+  // the identical command is the same act — replay identity holds
+  assert.equal(bf({ command: 'ls /' }), bf({ command: 'ls /' }));
+  // different commands are different identities: ls → rm -rf asks, always
+  assert.notEqual(bf({ command: 'ls /' }), bf({ command: 'ls /b' }));
+  assert.notEqual(bf({ command: 'ls /' }), bf({ command: 'rm -rf /' }), 'the read never covers the destructive act');
+  // normalization stays out: whitespace is phrasing the operator was shown
+  assert.notEqual(bf({ command: 'ls /' }), bf({ command: 'ls  /' }));
+  assert.notEqual(bf({ command: 'ls / ' }), bf({ command: 'ls /' }));
+  // an empty command contributes nothing — the payload stays tool-only, as before
+  assert.equal(bf({}), bf({ command: '' }));
+  assert.equal(bf({}), bf({}));
+  // a target-ful call ignores the command text: the network family's
+  // phrasing abstraction stands (curl -sS vs curl, same target → one identity)
+  const withTarget = { url: 'https://api.example.com/v1', host: 'api.example.com' };
+  assert.equal(bf({ ...withTarget, command: 'curl -sS https://api.example.com/v1' }), bf({ ...withTarget, command: 'curl https://api.example.com/v1' }));
+  // and a target-ful fingerprint never collides with a command-scoped one
+  assert.notEqual(bf(withTarget), bf({ command: 'curl https://api.example.com/v1' }));
+});

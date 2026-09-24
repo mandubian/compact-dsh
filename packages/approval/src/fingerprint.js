@@ -58,9 +58,25 @@ export function fingerprint(tool, args) {
   // keyed on the old query-stripped fingerprint simply never match again and
   // expire within the TTL — fail-closed, never fail-open.
   const q = canonicalQuery(args?.url);
+  // #26's bash half (docs/decision-bash-effect-class.md, option A): a
+  // target-less call's command IS its identity. canonicalTarget extracts only
+  // host/port/url, so a bare bash command contributed nothing and every
+  // command hashed to the same fingerprint — approving `ls /` admitted
+  // `rm -rf` for the cache TTL. The command joins the payload exactly as the
+  // gate's secret-reference path already hashes it: allow-once covers exactly
+  // this command, never a blanket over the tool. Target-ful calls are
+  // untouched (the network family's phrasing abstraction stands; the finding
+  // gates fingerprint per-target), and no normalization — a whitespace
+  // variant is a new ask, because normalization is abstraction. Persisted
+  // entries keyed on the old constant fingerprint never match again and
+  // expire within the TTL — fail-closed, never fail-open.
+  const command = Object.keys(t).length === 0 && typeof args?.command === 'string' && args.command.length > 0
+    ? args.command
+    : null;
   const payload = JSON.stringify({
     tool: String(tool),
     ...t,
+    ...(command ? { command } : {}),
     ...(methodClass ? { methodClass } : {}),
     ...(q != null ? { urlQuery: q } : {}),
   });
