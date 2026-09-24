@@ -46,11 +46,31 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function fixture({ rows = () => [], lookup = testLookup, addressAllowed = () => true } = {}) {
   LOOKUP_LOG.length = 0;
   const seen = [];
+  let uploadSeen = 0;   // bytes the origin received of a streamed upload (largest snapshot)
   const origin = createHttpServer((req, res) => {
     seen.push({ url: req.url, method: req.method, host: req.headers.host });
     if (req.url === '/redirect') {
       res.writeHead(302, { location: `http://other.test:${origin.address().port}/landed` });
       return res.end();
+    }
+    if (req.url === '/stream') {
+      // a slow response body: 40 chunks, one every 25 ms — mid-flight long enough to revoke
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      let n = 0;
+      const t = setInterval(() => {
+        if (res.destroyed || res.writableEnded) return clearInterval(t);
+        res.write(`chunk ${++n}\n`);
+        if (n >= 40) { clearInterval(t); res.end(); }
+      }, 25);
+      res.on('close', () => clearInterval(t));
+      return;
+    }
+    if (req.url === '/upload') {
+      let bytes = 0;
+      req.on('data', (d) => { bytes += d.length; });
+      req.on('end', () => { uploadSeen = bytes; res.end(`upload=${bytes}`); });
+      req.on('close', () => { uploadSeen = Math.max(uploadSeen, bytes); });
+      return;
     }
     let body = '';
     req.on('data', (d) => { body += d; });
@@ -75,6 +95,7 @@ async function fixture({ rows = () => [], lookup = testLookup, addressAllowed = 
 
   return {
     proxy, proxyPort: address.port, originPort, echoPort, seen,
+    originUploadBytes: () => uploadSeen,
     cleanup: () => { proxy.close(); origin.close(); echo.close(); },
   };
 }
@@ -93,6 +114,54 @@ function viaProxy(proxyPort, url, { method = 'GET', body = '' } = {}) {
     req.on('error', reject);
     if (body) req.write(body);
     req.end();
+  });
+}
+
+/** A GET whose body is consumed incrementally — resolves on end OR when cut mid-stream. */
+function streamVia(proxyPort, url) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+    const req = httpRequest({
+      host: '127.0.0.1', port: proxyPort, path: url,
+      headers: { host: new URL(url).host },
+    }, (res) => {
+      let chunks = 0;
+      res.on('data', (d) => { chunks += String(d).split('\n').filter(Boolean).length; });
+      res.on('end', () => done({ status: res.statusCode, chunks, cut: false }));
+      res.on('aborted', () => done({ status: res.statusCode, chunks, cut: true }));
+      res.on('error', () => done({ status: res.statusCode, chunks, cut: true }));
+    });
+    req.on('error', () => done({ status: 0, chunks: 0, cut: true }));
+    req.end();
+  });
+}
+
+/** A POST whose body streams out slowly — resolves on completion OR when cut mid-upload. */
+function uploadVia(proxyPort, url, { total = 40, size = 16, everyMs = 25 } = {}) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let sent = 0;
+    const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+    const req = httpRequest({
+      host: '127.0.0.1', port: proxyPort, method: 'POST', path: url,
+      headers: { host: new URL(url).host },
+    }, (res) => {
+      let body = '';
+      res.on('data', (d) => { body += d; });
+      res.on('end', () => done({ status: res.statusCode, sent, body, cut: false }));
+      res.on('aborted', () => done({ status: res.statusCode, sent, cut: true }));
+    });
+    req.on('error', () => done({ status: 0, sent, cut: true }));
+    const t = setInterval(() => {
+      // a mid-flight cut destroys the request before the close event clears
+      // this timer — never write into a dead exchange (review #80)
+      if (settled || req.destroyed) return clearInterval(t);
+      if (sent >= total * size) { clearInterval(t); return req.end(); }
+      req.write('x'.repeat(size));
+      sent += size;
+    }, everyMs);
+    req.on('close', () => clearInterval(t));
   });
 }
 
@@ -191,6 +260,89 @@ test('5. revocation kills the mid-flight tunnel, not just the next attempt', asy
   assert.equal(await Promise.race([closed, wait(1_500).then(() => false)]), true,
     'the reaper closes the tunnel whose grant stopped covering it');
   assert.equal(f.proxy.tunnelCount(), 0);
+});
+
+// -- mid-flight enforcement over plain HTTP (#79): the exchange is tracked
+//    like the tunnel — a grant that stops covering cuts what is already open
+
+test('6. revocation kills the mid-flight plain-HTTP response, not just the next attempt', async (t) => {
+  const live = { revokedNow: false };
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, {
+      id: 'sg_http',
+      get revokedAt() { return live.revokedNow ? Date.now() : null; },
+    })],
+  });
+  t.after(f.cleanup);
+
+  const stream = streamVia(f.proxyPort, `http://origin.test:${f.originPort}/stream`);
+  await wait(150);                      // chunks are flowing (~6 of 40)
+  live.revokedNow = true;               // the operator revokes while the body streams
+  const outcome = await stream;
+  assert.equal(outcome.cut, true, 'the response was cut mid-flight, not completed');
+  assert.ok(outcome.chunks < 40, `only ${outcome.chunks}/40 chunks arrived before the cut`);
+  assert.equal(f.proxy.exchangeCount(), 0, 'the exchange is forgotten once cut');
+  const next = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/data`);
+  assert.ok(next.body.includes(`[${GATE}/revoked]`), 'the next attempt is refused by name, as before');
+});
+
+test('7. revocation kills the mid-flight plain-HTTP upload — the body never completes', async (t) => {
+  const live = { revokedNow: false };
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, {
+      id: 'sg_upload', methodClass: 'write',
+      get revokedAt() { return live.revokedNow ? Date.now() : null; },
+    })],
+  });
+  t.after(f.cleanup);
+
+  const upload = uploadVia(f.proxyPort, `http://origin.test:${f.originPort}/upload`);
+  await wait(150);                      // ~6 of 40 chunks have left the container
+  live.revokedNow = true;               // revoke the write grant while the body streams
+  const outcome = await upload;
+  assert.equal(outcome.cut, true, 'the upload was cut before the body completed');
+  assert.ok(outcome.sent < 40 * 16, `only ${outcome.sent} of ${40 * 16} bytes left the client`);
+  assert.ok(f.originUploadBytes() < 40 * 16,
+    `the origin received only ${f.originUploadBytes()} bytes — the exfiltration stops mid-body`);
+  assert.equal(f.proxy.exchangeCount(), 0);
+});
+
+test('8. a lapsed TTL cuts the mid-flight plain-HTTP response the same way', async (t) => {
+  const live = { expireNow: false };
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, {
+      id: 'sg_http_ttl',
+      get expiresAt() { return live.expireNow ? Date.now() - 1_000 : Date.now() + 60_000; },
+    })],
+  });
+  t.after(f.cleanup);
+
+  const stream = streamVia(f.proxyPort, `http://origin.test:${f.originPort}/stream`);
+  await wait(150);
+  live.expireNow = true;                // same reaper, same clock, no revocation involved
+  const outcome = await stream;
+  assert.equal(outcome.cut, true, 'the lapsed grant cut the response mid-flight');
+  assert.ok(outcome.chunks < 40, `only ${outcome.chunks}/40 chunks arrived before the cut`);
+  assert.equal(f.proxy.exchangeCount(), 0);
+});
+
+test('9. a lapsed TTL cuts the mid-flight plain-HTTP upload the same way', async (t) => {
+  const live = { expireNow: false };
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, {
+      id: 'sg_upload_ttl', methodClass: 'write',
+      get expiresAt() { return live.expireNow ? Date.now() - 1_000 : Date.now() + 60_000; },
+    })],
+  });
+  t.after(f.cleanup);
+
+  const upload = uploadVia(f.proxyPort, `http://origin.test:${f.originPort}/upload`);
+  await wait(150);
+  live.expireNow = true;
+  const outcome = await upload;
+  assert.equal(outcome.cut, true, 'the lapsed grant cut the upload mid-flight');
+  assert.ok(f.originUploadBytes() < 40 * 16, 'the origin never received the whole body');
+  assert.equal(f.proxy.exchangeCount(), 0);
 });
 
 // -- the identity axes (#26) --------------------------------------------------
