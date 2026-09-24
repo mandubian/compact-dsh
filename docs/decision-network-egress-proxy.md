@@ -64,7 +64,7 @@ The proxy is an HTTP/HTTPS forwarder (no other protocol has a route):
 | DNS | the container never resolves: the hostname travels to the proxy in the request line / `CONNECT` (verified below: on the internal bridge, `getent` fails); the proxy resolves, classifies the answer and dials the validated address — public unicast only by default, a rebinding answer refused by name (`#55`'s resolve-then-pin) |
 | redirect | the proxy **never follows one** — the client's next request or `CONNECT` re-enters the check, so a cross-host redirect is refused with a named reason: *a new host is a new grant* |
 | method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7). Enforced per plain-HTTP request; a `CONNECT` is admitted under any live, classed grant for its authority — what rides inside an opaque tunnel is unobservable **by the decision not to intercept**, declared as residual 2 rather than pretended checked. Coverage is a lattice: a write grant covers the read to the same target, never the reverse |
-| TTL, revocation | the store is the single authority, checked per connection; an established tunnel is tracked against its grant, so **revocation closes mid-flight tunnels** — the route dies, not just the next attempt |
+| TTL, revocation | the store is the single authority, checked per connection; an established tunnel **and every in-flight plain-HTTP exchange** are tracked against their grant, so **revocation — or a lapsed TTL — cuts what is already open** (#79): the streaming response and the streaming upload alike, not just the next attempt |
 | other protocols | no route exists at all (ICMP, UDP, raw sockets): unreachable by construction, not filtered |
 
 **Session binding is the socket, not a credential.** One listener per session,
@@ -85,7 +85,7 @@ choice reads as decided, not defaulted:
 - **The policy is the product, not the plumbing.** What the mediator enforces
   — the session-scoped, TTL-bounded, revocable grant table read *directly*
   from the approval store, the method-class lattice (#26), the per-connection
-  re-check, mid-flight tunnel kill on revocation, and refusals that are
+  re-check, mid-flight kill on revocation (tunnels and plain-HTTP exchanges alike), and refusals that are
   Compact envelopes naming their cause and lawful next moves — is the CF
   grant family expressing itself at the wire. No shipped proxy has these
   concepts; each offers a config-time ACL engine instead, and the ask and the
@@ -306,7 +306,7 @@ ran).
 
 1. **`packages/egress-proxy`**: the mediator (per-session listeners, HTTP +
    `CONNECT`, DNS at the proxy, method classes, per-connection grant checks,
-   tunnel tracking for mid-flight revocation), refusing loudly at every seam.
+   tunnel and exchange tracking for mid-flight revocation), refusing loudly at every seam.
 2. **Materialization**: `egressHonesty('proxy')`; `allowed-once` on a network
    target materializes the `(host, port, method-class)` session grant when the
    posture is `proxy`; the fingerprint carries the method class (#26's network
@@ -322,7 +322,7 @@ ran).
      reason, lawful next moves);
    - same-grant redirect to another host → **refused** (*new host, new grant*);
    - grant TTL expired → **refused**;
-   - revocation → **kills the mid-flight tunnel**, not only the next attempt;
+   - revocation → **kills the mid-flight tunnel or plain-HTTP exchange**, not only the next attempt;
    - plus the identity axis: read grant + `POST` → refused; another session's
      grant → refused; unknown method → refused.
 
