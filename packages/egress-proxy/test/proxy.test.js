@@ -39,6 +39,9 @@ function row(over = {}) {
 const hostPort = (host, port, over = {}) =>
   row({ pattern: { kind: 'HostAndPort', value: { host, port: String(port) } }, ...over });
 
+const exactHost = (host, over = {}) =>
+  row({ pattern: { kind: 'ExactHost', value: host }, ...over });
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // -- fixture: origin + echo server + one mediator bound on loopback ----------
@@ -343,6 +346,39 @@ test('9. a lapsed TTL cuts the mid-flight plain-HTTP upload the same way', async
   assert.equal(outcome.cut, true, 'the lapsed grant cut the upload mid-flight');
   assert.ok(f.originUploadBytes() < 40 * 16, 'the origin never received the whole body');
   assert.equal(f.proxy.exchangeCount(), 0);
+});
+
+// -- port-explicit tunnels (#56, option A): the tunnel surface is consent-
+//    shaped — a CONNECT opens only where the operator was shown the port -----
+
+test('A-a: a bare-host grant carries plain HTTP but opens no tunnel — the port was never shown', async (t) => {
+  const f = await fixture({ rows: () => [exactHost('origin.test', { id: 'sg_bare' })] });
+  t.after(f.cleanup);
+
+  const plain = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/plain`);
+  assert.equal(plain.status, 200, 'plain HTTP is covered by the bare-host grant, as before');
+
+  const tunnel = await connectVia(f.proxyPort, `origin.test:${f.echoPort}`);
+  assert.equal(tunnel.ok, false, tunnel.raw);
+  assert.equal(tunnel.status, 403);
+  assert.ok(tunnel.raw.includes(`[${GATE}/portless-grant]`), tunnel.raw);
+  assert.match(tunnel.raw, /names no port/, 'the refusal names the missing consent, not a vague denial');
+  assert.match(tunnel.raw, /#56/, 'and the decision the rule comes from');
+  tunnel.socket.destroy();
+});
+
+test('A-b: a port-explicit grant opens the tunnel — consent-shaped, unchanged (#56 A)', async (t) => {
+  const f = await fixture({
+    rows: ({ echoPort }) => [hostPort('origin.test', echoPort, { id: 'sg_tls_a' })],
+  });
+  t.after(f.cleanup);
+
+  const res = await connectVia(f.proxyPort, `origin.test:${f.echoPort}`);
+  assert.equal(res.ok, true, res.raw);
+  assert.equal(f.proxy.tunnelCount(), 1, 'the operator saw the port; the tunnel opens');
+  res.socket.destroy();
+  await wait(30);
+  assert.equal(f.proxy.tunnelCount(), 0);
 });
 
 // -- the identity axes (#26) --------------------------------------------------

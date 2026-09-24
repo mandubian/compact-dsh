@@ -60,10 +60,10 @@ The proxy is an HTTP/HTTPS forwarder (no other protocol has a route):
 | Surface | What the proxy does |
 |---|---|
 | plain HTTP | client sends the absolute URI; the proxy checks `host:port` + method class against **this session's** live grants, then resolves the name **itself** and forwards |
-| HTTPS | client sends `CONNECT host:port`; the authority is checked against this session's live grants (host+port — a tunnel's *class* cannot be observed without interception, see residuals), then a byte tunnel: TLS end-to-end, never terminated |
+| HTTPS | client sends `CONNECT host:port`; the authority is checked against this session's live grants, and the grant must NAME the port (`HostAndPort` — a bare-host grant carries plain HTTP and the CONNECT is refused by name, #56 option A; a tunnel's *class* cannot be observed without interception, see residuals), then a byte tunnel: TLS end-to-end, never terminated |
 | DNS | the container never resolves: the hostname travels to the proxy in the request line / `CONNECT` (verified below: on the internal bridge, `getent` fails); the proxy resolves, classifies the answer and dials the validated address — public unicast only by default, a rebinding answer refused by name (`#55`'s resolve-then-pin) |
 | redirect | the proxy **never follows one** — the client's next request or `CONNECT` re-enters the check, so a cross-host redirect is refused with a named reason: *a new host is a new grant* |
-| method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7). Enforced per plain-HTTP request; a `CONNECT` is admitted under any live, classed grant for its authority — what rides inside an opaque tunnel is unobservable **by the decision not to intercept**, declared as residual 2 rather than pretended checked. Coverage is a lattice: a write grant covers the read to the same target, never the reverse |
+| method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7). Enforced per plain-HTTP request; a `CONNECT` is admitted only under a live, classed grant that names its port (#56 option A) — what rides inside an opaque tunnel is unobservable **by the decision not to intercept**, declared as residual 2 rather than pretended checked. Coverage is a lattice: a write grant covers the read to the same target, never the reverse |
 | TTL, revocation | the store is the single authority, checked per connection; an established tunnel **and every in-flight plain-HTTP exchange** are tracked against their grant, so **revocation — or a lapsed TTL — cuts what is already open** (#79): the streaming response and the streaming upload alike, not just the next attempt |
 | other protocols | no route exists at all (ICMP, UDP, raw sockets): unreachable by construction, not filtered |
 
@@ -271,7 +271,10 @@ ran).
    (`curl --proxytunnel`, SSH over CONNECT) — is unobservable too: the
    method-class axis (#26) and any protocol distinction hold only outside a
    tunnel; "no other protocol has a route" is true of clients that do not
-   tunnel, not of the enforced capability. The wire's privacy is the
+   tunnel, not of the enforced capability. Since the #56 adjudication the
+   tunnel surface is consent-shaped (option A): a CONNECT opens only under a
+   grant that NAMES the port — the operator saw the host AND the port; what
+   they never see is the bytes. The wire's privacy is the
    Subject's; the record's completeness is the operator's; neither is traded
    for the other.
 3. **Host services on the mediator's interface are reachable** from the
@@ -302,12 +305,13 @@ ran).
    extend the policy explicitly at composition (`addressAllowed`) — an
    exception declared at the seam that owns it, never a silent default.
 
-## The tunnel-surface adjudication (#56) — DRAFTED, PENDING DECISION
+## The tunnel-surface adjudication (#56) — ADOPTED: option A (2026-09-24)
 
-Status: the three options below are **drafted for adjudication, none adopted**
-(2026-09-23, phase-3 review). The record adopts one by amendment; the register
-evidence and, where the option says so, the enforcement move with it — never
-before.
+Status: **adopted by the Principal (2026-09-24): option A — port-explicit
+tunnels — with the registry-port companion**, drafted 2026-09-23 in the
+phase-3 review. The record, the register evidence and the enforcement moved in
+the same slice; B and C remain below as the considered-and-set-aside
+alternatives, not open questions.
 
 **The finding.** A `CONNECT` is admitted under *any* live, classed grant
 covering its authority, and the relay is protocol-blind: a **read** grant
@@ -375,13 +379,20 @@ residual becomes the whole story for everything inside a tunnel.
 | **B** port allowlist | no | composition config | posture-wide, not per-consent | allowlist edit | one allowlist entry, posture-wide |
 | **C** declare only | no | none | host-only | already there | carried — any port under a portless grant |
 
-**The recommendation, not the decision**: A, with the registry-port companion
-— it is the only option whose tunnel surface is consent-shaped, which is the
-direction the record's own identity doctrine (#26: the operator is shown what
-the grant covers) points. B is the defensible low-friction first step and
-composes with A later; C is the honest floor the record already stands on.
-The decision is the Principal's; whichever is adopted amends this record and
-moves the register evidence in the same slice that enforces it.
+**The decision**: A, with the registry-port companion — it is the only
+option whose tunnel surface is consent-shaped, the direction the record's own
+identity doctrine (#26: the operator is shown what the grant covers) points.
+Adopted 2026-09-24. The enforcement lives in `classifyConnection` (a tunnel
+admits only under a `HostAndPort` grant — the refusal `[EG/portless-grant]`
+names the missing consent), the companion in the analyzer's `registryPorts`
+(tier-2 declared facts: the TLS registries 443, apt's plain-http sources 80),
+and the ask gained the sentence that says a portless grant carries plain HTTP
+only. B remains the additive low-friction step (a composition-level
+`tunnelPorts` may still compose with A); C was the honest floor the record
+stood on until today. The companion also re-drew the package acts'
+fingerprints — the port joins the consent identity (#26) — so persisted cache
+entries keyed on the portless form never match again and expire within their
+TTL: fail-closed, the #8 G5 precedent.
 
 ## Phase 3 — the implementation slice, specified so it lands mechanically
 

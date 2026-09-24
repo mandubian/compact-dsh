@@ -125,6 +125,24 @@ test('#65: without an egress grant the cache keeps its own TTL (none posture, cl
   }
 });
 
+test('#56: a portless host ask says the tunnel is not covered — plain HTTP carries, CONNECT does not', async () => {
+  // the analyzer's tier-3 shape: curl/wget to a bare host (no URL, no port) —
+  // the materialized ExactHost grant covers plain HTTP, never the tunnel
+  const { approval } = boot({ egress: 'proxy' });
+  const args = { host: 'api.example.com', methodClass: 'read', delivery: 'mediator' };
+  const ask = approval.gate({ name: 'bash', arguments: args, agent: AGENT, callId: 'c1' });
+  assert.match(ask.reason, /names the host only/, ask.reason);
+  assert.match(ask.reason, /#56/, 'the ask names the decision the rule comes from');
+
+  // a URL act names its scheme port (tier 1) — no tunnel caveat applies
+  const urlAsk = approval.gate({ name: 'bash', arguments: READ, agent: AGENT, callId: 'c2' });
+  assert.doesNotMatch(urlAsk.reason, /names the host only/, urlAsk.reason);
+
+  // a port-explicit host act (tier 1 pairing or tier-2 registry fact) — ditto
+  const portAsk = approval.gate({ name: 'bash', arguments: { host: 'db.internal', port: '5433', methodClass: 'write', delivery: 'mediator' }, agent: AGENT, callId: 'c3' });
+  assert.doesNotMatch(portAsk.reason, /names the host only/, portAsk.reason);
+});
+
 // -- #66: the gate honours the method class ---------------------------------
 
 test('#66: under proxy /grants-grant refuses a classless network grant and names the repair', () => {

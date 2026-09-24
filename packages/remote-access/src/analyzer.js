@@ -14,7 +14,8 @@
 // Package-manager verbs resolve through packageHosts — the DEFAULT registry
 // per ecosystem (npm→registry.npmjs.org, …). A registry override in tool
 // config is invisible to static analysis; compositions that override
-// registries MUST override packageHosts too (recorded in the annex).
+// registries MUST override packageHosts too — and registryPorts when the
+// port moves off the declared default (#56 A) — recorded in the annex.
 
 const DEFAULT_COMMAND_ARG_KEYS = ['command', 'cmd', 'script'];
 
@@ -24,6 +25,21 @@ const DEFAULT_PACKAGE_HOSTS = {
   cargo: 'crates.io', go: 'proxy.golang.org', gem: 'rubygems.org',
   apt: 'archive.ubuntu.com', 'apt-get': 'archive.ubuntu.com',
   docker: 'registry-1.docker.io', podman: 'registry-1.docker.io', helm: 'registry-1.docker.io',
+};
+
+// The registry's port is a DECLARED per-ecosystem fact (#56 option A, tier 2):
+// the analyzer speaks it so the materialized grant NAMES the port — a
+// portless row would cover plain HTTP but never the tunnel the act actually
+// needs at the wire. Per-ecosystem, never a blanket rule: apt's default
+// sources are plain http (80); every other default registry speaks TLS (443).
+// A packageHosts override that moves a registry off its default port MUST
+// override registryPorts too (the annex duty, same as the host itself).
+const DEFAULT_REGISTRY_PORTS = {
+  npm: '443', pnpm: '443', yarn: '443', bun: '443',
+  pip: '443', pip3: '443', pipx: '443',
+  cargo: '443', go: '443', gem: '443',
+  apt: '80', 'apt-get': '80',
+  docker: '443', podman: '443', helm: '443',
 };
 
 // verbs whose presence in a command token stream means network access
@@ -157,7 +173,7 @@ function remoteOf(rest) {
        ?? null;
 }
 
-export function createAnalyzer({ commandArgKeys = DEFAULT_COMMAND_ARG_KEYS, packageHosts = DEFAULT_PACKAGE_HOSTS } = {}) {
+export function createAnalyzer({ commandArgKeys = DEFAULT_COMMAND_ARG_KEYS, packageHosts = DEFAULT_PACKAGE_HOSTS, registryPorts = DEFAULT_REGISTRY_PORTS } = {}) {
   function findingsIn(command, argKey) {
     const out = [];
     // 1. URL literals — the target carries BOTH the url and its host: the
@@ -243,7 +259,9 @@ export function createAnalyzer({ commandArgKeys = DEFAULT_COMMAND_ARG_KEYS, pack
       const pkgSub = PACKAGE_VERBS[bare];
       if (pkgSub && pkgSub.includes(tokens[i + 1])) {
         const host = packageHosts[bare] ?? null;
-        out.push({ arg: argKey, match: `${bare} ${tokens[i + 1]}`, kind: 'host', target: host ? { host } : null, verb: bare });
+        const port = registryPorts[bare] ?? null;
+        out.push({ arg: argKey, match: `${bare} ${tokens[i + 1]}`, kind: 'host',
+          target: host ? (port ? { host, port } : { host }) : null, verb: bare });
       }
     }
     // 3. bare IP literals anywhere (e.g. a redirected /dev/tcp target)
@@ -276,4 +294,4 @@ export function createAnalyzer({ commandArgKeys = DEFAULT_COMMAND_ARG_KEYS, pack
   };
 }
 
-export { DEFAULT_COMMAND_ARG_KEYS, DEFAULT_PACKAGE_HOSTS };
+export { DEFAULT_COMMAND_ARG_KEYS, DEFAULT_PACKAGE_HOSTS, DEFAULT_REGISTRY_PORTS };
