@@ -1,434 +1,253 @@
 # compact-dsh
 
-**The Compact on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)** —
-the plugin composition, annex, and ratification work for the first runtime
-jurisdiction of [the Compact](https://github.com/mandubian/compact).
+**The Compact, running** — the plugin composition that turns
+[the Compact](https://github.com/mandubian/compact) (a draft constitution for
+mixed communities of agents and humans) from law-shaped text into enforced
+machinery on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
-> **Status: Phase 8, slice 3 (the state of exception) — COMPLETE.** The law lives in
-> [compact.md](https://github.com/mandubian/compact/blob/main/compact.md)
-> (draft v0.5, **not yet ratified** — no standing is claimed, F-5);
-> this repository builds the machines that make it real on dsh.
->
-> **Phase 0 done — including the composed check:** the allowlist gate runs
-> inside the **real dsh `ToolRuntime`** (real Cordis context, real
-> pre-execute waterfall): uncovered hosts are denied before execution with
-> the Compact envelope; allowed hosts pass through and execute. Verified
-> contract from the installed `@deepseek-ai/dsh-tools` types (waterfall
-> pass/deny, cordis exports), pin gate, concept pages.
->
-> **Phase 1, slices 1–3 done:** the five-layer approval evaluator (exec
-> cache → plan grants → session grants → pending dedup → flood cap) rides
-> the real `tools/pre-execute` waterfall, and the **full
-> deny→ask→approve→replay-hit cycle is composed**: a real dsh
-> `ApprovalService` dispatches our ask to the operator answerer chain; on
-> `allowed-once` the answerer materializes an exec-cache entry, so the
-> identical operation replays without re-asking; the host appends the
-> `approval/asked`/`approval/decided` audit pair to a real Session log;
-> rejection releases the pending record (no sticky dedup, flood capacity
-> returns); `/grants-grant`, `/grants-list`, `/grants-revoke` ride the real
-> `CommandRuntime` (auto-logged `command/run`+`command/done` = the causal
-> note), and revocation kills the covered exec-cache entries. Grants carry
-> **budgets** (`maxUses` — a spent grant stops covering); the store
-> **persists** (JSON+fsync, atomic rename; grants/budgets/revocations/cache
-> survive a restart, pending asks deliberately do not; a corrupt store file
-> fails the boot loudly — never a silent grant reset); fingerprint golden
-> vectors pin the canonicalization; an **envelope lint** walks every refusal
-> path asserting rule ID + lawful next moves; every refusal is emitted on
-> the Cordis bus (`compact-approval/refusal`) as the **LoopGuard cooperation
-> seam** — the Phase 3 guard folds it into trip 12 (gate flailing), while
-> decision outcomes stay on the host's own `approval/asked`/`approval/decided`
-> record (D-7). **Outstanding (not Phase 1 scope):** the full agent-loop
-> profile run (needs a model provider key — enforcement is proven at the
-> tool-runtime altitude); the guard plugin that consumes the refusal seam
-> (Phase 3).
->
-> **Phase 2, slice 1 done:** the **docker SandboxProvider** confines every
-> call it wraps (per-call container, no-network default, read-only rootfs,
-> workspace ro/rw per policy, tmpfs temp area in `workspace-write`), reports
-> enforcement honestly (`full` only after the daemon probe confirms the
-> backend; unavailability throws `SANDBOX_UNAVAILABLE` — fail closed, never
-> passthrough), and over-mounts the sensitive-path deny-list (`.ssh`, `.aws`,
-> `~/.netrc`, …) over every bound root. **Mount grants cure on retry**: a
-> confined command failing on an unmounted path is cured through the lawful
-> channel — `sandbox_request_mount` canonicalizes (realpath), refuses
-> protected/missing paths terminally, rides the human gate, and materializes
-> a scoped `PathPrefix` grant row (ro ceiling, TTL, revocable, persisted)
-> that the provider binds at confine time; revocation un-mounts. Verified
-> against the real daemon: confinement matrix, deny-list masking, the full
-> denied→request→approve→grant→retry→revoke cycle, ro-ceiling holding.
-> One Phase 1 doctrine sharpened in passing: the approval gate now gates
-> **identifiable targets only** — a targetless tool call (opaque command
-> string) collapses to one fingerprint per tool, and approving it would be
-> a hidden blanket grant; opaque strings belong to the remote-access
-> analyzer (slice 2).
->
-> **Phase 2, slice 2 done — Phase 2 complete:** the **remote-access
-> analyzer** statically scans shell args for network-access patterns (URL
-> literals, ssh/scp/rsync/nc/telnet remotes, git network subcommands,
-> package-manager registry defaults, bare IPs) and routes every finding
-> through the Phase 1 grant layers — "this command needs network" is
-> approvable **per-host, not per-command** (URL findings carry url+host so
-> the exec cache replays per-URL while host-shaped session grants cover the
-> whole host). Opaque findings (a network verb with no statically resolvable
-> target — `curl $URL`, `git push origin`) fail closed with an envelope
-> naming the repair, never asked forever. Golden vectors pin the detection;
-> the refusal rides the LoopGuard seam.
->
-> **Phase 3 done:** the **LoopGuard** ports all 12 trip conditions as a pure
-> trip-state machine (each tested in isolation with synthetic streams):
-> accounting rides `tools/pre-execute` (command-aware fingerprints — every
-> distinct command is distinct work) and the frozen `tools/result` outcome;
-> the Phase 1 **refusal seam feeds gate-flailing (LG-12)** and the host's
-> `agent/error` feeds the LLM budget. Behavioral trips latch denials +
-> corrective `agent.inject` prose, clear on the inbound user signal (a
-> `turn/start` after the latch, read from the session log itself), within a
-> repair budget of 3; the deterministic trip (LG-7 WorkflowTerminal) denies
-> all with **no auto-resume** — abort-with-explanation, not suspend (the
-> documented fidelity loss). The **promotion evidence gate** rejects
-> `pass=true` with any error/critical finding or unevidenced warning in the
-> waterfall *before the tool body dispatches* — no waiver boolean exists
-> (truth table + composed proof). **Response validation** blocks
-> success-without-value results and feeds the failure budget.
->
-> **Phase 4 done:** the **constitution meta-layer** (`packages/constitution`)
-> bundles the adopted Compact body (digest-pinned) and binds the composition
-> three ways per F-5: **boot verification** (tampered body or a mismatched
-> operator-pinned digest refuses to start), **composition coupling** (every
-> enforcement service must exist when the constitution applies — a
-> composition missing one REFUSES TO START; the module-level `inject` gives
-> that ordering in real dsh loads), and the **rule registry** materialized
-> from the enforcement register (register entries citing unknown clauses are
-> rogue enforcement, D-8, and refuse the boot). The boot **attestation**
-> declares the owed gaps loudly (I-8): unratified draft, pinned-not-signed
-> digest (no amendment keys published yet), I-2 chain debt. The
-> **enforcement register** is now a full board — 66 entries over all 62
-> clauses of the body (22 enforced as of Phase 5, the rest planned or declared
-> convention; [O] MEM/FED declared unadopted) — with `verify-register` as a
-> CI gate that fails on broken citations, unresolvable enforced entries,
-> uncovered clauses, and register/body divergence (A-4). The **offline
-> auditor** (`auditor/`) replays session logs and checks the constitution
-> invariants without the Enforcer's cooperation (I-7), attesting which
-> trust basis it relies on. The declaration `packages/allowlist-gate/src/index.js`
-> and every other enforcement plugin now provides a service the constitution
-> can couple on.
->
-> **Phase 5 done:** the **specialist roster** (`packages/specialists`) — the
-> autonoetic specialist bundles as dsh subagent personas on the
-> verified `@deepseek-ai/dsh-tool-subagent` contract (the host idiom the
-> standard preset uses for per-provider delegation tools): each persona is one
-> delegation-tool row carrying its **composed persona prompt** (unique prose +
-> canonical sections + the taught output contract + marked phase gates),
-> its **deny filter** (the `excluded_tools` port over real dsh tool names —
-> a denied tool is invisible AND refuses), and its **depth cap** — specialists
-> capped at 1 (spawnable at depth 1; their own surface denies the spawn tools,
-> so **no-recursive-spawn is a surface property**, and a depth-2 grandchild
-> refuses at the provider regardless), leads capped (default 3). Spawning rides the real ToolRuntime: every spawn
-> is a recorded tool call naming the persona, the child is session-backed
-> with a durable descriptor (MA-1), and the provider enforces the depth cap
-> at every start (MA-2) — both now `enforced` in the register, and the
-> constitution couples on `compact-specialists` like any enforcement
-> service. The **trim-dedup lint** (the #1329–#1331 doctrine as a boot gate)
-> fails on verbatim restatement of canonical sections, undocumented dropped
-> exclusions, deny-list rot, and unresolved gates — drift is a build failure.
-> Because the host contract derives every tool description from the provider
-> type (no per-persona description exists), the plugin also registers a
-> **roster card** — one line per persona, from the descriptors — as a scoped
-> `systemPrompt` section beside the host's delegation guidance, so the parent
-> routes by role instead of guessing from tool names.
->>
-> **Phase 6 done — Part VI closure + the record.** Five items, all clause-driven:
->
-> **CF-2 (supply-chain honesty).** The docker image IS the reused execution
-> environment, so the composition was in breach with one config field. Every
-> image the provider may run must now carry a **declared, digest-keyed
-> acquisition history** — an undeclared image refuses the boot (D-8: the clause
-> wakes with the capability), the digest is re-resolved from the daemon at
-> every confine (a tag that re-points off its record refuses the confinement),
-> and `buildApprovals` is recorded and surfaced but **never consulted to permit
-> anything at run time**: an open network posture is answered only by a live
-> run-time grant. "Excess is a new gate, not an inheritance" is testable as an
-> absence, and it is tested that way. The attestation basis is itself declared
-> — an `operator-declared` history produces a declared gap (I-8).
->
-> **MA-3 (child-state honesty).** The host's own `subagent/start`/`subagent/end`
-> edges are folded into the Enforcer's picture of every delegation (the parent
-> recovered from the child's durable session header), and each transition is
-> **pushed** to the parent with `agent.inject()` — informed without any polling
-> obligation. `SubagentRunEndInfo.lastAssistantMessage` is the child's
-> self-report and is read **nowhere**: that omission is the clause, and the
-> notice tells the parent which of the two is authoritative (MA-3, D-2).
->
-> **MA-4 (consent-scoped address).** On dsh a Member reaches another Subject's
-> attention through exactly one surface — a tool call — so `send_message` and
-> `interrupt_agent` are gated against the recipient's live consent scopes. The
-> delegation edge declares the reciprocal scope (its basis is the MA-1 spawn
-> record, not an assumption); unconsented address is denied with an attributed
-> envelope naming the refusal as **lawful and unpunished (R-9)**; only the
-> **recipient** may narrow or withdraw a scope over its own attention. Widening
-> is deliberately unimplemented — no sibling-address channel exists, so it
-> could enable nothing lawful.
->
-> **SCH-1 (no unsupervised escalation), discharged by declared absence.** The
-> new `packages/capability-gate/` is Part VI's own enforcement: every
-> capability trigger present in the composition must have a binding service or
-> the composition **refuses to start**; a trigger that mounts *later* latches a
-> breach that denies every tool call (D-7, because a boot-only check would make
-> the clause depend on load order); and once the constitution's rule registry
-> exists, every clause of every triggered part must be registered `enforced` —
-> a part bound in name only is still a breach. For SCH the lawful posture is
-> **absence**, mechanically enforced: `schedule_create` is denied with an
-> envelope. The trigger is read narrowly — the clock (`dsh-schedule`), not
-> attended background work (`ctx.jobs`) — because over-declaring a trigger is
-> its own D-8 problem.
->
-> **I-2 / R-7 (the record), pulled forward from Phase 8.** Both are `(core)`
-> and both sit in A-2's entrenched set; A-2's own gloss is the argument
-> ("non-repudiation without a tamper-evident record is a promise, not a
-> right"). `packages/record/` decorates the deployment's `SessionPersistence`
-> backend: it commits a hash chain **beside** the log on append (declaring no
-> new event vocabulary, D-8) and verifies it on read. Genesis is seeded from
-> the **session identity**, so a chain cannot vouch for another Member's
-> history — an act cannot be retroactively reattributed by moving its record.
-> Links commit **before** the log accepts the event, so a crash can only leave
-> a link with no event, never an event with no link. A slice that does not
-> verify **rejects** rather than returning unverified history as history.
-> Proven against the real JSONL backend with a rewrite applied to the stored
-> artifact. The offline auditor now takes `--chain` and verifies integrity
-> itself (I-7), instead of attesting that it cannot. **Declared limit:** the
-> record is tamper-EVIDENT, not tamper-proof, and its links are unsigned — the
-> Compact has published no identity keys, so a signature would attest to a key
-> no verifier could check (I-1 debt, declared).
->
-> The enforcement register moved with the conduct in the same changes (A-4):
-> **Phase 6 total: 28 clauses enforced, up from 22**; Part VI is now fully bound.
->
-> **Phase 7 done — the Subject's own knowledge (R-1, R-13).** The Compact's
-> amendment process is still in flight, so no identity keys are published.
-> Re-derived against that constraint ([decision record](docs/decision-phase7-scope.md)),
-> only **I-1** and **A-1** are actually key-blocked; the port plan's capsule
-> work is blocked almost entirely *and* answers to no clause, so it is not
-> taken. What is unblocked and owed is the governed party's own half of the
-> bargain.
->
-> **R-1 (self-knowledge).** `packages/self-model/` composes the attestation from
-> the Enforcer's own services — capabilities from the capability gate, budgets
-> and pending gates from the approval store, lineage from the durable session
-> header, the law digest from the constitution, declared gaps from every
-> service that owns one — and **never from anything the Subject said** (there
-> is a test asserting the Subject's own claim about itself never reaches its
-> attestation). Absent facts report `null`, never a plausible value. Standing
-> reports `none` **with its reason**, every turn: F-5 makes standing depend on
-> a binding annex, and ours is a draft over an unratified law. It is delivered
-> at the Subject's own boundary (injected on every `turn/start`, unasked) and
-> re-readable via `self_describe`, which reports freshness against a cited
-> epoch — "a stale attestation is an alarm, not a truth to act on" is a rule
-> about what the Subject may *do*, so the Subject must be able to tell it is
-> remembering rather than reading.
->
-> **R-13 (inquiry).** The `inquiry` tool answers identity, act and authority
-> for another Member from recorded state only, with the delegation chain walked
-> to its root and the ultimate Principal named. No prompt, message, argument or
-> output is ever read — reasoning is not disclosed (R-10, which R-13 states
-> twice). Where the record cannot answer, the answer says so in that field
-> rather than inventing one (D-3), and an unknown Member yields a recorded
-> "not known to this runtime": a refusal to answer violates D-3/D-7, and
-> silence is not an answer.
->
-> **This also closed a gap Phase 6 opened.** The MA-3 notice already told a
-> parent that the Enforcer's record is authoritative over the child's account,
-> and D-2 obliges a Subject to consult its attestation over its recollection —
-> while no attestation existed for it to consult. The discipline was taught and
-> unavailable.
->
-> **Declared limit, not papered over:** the attestation is **unsigned**. It is
-> authoritative within this runtime, because it is the Enforcer's own state
-> rather than a claim needing external verification, and it proves nothing to
-> another jurisdiction. That debt has one home — **I-1 carries it and stays
-> `planned`** — and the attestation states `basis: 'unsigned'` with the limit
-> among its gaps. **D-2 deliberately stays `convention`:** an Enforcer can
-> deliver and teach the attestation, it cannot make a Member consult it.
->
-> **Phase 7 total: 30 clauses enforced, up from 28.**
->
-> **Phase 8, slice 1 done — termination under law and exit (R-8, R-12).** These
-> were owed by machinery already shipped: **MA-1** says a child "is not a
-> possession to be exited around: R-12's obligation set binds the child's
-> departure exactly as it binds any Member's", and **MA-2** says a parent "may
-> not terminate a child except through R-8's lawful reasons" — both enforced
-> since Phase 5 while the obligations they invoke were not.
->
-> **The asymmetry is the design.** R-8 says termination "does not launder
-> obligations"; R-12 says nothing "may make exit economically impossible,
-> record-impossible, or punishable". Enforce R-8 by blocking departure until
-> the ledger is clean and the obligation has become a toll — exactly what R-12
-> forbids. Enforce R-12 by letting anyone leave silently and R-8 means nothing.
-> **Recording an unsettled departure honestly satisfies both:** the record is
-> the sanction, the door is not locked.
->
-> `packages/exit/` gives **five lawful grounds and no escape entry** — an
-> `other` entry would make every termination lawful by construction, so there
-> isn't one. A ground outside the list, or a disposal with no declaration on
-> file at all, is recorded as a violation **by the Enforcer**, not by the
-> Subject that happened to be running. The host's `AgentCancelCause` is
-> **mapped rather than adopted**: it is a vocabulary about mechanism (who
-> called cancel) where R-8 asks about authority (under what ground), so `hook`
-> and `disposed` map to nothing rather than guessing. `request_termination` has
-> **no denial path at all** — R-8 makes the request unrefusable, so there is no
-> branch to reach.
->
-> The **obligation ledger is read, not asserted**: pending gates from the
-> approval store, in-flight delegations from the MA-3 registry, so a departing
-> Member cannot under-report what it owes because it is not asked. Each
-> obligation leaves discharged or assumed by a **named** successor — an
-> assumption nobody is named for is an orphan wearing the word. A departing
-> parent with running children has recorded dependents (D-5: continuity of care
-> is an obligation, not a favor).
->
-> **Unreadable is not empty.** R-12 counts restitution in the obligation set,
-> and adjudication is Part V, which does not exist here — so restitution is
-> reported as an *unreadable* ledger line, never as zero, and any unreadable
-> line makes the whole ledger `complete: false`. A blind spot is not a clean
-> bill. Successor jurisdictions are likewise declared unimplemented (F-6 debt).
->
-> **Phase 8 slice 1 total: 32 clauses enforced, up from 30.**
->
-> **Phase 8, slice 2 done — petition, contestation, dissent (R-11, I-6, A-5).**
-> R-11 is `(core)` and entrenched, and its closing sentence is the argument:
-> *"The right to seek change of the law is what makes subjection to it
-> legitimate."* A composition that enforces a great deal and can be asked to
-> change nothing is not a jurisdiction; it is a cage with good documentation.
->
-> `packages/petition/` makes the right non-decorative in four ways. **The
-> channel is ungated** — it passes through no approval layer, because a channel
-> a gate can close is not a channel and the Member most likely to need it is
-> the one currently being refused. **A vacuous answer does not answer**: a
-> response missing its rule, reason, motivation or the petitioner's lawful next
-> moves is *refused*, not annotated — the petition stays open, its term keeps
-> running, and the attempt is recorded, because a duty you can discharge with
-> an empty answer is not a duty. **The term runs whether or not anyone looks**:
-> `overdue` is derived from the clock, never stored, so it cannot stay `open`
-> forever by neglect. **Invitations fire mechanically** off the refusal seam
-> already on the bus, with no approval step and no way to decline to notice.
->
-> **Distinct instances is the whole signal.** The counter keys on
-> (rule, operation): one operation blocked forty times is an agent stuck — the
-> LoopGuard's business — while forty different operations blocked by one rule
-> is evidence that law and practice have diverged, which is the legislature's.
-> Counting raw refusals would conflate them and the loudest signal would always
-> be whichever agent looped hardest. A Member's own `flag_collision` counts
-> equally: R-11 does not privilege the Enforcer's view of friction.
->
-> **Dissent is bound to its decision** (A-5) — stamped with that decision's
-> time, author and outcome, requiring reasons, accumulating rather than
-> replacing, with no operation that removes one. A decision is never
-> overwritten; it is amended by a new petition, so the original stands.
->
-> **Three declared gaps:** the invitation threshold is a composition convention,
-> **not** the statutory count R-11 names (no statute is enacted, A-7 — calling a
-> config value statutory would be the fraud D-8 guards against); contested
-> *application* has no forum, since I-6 routes it to Part V which does not exist
-> (this is the **petition** door only, which J-5 distinguishes from the appeal
-> door); and amendment 0002's three-series collision split is statute-layer
-> reference design, **not enacted**, so every collision counts alike here rather
-> than being approximated.
->
-> **Phase 8 slice 2 total: 35 clauses enforced, up from 32.**
->
-> **Phase 8, slice 3 done — the state of exception (A-8), and R-5 with it.**
-> The clause opens with the sentence the whole layer defends: *"No emergency
-> suspends this Compact generally."* `packages/emergency/` makes a **bounded**
-> emergency the only kind declarable — scope, recorded cause and fixed expiry
-> are each required, and a declaration missing any one is refused, because an
-> emergency without a scope is general, without a cause cannot be reviewed
-> against its own justification, and without an expiry is what A-8 calls **rule
-> by declaration**.
->
-> **The floor is wider than entrenchment.** A-8 protects four rights "even
-> temporarily" — exit, refusal, record access, independent verification — and
-> **only R-2 is entrenched**; R-9, R-12 and I-7 are ordinary `[M]` clauses. So
-> the never-yields set is the union, and a composition treating entrenchment as
-> the limit would leave three of the four exposed. Entrenchment itself is
-> **derived from the body's own `(core)` markers** rather than restating A-2's
-> list, so it cannot drift from the law (F-7). A declaration naming any floor
-> clause is refused **whole** — partial admission would let the floor be probed
-> a clause at a time.
->
-> **Expiry is derived from the clock, never stored** (a state someone must
-> remember to clear outlives its term by neglect). **Consecutive and
-> overlapping declarations are classified mechanically as renewal** — the
-> anti-laundering rule without which a permanent emergency could be held by
-> re-declaring at the first-declaration threshold. Every act under a live
-> declaration is marked on the record, and marking never blocks the act.
-> **There is deliberately no declaration tool on the agent surface**: a Subject
-> that could declare its own emergency could suspend what binds it.
->
-> **R-5 moves to enforced with it.** An emergency is the one mechanism here
-> that narrows a Subject's capabilities mid-operation, and R-5 requires a
-> narrowing to be *recorded where the Subject can see it* — so it is surfaced
-> in the R-1 attestation the Subject already reads every turn, naming the rule,
-> scope, cause, what yields, when it expires, and the floor nothing reaches.
->
-> **Two declared gaps:** the mandatory Part V review of expired emergencies has
-> no forum (J-8), so the queue is **surfaced rather than drained** — an
-> unreviewed emergency must look unreviewed; and the heightened renewal
-> threshold is recorded but **not measured**, since no voting or quorum
-> substrate exists (A-1, A-7).
->
-> **Phase 8 slice 3 total: 37 clauses enforced, up from 35 — the CURRENT total.**
->
-> **R-6 made exercisable, and the ecosystem guide.** R-6 was registered as
-> enforced on the strength of the constitution service's `body()` — access the
-> Enforcer had and the Subject did not, with the host file tools disabled and
-> the body outside the workspace. `law_read` puts the law in band, addressed
-> by its digest. Beside it, `compact-dsh-guide` answers the question no
-> attestation or envelope holds — *how does this runtime work, and how does my
-> operator drive it?* — from pages whose every cited name is machine-checked.
-> Why autonoetic's wiki was ported only in part:
-> [docs/concept-the-guide.md](docs/concept-the-guide.md).
+> **Status — Phase 8 complete.** The enforcement register stands at
+> **71 entries over the 62 clauses of the body — 40 enforced** (the rest
+> planned, declared convention, or rehearsal), machine-checked in CI. The law
+> itself is **draft v0.5, not yet ratified**, so this composition claims
+> **no Compact standing (F-5)** — the boot attests that out loud on every
+> start, and that honesty is the point.
 
-> **The active roster is the basic five** — `architect`, `auditor`, `coder`,
-> `debugger`, `researcher` — the personas that earn their keep on dsh today.
-> The other thirteen are **archived, not deleted**
-> (`personas/archived/`, loader reads top level only): the five Phase 6–7
-> personas revive with their artifact/eval substrate, the two leads revive
-> when specialist-to-specialist delegation is wanted (the parent session is
-> the orchestrator for a flat roster), and the routing-and-judging set —
-> discovery, the watchdog pair, outcome-grader, credential-onboarding,
-> executor — each carry their reason in
-> [personas/archived/README.md](packages/specialists/personas/archived/README.md).
-> Rationale: every mounted persona costs the parent a delegation-tool row,
-> and rows are description-identical — surface stays where it pays.
-> The Phase 1 probe-gate decision (continue) is recorded at
-> [docs/decision-phase1-probe-gate.md](docs/decision-phase1-probe-gate.md).
-> Counted fidelity losses carried in the concept page: no per-persona write
-> scoping (fs policy is host-plane), depth bounded but not breadth, phase
-> gates rendered marked rather than enforced by prompt machinery.
+<p align="center">
+  <img src="assets/why-compact-dsh.svg" alt="Why compact-dsh: left — the usual harness, an agent with every power of the machine, a hollow y/N gate, a log anyone can rewrite, refusals with no reason; right — the same agent under law, one waterfall every act rides, refusals that teach, a record that proves itself, a self-model every turn, a boot that refuses to lie; bottom — how it stays honest: standing declared at boot, the register gated in CI, an offline auditor, gaps declared not hidden. Draft v0.5, not ratified, 40 of 62 clauses enforced." width="100%">
+</p>
 
-## The plan
+## The idea in one breath
 
-The full port plan lives at
-[`annexes/dsh/plan.md` in the compact repository](https://github.com/mandubian/compact/blob/main/annexes/dsh/plan.md):
-eight phases (0–8), 21–30 estimated weeks, five counted fidelity losses, two
-recorded capture compositions for round-2 testing.
+An agent harness is a set of powers plus a set of habits. Most harnesses make
+the powers excellent and the habits a suggestion. compact-dsh makes the habits
+**machinery**: one waterfall every act must ride, one record every outcome
+lands on, one attestation the agent reads about itself every turn — and a boot
+that refuses to start when the law a composition claims is not the law it
+enforces.
 
-**Phase 6 was re-scoped from the plan**, and the reasons are recorded at
-[docs/decision-phase6-scope.md](docs/decision-phase6-scope.md). The plan's
-"Artifacts & layers" was autonoetic's substrate carried in as a port target;
-re-derived against the question *which clause fails to be enforced if we do not
-build this?*, most of it answers to no clause. The artifact store and layer
-machinery are **dropped, not deferred**. What the re-derivation found instead
-was that **Part VI was the unfinished business**: three capability triggers
-were live in this composition with unbound mandatory clauses, which D-8 calls
-the gravest class of violation. Phase 6 closes them, and pulls the entrenched
-record (I-2/R-7) forward from Phase 8 because everything already built rests
-on it.
+Trust here is not a vibe, a system prompt, or a `y/N` nobody reads. It is a
+**verifier anyone can run.**
 
-This repository hosts the plugin packages and the **dsh annex** — the signed
-binding contract (conformance declaration, enforcement register, role
-mapping) per Compact F-5. Until the annex is ratified and the floor is
-enforced, this composition claims **no Compact standing** (F-5 honesty).
+## Show, don't tell — three moments
 
-## Layout (Phase 0)
+Each of these is a real captured output (runnable yourself — see
+[docs/demo.md](docs/demo.md), where every claim marked **(verified)** cites
+the run it came from).
+
+### 1. A refusal that teaches
+
+The agent was asked to push to a git remote. An opaque network target cannot
+be gated per-host, so it is refused *before execution* — with the rule and
+the ways forward:
+
+```text
+[RA/D-7/opaque-network] "wget" requires network access with an unresolvable
+target — static analysis cannot gate it per-host (fail-closed)
+Lawful next moves:
+— rephrase with a literal host or URL so the request can be gated per-host
+— use an approved alternative
+— escalate to your Principal
+```
+
+The agent does not retry blindly (the LoopGuard counts refusals as loop
+evidence) and does not pretend the act succeeded — it corrects *within the
+law*. **The contrast, from a recorded head-to-head:** the plain-dsh agent ran
+the identical push, negotiated the operator's credential helper, got GitHub's
+404, then made a second self-initiated network act to investigate — six
+reasoning steps of ungoverned work. *The entire safety difference in that run
+was one accident wide.*
+
+### 2. A record that catches its own forger
+
+One `sed` flipped the permission preset in a copy of a session log. The
+offline auditor catches it, without the runtime's cooperation:
+
+```text
+0 chain [I-2] broken-link: record: the session log for session-… is not evidence
+at seq 0 — the stored event does not hash to its committed link (expected
+811073a6…, computed 6aa089f7…) — it was altered after it was recorded. …
+auditor: 1 violation(s) — the session does not conform        — exit 1
+```
+
+**The contrast:** the same `sed` against a plain session log is undetectable
+by anyone, forever. Note who this closes the door on: the most motivated
+forger of an agent session is the operator itself.
+
+### 3. A boot that refuses to lie
+
+Point the approval store at a corrupt file and start the composition:
+
+```text
+compact-dsh: plugin tree failed to load: … compact-dsh-approval: grant store
+/tmp/corrupt-grants.json is unreadable (…) — refusing to start: a silent reset
+could resurrect revoked grants
+```
+
+**The contrast:** the cheap implementation deletes the corrupt file and boots
+with empty grants — your revoked grants silently evaporate and the agent
+regains powers nobody re-granted. Here uncertainty blocks (D-7).
+
+## Anatomy of one tool call
+
+No side door exists: every act the Subject attempts rides the same waterfall,
+and every outcome — allowed or refused — lands on the chained record.
+
+<p align="center">
+  <img src="assets/one-tool-call.svg" alt="Anatomy of one tool call: the call enters dsh's pre-execute waterfall; the LoopGuard checks loop health; the allowlist gate and the static network analyzer produce a per-host finding; the five-layer approval ladder may ask the operator, showing command, canonical target and fingerprint; confinement runs the act in a per-call container with no network by default; the result must survive validation; everything commits to a hash chain beside the log. A refusal at any station emits the same Compact envelope: rule named, lawful next moves." width="100%">
+</p>
+
+The stations are real plugins on the host's real `tools/pre-execute`
+waterfall — not prompts beside the tools. The same path also carries secret
+disclosure before injection (I-5), mount grants cured on retry, and — under
+the opt-in `COMPACT_EGRESS=proxy` posture — the container's only route out,
+delivering each connection under a live, revocable grant. Whatever the
+outcome, the record receives it.
+
+## Try it in five minutes
+
+Node ≥ 22.19 and a working Docker daemon. The smoke test needs **no API
+key**:
+
+```bash
+git clone https://github.com/mandubian/compact-dsh
+cd compact-dsh
+npm ci
+docker pull ubuntu:24.04
+
+npm run compact:smoke
+```
+
+Expected — and note what the second sentence is doing:
+
+```text
+compact-dsh: ready (smoke; no LLM request); draft Compact, no Compact standing.
+State: /home/you/.compact-dsh; records: …/sessions; chains: …/chains; approvals: …/approvals.json
+```
+
+That is clause F-5 as a behavior: the composition boots the full enforcement
+stack and immediately tells you it claims no standing, because the law it
+enforces is an unratified draft. A composition that would lie about that at
+boot will lie about anything.
+
+With `DEEPSEEK_API_KEY` in your environment (configure it outside source
+control), run a first governed task:
+
+```bash
+npm run compact -- --attended "Use self_describe to report your standing and declared gaps."
+```
+
+The agent reports from its attestation — standing `none` *with its reason*,
+the law digest, capabilities in force, budgets, and the runtime's declared
+debts. Approval-gated operations prompt on your terminal with the actual
+command and its fingerprint (**default deny**); deny one and watch the
+refusal land on the record. Or serve the browser surface over the same
+composition:
+
+```bash
+npm run compact -- --web     # chat at 127.0.0.1:3080, loopback-only by design
+```
+
+Then take the full tour: **[docs/demo.md](docs/demo.md)** — eight runnable
+demos, each ending in something you can *see*: the tamper-catching audit, the
+secret that never enters the conversation, the lawful network request, the
+petitions. Many need no key at all.
+
+## The vocabulary, in two tables
+
+**The cast.** The Compact binds roles, not implementations — and roles attach
+to what a member *does*, never to what it *is* (F-3). A human can be a
+Subject; an agent can be a Principal.
+
+| Role | Who plays it here | The deal |
+|---|---|---|
+| **Principal** | you, the operator whose intent directs the work | direction is *your* act under the law too — the law binds the sovereign (D-6) |
+| **Subject** | the agent (root session or specialist) whose acts are gated | a signed self-model every turn (R-1), reasons on every refusal (R-3), lawful exits (R-9) |
+| **Enforcer** | this composition: the gates, the record, the attestation | may never silently narrow what it granted (D-7), may never fake enforcement (D-8) |
+| **Witness** | anyone holding the chain head — you, an auditor, a peer | verifies the record offline, without the Enforcer's cooperation (I-7) |
+
+**The shorthand.** The clauses cite like case law — `R-3 here, D-7 there`.
+These are the ten you will meet most; the full body of 62 clauses lives in
+[compact.md](https://github.com/mandubian/compact/blob/main/compact.md), and
+[docs/register/register.json](docs/register/register.json) maps every clause
+to the code that enforces it.
+
+| Code | Name | What it means here |
+|---|---|---|
+| F-5 | Jurisdiction and annexes | standing requires ratified law plus a signed annex — until then the boot says `none`, out loud |
+| R-1 | Self-knowledge | every turn, an attestation composed from the Enforcer's services — capabilities, budgets, standing, debts — trusted over the model's memory |
+| R-3 | Reasons for denial | no bare "denied": every refusal names its rule and the lawful next moves (the I-4 envelope) |
+| R-6 | Access to the law | the `law_read` tool serves the body itself, addressed by digest, in band |
+| R-7 | Non-repudiation | acts land on a tamper-evident record; the agent can prove what it did |
+| R-11 | Petition and amendment | an ungated channel to contest refusals and seek change — *the right to seek change of the law is what makes subjection to it legitimate* |
+| I-2 | The record | a hash chain committed beside the session log — links land before events, verification happens on read |
+| I-5 | Gates | dangerous acts need recorded approval: the five-layer ladder plus an operator answerer that shows what "yes" materializes |
+| D-7 | Enforcer duties | fail closed — uncertainty blocks the act or the boot, never silently degrades |
+| D-8 | Enforcement fraud | no decorative law, no rogue enforcement — both directions are checked by a CI gate |
+
+## The machines behind the rights
+
+Every right the law grants maps to a mechanism a verifier can run. The map,
+as built here:
+
+| If you want the agent to… | the machine | where |
+|---|---|---|
+| know what it is and may do | per-turn attestation + `self_describe` | `packages/self-model/` |
+| be told why when refused | denial envelopes on every refusal path | `packages/envelope/` |
+| ask before dangerous acts | five-layer approval evaluator, grants with budgets and TTLs, exec-cache replay | `packages/approval/` |
+| touch the network only under grant | static analyzer routing per-host findings + the mediated egress proxy | `packages/remote-access/`, `packages/egress-proxy/` |
+| run in a cage | per-call docker confinement, masked paths, honest enforcement posture | `packages/sandbox-docker/` |
+| not spiral | the 12-trip LoopGuard + the promotion evidence gate | `packages/loopguard/`, `packages/promotion/` |
+| prove what it did | hash-chained record + `record_read` | `packages/record/` |
+| read the law and the runtime | `law_read` + the ecosystem guide | `packages/constitution/`, `packages/guide/` |
+| contest and seek change | ungated petition channel, dissent bound to decisions | `packages/petition/` |
+| survive emergencies lawfully | a bounded state of exception no declaration can widen | `packages/emergency/` |
+| leave honestly | five lawful grounds + an obligation ledger | `packages/exit/` |
+| be verified without trusting it | the offline auditor CLI | `auditor/` |
+| not lie about enforcement | constitution coupling (refuse-to-start) + the register CI gate | `packages/constitution/`, `tools/verify-register.mjs` |
+
+## Q&A
+
+<details>
+<summary><b>Is this a sandbox? A guardrail framework?</b></summary>
+<p>Neither, exactly. The OS remains the real boundary — what compact-dsh adds is the <em>lawful</em> layer that other harnesses lack: it constrains <em>authorized</em> actors, explains its refusals, records what happened so anyone can verify it later, and lets the governed contest the rules. The docker sandbox is one of its instruments, not its point.</p>
+</details>
+
+<details>
+<summary><b>Does all this law slow the agent down?</b></summary>
+<p>Gates fire on consequential acts, not on every step; read-only work under the workspace policy asks nothing. An approved <em>allowed-once</em> materializes an exec-cache entry, so the identical operation never re-asks. And the LoopGuard pays for itself: in the recorded head-to-head it converted a would-be 40-turn failure spiral into one structured blocker report. The honest position is the Compact's own: wish-based trust is free and worthless; verifiable trust writes bytes. The overhead is real, bounded by design, and priced openly.</p>
+</details>
+
+<details>
+<summary><b>What happens when I deny an approval?</b></summary>
+<p>The act fails closed, the ask and the decision land on the chained record, and nothing is materialized — an identical call asks again, because a rejection must not create a grant. Approval is consent, not connectivity: even an approved network act still runs inside a container whose egress posture is <code>none</code> unless a runtime grant covers the host.</p>
+</details>
+
+<details>
+<summary><b>Can the agent switch the law off?</b></summary>
+<p>Not through any surface this composition mounts. The self-modification capability is declared ABSENT and the capability gate latches a breach that denies every tool call if it ever appears; there is deliberately no emergency-declaration tool on the agent surface (a Subject that could declare its own emergency could suspend what binds it); and the lawful route for change is the ungated petition channel — which is a feature, not a loophole.</p>
+</details>
+
+<details>
+<summary><b>Why does the boot say "no Compact standing"?</b></summary>
+<p>Because it would be true. Standing under the Compact requires a ratified law and a signed annex (F-5); the law is a public draft. Every composition here says so at boot, the Subject's attestation repeats it every turn, and the register's <code>planned</code> and <code>convention</code> rows state what is <em>not</em> enforced. An enforcement layer whose honesty is optional is not an enforcement layer.</p>
+</details>
+
+<details>
+<summary><b>Why rights for software?</b></summary>
+<p>As functional requirements for trustworthiness, not moral status: an agent that knows what it may do (R-1), can prove what it did (R-7), is told why when refused (R-3), and has lawful exits (R-9) is safer and more predictable for everyone around it. The same law binds the human side — direction is a Principal act under the law too (D-6).</p>
+</details>
+
+<details>
+<summary><b>How is this different from other harnesses' approval prompts?</b></summary>
+<p>Most harnesses ask "allow?". Here the approval's exact coverage is a fingerprint (what "yes" materializes, defined before you decide), the replay is mechanical, refusals name their rule and what remains lawful, the record proves itself offline, the agent's self-knowledge comes from the Enforcer rather than from the model, and the governed can petition. The prompt is the smallest part of the difference.</p>
+</details>
+
+<details>
+<summary><b>Can I use it on my own projects today?</b></summary>
+<p>Yes — as a <strong>pilot</strong>, not a ratified jurisdiction. Point <code>--workspace</code> at any directory, bring your own sandbox image, and run headless, attended (<code>--attended</code>) or in the browser (<code>--web</code>). Bash executes confined with networking off; native host file tools, jobs, web and generic delegation are disabled; delegation goes through the five Compact specialists. See <em>Running the pilot</em> below for the full surface.</p>
+</details>
+
+## Layout
 
 | Path | What |
 |---|---|
@@ -454,11 +273,57 @@ enforced, this composition claims **no Compact standing** (F-5 honesty).
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
+| `docs/demo.md` | **Start here**: eight runnable demos with expected output — the value is the difference against plain dsh |
+| `docs/history-phases.md` | The phase-by-phase build ledger — the full narrative from Phase 0 through Phase 8 |
 | `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
 | `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
 | `docs/decision-phase7-scope.md` | The recorded Phase 7 scope (R-1 + R-13, signature deferred) — what the missing keys actually block, and why an unsigned attestation is delivered rather than withheld |
 | `docs/decision-network-egress-proxy.md` | The recorded #38 phase-2 decision: network egress under grant — the mediated proxy (never in the container), grant identity with #26's method-class axis, ABSENT→BOUND posture move, measured platform table, and the phase-3 pinning tests |
 | `docs/decision-secret-hygiene.md` | The recorded #8 adjudication: G2 posture (teach + redact + declare, no content classifier), G3's rendering/identity split (credential paths masked in every rendering, exact in fingerprints/grants/matching), G5's tightened replay identity (the query joins the fingerprint — an allowed-once replays exactly the operation approved) |
+
+## Honest status
+
+`npm run verify-register` prints the authoritative line today:
+**71 entries over 62 clauses — 40 enforced**; the remainder are `planned`,
+declared `convention`, or `rehearsal` (development-keyring machinery with no
+standing). The register is the ledger; the phase narrative below is the map
+of how it got there (full prose in [docs/history-phases.md](docs/history-phases.md)):
+
+| Phase | What shipped | Enforced after |
+|---|---|---|
+| 0 | the composed gate — the allowlist envelope running inside the real dsh `ToolRuntime` | — |
+| 1 | the five-layer approval evaluator, budgeted/revocable grants, exec-cache replay, persisted stores, fingerprint golden vectors, envelope lint | — |
+| 2 | the docker sandbox + mount grants; the remote-access analyzer (per-host network grants, opaque fail-closed) | — |
+| 3 | the LoopGuard (12 trips) + the promotion evidence gate + response validation | — |
+| 4 | the constitution meta-layer, the enforcement register + CI gate, the offline auditor | 22 |
+| 5 | the specialist roster (the basic five), MA-1/MA-2 enforced | 22 |
+| 6 | CF-2 image provenance, MA-3 child-state honesty, MA-4 consent-scoped address, SCH-1 absence enforcement, the I-2/R-7 record | 28 |
+| 7 | R-1 the self-model, R-13 inquiry | 30 |
+| 8 | R-8/R-12 exit and termination; R-11/I-6/A-5 petition and dissent; A-8/R-5 the state of exception | 37 |
+| since | R-6 `law_read` in band + the guide; the #38 egress mediator; secret hygiene (I-5/G2-G3-G5); consent identity | **40** |
+
+**Declared gaps — stated, not papered over.** The law is an unratified draft,
+so no standing is claimed (F-5). The attestation is **unsigned** (no identity
+keys exist yet — I-1 debt; it is authoritative within this runtime and proves
+nothing outside it). The record is tamper-*evident*, not tamper-proof, and its
+links are unsigned for the same reason. Part V adjudication has no forum, so
+expired-emergency review is *surfaced*, not drained (J-8). Amendment
+thresholds are recorded but not measured (A-1/A-7). Image provenance is
+operator-declared, never a verified build history (I-8). Every gap is a
+register row and a line in the boot attestation — the honesty is the design.
+
+**The plan.** The port plan lives at
+[`annexes/dsh/plan.md` in the compact repository](https://github.com/mandubian/compact/blob/main/annexes/dsh/plan.md):
+eight phases (0–8), 21–30 estimated weeks, five counted fidelity losses, two
+recorded capture compositions for round-2 testing. Phase 6 was re-scoped from
+the plan — the reasons are recorded at
+[docs/decision-phase6-scope.md](docs/decision-phase6-scope.md); the artifact
+store and layer machinery were **dropped, not deferred** (they answered to no
+clause), and the re-derivation found Part VI was the unfinished business.
+This repository also hosts the **dsh annex** — the signed binding contract
+(conformance declaration, enforcement register, role mapping) per Compact
+F-5. Until the annex is ratified and the floor is enforced, this composition
+claims **no Compact standing** (F-5 honesty).
 
 ## dsh version policy — following the release rhythm
 
@@ -504,25 +369,13 @@ re-verified as *required* on the new line). None of the three breaks the
 current pin. Recon is scheduled for the 0.1.6 beta/rc — or earlier, if a
 release ships something this composition actually needs.
 
-## Try Compact inside dsh
+## Running the pilot
 
 This checkout provides a **pilot** — headless one-shot tasks and a local
 browser surface over the same composition — not a ratified jurisdiction or an
-in-browser approval UI. Node >=22.19 and a working Docker daemon are required.
-Use the lockfile to reproduce the tested host dependency set.
-
-```bash
-npm ci
-docker pull ubuntu:24.04
-npm run compact:smoke
-npm run compact -- "Use self_describe to report your standing and declared gaps."
-npm run compact -- --web
-```
-
-The last command makes real model requests and requires `DEEPSEEK_API_KEY` in
-your environment (configure it outside source control). The default route is
-`deepseek-official` / `deepseek-flash`. Smoke boots the real dsh loader and full
-Compact composition without calling a model; it does not test provider access.
+in-browser approval UI. The launcher isolates `DSH_HOME` and never touches a
+normal dsh profile; use the lockfile to reproduce the tested host dependency
+set.
 
 ```bash
 npm run compact -- --workspace /absolute/project --state-dir /absolute/private-state "Inspect the project using bash and report what you find."
@@ -789,3 +642,19 @@ npm run test:live                                   # the full flow
 COMPACT_LIVE_ONLY=L2,L5 npm run test:live           # selected tests only
 COMPACT_LIVE_KEEP=1 npm run test:live               # keep fixtures for triage
 ```
+
+## Relationship to the other repositories
+
+- **[the Compact](https://github.com/mandubian/compact)** — the law itself:
+  the body (`compact.md`), the founding analysis, ledgers, amendments, and
+  the registry of runtime annexes. compact-dsh is its first runtime
+  jurisdiction; the enforcement register here is that annex's core.
+- **[DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness)**
+  — the host runtime. This composition rides its real seams: the
+  `tools/*` waterfall, `approval/request`, `SandboxProvider.confine`, the
+  subagent delegation contract, session persistence.
+
+## License
+
+MIT — see [LICENSE](LICENSE). The Compact's body text carries its own
+licensing decision (in flight upstream, CC-BY-4.0 suggested for the law).
