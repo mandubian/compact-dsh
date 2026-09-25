@@ -144,12 +144,21 @@ must be revisited (A-4 discipline).
 - No autonoetic credential vault — dsh's CredentialRef model stands; G2's
   output-side secret detection is its own adjudication.
 
-## The approval-at-rest adjudication (#75) — DRAFTED, PENDING DECISION
+## The approval-at-rest adjudication (#75) — ADOPTED: option C (2026-09-25)
 
-Status: the three options below are **drafted for adjudication, none adopted**
-(2026-09-24, filed from the issue). The record adopts one by amendment; where
-the decision changes matching semantics or the store format, the register
-evidence moves with it (A-4, `[baseline-update]`) — never before.
+Status: **adopted by the Principal (2026-09-25): option C — the declared
+residual.** The store stays plaintext behind the owner-only plumbing
+(`0600` file, `0700` state root); the at-rest residual is declared and the
+trust statement is one sentence an operator can hold: *the approvals file is
+Enforcer state — the same trust class as `~/.ssh/id_rsa`: owner-only on disk,
+and at-rest copies (backups, snapshots, volume images) are the operator's
+backup policy, exactly as they are for the private key.* **Option B remains
+the adjudicated upgrade path** — if a composition ever DECLARES at-rest
+copies as an adversary, B lands with its `UrlPrefix` semantics change
+adjudicated in the same slice, never quietly. **Option A requires a
+key-placement design first**: without the split key it claims protection its
+placement cannot prove. Drafted 2026-09-24 from the issue; the register
+evidence moved with this adoption (A-4, `[baseline-update]`).
 
 **The finding.** G3's adjudication kept the true URL path in the persisted
 canonical targets (`approvals.json` cache entries and `UrlPrefix` grant rows)
@@ -210,13 +219,19 @@ exactly as documented.
 | **B** HMAC matching | tail plaintext removed (clean prefix remains) | `UrlPrefix` downgraded to prefix + exact tail | store v3 + migration | per-store salt only |
 | **C** declared residual | exposed, as declared | unchanged | none | none |
 
-**The recommendation, not the decision**: C, with B as the honest upgrade
-path if at-rest copies ever become an adversary the composition actually
-declares — and B then lands with its `UrlPrefix` semantics change adjudicated
-in the same slice, never "quietly". A needs a key-placement design first;
-without the split key it claims protection its placement cannot prove. The
-doctrine the decision keeps in view either way: **an at-rest mechanism that
-cannot fail loudly should not claim more than its key placement proves** —
-whichever option is adopted, the residual that remains (copies that travel
-with the key, and the same-uid/root class) is stated in the same breath. The
-decision is the Principal's.
+**The decision (2026-09-25)**: C. The reasons, recorded where the next
+reader can weigh them: A and B both derive their real protection from the
+same single act — putting a secret on other media — which is a deployment
+decision (encrypted backups, an encrypted volume) the operator can make
+without the runtime growing a crypto surface whose strength depends on where
+its key happened to be placed; B's cost is permanent (`UrlPrefix` semantics,
+the matching-path rewrite) while its benefit is conditional on a threat model
+nothing declares today; and with a co-located salt, B degrades to
+obfuscation — low-entropy paths plus an offline dictionary is not a race a
+MAC wins. The doctrine stands, now as the adopted posture's own limit:
+**an at-rest mechanism that cannot fail loudly should not claim more than
+its key placement proves** — C claims exactly what its file modes prove, and
+the residual (same-uid/root, at-rest copies) is declared in the same breath
+as the posture. If that ever stops being enough, the path back here is
+recorded: B, adjudicated with its semantics change; A, with a key-placement
+design first.
