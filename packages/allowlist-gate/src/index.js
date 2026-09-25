@@ -10,10 +10,27 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
-import { parseAllowlist, extractTarget, decide, envelope } from './allowlist.js';
+import { parseAllowlist, extractTarget, decide } from './allowlist.js';
+import { buildEnvelope } from 'compact-envelope';
 
 export const name = 'compact-allowlist-gate';
 export const inject = ['tools'];
+
+/** The AG-1 denial, on the shared envelope shape (one text producer —
+ *  docs/concept-envelope-rendering.md): this gate's reason and moves, the
+ *  shared [AG/AG-1] header form. */
+export function denyEnvelope(tool, target) {
+  return buildEnvelope({
+    gate: 'AG',
+    ruleId: 'AG-1',
+    reason: `"${tool}" to ${target.host ?? ''}${target.port ? ':' + target.port : ''}${target.url ? ' (' + target.url + ')' : ''} is not covered by this runtime's network allowlist`,
+    lawfulNextMoves: [
+      'request a scoped session grant for this host (Gates Act, when enacted)',
+      'use an approved mirror already on the allowlist',
+      'escalate to your Principal with reasons',
+    ],
+  });
+}
 
 /**
  * @param {unknown} ctx Cordis context.
@@ -26,9 +43,11 @@ export function apply(ctx, config) {
     const target = extractTarget(exec?.arguments ?? {});
     const d = decide(target, rules);
     if (d.decision === 'deny') {
-      const env = envelope(tool, target);
-      const moves = env.lawfulNextMoves.map(m => `— ${m}`).join('\n');
-      return { kind: 'deny', reason: `${env.reason}\nLawful next moves:\n${moves}` };
+      // the shared builder owns the envelope's shape (one text producer —
+      // see docs/concept-envelope-rendering.md): the reason and moves are
+      // this gate's content, the [AG/AG-1] header the shared form
+      const env = denyEnvelope(tool, target);
+      return { kind: 'deny', reason: env.text };
     }
     return next(); // allow / abstain — delegate down the waterfall
   });

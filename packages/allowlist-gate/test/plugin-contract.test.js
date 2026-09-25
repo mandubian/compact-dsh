@@ -31,7 +31,7 @@ test('waterfall: uncovered host is denied without calling next()', async () => {
   const { run, wasNextCalled } = boot(['api.example.com']);
   const out = await run({ name: 'net.fetch', arguments: { host: 'evil.example' } });
   assert.equal(out.kind, 'deny');
-  assert.ok(out.reason.includes('[AG-1]'));
+  assert.ok(out.reason.includes('[AG/AG-1]'));
   assert.ok(out.reason.includes('Lawful next moves'));
   assert.ok(!wasNextCalled(), 'a denial must not continue the waterfall');
 });

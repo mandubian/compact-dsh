@@ -12,5 +12,8 @@
   },
   "engines": {
     "node": ">=22.19"
+  },
+  "dependencies": {
+    "compact-envelope": "0.1.0"
   }
 }
