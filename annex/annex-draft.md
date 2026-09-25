@@ -261,3 +261,15 @@ that touches enforcement code and the register in the same change must
 declare itself with the `[baseline-update]` prefix — edits to mapped
 conduct without register edits are enforcement fraud (D-8, A-4), and the
 guard makes the undeclared version unmergeable.
+
+**Register evidence is a pointer, not a book** (2026-09-25, adopted on the
+#75 review). Each entry's `evidence` carries ONE claim sentence — what this
+row enforces, in the row's own words — plus citations to the decision
+records and slices that carry the reasoning (`docs/decision-*.md`, issue
+and PR numbers). Amendments append a citation; they never restate prose
+that a record already holds. The gate enforces the discipline's teeth:
+every `docs/*.md` / `annex/*.md` path an evidence field cites must exist,
+or `verify-register` fails — a stale pointer is a broken audit trail and
+is unmergeable, exactly like a moved verifier. The full reasoning lives in
+the decision records, where it is versioned and reviewable; the register
+stays an index.
