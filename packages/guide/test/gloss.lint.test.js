@@ -17,9 +17,12 @@
 //      instruction, and at least one citation.
 //   5. Citations resolve against the enforcement register, so a gloss cannot
 //      cite a clause the register does not know (D-8: no rogue prose).
+//   6. No unregistered emitters — EVERY package's src is swept: a package
+//      that emits `ruleId:` without being registered above fails the lint,
+//      so a new gate cannot ship without joining the gloss contract.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -132,6 +135,29 @@ function scannedRules() {
   }
   return { found, orphans };
 }
+
+test('no package emits envelopes without registering in the gloss contract', () => {
+  const registered = new Set(Object.values(GATE_PACKAGES)
+    .flat()
+    .map(dir => dir.split('/')[1]));
+  const offenders = [];
+  const packagesDir = join(ROOT, 'packages');
+  for (const pkg of readdirSync(packagesDir)) {
+    if (registered.has(pkg)) continue;         // scanned and gloss-covered above
+    const src = join(packagesDir, pkg, 'src');
+    if (!existsSync(src)) continue;            // no source, nothing emits
+    for (const file of jsFiles(src)) {
+      const text = readFileSync(file, 'utf8');
+      // only code emits: comment lines that merely mention `ruleId:` are not
+      // emission sites
+      const code = text.split('\n')
+        .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
+        .join('\n');
+      if (/ruleId:/.test(code)) offenders.push(`${file} — register the gate in GATE_PACKAGES`);
+    }
+  }
+  assert.deepEqual(offenders, [], 'unregistered envelope emitters — every ruleId emitter must join the gloss contract');
+});
 
 test('gloss covers every rule the envelope builders can emit (forward)', () => {
   const { found, orphans } = scannedRules();
