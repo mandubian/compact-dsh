@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1046" width="100%" role="img" aria-label="Anatomy of one tool call in compact-dsh: the act rides a waterfall of gates — loopguard, allowlist and network analysis, the approval ladder, confinement — then execution with evidence, then the hash-chained record. Any station that refuses emits the same Compact envelope: rule named, lawful next moves. The operator's ask shows command, target, fingerprint. Allowed or refused, everything lands on the chained record, verifiable offline.">
+  <!--
+    compact-dsh — "anatomy of one tool call" plate for the README.
+    Adaptive: light/dark via prefers-color-scheme. Every quoted output string
+    is captured from real runs (see docs/demo.md); clause IDs reference compact.md.
+  -->
+  <style>
+    .bg{fill:#ffffff}
+    .mut{fill:#59636e}
+    .card{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1.5}
+    .band{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1.5}
+    .badcard{fill:#ffebe9;stroke:#a13a3a;stroke-width:1.2}
+    .lawcard{fill:#fff8c5;stroke:#9a6700;stroke-width:1.2}
+    .term{fill:#161b22;stroke:#30363d;stroke-width:1}
+    .chip{fill:#ffffff;stroke:#d0d7de;stroke-width:1}
+    .t-title{font:700 40px "Iowan Old Style",Palatino,Georgia,serif;fill:#1f2328}
+    .t-sub{font:italic 400 19px "Iowan Old Style",Palatino,Georgia,serif;fill:#59636e}
+    .t-h{font:700 17px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2328}
+    .t-b{font:400 15px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2328}
+    .t-s{font:400 13.5px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#59636e}
+    .t-m{font:700 12.5px ui-monospace,"SF Mono",Menlo,Consolas,monospace;fill:#e6edf3}
+    .t-ms{font:400 12.5px ui-monospace,"SF Mono",Menlo,Consolas,monospace;fill:#8b949e}
+    .t-mon{font:400 12.5px ui-monospace,"SF Mono",Menlo,Consolas,monospace;fill:#1f2328}
+    .t-lab{font:700 13px ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:.14em}
+    .c-law{fill:#9a6700} .c-bad{fill:#a13a3a} .c-ok{fill:#1c7a4a} .c-ai{fill:#0969da}
+    .station{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1.5}
+    @media (prefers-color-scheme:dark){
+      .bg{fill:#0d1117} .mut{fill:#8b949e}
+      .card{fill:#161b22;stroke:#30363d} .band{fill:#161b22;stroke:#30363d}
+      .badcard{fill:#25171c;stroke:#ff7a72} .lawcard{fill:#272115;stroke:#d4a72c}
+      .term{fill:#010409;stroke:#30363d} .chip{fill:#161b22;stroke:#30363d}
+      .t-title{fill:#e6edf3} .t-sub{fill:#8b949e} .t-h{fill:#e6edf3}
+      .t-b{fill:#e6edf3} .t-s{fill:#8b949e}
+      .t-m{fill:#e6edf3} .t-ms{fill:#8b949e} .t-mon{fill:#e6edf3}
+      .c-law{fill:#d4a72c} .c-bad{fill:#ff7a72} .c-ok{fill:#3fb950} .c-ai{fill:#58a6ff}
+      .station{fill:#161b22;stroke:#30363d}
+    }
+  </style>
+
+  <rect width="1200" height="1046" class="bg"/>
+
+  <!-- title -->
+  <text x="48" y="62" class="t-title">Anatomy of one tool call</text>
+  <text x="48" y="96" class="t-sub">there is no side door: every act the Subject attempts rides the same waterfall — and every outcome lands on the record</text>
+  <line x1="48" y1="118" x2="1152" y2="118" stroke="#d0d7de" stroke-width="1"/>
+
+  <!-- scenario strip -->
+  <rect x="40" y="134" width="1120" height="40" rx="8" class="term"/>
+  <text x="56" y="159" class="t-m">the scenario — the operator asks the agent to inspect an API; the Subject reaches for:  bash · curl https://example.com/api</text>
+
+  <!-- STATION 1 -->
+  <rect x="40" y="192" width="740" height="84" rx="10" class="station"/>
+  <text x="64" y="220" class="t-lab c-ai">0 · THE CALL</text>
+  <text x="64" y="244" class="t-b">the act enters the host's real pre-execute waterfall — every gate below is a</text>
+  <text x="64" y="264" class="t-b">plugin on the same bus. <tspan font-weight="700">Not prompts beside the tools: hooks inside the path.</tspan></text>
+  <line x1="410" y1="276" x2="410" y2="296" stroke="#0969da" stroke-width="2" marker-end="url(#a-ai)"/>
+
+  <!-- STATION 2 -->
+  <rect x="40" y="300" width="740" height="84" rx="10" class="station"/>
+  <text x="64" y="328" class="t-lab c-ai">1 · LOOPGUARD <tspan class="t-s" letter-spacing="0">— is this loop healthy? · packages/loopguard</tspan></text>
+  <text x="64" y="352" class="t-b">every distinct command is distinct work; recurring failure latches the loop —</text>
+  <text x="64" y="372" class="t-b">corrective prose, repair budget 3 — <tspan font-weight="700">forty silent identical turns: impossible.</tspan></text>
+  <line x1="410" y1="384" x2="410" y2="404" stroke="#0969da" stroke-width="2" marker-end="url(#a-ai)"/>
+
+  <!-- STATION 3 -->
+  <rect x="40" y="408" width="740" height="96" rx="10" class="station"/>
+  <text x="64" y="436" class="t-lab c-ai">2 · ALLOWLIST + NETWORK ANALYSIS <tspan class="t-s" letter-spacing="0">· allowlist-gate, remote-access</tspan></text>
+  <text x="64" y="460" class="t-b">tools that reach a host must be allow-listed (AG-1); the shell args are scanned</text>
+  <text x="64" y="480" class="t-b">statically — this URL becomes a <tspan font-weight="700">per-host finding for example.com</tspan>. An opaque</text>
+  <text x="64" y="498" class="t-b">target (<tspan class="t-mon">curl $URL</tspan>, <tspan class="t-mon">git push origin</tspan>) fails closed — it cannot be gated.</text>
+  <line x1="410" y1="504" x2="410" y2="524" stroke="#0969da" stroke-width="2" marker-end="url(#a-ai)"/>
+
+  <!-- STATION 4 -->
+  <rect x="40" y="528" width="740" height="108" rx="10" class="station"/>
+  <text x="64" y="556" class="t-lab c-law">3 · THE APPROVAL LADDER <tspan class="t-s" letter-spacing="0">— five layers before a human is asked · approval</tspan></text>
+  <text x="64" y="580" class="t-b">exec cache → plan grant → session grant → <tspan font-weight="700">the operator</tspan>. The ask shows the command,</text>
+  <text x="64" y="600" class="t-b">its canonical target, its fingerprint — and what “yes” materializes.</text>
+  <text x="64" y="620" class="t-b">An <tspan font-weight="700">allowed-once writes an exec-cache entry</tspan>: the identical act never re-asks.</text>
+  <line x1="410" y1="636" x2="410" y2="656" stroke="#0969da" stroke-width="2" marker-end="url(#a-ai)"/>
+
+  <!-- STATION 5 -->
+  <rect x="40" y="660" width="740" height="96" rx="10" class="station"/>
+  <text x="64" y="688" class="t-lab c-ai">4 · CONFINEMENT <tspan class="t-s" letter-spacing="0">— consent is not connectivity · sandbox-docker, egress-proxy</tspan></text>
+  <text x="64" y="712" class="t-b">a per-call container: <tspan font-weight="700">no network by default</tspan>, read-only rootfs, masked paths</text>
+  <text x="64" y="732" class="t-b">over every mount; secrets only as granted injections — never in conversation.</text>
+  <text x="64" y="750" class="t-b">Opt-in: the only route out is this session's egress mediator, under live grants.</text>
+  <line x1="410" y1="756" x2="410" y2="776" stroke="#0969da" stroke-width="2" marker-end="url(#a-ai)"/>
+
+  <!-- STATION 6 -->
+  <rect x="40" y="780" width="740" height="84" rx="10" class="station"/>
+  <text x="64" y="808" class="t-lab c-ok">5 · EXECUTION, THEN EVIDENCE <tspan class="t-s" letter-spacing="0">— success needs a value and evidence · promotion</tspan></text>
+  <text x="64" y="832" class="t-b">the tool body runs confined; the result is validated — an unevidenced <tspan class="t-mon">pass=true</tspan> is</text>
+  <text x="64" y="852" class="t-b">mechanically rejected. <tspan font-weight="700">The agent cannot declare victory over a failure.</tspan></text>
+  <line x1="410" y1="864" x2="410" y2="884" stroke="#1c7a4a" stroke-width="2" marker-end="url(#a-ok)"/>
+
+  <!-- STATION 7 -->
+  <rect x="40" y="888" width="740" height="84" rx="10" class="lawcard"/>
+  <text x="64" y="916" class="t-lab c-law">6 · THE RECORD <tspan class="t-s" letter-spacing="0">— the exit every path shares · record</tspan></text>
+  <text x="64" y="940" class="t-b">every event — act, ask, decision, refusal — commits to a <tspan font-weight="700">hash chain beside the log</tspan></text>
+  <text x="64" y="960" class="t-b">before the log accepts it — and the next attestation says what actually happened.</text>
+
+  <!-- RIGHT COLUMN: the deny path -->
+  <text x="812" y="220" class="t-lab c-bad">IF ANY STATION SAYS NO</text>
+  <rect x="812" y="236" width="348" height="240" rx="10" class="badcard"/>
+  <g class="t-mon">
+    <text x="828" y="262" font-weight="700">[RA/D-7/opaque-network] "wget"</text>
+    <text x="828" y="280" font-weight="700">requires network access with an</text>
+    <text x="828" y="298" font-weight="700">unresolvable target — static analysis</text>
+    <text x="828" y="316" font-weight="700">cannot gate it per-host (fail-closed)</text>
+    <text x="828" y="342" font-weight="700" class="c-bad">Lawful next moves:</text>
+    <text x="828" y="364">— rephrase with a literal host or URL</text>
+    <text x="844" y="382">so the request can be gated per-host</text>
+    <text x="828" y="404">— use an approved alternative</text>
+    <text x="828" y="426">— escalate to your Principal</text>
+  </g>
+  <text x="828" y="458" class="t-s">captured from a real run — docs/demo.md</text>
+  <text x="812" y="502" class="t-b">one envelope shape at every station:</text>
+  <text x="812" y="522" class="t-b"><tspan font-weight="700">the rule that refused (R-3), what</tspan></text>
+  <text x="812" y="542" class="t-b"><tspan font-weight="700">remains lawful (I-4)</tspan>.</text>
+  <text x="812" y="570" class="t-s">A refusal is evidence, not a dead end — the</text>
+  <text x="812" y="590" class="t-s">agent corrects within the law, and the friction</text>
+  <text x="812" y="610" class="t-s">feeds petition rights (R-11).</text>
+
+  <!-- RIGHT COLUMN: the ask -->
+  <text x="812" y="648" class="t-lab c-law">WHAT THE OPERATOR SEES</text>
+  <rect x="812" y="664" width="348" height="216" rx="10" class="term"/>
+  <g class="t-m">
+    <text x="828" y="690">approval requested · bash</text>
+    <text x="828" y="716" class="t-ms">command</text>
+    <text x="828" y="734" class="t-ms">  curl https://example.com/api</text>
+    <text x="828" y="756" class="t-ms">canonical target</text>
+    <text x="828" y="774" class="t-ms">  https://example.com/ · example.com</text>
+    <text x="828" y="796" class="t-ms">fingerprint</text>
+    <text x="828" y="814" class="t-ms">  fp_46e54fc76ae61559</text>
+    <text x="828" y="838">approve once / for session / deny</text>
+    <text x="828" y="858" class="t-ms">(default deny — empty, EOF, ^C refuse)</text>
+  </g>
+
+  <!-- footer band -->
+  <rect x="40" y="992" width="1120" height="40" rx="12" class="band"/>
+  <text x="600" y="1017" text-anchor="middle" class="t-s">allowed or refused, the same door out: the chained record (I-2) — anyone holding the chain head verifies it offline, without the Enforcer (I-7)</text>
+
+  <defs>
+    <marker id="a-ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0969da"/>
+    </marker>
+    <marker id="a-law" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9a6700"/>
+    </marker>
+    <marker id="a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1c7a4a"/>
+    </marker>
+  </defs>
+</svg>
