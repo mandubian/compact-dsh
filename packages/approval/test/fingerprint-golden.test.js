@@ -154,13 +154,15 @@ test('bash: a target-less call is command-scoped (#26 bash half, option A)', () 
   assert.notEqual(bf(withTarget), bf({ command: 'curl https://api.example.com/v1' }));
 });
 
-test('bash: the effect axis (option B on top of A) — classed reads share the class identity, unprovable commands are command-scoped', () => {
+test('bash: the effect axis (option B on top of A, tightened) — every target-less call is command-scoped; unprovable commands are command-scoped target-ful too', () => {
   const bf = (args) => fingerprint('bash', args);
   const READ = (command) => ({ command, effectClass: 'read', effectVerbs: ['ls'] });
-  // class+verb identity (the record's granularity decision): a provable read
-  // replays across its arguments — `ls`→`ls` replays, whatever the paths
-  assert.equal(bf(READ('ls /')), bf(READ('ls /b')));
-  // a different verb is a different identity: `ls`→`cat` asks
+  // the tightening (Principal's review): for a local read the risk axis is
+  // the ARGUMENTS — which files the act touches — so a re-phrased read asks
+  // again; only the identical command re-runs. `ls /tmp` never covers `ls /etc`.
+  assert.notEqual(bf(READ('ls /')), bf(READ('ls /b')), 'the arguments are the data selection — different acts');
+  assert.equal(bf(READ('ls /')), bf(READ('ls /')), 'the identical command replays');
+  // a different verb is trivially a different identity: `ls`→`cat` asks
   assert.notEqual(bf(READ('ls /')), bf({ command: 'cat /x', effectClass: 'read', effectVerbs: ['cat'] }));
   // an UNPROVABLE command falls back to A's exact-command payload — the
   // measured compound rider closes: the plain read and its rm-rf rider are
@@ -175,9 +177,9 @@ test('bash: the effect axis (option B on top of A) — classed reads share the c
   // non-bash wrappers: null class → command-scoped, target-ful included
   assert.notEqual(bf({ ...target, command: 'python -c "curl x"', methodClass: 'read', effectClass: null }),
                   bf({ ...target, command: 'python -c "curl x && echo more"', methodClass: 'read', effectClass: null }));
-  // target-less: provable read → class identity (no command in the payload);
-  // undeclared (A-only callers) → command identity, exactly as option A pinned
-  assert.equal(bf(READ('ls /')), bf({ command: 'ls /b', effectClass: 'read', effectVerbs: ['ls'] }));
-  assert.notEqual(bf(READ('ls /')), bf({ command: 'ls /' }), 'undeclared args keep A\'s command-scoped identity');
+  // target-less: the effect declaration changes nothing — command-scoped
+  // is command-scoped, whichever way the classifier spoke (one behavior)
+  assert.equal(bf(READ('ls /')), bf({ command: 'ls /' }), 'declared or undeclared, the identical command is one identity');
+  assert.notEqual(bf(READ('ls /')), bf(READ('ls /b')));
   assert.notEqual(bf(READ('ls /')), bf({ command: 'rm -rf /', effectClass: null }), 'the read class never covers the unprovable act');
 });

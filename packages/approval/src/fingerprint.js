@@ -77,37 +77,30 @@ export function fingerprint(tool, args) {
   // already hashes it: allow-once covers exactly this command, never a
   // blanket over the tool.
   //
-  // #26's bash half, option B (adopted on top of A): the analyzer's bash
-  // effect class refines who joins. A command the classifier PROVES read-only
-  // carries the class identity instead — class+verb, the record's granularity
-  // decision — so the read family keeps a phrasing abstraction of its own
-  // (target-less: `ls /a` and `ls /b` are one `ls` identity; target-ful: the
-  // payload is UNCHANGED, zero churn for the network family). A command the
-  // classifier cannot prove — mutating, off-vocabulary, unresolvable, a
-  // non-bash wrapper (effectClass null) — falls back to A's exact-command
-  // payload for target-less AND target-ful calls alike: that is what closes
-  // the measured compound rider (`curl x && rm -rf /workspace` stops sharing
-  // the plain read's identity). No normalization anywhere — a whitespace
-  // variant of a command-scoped act is a new ask, because normalization is
-  // abstraction. Persisted entries keyed on any superseded payload shape
-  // never match again and expire within the TTL — fail-closed, never
-  // fail-open.
+  // #26's bash half, option B (adopted on top of A, then TIGHTENED on the
+  // Principal's review): the effect axis exists as the null-class fallback
+  // ONLY. A command the classifier cannot prove read-only — mutating,
+  // off-vocabulary, unresolvable, a non-bash wrapper (effectClass null) —
+  // carries the exact-command payload for target-ful calls too: that is what
+  // closes the measured compound rider (`curl x && rm -rf /workspace` stops
+  // sharing the plain read's identity). A PROVABLE read keeps the payload it
+  // already had (the network family's own — zero churn), and a target-less
+  // call is command-scoped regardless of class: for a local read the risk
+  // axis is the arguments — which files the act touches — so `ls /tmp` and
+  // `ls /etc` are different acts and one approval never covers the other
+  // (the G5 doctrine at the bash layer: approving ?page=1 never covers
+  // ?page=2). No class+verb identity, no normalization anywhere — a
+  // whitespace variant is a new ask. Persisted entries keyed on any
+  // superseded payload shape never match again and expire within the TTL —
+  // fail-closed, never fail-open.
   const isTargetless = Object.keys(t).length === 0;
   const effectClass = args?.effectClass;   // 'read' | null (unprovable) | undefined (undeclared)
-  // the command joins when nothing finer vouches for the act: a target-less
-  // call whose class was not declared (option A) or whose class is null
-  // (unprovable — option B, target-ful included). A declared read carries the
-  // class identity instead — the command stays out of its payload.
-  const command = ((isTargetless && effectClass !== 'read') || effectClass === null) && typeof args?.command === 'string' && args.command.length > 0
+  const command = (isTargetless || effectClass === null) && typeof args?.command === 'string' && args.command.length > 0
     ? args.command
-    : null;
-  const effect = isTargetless && effectClass === 'read' && Array.isArray(args?.effectVerbs) && args.effectVerbs.length > 0
-    ? { effectClass, verbs: args.effectVerbs }
     : null;
   const payload = JSON.stringify({
     tool: String(tool),
     ...t,
-    ...(effect ?? {}),
     ...(command ? { command } : {}),
     ...(methodClass ? { methodClass } : {}),
     ...(q != null ? { urlQuery: q } : {}),
