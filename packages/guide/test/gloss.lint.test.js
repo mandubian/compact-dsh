@@ -19,7 +19,7 @@
 //      cite a clause the register does not know (D-8: no rogue prose).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
