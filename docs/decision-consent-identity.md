@@ -1,10 +1,22 @@
 # Decision record — consent identity is risk identity (fingerprint effect classes, G3/G5 residual)
 
-**Status: PROPOSED — awaiting adjudication.** Drafted 2026-09-22 against
+**Status: ADOPTED (status updated 2026-09-25 — the header now moves with the
+enforcement it describes).** Drafted 2026-09-22 against
 [#26](https://github.com/mandubian/compact-dsh/issues/26) and the secret-hygiene
-audit's G3/G5 ([#8](https://github.com/mandubian/compact-dsh/issues/8)). Constitutional
-under A-4 (recorded before the work); not enforcement until adopted — nothing
-here changes a fingerprint, a grant, or an envelope.
+audit's G3/G5 ([#8](https://github.com/mandubian/compact-dsh/issues/8)). What
+adoption has already moved, per position (details at each heading):
+
+- **Position 2 (G5) — ADOPTED** (the query joins the replay identity;
+  `canonicalQuery`, secret-hygiene slice `6e46f58`, PR #63).
+- **Position 3 (G3) — ADOPTED** (the rendering split;
+  `redactEmbeddedSecrets` on every rendered surface, `6e46f58`, PR #63; the
+  deciding-preview masking `35f7bae`, PR #9).
+- **Position 1 — ADOPTED in full (2026-09-25)**: the network half (the
+  method class joins the ask identity and the grant; the #38 phase-3 slice,
+  `f8216f3`) and the bash effect-class half (the closed read-only vocabulary,
+  class+verb identity, the null-class command-scoped fallback) — adjudicated
+  in `docs/decision-bash-effect-class.md`, adopted by the slices #85 (option
+  A) and #88 (option B).
 
 ## The principle
 
@@ -36,6 +48,18 @@ The fingerprint hashes `{tool, canonicalTarget}` only:
 
 ### 1. Effect class joins the fingerprint — derived by ONE authority (#26)
 
+**Status: ADOPTED in full (2026-09-25).** The network half: the method class
+rides the ask identity and the grant — `fingerprint.js` hashes the declared
+class, the grant stores it, the mediator enforces it per connection (the #38
+phase-3 slice, `f8216f3`). The bash effect-class half: adjudicated in
+[`docs/decision-bash-effect-class.md`](decision-bash-effect-class.md) and
+enforced by the adoption slices [#85](https://github.com/mandubian/compact-dsh/pull/85)
+(option A — the command-scoped fallback) and
+[#88](https://github.com/mandubian/compact-dsh/pull/88) (option B — the
+closed read-only vocabulary, the null-class fallback, the compound rider
+closed; granularity tightened to command-scoped-everywhere on adoption
+review).
+
 Extend the fingerprint payload with an **effect class**, derived by the same
 static analysis that already gates network targets and informs read-only vs
 workspace-write (no second derivation, no drift):
@@ -55,6 +79,10 @@ Register: I-5/R-3 conduct refinement (evidence text), no clause re-grading.
 
 ### 2. G5 — replay identity stays canonical target identity; the wording stops overclaiming
 
+**Status: ADOPTED** (the query joins the replay identity — `canonicalQuery`,
+sorted name=value pairs, one-way payload only; secret-hygiene slice `6e46f58`,
+PR #63; the residual wording lives in the ask and the decision notes).
+
 Tightening (cache keyed on the full URL) reintroduces the hygiene problem G3
 fights: query strings are where credentials ride, and putting them into
 fingerprints, `approvals.json`, and attestation lines persists exactly the
@@ -68,6 +96,11 @@ narrows the residual further: the method class travels with the identity even
 when the query does not.)
 
 ### 3. G3 — keep the path load-bearing; shape-hash it where it is rendered, not where it is granted
+
+**Status: ADOPTED** (the rendering split — every rendered surface passes
+through the credential-shape catalogue `redactEmbeddedSecrets`; the identity
+keeps the path verbatim; `6e46f58`, PR #63, and the deciding-preview masking
+`35f7bae`, PR #9).
 
 Stripping path components wholesale breaks `UrlPrefix` grant scoping — the
 path is grant semantics, not decoration. Proposed: the identity keeps the path
@@ -83,19 +116,26 @@ accepted because that file is Enforcer state (`protectedState`), not Subject-
 or record-readable. If that file ever leaves the Enforcer boundary, position 3
 must be revisited (A-4 discipline).
 
-## What adoption would touch
+## What adoption touched — all of it, landed
 
-1. `fingerprint.js` (effect class in the payload — golden vectors gain the new
-   axis; canonicalization of existing fields does not move), `evaluate.js`
-   (nothing — the verdict already carries the fingerprint), grants
-   (`parseAllowlistLikePattern` + `patternMatches` gain the method axis).
-2. The analyzer boundary: one authority, one import direction (approval reads
-   the classification; the analyzer never reads approval state).
+1. `fingerprint.js`: the declared method class joins the payload (`f8216f3`),
+   the query joins it (`6e46f58`), and the bash effect class joins it as the
+   null-class fallback — unprovable commands are command-scoped, target-ful
+   included; every target-less call is command-scoped (`#85` + `#88`);
+   canonicalization of the existing fields
+   never moved, `evaluate.js` needed nothing (the verdict already carries the
+   fingerprint), and grants carry the method axis as they always have.
+2. The analyzer boundary held as sketched: one authority, one import
+   direction — the effect class is derived by the same analyzer that finds
+   network targets and method classes; approval reads the classification and
+   never derives it.
 3. Wording: ask consequence sentence + decision note + receipt ("canonical
-   target" phrasing), per position 2.
-4. Preview/budget-line shape-hashing, per position 3.
-5. Register evidence lines for I-5 (fingerprint effect classes), G3/G5
-   residuals as documented posture.
+   target" phrasing), per position 2 — landed; the ask gained the
+   unprovable-command sentence per position 1's bash half.
+4. Preview/budget-line shape-hashing, per position 3 — landed.
+5. Register evidence lines for I-5: the method-class half (in #38's slice)
+   and the bash half (moved with its adoption slices, `#85` + `#88`) — the
+   register moved with the enforcement, never before it (A-4).
 
 ## Non-goals
 
