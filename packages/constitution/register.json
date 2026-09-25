@@ -200,7 +200,7 @@
       "kind": "enforced",
       "plugin": "compact-approval",
       "service": "compact-approval",
-      "evidence": "fail-closed: corrupt grant store refuses the boot; decisions from recorded state (grants persist, revocations survive restart); every rejection carries its reason",
+      "evidence": "fail-closed: corrupt grant store refuses the boot; decisions from recorded state (grants persist, revocations survive restart); every rejection carries its reason; the store's at-rest posture is the DECLARED residual (#75 option C): plaintext owner-only Enforcer state (0600 file, 0700 state root) — the same trust class as ~/.ssh/id_rsa; at-rest copies are the operator's backup policy, and an at-rest mechanism that cannot fail loudly claims no more than its key placement proves",
       "enforcedBy": [
         "packages/approval/src/persist.js"
       ],
