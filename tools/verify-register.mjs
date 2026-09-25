@@ -77,6 +77,14 @@ if (register) {
         if (!existsSync(resolve(root, p))) fail(`${e.clause} (${e.plugin}): ${kind} path does not exist: ${p} — update the register with the code (A-4)`);
       }
     }
+    // the pointer policy (2026-09-25, #75 review): evidence is ONE claim
+    // sentence plus citations to the records that carry the reasoning —
+    // amendments append citations, they never restate. A citation that does
+    // not resolve is a broken audit trail, and a broken audit trail fails
+    // the gate loudly, exactly like a moved verifier.
+    for (const m of String(e.evidence ?? '').matchAll(/((?:docs|annex)\/[A-Za-z0-9._/-]+\.md)/g)) {
+      if (!existsSync(resolve(root, m[1]))) fail(`${e.clause} (${e.plugin}): evidence cites ${m[1]}, which does not exist — fix the citation or the docs (A-4)`);
+    }
     if (e.kind === 'enforced') {
       if (!e.plugin) fail(`${e.clause}: an enforced entry must name its enforcing plugin`);
       if ((e.verifiers ?? []).length === 0) fail(`${e.clause} (${e.plugin}): an enforced entry without a verifier proves nothing (F-5)`);
