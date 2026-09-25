@@ -19,9 +19,9 @@
 
 import { buildEnvelope } from 'compact-envelope';
 import { REFUSAL_EVENT } from 'compact-dsh-approval';
-import { createAnalyzer, methodClassOf, egressDeliveryOf } from './analyzer.js';
+import { createAnalyzer, methodClassOf, egressDeliveryOf, bashEffectClassOf } from './analyzer.js';
 
-export { createAnalyzer, methodClassOf, egressDeliveryOf };
+export { createAnalyzer, methodClassOf, egressDeliveryOf, bashEffectClassOf };
 
 export const name = 'compact-remote-access';
 export const inject = ['compact-approval'];
@@ -55,9 +55,29 @@ export function apply(ctx, config) {
         // mediator's surface (plain HTTP / CONNECT) — null = it does not, or
         // static analysis cannot pin it, and the ask says approving
         // materializes no usable connectivity BEFORE the operator decides.
+        // The bash EFFECT CLASS rides beside both (#26 option B): the local
+        // effect of the whole command line, proved or null — a null class
+        // makes the fingerprint command-scoped, so a compound whose tail the
+        // classifier cannot prove read-only never shares the plain read's
+        // replay identity (the measured rider).
+        const effect = bashEffectClassOf(exec?.arguments ?? {});
         const d = approval.gate({
           name: exec?.name ?? 'unknown-tool',
-          arguments: { ...f.target, methodClass: methodClassOf(exec?.arguments ?? {}), delivery: egressDeliveryOf(f) },
+          arguments: {
+            ...f.target,
+            methodClass: methodClassOf(exec?.arguments ?? {}),
+            delivery: egressDeliveryOf(f),
+            ...(effect
+              ? effect.effectClass === 'read'
+                // provable read: the class rides; the fingerprint stays the
+                // network family's own (zero churn, phrasing abstraction kept)
+                ? { effectClass: effect.effectClass, effectVerbs: effect.verbs }
+                // unprovable: the command rides so the fingerprint is
+                // command-scoped — the measured rider loses the plain read's
+                // replay identity
+                : { effectClass: effect.effectClass, command: effect.command }
+              : {}),
+          },
           agent: exec?.agent,
           callId: exec?.callId,
         });

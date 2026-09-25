@@ -70,12 +70,44 @@ export function fingerprint(tool, args) {
   // variant is a new ask, because normalization is abstraction. Persisted
   // entries keyed on the old constant fingerprint never match again and
   // expire within the TTL — fail-closed, never fail-open.
-  const command = Object.keys(t).length === 0 && typeof args?.command === 'string' && args.command.length > 0
+  // #26's bash half, option A: a target-less call's command IS its identity —
+  // canonicalTarget extracts only host/port/url, so a bare bash command
+  // contributed nothing and every command hashed to the same fingerprint. The
+  // command joins the payload exactly as the gate's secret-reference path
+  // already hashes it: allow-once covers exactly this command, never a
+  // blanket over the tool.
+  //
+  // #26's bash half, option B (adopted on top of A): the analyzer's bash
+  // effect class refines who joins. A command the classifier PROVES read-only
+  // carries the class identity instead — class+verb, the record's granularity
+  // decision — so the read family keeps a phrasing abstraction of its own
+  // (target-less: `ls /a` and `ls /b` are one `ls` identity; target-ful: the
+  // payload is UNCHANGED, zero churn for the network family). A command the
+  // classifier cannot prove — mutating, off-vocabulary, unresolvable, a
+  // non-bash wrapper (effectClass null) — falls back to A's exact-command
+  // payload for target-less AND target-ful calls alike: that is what closes
+  // the measured compound rider (`curl x && rm -rf /workspace` stops sharing
+  // the plain read's identity). No normalization anywhere — a whitespace
+  // variant of a command-scoped act is a new ask, because normalization is
+  // abstraction. Persisted entries keyed on any superseded payload shape
+  // never match again and expire within the TTL — fail-closed, never
+  // fail-open.
+  const isTargetless = Object.keys(t).length === 0;
+  const effectClass = args?.effectClass;   // 'read' | null (unprovable) | undefined (undeclared)
+  // the command joins when nothing finer vouches for the act: a target-less
+  // call whose class was not declared (option A) or whose class is null
+  // (unprovable — option B, target-ful included). A declared read carries the
+  // class identity instead — the command stays out of its payload.
+  const command = ((isTargetless && effectClass !== 'read') || effectClass === null) && typeof args?.command === 'string' && args.command.length > 0
     ? args.command
+    : null;
+  const effect = isTargetless && effectClass === 'read' && Array.isArray(args?.effectVerbs) && args.effectVerbs.length > 0
+    ? { effectClass, verbs: args.effectVerbs }
     : null;
   const payload = JSON.stringify({
     tool: String(tool),
     ...t,
+    ...(effect ?? {}),
     ...(command ? { command } : {}),
     ...(methodClass ? { methodClass } : {}),
     ...(q != null ? { urlQuery: q } : {}),

@@ -1,9 +1,12 @@
 # Decision record — the bash effect-class half of consent identity (#26): the exec-cache conflation, adjudicated
 
-**Status: option A ADOPTED (2026-09-25, Principal); option B commissioned
-on top of it — the compound, granularity and non-bash semantics pinned below
-are its specification; option C stands as the stopgap any operator can reach
-for today.** Drafted 2026-09-24 against
+**Status: ADOPTED — option A and option B (2026-09-25, Principal).** A
+landed as the command-scoped fingerprint for target-less calls; **B landed on
+top of it as the bash effect class** — the closed read-only vocabulary, the
+split/max/poison compound semantics, class+verb granularity, and the
+null-class fallback to A's payload (target-ful included, which is what closes
+the live compound rider). **Option C stands as the stopgap any operator can
+reach for today.** Drafted 2026-09-24 against
 [#26](https://github.com/mandubian/compact-dsh/issues/26), which the egress
 record deferred here ("#26's bash effect-class half, which keeps its own
 record and adjudication"). Constitutional under A-4 (recorded before the
@@ -103,6 +106,25 @@ re-enters through the vocabulary); class+verb matches the issue's worked pins
 Cost either way: the vocabulary becomes a security-critical surface — one
 verb mis-filed as read-only re-opens the hole with a stamp on it — and the
 golden vectors, verdicts, and ask wording all gain the axis.
+
+**Decided, as implemented (2026-09-25): class+verb.** The identity of a
+provable read is the sorted set of read-only verbs the line invokes —
+`ls`→`ls` replays whatever the paths, `ls`→`cat` asks. The residual is
+DECLARED, not hidden: **same-verb reads share an identity** — `cat .env`
+approved replays `cat /etc/shadow` within the TTL, exactly the shape the
+issue's own worked pins demand — and a provable-read rider on a target-ful
+compound shares the target's identity (`curl x && echo hi` replays as
+`curl x`). Anything finer is A with extra steps; the vocabulary, not the
+fingerprint, is where suspicion belongs. **The vocabulary as landed**
+(starting minimal, growing only by adjudication): `ls pwd cat head tail echo
+printf wc which whoami id groups date uname uptime hostname df du ps stat env
+printenv grep sort uniq basename dirname true false test`; `git` only for
+status/log/diff/show/branch/tag/rev-parse/remote/describe/ls-files/blame;
+`curl` only when it writes nowhere locally (`-o -O --output -T --upload-file
+--stderr -J` poison); **never** wget (saves its body by default), never the
+package managers (they write their stores), never anything with a redirect or
+an expansion mark. Every unprovable command — including all of non-bash — is
+command-scoped by the fallback.
 
 **Option C — the configuration floor: disable the bash exec cache.** Set
 `execCacheTtlMs: 0` — available to any composition **today**, no code. Every
