@@ -216,7 +216,7 @@ test('composed: an enforcement act under the blessed composition is on the recor
   });
   const s = JSON.stringify(r);
   assert.ok(!s.includes('probed'), 'the call never executed');
-  assert.ok(s.includes('[AG-1]'), 'the denial carries the gate envelope — ' + s.slice(0, 250));
+  assert.ok(s.includes('[AG/AG-1]'), 'the denial carries the gate envelope — ' + s.slice(0, 250));
   assert.ok(s.includes('Lawful next moves'), 'the denial carries the lawful exits (R-3/R-9)');
 });
 

@@ -2,7 +2,7 @@
 //
 // A tools/pre-execute waterfall gate: network-capable tool calls are checked
 // against a declared allowlist; uncovered calls are denied with a
-// Compact-shaped reason (rule ID [AG-1] + lawful next moves, R-3/I-4).
+// Compact-shaped reason (rule ID [AG/AG-1] + lawful next moves, R-3/I-4).
 // Content-blind by design — the gate inspects the target, never the message
 // (R-9). Verified against the installed @deepseek-ai/dsh-tools types:
 // the listener is a waterfall — pass = return next(), deny = return the
