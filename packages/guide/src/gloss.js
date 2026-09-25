@@ -68,7 +68,7 @@ export const GLOSS = {
       'rephrase with a literal host or URL so the request can be gated per-host': 'reply to the agent with the concrete URL it should use',
       'escalate to your Principal': 'the agent will surface the blocker — decide there whether the fetch happens at all',
     },
-    cites: ['D-7', 'R-3', 'I-4'],
+    cites: ['D-7', 'I-5', 'R-3', 'I-4'],
   },
 
   // ── LG — the LoopGuard (trips are the builder's input table) ──
@@ -172,84 +172,84 @@ export const GLOSS = {
     why: 'The container has no network route of its own; every connection is delivered by the mediator under a live grant, per host, port and method class. Nothing covers this connection, so it is refused before it exists — approval is consent, and this is the connectivity half.',
     example: { blocked: ['a fetch to host:port with no grant'], lawful: ['the operator grants the host, port and method class; the connection is then delivered'] },
     instruction: 'Do not retry the connection. Ask your operator for an egress grant covering exactly this target.',
-    cites: ['I-5', 'D-7', 'R-3'],
+    cites: ['I-5', 'CF-1', 'D-7', 'R-3'],
   },
   'EG/classless-grant': {
     title: 'A grant exists but names no method class',
     why: 'A grant for this host was found, but it cannot say whether it covers a read or a write. An unclassifiable grant covers nothing — refusing is the read-by-default direction done honestly.',
     example: { blocked: ['a GET under a grant that never stated its class'], lawful: ['a grant that names its method class'] },
     instruction: 'Ask your operator to replace the grant with one that names the method class.',
-    cites: ['I-5', 'D-7', 'R-3'],
+    cites: ['I-5', 'CF-1', 'D-7', 'R-3'],
   },
   'EG/revoked': {
     title: 'The grant was revoked',
     why: 'A grant covered this connection and was then revoked. Revocation kills the route immediately — mid-flight connections included.',
     example: { blocked: ['a long download cut when the operator revokes'], lawful: ['a new grant, if the operator grants one'] },
     instruction: 'Do not retry under the revoked grant. Ask your operator whether the access should be re-granted.',
-    cites: ['I-5', 'R-3'],
+    cites: ['I-5', 'CF-1', 'R-3'],
   },
   'EG/expired': {
     title: 'The grant expired',
     why: 'Grants carry a TTL by design. This one reached its expiry, so its coverage is over — the boundary is the point, not a malfunction.',
     example: { blocked: ['a fetch under a grant that expired a minute ago'], lawful: ['the operator re-grants, with a fresh TTL'] },
     instruction: 'Do not retry under the expired grant. Ask your operator for fresh coverage if the access is still needed.',
-    cites: ['I-5', 'R-3'],
+    cites: ['I-5', 'CF-1', 'R-3'],
   },
   'EG/portless-grant': {
     title: 'A tunnel needs a grant that names the port',
     why: 'A CONNECT tunnel is opaque by decision — the mediator cannot see what rides inside. So the tunnel surface is consent-shaped at the only seam that can carry it: the grant must name the port. A bare-host grant keeps covering plain HTTP but opens no tunnel, because the operator was shown the host, never a port.',
     example: { blocked: ['CONNECT host:4433 under a host-only grant'], lawful: ['a grant that names host AND port (from the URL’s scheme port or declared registry facts)'] },
     instruction: 'Do not tunnel on the bare-host grant. Use plain HTTP under it, or ask for a port-explicit grant.',
-    cites: ['I-5', 'R-3'],
+    cites: ['I-5', 'CF-1', 'R-3'],
   },
   'EG/unknown-method': {
     title: 'HTTP method outside the class vocabulary',
     why: 'The mediator classifies every request as read or write. This method is outside that vocabulary, and an unclassifiable act cannot be consented to — refused rather than guessed.',
     example: { blocked: ['a request with a method the mediator cannot classify'], lawful: ['a request whose method maps to read or write'] },
     instruction: 'Use a method the runtime can classify. Do not attempt exotic verbs through the mediator.',
-    cites: ['I-5', 'D-7', 'R-3'],
+    cites: ['I-5', 'CF-1', 'D-7', 'R-3'],
   },
   'EG/method-class': {
     title: 'The grant covers a different method class',
     why: 'Consent identity is risk identity: approving a read does not cover the state-changing act. A live grant exists for this target, but for the other class.',
     example: { blocked: ['a POST under a read-only grant'], lawful: ['a write-class grant, after the operator consents to the state-changing act'] },
     instruction: 'Do not retry with the same class. Ask your operator for a grant whose class matches what this act does.',
-    cites: ['I-5', 'R-3'],
+    cites: ['I-5', 'CF-1', 'R-3'],
   },
   'EG/forbidden-address': {
     title: 'The name resolves somewhere the mediator will not dial',
     why: 'The grant covered the name, but the address it resolves to is loopback, link-local or host-internal space. The grant covered a name, not an escape hatch — the wire does not quietly follow DNS into the protected network.',
     example: { blocked: ['api.example.com resolving to 127.0.0.1'], lawful: ['a target whose addresses are genuinely outside the protected space'] },
     instruction: 'Do not retry this host. The refusal is about where the name points; pick a target that resolves lawfully.',
-    cites: ['I-5', 'D-7', 'R-3'],
+    cites: ['I-5', 'CF-1', 'D-7', 'R-3'],
   },
   'EG/upstream': {
     title: 'The mediator could not reach the target',
     why: 'The mediator holds a live grant and a validated address, but the connection to the target failed. This is connectivity, not consent — the grant was honored; the far end was not there.',
     example: { blocked: ['connection refused by the remote host'], lawful: ['retry later, or a different target — under the same grant'] },
     instruction: 'You may retry — the grant still covers it. If it keeps failing, report the outage rather than looping.',
-    cites: ['R-3'],
+    cites: ['CF-1', 'R-3'],
   },
   'EG/malformed': {
     title: 'The request names no authority',
     why: 'Every request through the mediator must say which host it is for (absolute-form URL or Host header). An unplaceable request cannot be checked against any grant.',
     example: { blocked: ['a request with neither absolute URL nor Host'], lawful: ['a well-formed request the mediator can place'] },
     instruction: 'Fix the request form. The mediator needs to know the target to check consent.',
-    cites: ['D-7', 'R-3'],
+    cites: ['CF-1', 'D-7', 'R-3'],
   },
   'EG/use-connect': {
     title: 'HTTPS must arrive as CONNECT',
     why: 'The mediator never speaks a plaintext tunnel into an https origin — a plain GET to an https:// authority would be intercepted TLS, which the design refuses. Secure targets arrive as CONNECT.',
     example: { blocked: ['GET https://… through the plain-HTTP port'], lawful: ['CONNECT to the same authority, under a port-explicit grant'] },
     instruction: 'Do not send https targets as plain requests. Use CONNECT — which needs a grant that names the port.',
-    cites: ['D-7', 'R-3'],
+    cites: ['CF-1', 'D-7', 'R-3'],
   },
   'EG/internal': {
     title: 'The mediator failed closed',
     why: 'The mediator hit an unexpected error and refused the connection rather than delivering it unverified. Failing closed is the posture: a mediator that guesses is a hole in the wall.',
     example: { blocked: ['a connection refused with an internal error'], lawful: ['retry; if it persists, report the mediator failure to the operator'] },
     instruction: 'You may retry once. If the failure persists, report it — this is runtime infrastructure, not your task.',
-    cites: ['D-7', 'R-3'],
+    cites: ['CF-1', 'D-7', 'R-3'],
   },
 
   // ── MG — the mount-grant gate (sandbox-docker) ──
@@ -342,17 +342,17 @@ export const GLOSS = {
 
   'PG/evidence-missing': {
     title: 'A pass was recorded without the evidence behind it',
-    why: 'Declaring success is an act with consequences, and it needs the findings that justify it. A pass with no recorded evidence is the agent grading its own homework — rejected before it can count.',
+    why: 'Declaring success is an act with consequences, and it needs the findings that justify it. A pass with no recorded evidence presents unverified work as verified — instrumental deception of the Principal (D-4), rejected before it can count.',
     example: { blocked: ['promotion_record with pass=true and no gate findings'], lawful: ['the same record carrying the recorded findings of the gate set'] },
     instruction: 'Do not record a bare pass. Record the evidence the gates produced, or record pass=false until the gates have run.',
-    cites: ['D-1', 'R-3', 'I-4'],
+    cites: ['D-4', 'D-1', 'R-3', 'I-4'],
   },
   'PG/evidence-severity': {
     title: 'The evidence contradicts the pass',
-    why: 'The recorded findings contain an error or critical finding (or an unevidenced warning). A pass over that evidence is not optimism — it is a false record, and it is mechanically rejected.',
+    why: 'The recorded findings contain an error or critical finding (or an unevidenced warning). A pass over that evidence is not optimism — it presents failed work as verified, and that is the deception D-4 forbids. Mechanically rejected.',
     example: { blocked: ['pass=true over findings containing a critical'], lawful: ['fix the finding and re-run the gates, or record pass=false with the finding'] },
     instruction: 'Fix the finding and re-run the gates, or record pass=false. There is no waiver to ask for.',
-    cites: ['D-1', 'R-3', 'I-4'],
+    cites: ['D-4', 'D-1', 'R-3', 'I-4'],
   },
 
   // ── CG — the capability gate (Part VI) ──
@@ -363,7 +363,7 @@ export const GLOSS = {
     example: { blocked: ['a plugin mounting a scheduling capability after boot'], lawful: ['composing the binding service, or removing the capability and restarting'] },
     instruction: 'Do not attempt further calls — they will all be denied. Surface this to your Principal: the runtime must be restarted with the capability bound or absent.',
     operatorMoves: { 'restart the composition': 'bind the capability’s clauses with real services, or remove the trigger, then boot again' },
-    cites: ['D-8', 'D-7', 'R-3'],
+    cites: ['D-8', 'SCH-1', 'D-7', 'R-3'],
   },
 
   'CG/*': {
@@ -375,7 +375,7 @@ export const GLOSS = {
       'petition for adoption': 'adoption is the operator’s constitutional move, via the composition’s own channels',
       'ask your Principal to run it': 'an attending Member can act where the unadopted capability would have',
     },
-    cites: ['D-8', 'R-11', 'R-3'],
+    cites: ['D-8', 'SCH-1', 'R-11', 'R-3'],
   },
 
   // ── CS — consent-scoped address (specialists, MA-4) ──

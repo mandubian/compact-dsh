@@ -100,23 +100,48 @@ function ruleIdValues(line) {
   return out;
 }
 
-/** Collect `gate/ruleId` keys the builders can emit, from the sources. */
+/** Collect `gate/ruleId` keys the builders can emit, from the sources —
+ *  with, per key, the register plugin name(s) of the package that emits it. */
 function scannedRules() {
   const found = new Set();
+  const rulePlugins = new Map();
   const orphans = [];
   for (const [gate, dirs] of Object.entries(GATE_PACKAGES)) {
     for (const dir of dirs) {
+      const pkg = dir.split('/')[1];
       for (const file of jsFiles(join(ROOT, dir))) {
-        const { gate: fileGate, text } = gateOfFile(file, dir.split('/')[1]);
+        const { gate: fileGate, text } = gateOfFile(file, pkg);
         const effective = fileGate ?? gate;
         if (effective !== gate) continue; // file belongs to a sibling gate (MG vs SC)
         const lines = text.split('\n');
         lines.forEach((line) => {
-          for (const v of ruleIdValues(line)) found.add(`${effective}/${v}`);
+          for (const v of ruleIdValues(line)) {
+            const key = `${effective}/${v}`;
+            found.add(key);
+            for (const p of PACKAGE_REGISTER_PLUGINS[pkg] ?? []) {
+              if (!rulePlugins.has(key)) rulePlugins.set(key, new Set());
+              rulePlugins.get(key).add(p);
+            }
+          }
         });
         // the LoopGuard's trip table: trip ids are the builder's ruleIds
         if (dir.includes('loopguard')) {
-          for (const m of text.matchAll(/\bid: '(LG-\d+)'/g)) found.add(`LG/${m[1]}`);
+          for (const m of text.matchAll(/\bid: '(LG-\d+)'/g)) {
+            found.add(`LG/${m[1]}`);
+            for (const p of PACKAGE_REGISTER_PLUGINS[pkg] ?? []) {
+              if (!rulePlugins.has(`LG/${m[1]}`)) rulePlugins.set(`LG/${m[1]}`, new Set());
+              rulePlugins.get(`LG/${m[1]}`).add(p);
+            }
+          }
+        }
+        // dynamic ruleId sites: the wildcard key is attributed to this file's
+        // package (AG/* from approval, CG/* from capability-gate)
+        if (/ruleId:\s*(?!')([A-Za-z_$`])/.test(text) && rulePlugins) {
+          const wildcard = `${effective}/*`;
+          for (const p of PACKAGE_REGISTER_PLUGINS[pkg] ?? []) {
+            if (!rulePlugins.has(wildcard)) rulePlugins.set(wildcard, new Set());
+            rulePlugins.get(wildcard).add(p);
+          }
         }
       }
     }
@@ -133,7 +158,7 @@ function scannedRules() {
       }
     }
   }
-  return { found, orphans };
+  return { found, rulePlugins, orphans };
 }
 
 test('no package emits envelopes without registering in the gloss contract', () => {
@@ -215,5 +240,51 @@ test('gloss citations resolve against the enforcement register (D-8)', () => {
     for (const c of g.cites) {
       assert.ok(clauses.has(c), `${key}: cites "${c}", which the register does not know`);
     }
+  }
+});
+
+// workspace package → the register plugin name(s) that credit its clauses
+// (the register's own attribution — note the two spellings it carries for
+// specialists). Anchoring is PER EMITTING FILE: a rule is anchored by the
+// plugins of the package that actually emits it, so a gate cannot pass on a
+// sibling gate's clauses (AG/AG-1 anchors to the allowlist gate's I-4, not
+// to compact-approval's)
+const PACKAGE_REGISTER_PLUGINS = {
+  approval: ['compact-approval'],
+  'allowlist-gate': ['compact-allowlist-gate'],
+  'remote-access': ['compact-remote-access'],
+  loopguard: ['compact-loopguard'],
+  'egress-proxy': ['compact-egress-proxy'],
+  promotion: ['compact-promotion'],
+  'capability-gate': ['compact-capability-gate'],
+  petition: ['compact-petition'],
+  specialists: ['compact-specialists', 'compact-dsh-specialists'],
+  blessed: ['compact-dsh-blessed'],
+  'sandbox-docker': ['compact-sandbox-docker'],
+};
+
+test('every gloss anchors to the register: it cites a clause its own emitting package enforces', () => {
+  const register = JSON.parse(readFileSync(join(ROOT, 'docs', 'register', 'register.json'), 'utf8'));
+  const enforced = new Map();
+  for (const e of register.entries) {
+    if (e.kind !== 'enforced') continue;
+    if (!enforced.has(e.plugin)) enforced.set(e.plugin, new Set());
+    enforced.get(e.plugin).add(e.clause);
+  }
+  // rule → the union of register plugins over the files that emit it
+  const { rulePlugins } = scannedRules();
+  for (const [key, g] of Object.entries(GLOSS)) {
+    const plugins = rulePlugins.get(key);
+    assert.ok(plugins && plugins.size >= 1,
+      `${key}: no emitting package attributed by the scan — register the emitter or fix the attribution`);
+    const clauses = new Set();
+    for (const p of plugins) for (const c of enforced.get(p) ?? []) clauses.add(c);
+    assert.ok(clauses.size >= 1, `${key}: the register credits no enforced clause to [${[...plugins].join(', ')}]`);
+    const anchored = g.cites.filter(c => clauses.has(c));
+    assert.ok(
+      anchored.length >= 1,
+      `${key}: cites [${g.cites.join(', ')}] name none of the clauses its emitting packages enforce ` +
+      `(${[...plugins].join(', ')} → ${[...clauses].join(', ')}) — the gloss must anchor to what the register ` +
+      `says the emitter enforces, not merely to clauses that exist`);
   }
 });

@@ -161,10 +161,12 @@ mechanism is the one thing this composition cannot do honestly.
   item: send one formatted refusal, look at the page. T3 on the web page is
   the *text form* until that lands; the approval card widget itself is
   upstream's, fed by the `reason` we send.
-- **How T2 is selected** — how the runtime knows an agent's depth is an open
-  decision: a model-route convention in `settings.yaml`, a per-agent declared
-  class, or a composition default of T1 with T2 opt-in. Default is T1; T2 is
-  never a downgrade of rights, only of prose.
+- **How T2 is selected** — decided: operator-declared per composition
+  (`COMPACT_ENVELOPE_TIER=instructional`; default `full`; an unknown value
+  refuses rather than degrading). Per-model auto-detection was rejected —
+  guessing the audience from a route name is the Enforcer guessing (D-7);
+  per-agent override waits for a second agent class. The adjudication is
+  recorded at [decision-envelope-tier.md](decision-envelope-tier.md).
 - **Language** — English only at first; the runtime has one working language.
   i18n of glosses is not taken.
 - **What the gloss is not** — it is not law, not a register entry, not
