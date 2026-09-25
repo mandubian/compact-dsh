@@ -217,3 +217,43 @@ test('gloss citations resolve against the enforcement register (D-8)', () => {
     }
   }
 });
+
+// gate → the register plugin name(s) that enforce it (the register's own
+// attribution — note the two spellings the register carries for specialists)
+const GATE_PLUGINS = {
+  AG: ['compact-approval', 'compact-allowlist-gate'],
+  RA: ['compact-remote-access'],
+  LG: ['compact-loopguard'],
+  EG: ['compact-egress-proxy'],
+  MG: ['compact-sandbox-docker'],
+  SC: ['compact-sandbox-docker'],
+  CF: ['compact-dsh-blessed'],
+  PG: ['compact-promotion'],
+  CG: ['compact-capability-gate'],
+  CS: ['compact-specialists', 'compact-dsh-specialists'],
+  PT: ['compact-petition'],
+};
+
+test('every gloss anchors to the register: it cites a clause its own gate enforces', () => {
+  const register = JSON.parse(readFileSync(join(ROOT, 'docs', 'register', 'register.json'), 'utf8'));
+  const enforced = new Map();
+  for (const e of register.entries) {
+    if (e.kind !== 'enforced') continue;
+    if (!enforced.has(e.plugin)) enforced.set(e.plugin, new Set());
+    enforced.get(e.plugin).add(e.clause);
+  }
+  for (const [key, g] of Object.entries(GLOSS)) {
+    const gate = key.slice(0, key.indexOf('/'));
+    const plugins = GATE_PLUGINS[gate];
+    assert.ok(plugins, `${key}: gate ${gate} has no plugin mapping in GATE_PLUGINS`);
+    const gateClauses = new Set();
+    for (const p of plugins) for (const c of enforced.get(p) ?? []) gateClauses.add(c);
+    assert.ok(gateClauses.size >= 1, `${key}: the register credits no enforced clause to ${gate}'s plugins`);
+    const anchored = g.cites.filter(c => gateClauses.has(c));
+    assert.ok(
+      anchored.length >= 1,
+      `${key}: cites [${g.cites.join(', ')}] name none of the clauses ${gate}'s plugins enforce ` +
+      `(${[...gateClauses].join(', ')}) — the gloss must anchor to what the register says this gate enforces, ` +
+      `not merely to clauses that exist`);
+  }
+});
