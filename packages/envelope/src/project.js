@@ -41,7 +41,10 @@ export function operatorCard(env, gloss, { kind = 'refused' } = {}) {
   const rule = `${env.gate}/${env.ruleId}`;
   const lead = kind === 'ask' ? 'Approval requested' : 'Not run';
   const lines = [`${lead}: ${gloss?.title ?? env.reason}`];
-  if (env.reason) lines.push(env.reason);
+  // the canonical reason stands alone only when the lead does not already
+  // carry it (unglossed cards lead with the reason; it also rides in the
+  // raw envelope — no triple copy)
+  if (gloss?.title && env.reason) lines.push(env.reason);
   if (gloss?.why) lines.push(gloss.why);
   lines.push(`Rule: ${rule}`);
   const ex = gloss?.example;
