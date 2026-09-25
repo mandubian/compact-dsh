@@ -8,7 +8,7 @@ accountability mechanism.*
 
 R-3 and I-4 make every refusal name the rule that caused it and the lawful
 next moves available — the denial envelope. The same shape reaches three
-readers through three surfaces:
+readers through four surfaces:
 
 | Surface | Who reads it | What they get today | The problem |
 |---|---|---|---|
@@ -86,13 +86,13 @@ fits exactly):
 {
   rule: 'RA/D-7/opaque-network',
   title: 'The network target is not named',
-  why: 'The runtime protects hosts one at a time. This command reaches for
+  why: `The runtime protects hosts one at a time. This command reaches for
         the network without naming a host, so there is nothing to approve —
-        a "yes" here would approve anything.',
+        a "yes" here would approve anything.`,
   example: { blocked: ['curl $URL', 'git push origin'],
              lawful:  ['curl https://api.example.com/v1'] },
-  instruction: 'Do not retry this command as-is. Name the host literally,
-                or ask your operator for the concrete target.',
+  instruction: `Do not retry this command as-is. Name the host literally,
+                or ask your operator for the concrete target.`,
   operatorMoves: { // canonical move → what the operator can literally do
     'rephrase with a literal host or URL …': 'reply with the concrete URL',
     'escalate to your Principal': 'the agent will ask you; decide there',
