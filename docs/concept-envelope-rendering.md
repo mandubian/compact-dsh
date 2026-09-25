@@ -76,6 +76,27 @@ and no tier is privileged over another. The LoopGuard's corrective
 `agent.inject` prose is the precedent: the Enforcer already authors
 instructional text; T2 applies that discipline to envelopes.
 
+## The words, plainly
+
+The ladder brought in a few terms of art — some coined here, some inherited.
+This is the whole vocabulary, in plain language:
+
+| Term | Plain meaning |
+|---|---|
+| **envelope** (the canonical one) | the refusal or ask itself: which rule refused, why, and the lawful next moves. `buildEnvelope()` produces it; its `text` is the exact string R-3 and I-4 require. It is the single source of truth — every rendering below is derived from it and can be checked against it. |
+| **band copy** | the string the runtime actually emits to the Subject's context for one act — the denial or ask text as the agent receives it. "Band" as in channel: it is the link between Enforcer and Subject. Whatever is emitted on it is also what the record keeps — *the band text is the recorded text*. Coined by this design; not law vocabulary. |
+| **band tier** | which form the band copy takes: `full` (T1 — the canonical text; the default) or `instructional` (T2 — the same rule and moves, led by the procedure). Declared by the operator, never guessed; an unknown value refuses. |
+| **T0 … T3** | the four audiences, not four laws: T0 the record, T1 the agent's full-fidelity copy, T2 the agent's instructional copy, T3 the operator's card. One envelope, four projections. |
+| **gloss** | the per-rule human explanation — title, why, a blocked/lawful example, the instructional line — in `packages/envelope/src/gloss.js`. The raw material the T2 and T3 projections are built from. |
+| **wire lint** | the approval suite's check that the envelope shape (rule + lawful moves) is present on the *actually emitted* reason — on the wire, not on a helper. |
+| **register anchor** | the lint rule that a gloss must cite at least one clause its own gate's plugin enforces — tying prose to the register's attribution, not just to clauses that exist. |
+| **waterfall** | dsh's `tools/pre-execute` pipeline: every tool call passes through every gate in order; a gate returns a denial or delegates to the next. |
+
+Everything else — Principal, Subject, Enforcer, Witness, petition, the
+clause codes (R-3, I-4, D-7…) — is law vocabulary, defined in
+[compact.md](https://github.com/mandubian/compact/blob/main/compact.md), with
+the short versions in the README's "The vocabulary, in two tables".
+
 ## The gloss record: one row, four projections
 
 One record per rule that an envelope can carry, hosted beside the guide

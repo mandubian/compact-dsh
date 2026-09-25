@@ -33,7 +33,7 @@ runtime know an agent's tier?**
 
 ## The decision
 
-- The band tier is **operator-declared per composition**:
+- The band tier — the band being the channel between Enforcer and Subject; the *band copy* is the text the runtime actually emits to the Subject's context (defined with the full vocabulary in the [concept page's glossary](concept-envelope-rendering.md#the-words-plainly)) — is **operator-declared per composition**:
   `COMPACT_ENVELOPE_TIER=instructional` selects T2 for band copy; the
   default, and the absence of the variable, is `full` (T1).
 - **An unknown value refuses** — `resolveTier` throws. A typo'd tier is a
