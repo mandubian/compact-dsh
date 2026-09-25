@@ -1,6 +1,9 @@
 # Decision record — the bash effect-class half of consent identity (#26): the exec-cache conflation, adjudicated
 
-**Status: PROPOSED — awaiting adjudication.** Drafted 2026-09-24 against
+**Status: option A ADOPTED (2026-09-25, Principal); option B commissioned
+on top of it — the compound, granularity and non-bash semantics pinned below
+are its specification; option C stands as the stopgap any operator can reach
+for today.** Drafted 2026-09-24 against
 [#26](https://github.com/mandubian/compact-dsh/issues/26), which the egress
 record deferred here ("#26's bash effect-class half, which keeps its own
 record and adjudication"). Constitutional under A-4 (recorded before the
@@ -114,10 +117,12 @@ is the same posture with less collateral, at the cost of one seam.
 | **B** effect classes | the granularity question, drafted above | read-shape replays | classifier + vocabulary + vectors | after its own adoption slice |
 | **C** config floor | none | none (global) / none for bash (per-family) | none | today, composition-side |
 
-**The recommendation, not the decision**: A now, B as the adjudicated
-upgrade, C as the stopgap any operator can reach for today. A is not a dead
-end on the road to B — A's payload **is** B's null-class fallback, so B
-adopts on top of A rather than instead of it. And A is the branch the
+**The decision (2026-09-25)**: A now — adopted as the command-scoped
+fingerprint for target-less calls — and **B commissioned as the upgrade on
+top of it** (A's payload **is** B's null-class fallback, so B adopts on top
+of A rather than instead of it); C remains the stopgap any operator can reach
+for today. A's scope is the latent half (stated above): the live compound
+rider is B's to close. And A is the branch the
 record's own doctrine already runs where it knew identity mattered; the
 finding above is that the same doctrine applies to every bash command, not
 only the ones that name a secret. Until one of the three is adopted, the
