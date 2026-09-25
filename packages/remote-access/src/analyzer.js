@@ -129,6 +129,108 @@ export function egressDeliveryOf(finding) {
   if (MEDIATOR_CLIENTS.has(finding.verb)) return finding.target ? 'mediator' : null;
   return null;
 }
+
+// -- bash effect class (#26 option B) ----------------------------------------
+// The LOCAL-effect axis of a command line, derived by the same one authority
+// that finds network targets and method classes. A CLOSED read-only
+// vocabulary: a subcommand is provably `read` only when its verb is LISTED —
+// everything else (mutating, unknown, unresolvable) leaves the whole command
+// `null`, and the null class falls back to option A's exact-command payload.
+// Three rules, pinned in the record ("Compound commands"): split at the shell
+// separators, the compound's class is the MAX of its parts, any unprovable
+// part poisons the whole. The vocabulary is the security-critical surface —
+// one verb mis-filed as read-only re-opens the conflation with a stamp on it
+// — so it starts minimal and grows only by adjudication.
+const BASH_READ_VERBS = new Set([
+  'ls', 'pwd', 'cat', 'head', 'tail', 'echo', 'printf', 'wc', 'which',
+  'whoami', 'id', 'groups', 'date', 'uname', 'uptime', 'hostname', 'df',
+  'du', 'ps', 'stat', 'env', 'printenv', 'grep', 'sort', 'uniq', 'basename',
+  'dirname', 'true', 'false', 'test',
+]);
+// git is subcommand-structured: `git status` reads, `git push` does not —
+// class it only for its known read-only subcommands, poison otherwise.
+const GIT_READ_SUBS = new Set([
+  'status', 'log', 'diff', 'show', 'branch', 'tag', 'rev-parse', 'remote',
+  'describe', 'ls-files', 'blame',
+]);
+// curl is classed read only when it writes nowhere locally (body to stdout);
+// these flags write files and poison. wget saves its body to a file BY
+// DEFAULT and is never classed; the package managers write their stores and
+// are never classed.
+const CURL_LOCAL_WRITE_FLAGS = new Set([
+  '-o', '-O', '--output', '--output-document', '-T', '--upload-file',
+  '--stderr', '-J', '--remote-header-name',
+]);
+// any of these anywhere in the command makes the local effect unprovable: a
+// redirect writes a file (2>&1 included — conservative, documented), a
+// variable/substitution could expand to anything, quoting does not exempt
+// (the URL-literal doctrine).
+const UNPROVABLE_MARKS = /[>$`$]/;
+
+function partClass(tokens, start, end) {
+  // classify one subcommand (tokens[start..end)): its head verb decides
+  let i = start;
+  while (i < end && /^[\w-]+=/.test(tokens[i])) i += 1;   // env assignments
+  if (i >= end) return null;                               // empty part: unprovable
+  const bare = tokens[i].replace(/^.*\//, '');
+  if (BASH_READ_VERBS.has(bare)) return bare;
+  if (bare === 'git') {
+    const sub = tokens[i + 1];
+    if (sub && GIT_READ_SUBS.has(sub)) return `git:${sub}`;
+    return null;
+  }
+  if (bare === 'curl') {
+    for (let j = i + 1; j < end; j++) {
+      if (CURL_LOCAL_WRITE_FLAGS.has(tokens[j]) || tokens[j].startsWith('--output=')) return null;
+    }
+    return 'curl';
+  }
+  return null;                                             // off-vocabulary: poison
+}
+
+/**
+ * The bash effect class of a command line —
+ * { effectClass: 'read', verbs, command } when every part is provably
+ * read-only, { effectClass: null, command } when any part is unprovable
+ * (mutating, off-vocabulary, unresolvable, a non-bash wrapper — the
+ * classifier never peers inside an interpreter), and null only when there is
+ * no command text to classify. The scanned command text rides the result so
+ * the null-class fallback can be command-scoped (option A's payload) at the
+ * fingerprint: an unprovable command is its own identity. Split at the shell
+ * separators the network tokenizer already uses; the class is the max of the
+ * parts (all provable reads → read); one unprovable part poisons the whole.
+ */
+export function bashEffectClassOf(args) {
+  for (const key of DEFAULT_COMMAND_ARG_KEYS) {
+    const command = args?.[key];
+    if (typeof command !== 'string' || !command.trim()) continue;
+    const tokens = [];
+    const cmdPos = [];
+    let atCmd = true;
+    for (const m of command.matchAll(TOKEN_RE)) {
+      if (SEPARATORS.has(m[0])) { atCmd = true; continue; }
+      tokens.push(m[0]);
+      cmdPos.push(atCmd);
+      atCmd = false;
+    }
+    // poison scans first: one unprovable mark anywhere and the whole line
+    // has no provable class
+    if (tokens.some((t) => UNPROVABLE_MARKS.test(t))) return { effectClass: null, command };
+    const verbs = new Set();
+    let start = -1;
+    for (let i = 0; i <= tokens.length; i++) {
+      const boundary = i === tokens.length || cmdPos[i];
+      if (boundary && start >= 0) {
+        const cls = partClass(tokens, start, i);
+        if (cls == null) return { effectClass: null, command };  // max rule: one unprovable part → whole null
+        verbs.add(cls);
+      }
+      if (boundary) start = cmdPos[i] ? i : -1;
+    }
+    return { effectClass: 'read', verbs: [...verbs].sort(), command };
+  }
+  return null;
+}
 const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const SCP_LIKE_RE = /^[\w.-]+@([\w.-]+):/; // git@github.com:org/repo
 // shell-naive tokenization: separators are their own matches so command

@@ -695,6 +695,10 @@ export function approvalPlugin(opts = {}) {
           (approval.egress === 'proxy' && args?.delivery === 'mediator' && args?.url == null && args?.port == null
             ? ` The grant this approval materializes names the host only: it carries plain HTTP, while a tunneled act ` +
               `(CONNECT) to it would be refused at the wire — a tunnel opens only where the operator was shown the port (#56).`
+            : '') +
+          (args?.effectClass === null && typeof args?.command === 'string' && args.command
+            ? ` This command's local effects are not statically provable as read-only, so the approval covers exactly ` +
+              `this command — a differently-phrased or differently-tailed command asks again (#26).`
             : ''),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };
