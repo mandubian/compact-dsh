@@ -16,7 +16,7 @@
 //
 // Usage: node tools/verify-register.mjs [--register <path>]
 import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CLAUSES, clauseOf, clauseIds, verifyBody, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 
@@ -83,7 +83,15 @@ if (register) {
     // not resolve is a broken audit trail, and a broken audit trail fails
     // the gate loudly, exactly like a moved verifier.
     for (const m of String(e.evidence ?? '').matchAll(/((?:docs|annex)\/[A-Za-z0-9._/-]+\.md)/g)) {
-      if (!existsSync(resolve(root, m[1]))) fail(`${e.clause} (${e.plugin}): evidence cites ${m[1]}, which does not exist — fix the citation or the docs (A-4)`);
+      // the citation is repo-relative BY POLICY: a `..`-bearing path escapes
+      // the checkout and turns this check into a filesystem existence oracle
+      // on the runner (Copilot review #93) — reject before any stat
+      const abs = resolve(root, m[1]);
+      if (relative(root, abs).startsWith('..')) {
+        fail(`${e.clause} (${e.plugin}): evidence cites ${m[1]}, which escapes the repository — citations are repo-relative`);
+        continue;
+      }
+      if (!existsSync(abs)) fail(`${e.clause} (${e.plugin}): evidence cites ${m[1]}, which does not exist — fix the citation or the docs (A-4)`);
     }
     if (e.kind === 'enforced') {
       if (!e.plugin) fail(`${e.clause}: an enforced entry must name its enforcing plugin`);

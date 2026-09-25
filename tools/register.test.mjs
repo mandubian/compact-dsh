@@ -34,13 +34,27 @@ test('the gate catches an evidence citation that does not resolve (pointer polic
   const dir = mkdtempSync(join(tmpdir(), 'compact-register-'));
   const reg = JSON.parse(readFileSync(join(ROOT, 'docs/register/register.json'), 'utf8'));
   // simulate a moved/renamed decision record: break one evidence citation
-  reg.entries.find(e => e.clause === 'I-5' && e.plugin === 'compact-approval').evidence +=
-    ' Adjudicated in docs/decision-RENAMED-RECORD.md.';
+  const entry = reg.entries.find(e => e.clause === 'I-5' && e.plugin === 'compact-approval');
+  assert.ok(entry, 'the I-5 approval entry must exist for this fixture');
+  entry.evidence += ' Adjudicated in docs/decision-RENAMED-RECORD.md.';
   const broken = join(dir, 'register.json');
   writeFileSync(broken, JSON.stringify(reg, null, 2));
   const r = spawnSync(process.execPath, ['tools/verify-register.mjs', '--register', broken], { cwd: ROOT, encoding: 'utf8' });
   assert.notEqual(r.status, 0, 'the gate must fail on a broken evidence citation');
   assert.ok((r.stderr + r.stdout).includes('docs/decision-RENAMED-RECORD.md'), 'the failure names the broken citation');
+});
+
+test('the gate rejects an evidence citation that escapes the repository (no filesystem oracle)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-register-'));
+  const reg = JSON.parse(readFileSync(join(ROOT, 'docs/register/register.json'), 'utf8'));
+  const entry = reg.entries.find(e => e.clause === 'I-5' && e.plugin === 'compact-approval');
+  assert.ok(entry, 'the I-5 approval entry must exist for this fixture');
+  entry.evidence += ' See docs/../../../etc/passwd.md.';
+  const broken = join(dir, 'register.json');
+  writeFileSync(broken, JSON.stringify(reg, null, 2));
+  const r = spawnSync(process.execPath, ['tools/verify-register.mjs', '--register', broken], { cwd: ROOT, encoding: 'utf8' });
+  assert.notEqual(r.status, 0, 'the gate must reject an escaping citation');
+  assert.ok((r.stderr + r.stdout).includes('escapes the repository'), 'the failure names the escape, never stats outside');
 });
 
 test('the auditor attests a conforming synthetic session', () => {
