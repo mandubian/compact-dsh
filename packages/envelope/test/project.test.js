@@ -8,8 +8,8 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildEnvelope } from '../src/index.js';
-import { instructionalText, operatorCard, resolveTier, bandTier, BAND_TIERS } from '../src/project.js';
-import { GLOSS } from '../../guide/src/gloss.js';
+import { instructionalText, operatorCard, bandReason, resolveTier, bandTier, BAND_TIERS } from '../src/project.js';
+import { GLOSS } from '../src/gloss.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -66,6 +66,7 @@ test('T3 carries title, why, rule, example, moves with operator actions, and the
   const gloss = GLOSS['RA/D-7/opaque-network'];
   const card = operatorCard(env, gloss);
   assert.ok(card.startsWith('Not run: The network target is not named'), 'card leads with the plain title');
+  assert.ok(card.includes('synthetic reason for RA/D-7/opaque-network'), 'card carries the canonical reason — it must stand alone for a deciding human');
   assert.ok(card.includes(gloss.why), 'card carries the why');
   assert.ok(card.includes('Rule: RA/D-7/opaque-network'), 'card names the rule');
   assert.ok(card.includes(`Refused path — e.g. ${gloss.example.blocked[0]}`), 'card shows the blocked example');
@@ -86,6 +87,27 @@ test('T3 for an ask leads as an ask; T3 without a gloss still shows the rule and
   assert.ok(bare.includes('Rule: EG/no-grant'), 'unglossed card still names the rule');
   assert.ok(bare.includes('Raw envelope:'), 'unglossed card still carries the raw envelope');
   assert.ok(bare.includes('synthetic reason for EG/no-grant'), 'unglossed card falls back to the canonical reason');
+});
+
+test('bandReason: tier full is byte-identical to the canonical text; instructional is the T2 floor form', () => {
+  const env = syntheticEnv('RA/D-7/opaque-network');
+  assert.equal(bandReason(env), env.text, 'default tier: the canonical text, byte for byte');
+  assert.equal(bandReason(env, { tier: 'full' }), env.text);
+  const t2 = bandReason(env, { tier: 'instructional' });
+  assert.ok(t2.includes('[RA/D-7/opaque-network]'), 'T2 band copy names the rule');
+  for (const m of env.lawfulNextMoves) assert.ok(t2.includes(m), 'T2 band copy carries every move');
+  assert.notEqual(t2, env.text, 'instructional tier actually changes the band copy');
+
+  // asks: kind flows through the band copy
+  const askT2 = bandReason(env, { kind: 'ask', tier: 'instructional' });
+  assert.ok(askT2.startsWith('Needs approval'), 'an ask band copy leads as an ask');
+
+  // an unglossed rule never invents prose: the T2 skeleton wraps the
+  // canonical reason and keeps every move
+  const bare = syntheticEnv('XX/never-glossed');
+  const bareT2 = bandReason(bare, { tier: 'instructional' });
+  assert.ok(bareT2.includes('synthetic reason for XX/never-glossed'), 'unglossed T2 keeps the canonical reason');
+  for (const m of bare.lawfulNextMoves) assert.ok(bareT2.includes(m), 'unglossed T2 keeps every move');
 });
 
 test('tier resolution: default full, declared instructional, unknown refuses (D-7)', () => {

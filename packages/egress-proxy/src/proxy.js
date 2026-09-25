@@ -35,7 +35,7 @@
 import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { connect as dial, isIP } from 'node:net';
 import { lookup as dnsLookup } from 'node:dns';
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 import { patternMatches } from 'compact-dsh-approval';
 
 /** The acting gate every refusal from here is stamped with (R-3/I-4). */
@@ -80,11 +80,11 @@ function patternReaches(grant, { host, port, url, tunnel }) {
 
 function refuse(res, envelope, status = 403) {
   res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8', 'proxy-agent': 'compact-dsh-egress-proxy' });
-  res.end(envelope.text);
+  res.end(bandReason(envelope));
 }
 
 function rawRefuse(socket, envelope, statusLine = 'HTTP/1.1 403 Forbidden') {
-  if (socket.writable) socket.end(`${statusLine}\r\ncontent-type: text/plain; charset=utf-8\r\n\r\n${envelope.text}\n`);
+  if (socket.writable) socket.end(`${statusLine}\r\ncontent-type: text/plain; charset=utf-8\r\n\r\n${bandReason(envelope)}\n`);
   else socket.destroy();
 }
 

@@ -47,7 +47,7 @@ export const GLOSS = {
 
   'AG/*': {
     title: 'This act is not covered by any grant layer',
-    why: 'Dangerous acts need a recorded approval. This exact operation — tool, canonical target and fingerprint — is not covered by the exec cache, a plan grant, or a session grant, so the runtime asks the operator before it runs. Approving once materializes an exec-cache entry: the identical operation then replays without re-asking, until the entry expires.',
+    why: 'Dangerous acts need a recorded approval. This exact operation — tool, canonical target and fingerprint — is not covered by the exec cache, a plan grant, or a session grant, so the runtime asks the operator before it runs. What "yes" materializes is stated on the ask itself: the exec-cache consequence, its configured TTL and reach, and both exits.',
     example: { blocked: ['bash curl https://example.com/api — with no live grant for example.com'], lawful: ['the operator approves once at the ask; the identical call then replays'] },
     instruction: 'Deliver the ask to your operator and wait. Do not restate the call differently to dodge the fingerprint — a changed operation asks again.',
     operatorMoves: {

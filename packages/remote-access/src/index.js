@@ -17,7 +17,7 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 import { REFUSAL_EVENT } from 'compact-dsh-approval';
 import { createAnalyzer, methodClassOf, egressDeliveryOf, bashEffectClassOf } from './analyzer.js';
 
@@ -43,7 +43,7 @@ export function apply(ctx, config) {
             reason: `"${f.verb}" requires network access with an unresolvable target — static analysis cannot gate it per-host (fail-closed)`,
             lawfulNextMoves: ['rephrase with a literal host or URL so the request can be gated per-host', 'use an approved alternative', 'escalate to your Principal'] });
           try { ctx.emit?.(REFUSAL_EVENT, { kind: 'deny', verdict: 'opaque-network', ruleId: 'D-7/opaque-network', tool: exec?.name ?? 'unknown-tool', fingerprint: null, root: null, session: null, at: Date.now() }); } catch { /* accounting must not break enforcement */ }
-          return { kind: 'deny', reason: env.text };
+          return { kind: 'deny', reason: bandReason(env) };
         }
         // route the finding through the five grant layers (approvable per-host).
         // The method class rides the call: it JOINS THE FINGERPRINT (consent

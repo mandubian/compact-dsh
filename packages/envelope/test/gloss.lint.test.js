@@ -26,7 +26,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { GLOSS, WILDCARD_GLOSS, glossFor } from '../src/gloss.js';
+import { GLOSS, WILDCARD_GLOSS, glossFor } from '../src/gloss.js';  // the gloss lives with the envelope (band-time data)
 import { fingerprint } from '../../approval/src/fingerprint.js';
 import { CAPABILITY_PARTS } from '../../capability-gate/src/parts.js';
 

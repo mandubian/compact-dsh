@@ -73,3 +73,30 @@ that anchored to the old clause, forcing reconciliation in the same PR.
   projection is exercised by its property tests, not by a live surface.
 - The tier is composition-wide; per-agent override waits for a second agent
   class (option 2 above).
+
+## Slice-3 addendum — the band copy is the recorded copy, and the gloss moved
+
+Wiring the tier into the gates surfaced two facts the record states plainly:
+
+- **The band text is the recorded text.** The denial reason the waterfall
+  carries is what the session log records — there is no second, private
+  canonical copy. So under `instructional`, the record carries the T2 form;
+  the floor lint guarantees the rule and every lawful move survive it. Under
+  the default (`full`), every byte is exactly what the record has always
+  carried — the wiring is byte-identical until the operator declares a tier.
+- **The gloss lives with the envelope now.** Band-time prose must be available
+  where the band copy is built; hosting it in the guide would have made every
+  gate import the interpretive package and made the "no force" aid load-bearing.
+  `gloss.js` and its lint moved to `packages/envelope/` — the guide will serve
+  the same records as a page (interpretation reading machinery, the right
+  direction). The register anchor moved with it, unchanged.
+- **Asks render the T3 card always** (a surface, not a tier): the card carries
+  the canonical reason and embeds the canonical envelope verbatim, so the
+  human-facing ask keeps the identity on the record. The approval wire lint
+  now reads the envelope out of the card.
+- **The card caught its own overclaim**: the static `AG/*` gloss asserted the
+  exec-cache replay unconditionally, contradicting the canonical ask's
+  ttl-disabled disclosure ("Approving covers this ask only"). The gloss now
+  defers — what "yes" materializes is stated on the ask itself. A static
+  gloss contradicting a configuration-aware envelope is precisely the drift
+  the lint cannot parse; here, the approval suite's own honesty test caught it.

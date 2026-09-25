@@ -12,6 +12,8 @@
 // invents prose. Without a gloss there is nothing to teach; the law's own
 // words are the honest floor.
 
+import { glossFor } from './gloss.js';
+
 function movesBlock(moves) {
   return (moves ?? []).map(m => `— ${m}`).join('\n');
 }
@@ -39,6 +41,7 @@ export function operatorCard(env, gloss, { kind = 'refused' } = {}) {
   const rule = `${env.gate}/${env.ruleId}`;
   const lead = kind === 'ask' ? 'Approval requested' : 'Not run';
   const lines = [`${lead}: ${gloss?.title ?? env.reason}`];
+  if (env.reason) lines.push(env.reason);
   if (gloss?.why) lines.push(gloss.why);
   lines.push(`Rule: ${rule}`);
   const ex = gloss?.example;
@@ -55,6 +58,25 @@ export function operatorCard(env, gloss, { kind = 'refused' } = {}) {
   lines.push('Raw envelope:');
   lines.push(env.text);
   return lines.join('\n');
+}
+
+/** The operator-facing ask: the T3 card is a SURFACE, not a tier — the human
+ *  always gets the full card (and, embedded in it, the canonical envelope),
+ *  whatever the band tier is. */
+export function askCard(env) {
+  return operatorCard(env, glossFor(env.gate, env.ruleId)?.gloss, { kind: 'ask' });
+}
+
+/** The band copy a gate emits for the Subject: the tier-aware text for this
+ *  envelope. 'full' (the default) is the canonical envelope text — byte for
+ *  byte what the record has always carried; 'instructional' is the T2 form
+ *  (rule id + procedure + every move). The record carries what the Subject
+ *  was told, so under T2 the record carries T2 — the floor lint guarantees
+ *  the rule and every move survive. */
+export function bandReason(env, { kind = 'refused', tier = bandTier() } = {}) {
+  if (tier === 'full') return env.text;
+  const { gloss } = glossFor(env.gate, env.ruleId) ?? {};
+  return instructionalText(env, gloss, { kind });
 }
 
 /** The band tiers (the decision record: docs/decision-envelope-tier.md).
