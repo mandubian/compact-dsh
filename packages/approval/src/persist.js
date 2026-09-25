@@ -93,7 +93,7 @@ export class PersistentGrantStore extends GrantStore {
       // doctrine: an at-rest mechanism that cannot fail loudly claims no
       // more than its key placement proves. If a composition ever declares
       // at-rest copies as an adversary, the recorded upgrade path is the
-      // HMAC-encoded matching of decision-consent-identity.md's #75
+      // HMAC-encoded matching of docs/decision-consent-identity.md's #75
       // adjudication — with its UrlPrefix semantics change adjudicated in
       // the same slice.
       mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
