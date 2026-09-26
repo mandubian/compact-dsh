@@ -100,3 +100,24 @@ Wiring the tier into the gates surfaced two facts the record states plainly:
   defers — what "yes" materializes is stated on the ask itself. A static
   gloss contradicting a configuration-aware envelope is precisely the drift
   the lint cannot parse; here, the approval suite's own honesty test caught it.
+
+### The live capture (2026-09-25) — the operator channel carries the canonical disclosure
+
+The first real ask through the web surface showed the T3 card as the operator
+sees it: one collapsed paragraph, the same fact stated three times (lead,
+canonical reason, gloss why) and the moves twice. Two findings, both recorded:
+
+- **The web ask surface renders whitespace-collapsed plain text** — no
+  markdown, no line breaks. The recon item is answered; the composition
+  cannot reformat the card, upstream owns the rendering.
+- **For the AG ask family the canonical reason already is the full,
+  configuration-aware disclosure** — the TTL and reach of the exec-cache
+  consequence, the consent-vs-connectivity honesty, the lawful moves. The
+  card wrapped that disclosure in commentary and duplicated it threefold.
+
+The asks therefore carry the canonical text alone; `askCard` remains a tested
+projection for the day a surface can render structure. The principle this
+settles: **the ask's disclosure is the canonical reason — static prose never
+wraps it.** Configuration-aware text is authoritative over commentary; a
+static gloss that contradicts what the ask itself states is a bug, as the
+ttl-disabled overclaim already showed.

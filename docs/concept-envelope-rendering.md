@@ -87,7 +87,7 @@ The runtime speaks over three **channels**, and it matters which is which:
 one envelope (the canonical text — the single source of truth)
    |
    |-- the BAND (Enforcer -> Subject's context): carries T1 or T2 -- the tier picks
-   |-- the OPERATOR CHANNEL (the ask surface): always carries T3 -- the card
+   |-- the OPERATOR CHANNEL (the ask surface): carries the canonical disclosure -- the card (T3) waits for a surface that can render it
    `-- the RECORD (what is written down): archives whatever a channel carried -- read as T0
 ```
 
@@ -96,11 +96,32 @@ one envelope (the canonical text — the single source of truth)
 | **envelope** (the canonical one) | the refusal or ask itself: which rule refused, why, and the lawful next moves. `buildEnvelope()` produces it; its `text` is the exact string R-3 and I-4 require. It is the single source of truth — every rendering below is derived from it and can be checked against it. |
 | **band copy** | the string the runtime actually emits to the Subject's context for one act — the denial or ask text as the agent receives it. "Band" as in channel: it is the link between Enforcer and Subject. Whatever is emitted on it is also what the record keeps — *the band text is the recorded text*. Coined by this design; not law vocabulary. |
 | **band tier** | the switch on the band. The band's reader is the agent, and exactly two projections may ride it: **T1** (tier `full`, the default) or **T2** (tier `instructional`). Declared by the operator, never guessed; an unknown value refuses. |
-| **T0 … T3** | the four projections, not four laws. **T1** and **T2** are the two forms the band can carry — the band tier picks between them. **T3** never rides the band: it is the operator card, carried by the ask surface (terminal prompt, browser card), always. **T0** is not emitted anywhere at all: it is the record's stored copy of what a channel carried — the auditor's reading, years later. One sentence holds it together: *the tier chooses what the agent is told (T1 vs T2); the record archives whatever was told (T0); the card is what the operator is shown (T3).* |
+| **T0 … T3** | the four projections, not four laws. **T1** and **T2** are the two forms the band can carry — the band tier picks between them. **T3** never rides the band and — since the first live capture (2026-09-25) — rides no live surface either: the one ask surface that exists (the web card) collapses whitespace and renders no markdown, so wrapping the disclosure in the card tripled it into a wall. Today the ask surface carries the canonical disclosure (the T1 text); the card stays a tested projection for the day a surface can render structure. **T0** is not emitted anywhere at all: it is the record's stored copy of what a channel carried — the auditor's reading, years later. One sentence holds it together: *the tier chooses what the agent is told (T1 vs T2); the record archives whatever was told (T0); the card is what the operator is shown (T3).* |
 | **gloss** | the per-rule human explanation — title, why, a blocked/lawful example, the instructional line — in `packages/envelope/src/gloss.js`. The raw material the T2 and T3 projections are built from. |
 | **wire lint** | the approval suite's check that the envelope shape (rule + lawful moves) is present on the *actually emitted* reason — on the wire, not on a helper. |
 | **register anchor** | the lint rule that a gloss must cite at least one clause its own gate's plugin enforces — tying prose to the register's attribution, not just to clauses that exist. |
 | **waterfall** | dsh's `tools/pre-execute` pipeline: every tool call passes through every gate in order; a gate returns a denial or delegates to the next. |
+
+**The gate codes.** The envelope header is `[GATE/ruleId]` — which gate
+refused, under which rule. The GATE segment is a runtime mnemonic, not law
+vocabulary; the ruleId is often a law clause itself (`I-5/secret-use`), a
+runtime identity (`AG-1`, the allowlist rule; the `fp_…` fingerprint of the
+exact operation), or a gate-specific verdict name (`EG/no-grant`). The full
+set:
+
+| Code | Gate |
+|---|---|
+| **AG** | Approval Gate — the allowlist and the five-layer approval evaluator |
+| **RA** | the remote-access analyzer (network findings) |
+| **LG** | the LoopGuard (the 12 trip conditions, `LG-1`…`LG-12`) |
+| **EG** | the egress mediator (per-connection verdicts) |
+| **MG** | mount grants |
+| **SC** | supply chain (sandbox image provenance, CF-2) |
+| **CF** | confinement (the workspace anchor) |
+| **PG** | the promotion evidence gate |
+| **CG** | the capability gate |
+| **CS** | consent-scoped address |
+| **PT** | the petition channel |
 
 Everything else — Principal, Subject, Enforcer, Witness, petition, the
 clause codes (R-3, I-4, D-7…) — is law vocabulary, defined in
@@ -174,16 +195,18 @@ mechanism is the one thing this composition cannot do honestly.
 
 ## What changes per surface
 
-- `packages/guide/` — hosts the gloss records and serves them as a guide page
-  (the Subject can read *why it was refused* in band — R-3 and R-6 pointing
-  at the same door).
-- `packages/envelope/` — grows a projection module (T2, T3) over the
-  structured fields; the canonical `text` is untouched.
-- The terminal operator prompter — adds the gloss title/why line and the
-  per-move operator actions to the ask it already renders.
-- The gateway ask (`reason`) — carries the T3 form so the host's approval
-  card shows the human face; the compact composition's transcript notes keep
-  their current one-line discipline.
+- `packages/envelope/` — hosts the gloss records (band-time data — moved from
+  the guide, whose aid must never be load-bearing) and the projection module
+  (T2, T3) over the structured fields; the canonical `text` is untouched.
+- The gateway ask (`reason`) — carries the **canonical disclosure alone**
+  (live capture, 2026-09-25: the web card collapses whitespace, so the T3
+  card tripled the ask into a wall); `askCard` stays a tested projection for
+  the day a surface can render structure.
+- The terminal operator prompter — renders whatever reason the ask carries,
+  indented, beside the command/target/fingerprint preview it already shows.
+- `packages/guide/` — the guide page serving the gloss to the Subject remains
+  a follow-up (interpretation reading machinery — R-3 and R-6 at the same
+  door).
 
 ## Declared gaps and open questions
 

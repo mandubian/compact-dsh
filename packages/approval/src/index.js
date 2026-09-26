@@ -39,7 +39,7 @@ import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget, canonicalQuery } from './fingerprint.js';
 import { parseAllowlistLikePattern } from './pattern.js';
-import { buildEnvelope, bandReason, askCard } from 'compact-envelope';
+import { buildEnvelope, bandReason } from 'compact-envelope';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
 export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, evaluate, fingerprint, canonicalTarget, canonicalQuery, parseAllowlistLikePattern, DEFAULTS };
@@ -645,7 +645,7 @@ export function approvalPlugin(opts = {}) {
             `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints. ` +
             replayConsequence(approval.execCacheTtlMs),
           lawfulNextMoves: ['rephrase without the secret reference', 'escalate to your Principal'] });
-        return { kind: 'ask', reason: askCard(env) };
+        return { kind: 'ask', reason: env.text };
       }
       const v = approval.evaluate({ tool, args, root, session, now: Date.now() });
       if (v.verdict === 'allowed') {
@@ -701,7 +701,7 @@ export function approvalPlugin(opts = {}) {
               `this command — a differently-phrased or differently-tailed command asks again (#26).`
             : ''),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
-      return { kind: 'ask', reason: askCard(env) };
+      return { kind: 'ask', reason: env.text };
     };
 
     ctx.on('tools/pre-execute', async (exec, next) => approval.gate(exec) ?? next());
