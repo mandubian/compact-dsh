@@ -81,12 +81,22 @@ instructional text; T2 applies that discipline to envelopes.
 The ladder brought in a few terms of art — some coined here, some inherited.
 This is the whole vocabulary, in plain language:
 
+The runtime speaks over three **channels**, and it matters which is which:
+
+```text
+one envelope (the canonical text — the single source of truth)
+   |
+   |-- the BAND (Enforcer -> Subject's context): carries T1 or T2 -- the tier picks
+   |-- the OPERATOR CHANNEL (the ask surface): always carries T3 -- the card
+   `-- the RECORD (what is written down): archives whatever a channel carried -- read as T0
+```
+
 | Term | Plain meaning |
 |---|---|
 | **envelope** (the canonical one) | the refusal or ask itself: which rule refused, why, and the lawful next moves. `buildEnvelope()` produces it; its `text` is the exact string R-3 and I-4 require. It is the single source of truth — every rendering below is derived from it and can be checked against it. |
 | **band copy** | the string the runtime actually emits to the Subject's context for one act — the denial or ask text as the agent receives it. "Band" as in channel: it is the link between Enforcer and Subject. Whatever is emitted on it is also what the record keeps — *the band text is the recorded text*. Coined by this design; not law vocabulary. |
-| **band tier** | which form the band copy takes: `full` (T1 — the canonical text; the default) or `instructional` (T2 — the same rule and moves, led by the procedure). Declared by the operator, never guessed; an unknown value refuses. |
-| **T0 … T3** | the four audiences, not four laws: T0 the record, T1 the agent's full-fidelity copy, T2 the agent's instructional copy, T3 the operator's card. One envelope, four projections. |
+| **band tier** | the switch on the band. The band's reader is the agent, and exactly two projections may ride it: **T1** (tier `full`, the default) or **T2** (tier `instructional`). Declared by the operator, never guessed; an unknown value refuses. |
+| **T0 … T3** | the four projections, not four laws. **T1** and **T2** are the two forms the band can carry — the band tier picks between them. **T3** never rides the band: it is the operator card, carried by the ask surface (terminal prompt, browser card), always. **T0** is not emitted anywhere at all: it is the record's stored copy of what a channel carried — the auditor's reading, years later. One sentence holds it together: *the tier chooses what the agent is told (T1 vs T2); the record archives whatever was told (T0); the card is what the operator is shown (T3).* |
 | **gloss** | the per-rule human explanation — title, why, a blocked/lawful example, the instructional line — in `packages/envelope/src/gloss.js`. The raw material the T2 and T3 projections are built from. |
 | **wire lint** | the approval suite's check that the envelope shape (rule + lawful moves) is present on the *actually emitted* reason — on the wire, not on a helper. |
 | **register anchor** | the lint rule that a gloss must cite at least one clause its own gate's plugin enforces — tying prose to the register's attribution, not just to clauses that exist. |

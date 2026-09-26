@@ -71,7 +71,9 @@ export function askCard(env) {
 }
 
 /** The band copy a gate emits for the Subject: the tier-aware text for this
- *  envelope. 'full' (the default) is the canonical envelope text — byte for
+ *  envelope. The band carries T1 or T2 — never T0 (the record's archive of
+ *  whatever was carried) and never T3 (the operator card, which rides the
+ *  ask surface). 'full' (the default) is the canonical envelope text — byte for
  *  byte what the record has always carried; 'instructional' is the T2 form
  *  (rule id + procedure + every move). The record carries what the Subject
  *  was told, so under T2 the record carries T2 — the floor lint guarantees
