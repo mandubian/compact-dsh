@@ -16,7 +16,7 @@
 // decision, and the host appends the approval/asked + approval/decided
 // audit pair — no out-of-band "the operator said it was fine".
 import { defineTool } from '@deepseek-ai/dsh-tools';
-import { buildEnvelope,bandReason, askCard } from 'compact-envelope';
+import { buildEnvelope, bandReason } from 'compact-envelope';
 import { coveringGrants, identityOf } from 'compact-dsh-approval';
 import { canonicalizeBestEffort, statSafe, within } from './mounts.js';
 

@@ -174,16 +174,18 @@ mechanism is the one thing this composition cannot do honestly.
 
 ## What changes per surface
 
-- `packages/guide/` — hosts the gloss records and serves them as a guide page
-  (the Subject can read *why it was refused* in band — R-3 and R-6 pointing
-  at the same door).
-- `packages/envelope/` — grows a projection module (T2, T3) over the
-  structured fields; the canonical `text` is untouched.
-- The terminal operator prompter — adds the gloss title/why line and the
-  per-move operator actions to the ask it already renders.
-- The gateway ask (`reason`) — carries the T3 form so the host's approval
-  card shows the human face; the compact composition's transcript notes keep
-  their current one-line discipline.
+- `packages/envelope/` — hosts the gloss records (band-time data — moved from
+  the guide, whose aid must never be load-bearing) and the projection module
+  (T2, T3) over the structured fields; the canonical `text` is untouched.
+- The gateway ask (`reason`) — carries the **canonical disclosure alone**
+  (live capture, 2026-09-25: the web card collapses whitespace, so the T3
+  card tripled the ask into a wall); `askCard` stays a tested projection for
+  the day a surface can render structure.
+- The terminal operator prompter — renders whatever reason the ask carries,
+  indented, beside the command/target/fingerprint preview it already shows.
+- `packages/guide/` — the guide page serving the gloss to the Subject remains
+  a follow-up (interpretation reading machinery — R-3 and R-6 at the same
+  door).
 
 ## Declared gaps and open questions
 
