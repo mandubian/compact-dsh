@@ -11,7 +11,7 @@
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 import { parseAllowlist, extractTarget, decide } from './allowlist.js';
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 
 export const name = 'compact-allowlist-gate';
 export const inject = ['tools'];
@@ -47,7 +47,7 @@ export function apply(ctx, config) {
       // see docs/concept-envelope-rendering.md): the reason and moves are
       // this gate's content, the [AG/AG-1] header the shared form
       const env = denyEnvelope(tool, target);
-      return { kind: 'deny', reason: env.text };
+      return { kind: 'deny', reason: bandReason(env) };
     }
     return next(); // allow / abstain — delegate down the waterfall
   });
