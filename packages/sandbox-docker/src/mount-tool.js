@@ -102,7 +102,7 @@ export function mountRequestTool({ approval, askApproval, protectedPaths, grantT
       const env = buildEnvelope({ gate: GATE, ruleId: 'I-5/mount',
         reason: `mount requested: ${canonical} (${mode}) for session ${session} — ${justification}`,
         lawfulNextMoves: [`request a narrower subdirectory of ${canonical}`, 'use an approved alternative path', 'escalate to your Principal'] });
-      const outcome = await askApproval({ agent: exec.agent, toolName: exec.name, callId: exec.callId, reason: askCard(env), signal: exec.signal });
+      const outcome = await askApproval({ agent: exec.agent, toolName: exec.name, callId: exec.callId, reason: env.text, signal: exec.signal });
       if (outcome !== 'allowed-once') {
         throwEnvelope(buildEnvelope({ gate: GATE, ruleId: 'I-5/mount',
           reason: `mount of ${canonical} (${mode}) was not approved (${outcome})`,
