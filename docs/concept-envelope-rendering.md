@@ -102,6 +102,27 @@ one envelope (the canonical text — the single source of truth)
 | **register anchor** | the lint rule that a gloss must cite at least one clause its own gate's plugin enforces — tying prose to the register's attribution, not just to clauses that exist. |
 | **waterfall** | dsh's `tools/pre-execute` pipeline: every tool call passes through every gate in order; a gate returns a denial or delegates to the next. |
 
+**The gate codes.** The envelope header is `[GATE/ruleId]` — which gate
+refused, under which rule. The GATE segment is a runtime mnemonic, not law
+vocabulary; the ruleId is often a law clause itself (`I-5/secret-use`), a
+runtime identity (`AG-1`, the allowlist rule; the `fp_…` fingerprint of the
+exact operation), or a gate-specific verdict name (`EG/no-grant`). The full
+set:
+
+| Code | Gate |
+|---|---|
+| **AG** | Approval Gate — the allowlist and the five-layer approval evaluator |
+| **RA** | the remote-access analyzer (network findings) |
+| **LG** | the LoopGuard (the 12 trip conditions, `LG-1`…`LG-12`) |
+| **EG** | the egress mediator (per-connection verdicts) |
+| **MG** | mount grants |
+| **SC** | supply chain (sandbox image provenance, CF-2) |
+| **CF** | confinement (the workspace anchor) |
+| **PG** | the promotion evidence gate |
+| **CG** | the capability gate |
+| **CS** | consent-scoped address |
+| **PT** | the petition channel |
+
 Everything else — Principal, Subject, Enforcer, Witness, petition, the
 clause codes (R-3, I-4, D-7…) — is law vocabulary, defined in
 [compact.md](https://github.com/mandubian/compact/blob/main/compact.md), with
