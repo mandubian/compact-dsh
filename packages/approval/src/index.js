@@ -261,7 +261,8 @@ export function createApproval(opts = {}) {
             tool, fingerprint: fp, target: entry.target ?? {},
             grantedAt: entry.grantedAt, expiresAt: entry.expiresAt,
           }) }],
-          source: { kind: 'plugin', plugin: 'compact-approval' },
+          source: { kind: 'plugin', plugin: 'compact-approval', form: 'notice',
+            summary: `Replay: "${oneLine(tool) || 'unknown-tool'}" running under a prior operator approval` },
         }));
         approval.replayNotes.set(key, now);
       } catch { /* the trace is a receipt, never a gate — and not yet spent */ }
@@ -340,6 +341,21 @@ export function approvalTranscriptNote({ tool, fingerprint, target }, outcome, {
       return `[compact-approval] Gate decision: ${subject} closed cancelled — no operator answer arrived; the call did not run (fail-closed).`;
     default:
       return `[compact-approval] Gate decision: ${subject} closed ${outcome ?? 'unavailable'} — no operator answer; the call did not run (fail-closed).`;
+  }
+}
+
+/**
+ * The collapsed-row summary for the decision note: what the web transcript
+ * shows WITHOUT expanding (the note's `form: 'notice'` presentation — a
+ * producer-declared form upstream's chat renders with its summary on the
+ * row). One line, always; the full note text is the expanded body.
+ */
+export function approvalNoticeSummary({ tool }, outcome) {
+  const t = oneLine(tool) || 'unknown-tool';
+  switch (outcome) {
+    case 'allowed-once': return `Approval: "${t}" allowed once by the operator`;
+    case 'rejected': return `Approval: "${t}" denied by the operator — did not run`;
+    default: return `Approval: "${t}" closed ${outcome ?? 'unavailable'} — did not run`;
   }
 }
 
@@ -550,6 +566,10 @@ async function answerRequest(approval, req, next) {
     // answered, for every outcome, on the browser and terminal paths alike
     // (this wrapper sees both). An agent without inject (test shapes) skips
     // the note; a throwing inject must never take the decision path down.
+    // form:'notice' + summary: the web transcript renders the one-line
+    // account on the collapsed context row (readable without expanding),
+    // the full note as the expanded body — "an approval happened" is visible
+    // at a glance, which is the point of a trace.
     if (typeof agent?.inject === 'function') {
       try {
         agent.inject(createUserMessage({
@@ -561,7 +581,8 @@ async function answerRequest(approval, req, next) {
             ? ` The approved injection grant${rec.secretRefs.length > 1 ? 's are' : ' is'} live for this session ` +
               `(${rec.secretRefs.map(r => '$' + r).join(', ')}), TTL-bounded.`
             : '') }],
-          source: { kind: 'plugin', plugin: 'compact-approval' },
+          source: { kind: 'plugin', plugin: 'compact-approval', form: 'notice',
+            summary: approvalNoticeSummary(view, outcome) },
         }));
       } catch { /* the note is a trace, never a gate */ }
     }
