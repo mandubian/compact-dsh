@@ -1,0 +1,24 @@
+{
+  "name": "compact-dsh-card",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The web ask card: the canonical envelope text, structured client-side — a pure re-layout, no added prose (#90).",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": ["@deepseek-ai/dsh-client-ui-primitives"],
+      "external": ["@deepseek-ai/dsh-client-ui-primitives"]
+    }
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+  }
+}

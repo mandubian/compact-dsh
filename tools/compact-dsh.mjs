@@ -160,6 +160,10 @@ async function main() {
     ...values.smoke ? [] : values.web ? bundle('@deepseek-ai/dsh-web-app') : bundle('@deepseek-ai/dsh-headless'),
     ...bundle('compact-dsh-blessed'),
     { id: 'tools', config: { mode: 'native' } },
+    // the web ask card (#90): a static client plugin the browser loads to
+    // render the ask as the structured card. Web-only — the browser is the
+    // only surface it renders on; headless/attended compose nothing here.
+    ...values.web ? bundle('compact-dsh-card') : [],
     ...values.web ? webRows() : values.smoke ? [] : [
       { id: 'headless-startup', disabled: true },
       { id: 'code-runtime', disabled: true },

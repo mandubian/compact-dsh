@@ -121,3 +121,31 @@ settles: **the ask's disclosure is the canonical reason — static prose never
 wraps it.** Configuration-aware text is authoritative over commentary; a
 static gloss that contradicts what the ask itself states is a bug, as the
 ttl-disabled overclaim already showed.
+
+### The live capture (2026-09-28) — the ask surface becomes compact's own renderer
+
+The first capture's premise — "upstream owns the rendering" — was incomplete:
+upstream owns *their* card, but dsh's client-module system lets a composition
+ship its own static browser plugin (`dsh.client` manifest → served bundle →
+lazy boot-graph load; distinct from the dynamic runner the composition
+refuses at A-4/DYN). `packages/card/` is exactly that: a client plugin that
+registers a higher-priority takeover on the composer chain (upstream's
+ApprovalPanel keeps priority 1 and everything the select declines) and
+renders the ask from the canonical text alone.
+
+The card is a **pure re-layout, not a projection onto new prose** — the
+2026-09-25 principle is what makes it honest. It parses the lint-pinned
+envelope shape back into its parts (gate/rule chip, reason with line breaks
+intact, the moves as list rows — every line after the marker renders, so the
+R-3 floor survives the layout), keeps the verbatim text one disclosure away,
+and offers the same two outcomes on the same waterfall. A text that does not
+parse as a canonical envelope degrades to the upstream face with pre-wrap;
+nothing is invented, nothing is narrowed. The gloss-wrapped `askCard` stays
+retired for asks — the card wraps the disclosure in *layout*, never in
+*commentary*.
+
+Verified live on the web surface: a real `AG/fp_…` ask rendered the
+structured card (chip, intact paragraph, three moves, raw envelope
+collapsed), Deny resolved the waterfall, and the Subject was told the call
+was rejected by the operator. The card tests pin the parse (never narrows),
+the select (approvals only), the registration order, and both faces.
