@@ -14,16 +14,19 @@
 // the canonical reason — static prose never wraps it. The card therefore
 // adds no prose: it parses the canonical envelope text (the format is
 // lint-pinned by the approval suite's wire lint) and re-lays it out —
-// gate/rule chip, the reason with its line breaks intact (the upstream
-// headline collapses whitespace), the lawful next moves as a real list —
-// and always keeps the verbatim text one disclosure away. Where the text
-// does not parse as a canonical envelope (any other ask riding the same
-// waterfall), the card degrades to the upstream face with pre-wrap: the
-// reason shown as-is, same two buttons. Nothing is invented, nothing is
-// duplicated, nothing is rewritten: the reason and the move rows are
-// verbatim substrings of the source (each row carries its own dash exactly
-// when the builder wrote one), only whitespace-only rows are skipped at
-// render, so the R-3 floor — the rule and EVERY move — survives the layout.
+// gate/rule chip, the COMMAND the ask is about (read from the session's
+// chat state by callId — the same lookup upstream's ApprovalCommand
+// performs for its detail slot, which a full composer takeover otherwise
+// loses), the reason with its line breaks intact (the upstream headline
+// collapses whitespace), the lawful next moves as a real list — and always
+// keeps the verbatim text one disclosure away. Where the text does not
+// parse as a canonical envelope (any other ask riding the same waterfall),
+// the card degrades to the upstream face with pre-wrap: the reason shown
+// as-is, same two buttons. Nothing is invented, nothing is duplicated,
+// nothing is rewritten: the reason and the move rows are verbatim
+// substrings of the source (each row carries its own dash exactly when the
+// builder wrote one), only whitespace-only rows are skipped at render, so
+// the R-3 floor — the rule and EVERY move — survives the layout.
 //
 // Hand-authored in the loader-factory form the served bundles use; there is
 // no build step to drift from.
@@ -78,9 +81,49 @@ window.__ModuleLoader__.load({
 
 		// ── the card ──
 
+		// The command of the correlated tool call, read from the session's
+		// chat state — the SAME lookup upstream's ApprovalCommand performs
+		// for its `conversation.approval.detail` slot. The approval wire
+		// carries no arguments (the operator must see what they decide on,
+		// but the wire is not the place), so the transcript node reached by
+		// callId is the only honest source. Absent useChat (tests, other
+		// surfaces) or a pruned node → no command box, never a guess.
+		// The args JSON rides `argsRaw` on the pinned build; `arguments` is
+		// accepted too — and every node is guarded on its own, so one
+		// malformed entry can never hide the call in another.
+		function commandOfRoot(root) {
+			if (root == null || typeof root !== 'object') return undefined;
+			const raw = typeof root.argsRaw === 'string' ? root.argsRaw
+				: typeof root.arguments === 'string' ? root.arguments : undefined;
+			if (raw === undefined) return undefined;
+			try {
+				const args = JSON.parse(raw);
+				return typeof args?.command === 'string' ? args.command : undefined;
+			} catch {
+				return undefined;
+			}
+		}
+
+		function useCorrelatedCommand(callId, useChat) {
+			return (useChat ?? ((selector) => selector(undefined)))((snapshot) => {
+				if (callId == null || !snapshot || !snapshot.nodes) return undefined;
+				for (const node of snapshot.nodes.values()) {
+					try {
+						const root = node && node.kind === 'tool-call' ? node.data.root : undefined;
+						if (root != null && typeof root === 'object' && root.callId === callId && !('kind' in root)) {
+							const command = commandOfRoot(root);
+							if (command !== undefined) return command;
+						}
+					} catch { /* one malformed node must not hide the call in another */ }
+				}
+				return undefined;
+			}) ?? undefined;
+		}
+
 		function CompactCard(props) {
 			const approval = props.matched;
 			const parsed = parseAsk(approval?.reason);
+			const command = useCorrelatedCommand(approval?.callId, props.useChat);
 			const answeredState = react.useState(false);
 			const answered = answeredState[0];
 			const setAnswered = answeredState[1];
@@ -98,6 +141,11 @@ window.__ModuleLoader__.load({
 					react.createElement('div', { className: 'compact-card-body', 'data-approval-scroll': '', tabIndex: 0, role: 'group', 'aria-label': 'Approval details' },
 						parsed ? react.createElement('span', { className: 'compact-card-chip' },
 							parsed.gate + (parsed.ruleId ? '/' + parsed.ruleId : '')) : null,
+						// The decision itself, first: the exact command (or tool) this
+						// ask is about — what "yes" runs — before any consequence prose.
+						command != null ? react.createElement('div', { className: 'compact-card-deciding' },
+							react.createElement('div', { className: 'compact-card-deciding-label' }, 'You are approving'),
+							react.createElement('pre', { className: 'compact-card-command' }, command)) : null,
 						react.createElement('div', { className: 'compact-card-reason' }, reason),
 						// Each move row IS its source line — dash included when the
 						// builder wrote one, absent when it didn't; the only rows
@@ -139,6 +187,9 @@ window.__ModuleLoader__.load({
 			'.compact-card-dot{width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-state-warn-primary,#8a6d1a);flex:none}',
 			'.compact-card-body{box-sizing:border-box;max-height:var(--dsh-composer-text-max-height,336px);display:flex;flex-direction:column;gap:8px;padding:12px 16px 0;overflow-y:auto}',
 			'.compact-card-chip{display:inline-flex;align-self:flex-start;font-family:var(--ds-font-family-code,ui-monospace,monospace);font-size:12px;line-height:18px;padding:1px 8px;border-radius:6px;background:var(--dsw-alias-state-warn-tertiary,#faf3e3);color:var(--dsw-alias-state-warn-primary,#8a6d1a)}',
+			'.compact-card-deciding{display:flex;flex-direction:column;gap:4px}',
+			'.compact-card-deciding-label{color:var(--dsw-alias-label-tertiary,#6e7781);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}',
+			'.compact-card-command{margin:0;font-family:var(--ds-font-family-code,ui-monospace,monospace);font-size:13px;line-height:20px;white-space:pre-wrap;word-break:break-all;color:var(--dsw-alias-label-primary,#1f2328);background:var(--dsw-specific-input-major,#f6f8fa);border:1px solid var(--dsw-alias-border-l2,#d0d7de);border-radius:8px;padding:8px 10px;max-height:120px;overflow-y:auto}',
 			'.compact-card-reason{white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-primary,#1f2328);font-size:14px;line-height:21px}',
 			'.compact-card-moves{display:flex;flex-direction:column;gap:4px}',
 			'.compact-card-moves-label{color:var(--dsw-alias-label-tertiary,#6e7781);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}',
