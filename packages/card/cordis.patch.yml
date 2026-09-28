@@ -1,0 +1,8 @@
+# The web ask card (#90): a client-side renderer for the approval composer
+# takeover. Web-only — the launcher mounts this row only on the web surface;
+# the card renders in the browser, and headless/attended compose nothing here.
+# The host half is inert (src/index.js); the bundle is lib/client.js, served
+# by the client-modules host and loaded lazily by the web shell.
+- insert:
+    - id: compact-card
+      name: compact-dsh-card

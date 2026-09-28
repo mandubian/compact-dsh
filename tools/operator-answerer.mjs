@@ -18,8 +18,8 @@ import { createInterface as defaultCreateInterface } from 'node:readline';
 
 // Only the compact gate's envelope asks are the operator's business; anything
 // else reaching this point is not ours to decide and fails closed downstream.
-// slice 3: the compact ask's reason is the T3 operator card — the canonical
-// envelope is embedded verbatim inside it, so the marker is matched at line
+// slice 3, as amended by the 2026-09-25 live capture (#90): the compact ask's
+// reason is the canonical disclosure alone, so the marker is matched at line
 // start anywhere in the reason, not only at position 0
 const COMPACT_ENVELOPE_REASON = /(^|\n)\[AG(\/|\])/;
 const OUTCOMES = ['allowed-once', 'rejected'];
