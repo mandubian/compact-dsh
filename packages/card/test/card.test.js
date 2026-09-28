@@ -200,6 +200,29 @@ test('malformed argsRaw and a pruned node degrade to no box, no crash', () => {
   assert.equal(findByClass(pruned, 'compact-card-deciding').length, 0);
 });
 
+test('one malformed node never hides the correlated call sitting after it', () => {
+  const snapshot = {
+    nodes: new Map([
+      ['bad-shape', { kind: 'tool-call', data: null }],
+      ['bad-root', { kind: 'tool-call', data: { root: 42 } }],
+      ['good', { kind: 'tool-call', data: { root: CURL_CALL } }],
+    ]),
+  };
+  const tree = card.CompactCard({
+    matched: { kind: 'approval', callId: 'call-1', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' },
+    useChat: (selector) => selector(snapshot),
+  });
+  assert.equal(textOf(findByClass(tree, 'compact-card-command')[0]), 'curl https://example.com');
+});
+
+test('the args JSON under `arguments` (not only argsRaw) is accepted', () => {
+  const tree = card.CompactCard({
+    matched: { kind: 'approval', callId: 'call-1', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' },
+    useChat: chatWith({ callId: 'call-1', arguments: JSON.stringify({ command: 'curl https://example.com' }) }),
+  });
+  assert.equal(textOf(findByClass(tree, 'compact-card-command')[0]), 'curl https://example.com');
+});
+
 test('no useChat (tests, foreign surfaces): the card renders without the command box', () => {
   const tree = card.CompactCard({ matched: { kind: 'approval', callId: 'call-1', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' } });
   assert.equal(findByClass(tree, 'compact-card-deciding').length, 0);

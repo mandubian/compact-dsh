@@ -88,22 +88,34 @@ window.__ModuleLoader__.load({
 		// but the wire is not the place), so the transcript node reached by
 		// callId is the only honest source. Absent useChat (tests, other
 		// surfaces) or a pruned node → no command box, never a guess.
+		// The args JSON rides `argsRaw` on the pinned build; `arguments` is
+		// accepted too — and every node is guarded on its own, so one
+		// malformed entry can never hide the call in another.
+		function commandOfRoot(root) {
+			if (root == null || typeof root !== 'object') return undefined;
+			const raw = typeof root.argsRaw === 'string' ? root.argsRaw
+				: typeof root.arguments === 'string' ? root.arguments : undefined;
+			if (raw === undefined) return undefined;
+			try {
+				const args = JSON.parse(raw);
+				return typeof args?.command === 'string' ? args.command : undefined;
+			} catch {
+				return undefined;
+			}
+		}
+
 		function useCorrelatedCommand(callId, useChat) {
 			return (useChat ?? ((selector) => selector(undefined)))((snapshot) => {
 				if (callId == null || !snapshot || !snapshot.nodes) return undefined;
-				try {
-					for (const node of snapshot.nodes.values()) {
+				for (const node of snapshot.nodes.values()) {
+					try {
 						const root = node && node.kind === 'tool-call' ? node.data.root : undefined;
-						if (root !== undefined && root.callId === callId && !('kind' in root)) {
-							try {
-								const args = JSON.parse(root.argsRaw);
-								return typeof args.command === 'string' ? args.command : undefined;
-							} catch {
-								return undefined;
-							}
+						if (root != null && typeof root === 'object' && root.callId === callId && !('kind' in root)) {
+							const command = commandOfRoot(root);
+							if (command !== undefined) return command;
 						}
-					}
-				} catch { /* a malformed snapshot renders no command, never a crash */ }
+					} catch { /* one malformed node must not hide the call in another */ }
+				}
 				return undefined;
 			}) ?? undefined;
 		}
