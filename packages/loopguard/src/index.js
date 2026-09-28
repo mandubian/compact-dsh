@@ -193,10 +193,16 @@ function injectCorrective(ctx, exec, trip) {
   try {
     const agent = exec?.agent;
     if (!agent || typeof agent.inject !== 'function') return;
+    // form:'notice' + summary: the trip is visible on the web transcript's
+    // collapsed context row without expanding — a denied loop leaves a mark
     if (trip.denyAll || trip.behavioral === false) {
-      agent.inject(createUserMessage({ content: [{ type: 'text', text: haltProse(trip) }], source: { kind: 'plugin', plugin: 'compact-loopguard' } }));
+      agent.inject(createUserMessage({ content: [{ type: 'text', text: haltProse(trip) }],
+        source: { kind: 'plugin', plugin: 'compact-loopguard', form: 'notice',
+          summary: `LoopGuard ${trip.id} ${trip.label}: all further calls denied (session halt)` } }));
     } else {
-      agent.inject(createUserMessage({ content: [{ type: 'text', text: correctiveProse(trip) }], source: { kind: 'plugin', plugin: 'compact-loopguard' } }));
+      agent.inject(createUserMessage({ content: [{ type: 'text', text: correctiveProse(trip) }],
+        source: { kind: 'plugin', plugin: 'compact-loopguard', form: 'notice',
+          summary: `LoopGuard ${trip.id} ${trip.label}: calls denied until your Principal's next message` } }));
     }
   } catch { /* a failed injection must never break the denial */ }
 }

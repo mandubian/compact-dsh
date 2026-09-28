@@ -177,7 +177,11 @@ export function apply(ctx, config = {}) {
         if (typeof agent?.inject === 'function') {
           agent.inject(createUserMessage({
             content: [{ type: 'text', text: renderPetition(result.petition, register) }],
-            source: SOURCE,
+            // form:'notice' + summary: the answer is visible on the web
+            // transcript's collapsed context row — R-11's "the petitioner is
+            // TOLD" reaches the page, not only the model context
+            source: { ...SOURCE, form: 'notice',
+              summary: `Petition ${result.petition.id}: answered` },
           }));
         }
       } catch { /* a failed notice must never unmake the decision */ }

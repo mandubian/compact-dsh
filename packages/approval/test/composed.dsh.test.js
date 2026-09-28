@@ -140,6 +140,10 @@ test('composed: every decided ask leaves a transcript note (#25), every replay a
   const note = agent.injected[0];
   assert.equal(note.source?.kind, 'plugin');
   assert.equal(note.source?.plugin, 'compact-approval');
+  // the notice presentation: the web transcript shows the summary on the
+  // collapsed context row — "an approval happened" is visible at a glance
+  assert.equal(note.source?.form, 'notice');
+  assert.equal(note.source?.summary, 'Approval: "net_probe" allowed once by the operator');
   const text = note.content?.[0]?.text ?? '';
   assert.match(text, /\[fp_[0-9a-f]{16}\] was allowed once/);
   assert.match(text, /host=noted\.example/, 'the canonical target is envelope-grade and on the note');
@@ -153,6 +157,8 @@ test('composed: every decided ask leaves a transcript note (#25), every replay a
   assert.equal(agent.injected.length, 2, 'the replay leaves exactly one receipt');
   const receipt = agent.injected[1];
   assert.equal(receipt.source?.plugin, 'compact-approval');
+  assert.equal(receipt.source?.form, 'notice');
+  assert.match(receipt.source?.summary, /^Replay: "net_probe" running under a prior operator approval$/);
   const receiptText = receipt.content?.[0]?.text ?? '';
   assert.match(receiptText, /^\[compact-approval\] Replay: "net_probe" \(host=noted\.example\) \[fp_[0-9a-f]{16}\]/);
   assert.match(receiptText, /granted \d{4}-\d{2}-\d{2}T.*Z, expires \d{4}-\d{2}-\d{2}T.*Z — no new decision was asked or made/);
