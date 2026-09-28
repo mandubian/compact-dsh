@@ -127,7 +127,7 @@ test('citationsIn parses only the prefixed forms', () => {
     [{ kind: 'tool', ref: 'law_read' }, { kind: 'clause', ref: 'R-6' }]);
 });
 
-test('apply: registers the tool and provides the service', () => {
+test('apply: registers the reading tools and provides the service', () => {
   const registered = [];
   const provided = {};
   const ctx = {
@@ -135,8 +135,7 @@ test('apply: registers the tool and provides the service', () => {
     provide: (n, s) => { provided[n] = s; },
   };
   const service = apply(ctx);
-  assert.equal(registered.length, 1);
-  assert.equal(registered[0].name ?? registered[0].definition?.name, 'guide');
+  assert.deepEqual(registered.map(t => t.name ?? t.definition?.name).sort(), ['gloss_read', 'guide']);
   assert.equal(provided['compact-guide'], service);
   assert.ok(service.citedTools().includes('law_read'));
 });
