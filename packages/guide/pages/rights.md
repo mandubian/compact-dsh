@@ -101,6 +101,13 @@ lawful next moves (`clause:R-3`). Examples: `LG` (LoopGuard), `PG` (promotion), 
 scopes), `PT` (petition). Read the moves before retrying; approvals are in
 `page:approvals`.
 
+`tool:gloss_read` serves the plain-language explanation behind the rule you
+were refused or asked under: why the gate exists, a worked example of the
+refused and the lawful path, what to do, and what your operator can do. Pass
+the `GATE/ruleId` exactly as the envelope named it. The gloss is an
+interpretive aid with no force — the envelope's canonical text prevails, and
+the law itself is `tool:law_read`.
+
 ## Your record (R-2)
 
 `tool:record_read` reads the record of acts done in your name: your own session,

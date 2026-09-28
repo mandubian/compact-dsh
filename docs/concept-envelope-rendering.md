@@ -216,9 +216,14 @@ mechanism is the one thing this composition cannot do honestly.
   leaves upstream's panel everything else.
 - The terminal operator prompter — renders whatever reason the ask carries,
   indented, beside the command/target/fingerprint preview it already shows.
-- `packages/guide/` — the guide page serving the gloss to the Subject remains
-  a follow-up (interpretation reading machinery — R-3 and R-6 at the same
-  door).
+- `packages/guide/` — the gloss reading door (`gloss_read`): the Subject
+  passes the `GATE/ruleId` its envelope named and reads the rule's gloss
+  from the live table — why the gate exists, the worked example, what to
+  do, what the operator can do — with the standing on every answer (the
+  envelope prevails; a disagreeing gloss is a lint failure). R-3 and R-6 at
+  the same door: `law_read` serves the law, `gloss_read` serves the
+  runtime's interpretation of the rule that fired. No page restates the
+  table — a second copy is the drift the lint exists to prevent.
 
 ## Declared gaps and open questions
 

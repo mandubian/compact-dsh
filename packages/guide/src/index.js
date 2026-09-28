@@ -27,8 +27,10 @@
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { PAGES, citationsIn, CITATION_KINDS, loadPages } from './pages.js';
+import { GLOSS_TOOL, readGloss } from './gloss.js';
 
 export { PAGES, citationsIn, CITATION_KINDS, loadPages };
+export { GLOSS_TOOL, readGloss, renderGlossIndex, renderRecord } from './gloss.js';
 
 export const name = 'compact-guide';
 export const GUIDE_TOOL = 'guide';
@@ -100,8 +102,30 @@ export function apply(ctx, config = {}) {
       return answer({ page: args?.page, query: args?.query }, pages);
     },
   });
+  // The gloss reading door (#90): the per-rule explanation behind the
+  // envelope's `[GATE/ruleId]`, served from the LIVE table compact-envelope
+  // holds — never a page restating it (a second copy is the drift the lint
+  // exists to prevent). Same standing as every page here: an interpretive
+  // aid; the envelope prevails.
+  const glossTool = defineTool({
+    name: GLOSS_TOOL,
+    description:
+      'The plain-language explanation behind a refusal or ask you received: why the gate that refused you exists, ' +
+      'a worked example of the refused and the lawful path, what to do next, and what your operator can do. The ' +
+      'envelope names the rule — e.g. [RA/D-7/opaque-network] — and this serves that rule\'s gloss. With no ' +
+      'arguments, the index of every glossed rule. The gloss is an interpretive aid with no force: the envelope ' +
+      'itself prevails, and the law is law_read.',
+    parameters: {
+      rule: { type: 'string', description: 'the GATE/ruleId from the envelope you received, e.g. "RA/D-7/opaque-network"' },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    async execute(args) {
+      return readGloss({ rule: args?.rule });
+    },
+  });
   ctx.inject?.(['tools'], (scope) => {
     scope.tools.register(guide);
+    scope.tools.register(glossTool);
   });
   const service = {
     name,
