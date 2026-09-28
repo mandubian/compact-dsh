@@ -20,8 +20,10 @@
 // does not parse as a canonical envelope (any other ask riding the same
 // waterfall), the card degrades to the upstream face with pre-wrap: the
 // reason shown as-is, same two buttons. Nothing is invented, nothing is
-// duplicated, nothing is dropped — every line after the moves marker
-// renders, so the R-3 floor (the rule and EVERY move) survives the layout.
+// duplicated, nothing is rewritten: the reason and the move rows are
+// verbatim substrings of the source (each row carries its own dash exactly
+// when the builder wrote one), only whitespace-only rows are skipped at
+// render, so the R-3 floor — the rule and EVERY move — survives the layout.
 //
 // Hand-authored in the loader-factory form the served bundles use; there is
 // no build step to drift from.
@@ -38,30 +40,31 @@ window.__ModuleLoader__.load({
 
 		// The eleven gate families (docs/concept-envelope-rendering.md). The
 		// ruleId may itself carry slashes (AG/I-5/secret-use), so the head is
-		// `[<gate>` + optional `/<ruleId>]` with the ruleId matched lazily up
-		// to the closing bracket.
-		const GATE_HEAD = /^\[([A-Z]{2})(?:\/([^\]]+))?\]\s*([\s\S]*)$/;
+		// `[<gate>` + optional `/<ruleId>]` — then exactly the one space the
+		// canonical builder emits (buildEnvelope: `'] ${reason}'`); everything
+		// after it stays verbatim, so the parser normalizes nothing.
+		const GATE_HEAD = /^\[([A-Z]{2})(?:\/([^\]]+))?\] /;
 		const MOVES_MARKER = 'Lawful next moves:';
 
 		/** Parse the canonical envelope text into its structured parts.
 		 * Returns null for anything that is not a canonical envelope — the
-		 * caller renders the fallback face. `moves` keeps EVERY line after
-		 * the marker verbatim (dash and all when unmarked): a dropped line
-		 * would be a narrowed R-3 floor. */
+		 * caller renders the fallback face. VERBATIM throughout: the reason
+		 * and `moves` are substrings of the source, never trimmed or
+		 * filtered — a dropped or rewritten line would narrow the R-3 floor
+		 * or change the text. Blank move lines are skipped only at render
+		 * time (whitespace-only rows carry no content). */
 		function parseAsk(text) {
 			if (typeof text !== 'string' || text.length === 0) return null;
 			const lines = text.split('\n');
 			const head = GATE_HEAD.exec(lines[0]);
 			if (!head) return null;
 			const markerAt = lines.indexOf(MOVES_MARKER, 1);
-			if (markerAt !== -1 && markerAt < 1) return null;
 			const rest = markerAt === -1 ? lines.slice(1) : lines.slice(1, markerAt);
-			const reasonParts = head[3] !== '' ? [head[3], ...rest] : rest;
 			return {
 				gate: head[1],
 				ruleId: head[2] ?? null,
-				reason: reasonParts.join('\n').trim(),
-				moves: markerAt === -1 ? [] : lines.slice(markerAt + 1).map(line => line.trim()).filter(line => line.length > 0),
+				reason: [lines[0].slice(head[0].length), ...rest].join('\n'),
+				moves: markerAt === -1 ? [] : lines.slice(markerAt + 1),
 			};
 		}
 
@@ -96,10 +99,13 @@ window.__ModuleLoader__.load({
 						parsed ? react.createElement('span', { className: 'compact-card-chip' },
 							parsed.gate + (parsed.ruleId ? '/' + parsed.ruleId : '')) : null,
 						react.createElement('div', { className: 'compact-card-reason' }, reason),
-						parsed && parsed.moves.length > 0 ? react.createElement('div', { className: 'compact-card-moves' },
+						// Each move row IS its source line — dash included when the
+						// builder wrote one, absent when it didn't; the only rows
+						// skipped are whitespace-only (no content to drop).
+						parsed && parsed.moves.some(move => move.trim().length > 0) ? react.createElement('div', { className: 'compact-card-moves' },
 							react.createElement('div', { className: 'compact-card-moves-label' }, 'Lawful next moves'),
 							react.createElement('ul', { className: 'compact-card-moves-list' },
-								parsed.moves.map((move, i) => react.createElement('li', { key: i }, move.replace(/^—\s*/, ''))))) : null,
+								parsed.moves.filter(move => move.trim().length > 0).map((move, i) => react.createElement('li', { key: i }, move)))) : null,
 						react.createElement('details', { className: 'compact-card-raw' },
 							react.createElement('summary', null, 'Raw envelope'),
 							react.createElement('pre', null, String(approval?.reason ?? '')))),
@@ -137,8 +143,7 @@ window.__ModuleLoader__.load({
 			'.compact-card-moves{display:flex;flex-direction:column;gap:4px}',
 			'.compact-card-moves-label{color:var(--dsw-alias-label-tertiary,#6e7781);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}',
 			'.compact-card-moves-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}',
-			'.compact-card-moves-list li{color:var(--dsw-alias-label-primary,#1f2328);font-size:13px;line-height:20px;padding-left:14px;position:relative}',
-			'.compact-card-moves-list li:before{content:"—";position:absolute;left:0;color:var(--dsw-alias-label-tertiary,#6e7781)}',
+			'.compact-card-moves-list li{color:var(--dsw-alias-label-primary,#1f2328);font-size:13px;line-height:20px;white-space:pre-wrap;word-break:break-word}',
 			'.compact-card-raw{color:var(--dsw-alias-label-tertiary,#6e7781);font-size:12px}',
 			'.compact-card-raw summary{cursor:pointer;user-select:none;width:fit-content}',
 			'.compact-card-raw pre{margin:6px 0 0;font-family:var(--ds-font-family-code,ui-monospace,monospace);font-size:12px;line-height:18px;white-space:pre-wrap;word-break:break-word;background:var(--dsw-alias-state-warn-tertiary,#faf3e3);border-radius:8px;padding:8px 10px;max-height:200px;overflow-y:auto;color:var(--dsw-alias-label-secondary,#424a53)}',

@@ -87,10 +87,23 @@ test('parseAsk tolerates a head with no ruleId and no moves block', () => {
   assert.deepEqual(parsed.moves, []);
 });
 
-test('the R-3 floor: no move line is ever dropped, whatever its shape', () => {
+test('the R-3 floor: no move line is ever dropped or rewritten, whatever its shape', () => {
   const text = '[AG/fp_x] reason here\nLawful next moves:\n— a normal move\na line without a dash\n— another move\n';
   const parsed = card.parseAsk(text);
-  assert.deepEqual(parsed.moves, ['— a normal move', 'a line without a dash', '— another move']);
+  assert.deepEqual(parsed.moves, ['— a normal move', 'a line without a dash', '— another move', '']);
+});
+
+test('the parse is verbatim: whitespace survives, a head without the canonical single space does not parse', () => {
+  // the reason is the exact substring after '] ' — trailing spaces, extra
+  // separators, and blank lines are all preserved (the renderer, not the
+  // parser, skips whitespace-only rows)
+  const parsed = card.parseAsk('[AG/fp_x]  two spaces and a trailing one \nLawful next moves:\n—  spaced move  \n\n— next\n');
+  assert.equal(parsed.reason, ' two spaces and a trailing one ');
+  assert.deepEqual(parsed.moves, ['—  spaced move  ', '', '— next', '']);
+  // the canonical builder emits exactly one space; anything else is not the
+  // canonical shape and takes the fallback face
+  assert.equal(card.parseAsk('[AG/fp_x]no-space'), null);
+  assert.equal(card.parseAsk('[AG/fp_x]\nno space'), null);
 });
 
 test('parseAsk returns null for anything that is not a canonical envelope', () => {
@@ -127,7 +140,7 @@ test('apply registers one composer takeover at priority 0 with the same select',
   assert.equal(component, card.CompactCard);
 });
 
-test('the canonical face: chip, intact line breaks, one row per move, both buttons', () => {
+test('the canonical face: chip, intact line breaks, one verbatim row per move, both buttons', () => {
   const tree = card.CompactCard({ matched: { kind: 'approval', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' } });
   const chip = findByClass(tree, 'compact-card-chip');
   assert.equal(chip.length, 1);
@@ -135,11 +148,21 @@ test('the canonical face: chip, intact line breaks, one row per move, both butto
   const reason = findByClass(tree, 'compact-card-reason');
   assert.equal(textOf(reason[0]), FINGERPRINT_ASK.reason);
   const moves = findByClass(tree, 'compact-card-moves-list');
-  assert.equal(findAll(moves[0], n => typeof n === 'object' && n.type === 'li').length, FINGERPRINT_ASK.lawfulNextMoves.length);
+  const rows = findAll(moves[0], n => typeof n === 'object' && n.type === 'li');
+  assert.equal(rows.length, FINGERPRINT_ASK.lawfulNextMoves.length);
+  // each row IS its source line — the builder's dash rides in the text
+  assert.deepEqual(rows.map(textOf), FINGERPRINT_ASK.lawfulNextMoves.map(m => `— ${m}`));
   const labels = findAll(tree, n => typeof n === 'object' && n.type === fakeButton).map(b => textOf(b));
   assert.deepEqual(labels, ['Deny', 'Allow once']);
   const raw = findByClass(tree, 'compact-card-raw');
   assert.equal(textOf(findAll(raw[0], n => typeof n === 'object' && n.type === 'pre')[0]), FINGERPRINT_ASK.text);
+});
+
+test('a move line without a dash renders without one; whitespace-only rows render none', () => {
+  const text = '[AG/fp_x] reason here\nLawful next moves:\n— a normal move\na line without a dash\n\n— another move\n';
+  const tree = card.CompactCard({ matched: { kind: 'approval', reason: text, answer: async () => 'rejected' } });
+  const rows = findAll(findByClass(tree, 'compact-card-moves-list')[0], n => typeof n === 'object' && n.type === 'li');
+  assert.deepEqual(rows.map(textOf), ['— a normal move', 'a line without a dash', '— another move']);
 });
 
 test('the fallback face: a non-canonical ask renders as-is, no chip, no moves', () => {
