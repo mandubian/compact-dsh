@@ -53,7 +53,7 @@ export function renderGlossIndex(gloss = GLOSS) {
   const lines = [];
   for (const [gate, rows] of [...families.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     lines.push('', gate);
-    rows.sort((a, b) => (a[0].includes('/*') ? 1 : 0) - (b[0].includes('/*') ? 1 : 0) || a[0].localeCompare(b[0]))
+    rows.sort((a, b) => (a[0].endsWith('/*') ? 1 : 0) - (b[0].endsWith('/*') ? 1 : 0) || a[0].localeCompare(b[0]))
       .forEach(([key, title]) => lines.push(`  ${key} — ${title}`));
   }
   return `${Object.keys(gloss).length} glossed rules. Read one with gloss_read({ rule: "<GATE/ruleId>" }) — ` +
