@@ -144,6 +144,18 @@ nothing is invented, nothing is narrowed. The gloss-wrapped `askCard` stays
 retired for asks — the card wraps the disclosure in *layout*, never in
 *commentary*.
 
+**The operator's "what exactly am I approving" (same day, reading it live):
+the card must lead with the command.** The first takeover dropped the one
+thing upstream's panel had that the canonical text does not — the command
+line itself, which reaches the browser only through the session's transcript
+(the approval wire carries no arguments, deliberately). The card now reads
+the correlated tool call by `callId` from the chat state — the same lookup
+upstream's `ApprovalCommand` performs for its detail slot — and renders it
+in a monospace box ABOVE the reason, under the only label the card adds:
+"You are approving". Consequences after the thing they are consequences of.
+A pruned node, a malformed arg, or a tool without a command argument renders
+no box — never a guess.
+
 Verified live on the web surface: a real `AG/fp_…` ask rendered the
 structured card (chip, intact paragraph, three moves, raw envelope
 collapsed), Deny resolved the waterfall, and the Subject was told the call

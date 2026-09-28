@@ -158,6 +158,56 @@ test('the canonical face: chip, intact line breaks, one verbatim row per move, b
   assert.equal(textOf(findAll(raw[0], n => typeof n === 'object' && n.type === 'pre')[0]), FINGERPRINT_ASK.text);
 });
 
+// ── the command: what "yes" runs, read from the session's chat state ──
+
+const chatWith = (root) => (selector) => selector({
+  nodes: new Map([[`k:${root.callId}`, { kind: 'tool-call', data: { root } }]]),
+});
+const CURL_CALL = { callId: 'call-1', argsRaw: JSON.stringify({ command: 'curl https://example.com' }) };
+
+test('the command box shows the exact command, above the reason', () => {
+  const tree = card.CompactCard({
+    matched: { kind: 'approval', callId: 'call-1', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' },
+    useChat: chatWith(CURL_CALL),
+  });
+  assert.equal(findByClass(tree, 'compact-card-deciding').length, 1, 'the deciding block must render');
+  assert.equal(textOf(findByClass(tree, 'compact-card-deciding-label')[0]), 'You are approving');
+  assert.equal(textOf(findByClass(tree, 'compact-card-command')[0]), 'curl https://example.com');
+  // order: the command rides BEFORE the reason — what "yes" runs first,
+  // consequences after
+  const names = findByClass(tree, 'compact-card-body')[0].children.filter(Boolean).map(n => n.props?.className);
+  assert.ok(names.indexOf('compact-card-deciding') < names.indexOf('compact-card-reason'), `command must precede reason, got: ${names}`);
+});
+
+test('a tool call with no command arg renders no box, never a guess', () => {
+  const tree = card.CompactCard({
+    matched: { kind: 'approval', callId: 'call-2', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' },
+    useChat: chatWith({ callId: 'call-2', argsRaw: JSON.stringify({ path: '/tmp/x' }) }),
+  });
+  assert.equal(findByClass(tree, 'compact-card-deciding').length, 0);
+});
+
+test('malformed argsRaw and a pruned node degrade to no box, no crash', () => {
+  const malformed = card.CompactCard({
+    matched: { kind: 'approval', callId: 'call-3', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' },
+    useChat: chatWith({ callId: 'call-3', argsRaw: '{not json' }),
+  });
+  assert.equal(findByClass(malformed, 'compact-card-deciding').length, 0);
+  const pruned = card.CompactCard({
+    matched: { kind: 'approval', callId: 'call-9', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' },
+    useChat: chatWith(CURL_CALL),
+  });
+  assert.equal(findByClass(pruned, 'compact-card-deciding').length, 0);
+});
+
+test('no useChat (tests, foreign surfaces): the card renders without the command box', () => {
+  const tree = card.CompactCard({ matched: { kind: 'approval', callId: 'call-1', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' } });
+  assert.equal(findByClass(tree, 'compact-card-deciding').length, 0);
+  assert.equal(findByClass(tree, 'compact-card-reason').length, 1);
+  const labels = findAll(tree, n => typeof n === 'object' && n.type === fakeButton).map(b => textOf(b));
+  assert.deepEqual(labels, ['Deny', 'Allow once']);
+});
+
 test('a move line without a dash renders without one; whitespace-only rows render none', () => {
   const text = '[AG/fp_x] reason here\nLawful next moves:\n— a normal move\na line without a dash\n\n— another move\n';
   const tree = card.CompactCard({ matched: { kind: 'approval', reason: text, answer: async () => 'rejected' } });
