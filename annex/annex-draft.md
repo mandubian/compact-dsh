@@ -117,7 +117,11 @@ the self-judgment J-1 forbids).
 **Part VI is fully bound as of Phase 6** (MA-1…MA-4, CF-1, CF-2 enforced;
 SCH-1 discharged by enforced absence). The judicature (Part V) remains the
 largest declared deficiency: no adjudicating machinery exists, and J-8's own
-trajectory language is the disclosure.
+trajectory language is the disclosure. The hearing layer's shape — who hears,
+what evidence, what remedies, what appeal is — is now designed
+([docs/concept-judicature.md](../docs/concept-judicature.md), #99), with the
+adjudicator-set declaration (J-8 → J-4) as its first slice and the
+fail-closed state until then: an undeclared set hears nothing (D-7).
 
 The conventions recorded below remain in force.
 

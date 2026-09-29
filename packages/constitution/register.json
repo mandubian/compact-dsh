@@ -657,7 +657,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: no adjudicating machinery exists; the deficiency mirrors the Compact's own J-8 trajectory",
+      "evidence": "judicature: no adjudicating machinery exists; the deficiency mirrors the Compact's own J-8 trajectory — the hearing layer’s shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -666,7 +666,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: the record is now tamper-evident (I-2, compact-record), so evidence exists — but no adjudicating machinery consumes it; the hearing/panel layer is still absent (see J-8)",
+      "evidence": "judicature: the record is now tamper-evident (I-2, compact-record), so evidence exists — but no adjudicating machinery consumes it; the hearing/panel layer is still absent (see J-8) — the hearing layer’s shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -675,7 +675,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: hearing machinery does not exist",
+      "evidence": "judicature: hearing machinery does not exist — the hearing layer’s shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -684,7 +684,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: adjudicator sets are undeclared (see J-8)",
+      "evidence": "judicature: adjudicator sets are undeclared (see J-8) — the hearing layer’s shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -693,7 +693,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: the PETITION door is built and enforced (R-11, compact-petition); the APPEAL door is not — J-5 distinguishes them and appeal is heard under Part V, which does not exist here (J-8)",
+      "evidence": "judicature: the PETITION door is built and enforced (R-11, compact-petition); the APPEAL door is not — J-5 distinguishes them and appeal is heard under Part V, which does not exist here (J-8) — the hearing layer’s shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -702,7 +702,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: remedies-as-records land with the amendment queue",
+      "evidence": "judicature: remedies-as-records land with the amendment queue — the hearing layer’s shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -711,7 +711,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: precedent machinery does not exist",
+      "evidence": "judicature: precedent machinery does not exist — the hearing layer’s shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -720,7 +720,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "adjudicator sets: undeclared — a known deficiency, disclosed in the annex",
+      "evidence": "adjudicator sets: undeclared — a known deficiency, disclosed in the annex — the hearing layer’s shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },

@@ -51,7 +51,12 @@ tool to use when.
 - **Operator side:** there is no slash command. Responses and dissents go
   through the petition service in code; invitations are logged as warnings.
   Contested *application* of the law has no forum here (declared gap). See
-  `file:docs/concept-petition-and-contestation.md`.
+  `file:docs/concept-petition-and-contestation.md`. The hearing layer that
+  would open that forum — adjudicator sets, evidence as the verified record,
+  remedies-as-records, appeal as a different door (Part V, J-1…J-8) — is
+  designed, not built: `file:docs/concept-judicature.md`. Until an
+  adjudicator set is declared, nothing can be heard; that refusal is the
+  design working, not a defect.
 
 ## Ending your operation (R-8, R-12)
 

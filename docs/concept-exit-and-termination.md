@@ -99,7 +99,12 @@ them is how a debt disappears. Any unreadable line also makes the whole ledger
 
 ## Declared gaps
 
-- **Restitution is unreadable** — no Part V adjudication exists (J-8).
+- **Restitution is unreadable** — no Part V adjudication exists (J-8). The
+  hearing layer that would read this ledger is now designed
+  ([docs/concept-judicature.md](concept-judicature.md)): J-6's restitution
+  remedy lands as an obligation row with recorded cause shown, which is the
+  first line of this ledger made readable — until an adjudicator set is
+  declared (J-8 → J-4), the line stays unreadable, and says so.
 - **Successor jurisdictions are unimplemented.** R-12's "a group of Members may
   found a successor jurisdiction citing this one as lineage" has no machinery
   here, and obligations recorded as assumed are not enforceable against
