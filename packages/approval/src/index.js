@@ -34,7 +34,7 @@
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 import { createHash } from 'node:crypto';
-import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS } from './grants.js';
+import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget, canonicalQuery } from './fingerprint.js';
@@ -42,7 +42,7 @@ import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope, bandReason } from 'compact-envelope';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
-export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, evaluate, fingerprint, canonicalTarget, canonicalQuery, parseAllowlistLikePattern, DEFAULTS };
+export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, evaluate, fingerprint, canonicalTarget, canonicalQuery, parseAllowlistLikePattern, DEFAULTS };
 
 export const name = 'compact-approval';
 export const inject = ['approval'];
@@ -55,6 +55,26 @@ export const inject = ['approval'];
 // the host ApprovalService already appends approval/asked + approval/decided
 // to the durable log, and the guard reads decisions from recorded state (D-7).
 export const REFUSAL_EVENT = 'compact-approval/refusal';
+
+/**
+ * #102 — the EG refusal rules that PROVE a route dead, i.e. that no live,
+ * classed egress grant reaches the refused (host, port) for this session:
+ *   - no-grant: not even a pattern-reaching row exists;
+ *   - classless-grant: rows reach but none is classed — and since rows are
+ *     read live-or-not, this proves no classed row EVER reached the route,
+ *     so no cached approval for it was ever deliverable;
+ *   - expired / revoked: the classed rows that reached it stopped covering;
+ *   - portless-grant (#56): a CONNECT refused because no live row NAMES the
+ *     port — proof the TUNNEL route is dead, scoped in wireRefusal to the
+ *     entries whose delivery can only be a tunnel (https: targets), since
+ *     plain HTTP carries under the same host rows.
+ * A refusal carrying one of these kills the exec-cache entries routed to the
+ * refused (host, port). Deliberately NOT deaths: 'method-class' (a live
+ * route of the covered class remains — killing would out-run the proof) and
+ * everything upstream of the grant question (malformed, use-connect,
+ * unknown-method, forbidden-address, upstream, internal).
+ */
+const DELIVERY_DEATH_RULES = new Set(['no-grant', 'classless-grant', 'expired', 'revoked', 'portless-grant']);
 
 function refusalPayload({ kind, verdict, ruleId, tool, fingerprint, root, session }) {
   return { kind, verdict, ruleId, tool, fingerprint, root, session, at: Date.now() };
@@ -267,6 +287,30 @@ export function createApproval(opts = {}) {
         approval.replayNotes.set(key, now);
       } catch { /* the trace is a receipt, never a gate — and not yet spent */ }
     },
+    /**
+     * #102 Option B — the wire teaches the gate. The mediator hands each of
+     * its EG refusals over (host, port, ruleId); a refusal whose rule proves
+     * the route dead (DELIVERY_DEATH_RULES) kills the exec-cache entries
+     * routed to that (host, port). This closes the classless-act gap: an act
+     * whose method class was not derivable materializes NO egress grant, so
+     * #65's ask-time cap never applied to it — its cached approval promised
+     * 24h of replay over a delivery that rode ANOTHER approval's one-hour
+     * grant. Ask-time, the gate cannot know which grants will exist later;
+     * the wire can observe which exist NOW — so the entry survives exactly
+     * as long as its delivery demonstrably works, and self-heals for every
+     * delivery death (expiry and revocation alike), not just the TTL
+     * mismatch. The killed fingerprints are returned for the caller's log.
+     * Never throws: the wire teaches, it must never take the gate down.
+     */
+    wireRefusal: (fact) => {
+      try {
+        if (!DELIVERY_DEATH_RULES.has(fact?.ruleId)) return [];
+        return approval.store.killCacheForRoute({
+          host: fact?.host, port: fact?.port,
+          tunnelOnly: fact?.ruleId === 'portless-grant',
+        });
+      } catch { return []; }
+    },
   };
   // #8 G2 — the secret-hygiene posture, declared where the governed party can
   // read it (I-8): the composition teaches the discipline and keeps the
@@ -458,34 +502,6 @@ function egressHonesty(egress) {
       return `This gate's approval is consent, not connectivity: whether the sandbox grants egress is the ` +
         `runtime's posture, not this approval's effect.`;
   }
-}
-
-/**
- * The egress pattern for a canonical target (#38 phase 3). A connection is a
- * (host, port) fact, so: URL findings become HostAndPort on their scheme's
- * port (explicit port kept), an explicit host+port keeps both, and a bare
- * host stays HOST-SCOPED (ExactHost — the analyzer found the host and said
- * nothing about ports; the mediator reads that kind as covering any port it
- * names, because narrowing below the shown unit is a grant the operator never
- * made). Unparsable/absent target → null: nothing to grant.
- */
-export function egressPatternFor(target) {
-  if (typeof target?.url === 'string') {
-    try {
-      const u = new URL(target.url);
-      return {
-        kind: 'HostAndPort',
-        value: { host: u.hostname.toLowerCase(), port: String(u.port || (u.protocol === 'https:' ? '443' : '80')) },
-      };
-    } catch { return null; }
-  }
-  if (typeof target?.host === 'string') {
-    if (target.port != null && target.port !== '') {
-      return { kind: 'HostAndPort', value: { host: target.host.toLowerCase(), port: String(target.port) } };
-    }
-    return { kind: 'ExactHost', value: target.host.toLowerCase() };
-  }
-  return null;
 }
 
 /**
