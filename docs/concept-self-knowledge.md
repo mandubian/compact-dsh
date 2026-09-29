@@ -25,6 +25,7 @@ is precisely what the clause forbids.
 | Field | Source |
 |---|---|
 | active capabilities | the capability gate's Part VI posture + the enforcement services present |
+| the container's egress posture | `approval.egress` — the same declaration the approval gate reads; absent when the composition declares none (#106) |
 | remaining budgets | the approval store's live grants (what is **left**, not what was granted) |
 | pending gates | the approval store's pending records |
 | lineage | the Subject's durable session header — the record that survives a restart |
@@ -36,6 +37,24 @@ An attestation assembled from anything the Subject *said* would be the
 Subject's memory wearing the Enforcer's voice — the exact inversion R-1
 forbids. There is a test that asserts the Subject's own claim about itself
 never appears in its own attestation.
+
+### The wire is declared, not discovered (#106)
+
+The egress posture is composition state, and the approval ask already
+discloses it — to the **operator**, whose terminal renders "consent, not
+connectivity" while the Subject's loop is suspended. The Subject read nothing,
+and the live failure mode was a session that spent four operator asks and
+three approved executions discovering that its container had no route —
+because `command not found` (tool missing) is first-order indistinguishable
+from `no route` (no wire) from inside, and the image shipped no network client
+that could have produced the connect error that would have settled it.
+
+So the attestation renders one declarative line under Capabilities —
+`Egress: none`, `Egress: mediated (COMPACT_EGRESS=proxy)`, or
+`Egress: open (CF-2)` — sourced from the same `approval.egress` declaration
+the gate reads, never from observed behavior. When the composition declares no
+posture (a standalone gate), the line is simply absent: an unknown posture is
+not a posture to guess (D-7).
 
 ### Absent facts are null, never plausible
 

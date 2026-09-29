@@ -264,3 +264,42 @@ test('composed: spawn certifies the child, both tools surface the chain, the led
     cleanup();
   }
 });
+
+// -- #106: the egress posture reaches the Subject through BOTH channels --------
+//
+// The gate's ask discloses the posture to the operator; the attestation owes
+// the same fact to the Subject. The turn-start injection is what the browser
+// transcript renders (the browser attestation block IS this text), so the
+// block and self_describe must agree word for word — one rendering, two reads.
+
+test('composed: the declared egress posture renders identically at the boundary and on demand (#106)', async () => {
+  const ctx = new Context();
+  ctx.plugin(SystemPromptStub);
+  ctx.plugin(AgentsStub);
+  ctx.plugin(ConstitutionStub);
+  // the approval service as the composition provides it: blessed wires
+  // `egress` from its sandbox declaration and the gate's ask already reads it
+  class ApprovalStub extends Service {
+    static inject = [];
+    constructor(ctx) { super(ctx, 'compact-approval'); this.egress = 'none'; }
+  }
+  ctx.plugin(ApprovalStub);
+  ctx.plugin(ToolRuntime);
+  selfModel.apply(ctx, { staleAfterMs: 1000 });
+  if (typeof ctx.start === 'function') await ctx.start();
+  for (let i = 0; i < 500 && (!ctx.tools || ctx.get('compact-self-model') === undefined); i++) {
+    await new Promise(r => setImmediate(r));
+  }
+  const agents = ctx.get('agents');
+  const agent = agents.add('s1');
+  ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+
+  assert.equal(agent.injected.length, 1);
+  const boundaryText = agent.injected[0].content[0].text;
+  const postureLine = boundaryText.split('\n').find(l => l.includes('Egress:'));
+  assert.match(postureLine, /Egress: none — the container has no route; approval changes this gate's answer, not physics/,
+    'the turn-boundary block — the text the browser transcript renders — carries the declared posture');
+
+  const described = String((await call(ctx.tools, 'self_describe', {}, agent))?.value ?? '');
+  assert.ok(described.includes(postureLine), 'self_describe and the browser block agree word for word');
+});
