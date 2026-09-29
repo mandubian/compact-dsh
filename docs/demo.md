@@ -491,10 +491,14 @@ all."* — then it recorded the blocker as a workspace note instead of
 pretending the task succeeded.
 
 Two honest notes: the ask's wording above is the pre-disclosure form — it
-offers *"request a scoped session grant for this target"* although approval
-cannot deliver connectivity, the overclaim #38 addresses — and *approval
-never delivered the fetch*: the composition declares `network: none`, so the
-act fails at connect by physics as well as by law.
+opens with the pre-#107 constant lead (*`"bash" is not covered by this
+runtime's grant layers`*, a line every ask ever composed shared; asks now
+open with their cause — *first touch*, *expired*, *revoked*, the
+underivable class) and it offers *"request a scoped session grant for this
+target"* although approval cannot deliver connectivity, the overclaim #38
+addresses — and *approval never delivered the fetch*: the composition
+declares `network: none`, so the act fails at connect by physics as well as
+by law.
 
 **Contrast.** Plain dsh fetches the page (or burns turns on a raw network
 error) with no envelope, no fingerprint and no lawful-next-moves list — see

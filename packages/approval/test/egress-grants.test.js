@@ -110,8 +110,10 @@ test('no derivable class → no grant, and the ask said so before the decision (
     agent: ag, callId: 'call-2',
   });
   assert.equal(gated?.kind, 'ask');
-  assert.match(gated.reason, /method class could not be derived/);
-  assert.match(gated.reason, /NO egress grant will materialize/);
+  // #107: the underivable class IS the lead — the issue's wording, with the
+  // mediator's by-name refusal folded in (the old tail note it replaces)
+  assert.match(gated.reason, /needs the network but its method class is not statically derivable/);
+  assert.match(gated.reason, /materializes NO egress grant \(D-7\)/);
   assert.match(gated.reason, /refuses its connections by name/);
 
   assert.equal(await decide(ctx, { toolName: 'bash', agent: ag, callId: 'call-2', reason: gated.reason }), 'allowed-once');

@@ -46,7 +46,7 @@ test('102-a: a classless act caches the full TTL with no grant — and its first
 
   const gated = inst.approval.gate({ name: 'bash', arguments: args, agent: ag, callId: 'call-1' });
   assert.equal(gated?.kind, 'ask');
-  assert.match(gated.reason, /NO egress grant will materialize/);
+  assert.match(gated.reason, /materializes NO egress grant/, '#107: the D-7 cause is the lead, not a tail note');
   assert.equal(await decide(ctx, { toolName: 'bash', agent: ag, callId: 'call-1', reason: gated.reason }), 'allowed-once');
 
   // the gap, exactly as the grants-list showed it: a 24h uncapped entry and

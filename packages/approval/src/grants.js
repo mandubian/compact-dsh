@@ -218,6 +218,79 @@ export class GrantStore {
   }
 }
 
+/**
+ * #107 — WHY did this call ask? "Uncovered" is the definition of an ask
+ * (layer 5's fall-through), not a cause: every ask ever composed opened with
+ * the same zero-bit line while the sentence that discriminated sat in the
+ * tail. This classifier is the store-side half of the fix: pure logic over
+ * (store, call) naming the cause class the ask's lead sentence renders.
+ * The composer (src/index.js askReason) overlays the two call-shaped causes
+ * the store cannot see — declared secret references and an underivable
+ * method class — on top of this verdict.
+ *
+ * Classes, in priority order (the first that applies answers):
+ *   revoked        — a grant row covering this target was revoked
+ *   expired        — a covering row lapsed by TTL
+ *   spent          — a covering row exhausted its budget (a spent grant IS
+ *                    an expired one: widening requires a new decision)
+ *   rephrase       — a live cached approval covers this target's route under
+ *                    a different fingerprint: approval covers the exact
+ *                    phrasing it approved, so this act asks anew (#26)
+ *   classless-grant — a LIVE network row reaches the target but carries no
+ *                    method class: under the mediated posture the mediator
+ *                    refuses classless rows by name, so the gate must not
+ *                    answer with it (D-7) — the act asks instead
+ *   first-touch    — nothing in this store has ever covered the target
+ *
+ * Target semantics mirror evaluate exactly: grant rows match against the RAW
+ * args (a PathPrefix row needs target.path; host rows need host/port), scope
+ * is evaluate's own rule, and the cache comparison is canonical-target to
+ * canonical-target (what cacheSet stores), keyed by egress route for the
+ * network family and by the canonical value itself for everything else.
+ */
+export function classifyAskCause(store, { target, session, now, egress, hasMethodClass = false }) {
+  const scopeOk = g =>
+    (g.session != null) ? g.session === session
+    : (g.root != null) ? (session === g.root || (session ?? '').startsWith(g.root + '/'))
+    : true;
+  // plan grants answer unscoped (evaluate's layer 2), so they count as this
+  // target's history for every session; session grants only within scope
+  const rows = [
+    ...store.sessionGrants.filter(scopeOk),
+    ...store.planGrants,
+  ].filter(g => patternMatches(g.pattern, target));
+  const newest = (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0);
+  const revokedRow = rows.filter(g => g.revokedAt != null).sort(newest)[0];
+  if (revokedRow) return { kind: 'revoked', grant: revokedRow };
+  const expiredRow = rows.filter(g => !g.revokedAt && g.expiresAt != null && g.expiresAt <= now)
+    .sort((a, b) => b.expiresAt - a.expiresAt)[0];
+  if (expiredRow) return { kind: 'expired', grant: expiredRow };
+  const spentRow = rows.filter(g => !g.revokedAt && g.maxUses != null && g.uses >= g.maxUses).sort(newest)[0];
+  if (spentRow) return { kind: 'spent', grant: spentRow };
+  // the cache is fingerprint-keyed; the rephrase question is target-keyed
+  const route = targetKey(target);
+  if (route != null) {
+    for (const e of store.cache.values()) {
+      if (targetKey(e.target) === route) return { kind: 'rephrase' };
+    }
+  }
+  if (egress === 'proxy' && hasMethodClass) {
+    const classlessRow = rows.find(g => g.methodClass == null && NETWORK_PATTERN_KINDS.includes(g.pattern?.kind));
+    if (classlessRow) return { kind: 'classless-grant', grant: classlessRow };
+  }
+  return { kind: 'first-touch' };
+}
+
+/** The comparison key for the rephrase class: egress route for the network
+ *  family (host+port — the unit the operator thinks in), the canonical
+ *  target itself otherwise; null when the target carries nothing comparable
+ *  (command-aware entries never collide under this key). */
+function targetKey(target) {
+  const route = egressPatternFor(target);
+  if (route) return JSON.stringify(route);
+  return Object.keys(target ?? {}).length ? JSON.stringify(target) : null;
+}
+
 // -- pattern matching (host/url classes as the allowlist gate, plus mount paths)
 export function patternMatches(pattern, target) {
   if (pattern.kind === 'UrlPrefix') return typeof target.url === 'string' && target.url.startsWith(pattern.value);
