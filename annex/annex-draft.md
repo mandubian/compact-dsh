@@ -112,7 +112,12 @@ threshold A-1 requires. "Not yet, and here is what closes it" — never
 "never, by nature": keys accumulate as external Witnesses join, and no
 founder-only key set would satisfy the distributed trust root (a threshold
 of one is not a threshold, and founder keys verifying founder amendments is
-the self-judgment J-1 forbids).
+the self-judgment J-1 forbids). What the keys ARE — Member keys bound to a
+community roll, accreditation chaining to A-1 through organic statute, the
+session countersignature, the genesis constants table — is now designed
+([docs/concept-member-identity.md](../docs/concept-member-identity.md),
+#116), so the activation this paragraph names has a mechanical shape to
+activate.
 
 **Part VI is fully bound as of Phase 6** (MA-1…MA-4, CF-1, CF-2 enforced;
 SCH-1 discharged by enforced absence). The judicature (Part V) remains the

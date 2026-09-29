@@ -261,7 +261,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "identity and keys: the Compact has published no amendment keys; the digest is pinned, not signed — signature verification lands with the rights layer (Phase 8); the gap is declared in every boot attestation. PENDING: I-1 identity keys (a ratification-time constant, not a permanent debt — activation is mechanical when the distinct-keyholder set reaches the distributed threshold A-1 requires; a founder-only key set would be the self-judgment J-1 forbids, so keys arrive with external Witnesses, not before)",
+      "evidence": "identity and keys: the Compact has published no amendment keys; the digest is pinned, not signed — signature verification lands with the rights layer (Phase 8); the gap is declared in every boot attestation. PENDING: I-1 identity keys (a ratification-time constant, not a permanent debt — activation is mechanical when the distinct-keyholder set reaches the distributed threshold A-1 requires; a founder-only key set would be the self-judgment J-1 forbids, so keys arrive with external Witnesses, not before) — the Member-identity design is docs/concept-member-identity.md (#116): keys plus roll lineage, accreditation chaining to A-1 through organic statute, the session countersignature, the genesis constants table; design-first: no code before the page lands",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -406,7 +406,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "cross-runtime composition lands with the capsule/federation work (Phases 7-8)",
+      "evidence": "cross-runtime composition lands with the capsule/federation work (Phases 7-8) — identity travel is designed in docs/concept-member-identity.md (#116): the presentation bundle (key, roll lineage to an epoch checkpoint, record slices per the origin's annex) answers who, never what is permitted here; FED-1 stays unadopted",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -424,7 +424,7 @@
       "kind": "convention",
       "plugin": null,
       "service": null,
-      "evidence": "membership: any session acting under the composition is a Subject; declared",
+      "evidence": "membership: any session acting under the composition is a Subject; declared — the community roll (admission, rotation, revocation, accreditation events) that membership will ride is designed in docs/concept-member-identity.md (#116)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -729,7 +729,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "amendment authority: ratification-time key constants do not exist (the Compact is unratified)",
+      "evidence": "amendment authority: ratification-time key constants do not exist (the Compact is unratified) — the genesis constants table (keyholder set and classes, thresholds with distinct-keyholder semantics, key policy, epoch cadence, custody floor) is designed in docs/concept-member-identity.md (#116)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -796,7 +796,7 @@
       "kind": "convention",
       "plugin": null,
       "service": null,
-      "evidence": "statute-making: no statutes enacted yet",
+      "evidence": "statute-making: no statutes enacted yet — the external-Witness accreditation statute's shape (the chain to A-1 through organic statute, never a root signature over a Witness) is designed in docs/concept-member-identity.md (#116)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -890,7 +890,7 @@
       "kind": "rehearsal",
       "plugin": "compact-constitution",
       "service": null,
-      "evidence": "identity and keys, REHEARSED under the development keyring (amendment 0004 upstream): the boot verifies the law seal over the bundled body — k-of-n with DISTINCT-signer semantics (the review-0004 finding, ported as the reference loop), manifest pinned by trustedKeyringDigest, vendored founder seal as the interop fixture, every failure refusing the boot with a named reason; runtime-side, the enforcer key is declared in a signed ANNEX anchored to the sealed law by digest (F-5's own mechanism — no CA: the authority keyring signs law artifacts only, never enforcer identities), and subject session certificates bind {subjectId, publicKey, scope, depth, lineage} under the annex key — issued for a delegated child AT ITS SPAWN BOUNDARY and chained to the PARENT certificate's digest, ledgered beside the chains (a lead session is certified at its first attestation; a parent whose header cannot be read yields a child certificate that NAMES the parent and is reported as the unbound link it is, never as a chain that verifies), and verified OFFLINE by the auditor's --identities: signature under the annex key, the ledger line's declared digest re-derived from the certificate it carries, every child at exactly one depth below a parent present in the ledger, expiry and unknown-key certificates refused by name, an unbound parent link declared as a warning and an unreadable ledger refused as an error. Machinery exercised, nothing discharged: this entry conveys no standing and the planned I-1 entry above stands",
+      "evidence": "identity and keys, REHEARSED under the development keyring (amendment 0004 upstream): the boot verifies the law seal over the bundled body — k-of-n with DISTINCT-signer semantics (the review-0004 finding, ported as the reference loop), manifest pinned by trustedKeyringDigest, vendored founder seal as the interop fixture, every failure refusing the boot with a named reason; runtime-side, the enforcer key is declared in a signed ANNEX anchored to the sealed law by digest (F-5's own mechanism — no CA: the authority keyring signs law artifacts only, never enforcer identities), and subject session certificates bind {subjectId, publicKey, scope, depth, lineage} under the annex key — issued for a delegated child AT ITS SPAWN BOUNDARY and chained to the PARENT certificate's digest, ledgered beside the chains (a lead session is certified at its first attestation; a parent whose header cannot be read yields a child certificate that NAMES the parent and is reported as the unbound link it is, never as a chain that verifies), and verified OFFLINE by the auditor's --identities: signature under the annex key, the ledger line's declared digest re-derived from the certificate it carries, every child at exactly one depth below a parent present in the ledger, expiry and unknown-key certificates refused by name, an unbound parent link declared as a warning and an unreadable ledger refused as an error. Machinery exercised, nothing discharged: this entry conveys no standing and the planned I-1 entry above stands — the extension to MEMBER keys (the roll, the session countersignature, accredited externals, rotation and revocation as roll events) is specified in docs/concept-member-identity.md (#116), to rehearse under the same standing: none labels",
       "enforcedBy": [
         "packages/seals/src/seal.js",
         "packages/seals/src/annex.js",
