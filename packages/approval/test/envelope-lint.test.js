@@ -33,6 +33,11 @@ function assertEnvelope(shape, reason, label) {
   const moves = reason.split('\n').filter(l => l.startsWith('— '));
   assert.ok(moves.length >= 1, `${label}: at least one lawful next move`);
   for (const m of moves) assert.ok(m.length > 4, `${label}: a move is not an empty bullet`);
+  // #107: the mechanical restatement ("… is not covered by this runtime's
+  // grant layers") is the definition of an ask, not a cause — it appears at
+  // most once, demoted behind the lead sentence that differs between asks
+  const bannerHits = [...reason.matchAll(/is not covered by this runtime's grant layers/g)];
+  assert.ok(bannerHits.length <= 1, `${label}: the constant line appears at most once`);
   return shape;
 }
 
@@ -65,6 +70,14 @@ test('lint: the uncovered ask carries rule ID + lawful next moves', async () => 
   const out = await run({ name: 'net.fetch', arguments: { host: 'unknown.example' }, agent: AGENT });
   assert.equal(out.kind, 'ask');
   assertEnvelope(out.kind, out.reason, 'uncovered ask');
+});
+
+test('lint: #107 — the ask leads with its cause, the constant line demoted behind it', async () => {
+  const { run } = boot({});
+  const out = await run({ name: 'net.fetch', arguments: { host: 'lead.example' }, agent: AGENT });
+  const constant = out.reason.indexOf('is not covered by this runtime\'s grant layers');
+  assert.ok(constant > -1, 'the mechanical restatement is kept, once, for the record');
+  assert.ok(out.reason.indexOf('First touch:') < constant, 'the cause sentence precedes the restatement');
 });
 
 test('lint: the uncovered ask states what approval materializes, before the decision (#40 posture)', async () => {

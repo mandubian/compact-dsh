@@ -51,7 +51,9 @@ const findByClass = (node, cls) => findAll(node, n => typeof n === 'object' && n
 
 const FINGERPRINT_ASK = buildEnvelope({
   gate: 'AG', ruleId: 'fp_ab12cd34',
-  reason: `"bash" is not covered by this runtime's grant layers. Approving once also covers the identical operation until the exec-cache TTL elapses.`,
+  // #107 shape: the cause leads, the mechanical restatement is demoted behind it
+  reason: `First touch: nothing has ever covered host=api.example.com in this runtime — no grant row, no cached approval. ` +
+    `"bash" is not covered by this runtime's grant layers. Approving once also covers the identical operation until the exec-cache TTL elapses.`,
   lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'],
 });
 const SECRET_ASK = buildEnvelope({

@@ -34,7 +34,7 @@
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 import { createHash } from 'node:crypto';
-import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor } from './grants.js';
+import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget, canonicalQuery } from './fingerprint.js';
@@ -42,7 +42,7 @@ import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope, bandReason } from 'compact-envelope';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
-export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, evaluate, fingerprint, canonicalTarget, canonicalQuery, parseAllowlistLikePattern, DEFAULTS };
+export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause, evaluate, fingerprint, canonicalTarget, canonicalQuery, parseAllowlistLikePattern, DEFAULTS };
 
 export const name = 'compact-approval';
 export const inject = ['approval'];
@@ -517,6 +517,93 @@ function humanTtl(ms) {
 }
 
 /**
+ * #107 — the ask's reason, LED BY ITS CAUSE. "Uncovered" is the definition
+ * of an ask (evaluate's layer-5 fall-through), not a cause: every ask ever
+ * composed opened with the same zero-bit line — `"bash" is not covered by
+ * this runtime's grant layers` — while the sentences that discriminated
+ * (will-fail-at-connect vs covers-exactly-this-command) sat in the tail.
+ * Four identical headlines in a row train the skim-and-press-2 reflex the
+ * README opens against, and on denial the Subject reads that same envelope
+ * text as the stated reason: formally a rule (AG/uncovered), materially
+ * useless to its reader (R-3's doctrine betrayed by its own prose).
+ *
+ * The builder puts the reason CLASS in the first sentence — the secret
+ * agreement, the underivable method class, or the store-side cause the
+ * classifier named — and demotes the mechanical restatement behind it,
+ * exactly once. Every disclosure the old composer appended after the banner
+ * (replay consequence, egress honesty, the #57/#56/#26 notes) stays, now
+ * after a lead that differs between asks. The D-7 underivable-class note
+ * moves wholesale into its lead (it IS the cause when it fires — repeating
+ * it in the tail would stutter).
+ *
+ * Non-goals (unchanged): the gate's semantics, the fingerprint, the layers,
+ * and the envelope shape (gate, ruleId, reason, lawful next moves).
+ */
+export function askReason({ tool, args, secretRefs = [], cause, approval }) {
+  const bits = targetBitsOf(canonicalTarget(args));
+  const targetText = bits || 'this target';
+  const underivable = approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'methodClass') && args.methodClass == null;
+  // the D-7 cause sentence, shared by its lead and the combined case below
+  const d7 = `"${tool}" needs the network but its method class is not statically derivable — approval covers exactly this command ` +
+    `and materializes NO egress grant (D-7): the mediator refuses its connections by name.`;
+  let lead;
+  if (secretRefs.length) {
+    // the injection agreement is the highest-stakes consequence an approval
+    // can carry — its disclosure is the lead, not a clause behind a banner
+    // (same sentence the targetless path leads with, one doctrine both ways)
+    lead = `"${tool}" references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
+      `approving it materializes the injection grant — session-scoped, TTL-bounded, revocable (grants-revoke) — and the credential is available to this command inside the ` +
+      `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints.` +
+      (bits ? ` Target: ${bits}.` : '');
+    // a secret act under the mediated posture can ALSO be the underivable
+    // class: what approving writes (injection) AND what it cannot deliver
+    // (no egress grant) are both decision-grade — neither drops (the proxy
+    // honesty paragraph below otherwise overclaims alone)
+    if (underivable) lead += ` ${d7}`;
+  } else if (underivable) {
+    lead = d7;
+  } else {
+    const iso = (ts) => { try { return new Date(ts).toISOString(); } catch { return 'an unrecorded time'; } };
+    const g = cause?.grant;
+    switch (cause?.kind) {
+      case 'revoked':
+        lead = `The grant covering ${targetText} (${g.id}) was revoked. Approving re-asks for consent.`; break;
+      case 'expired':
+        lead = `Your earlier grant for ${targetText} (${g.id}) expired ${iso(g.expiresAt)}. Approving re-arms coverage.`; break;
+      case 'spent':
+        lead = `Your earlier grant for ${targetText} (${g.id}) spent its budget (${g.uses}/${g.maxUses} uses). Approving re-arms coverage.`; break;
+      case 'classless-grant':
+        lead = `A live grant for ${targetText} (${g.id}) carries no method class, and the mediator refuses classless rows by name — ` +
+          `this classed act asks. Approving materializes a classed grant the wire can deliver (D-7).`; break;
+      case 'rephrase':
+        lead = `${targetText} was approved before, but only as the exact phrasing approved` +
+          `${cause.lapsed ? ' — and that approval has lapsed' : ''} — this differently-shaped act on the ` +
+          `same target asks anew (#26).`; break;
+      default:
+        lead = `First touch: nothing has ever covered ${targetText} in this runtime — no grant row, no cached approval. ` +
+          `Approving materializes scoped, expiring coverage (the terms follow).`;
+    }
+  }
+  // demoted, exactly once: the mechanical restatement of the verdict is the
+  // definition of an ask, kept for the record after the cause that differs
+  const restated = `"${tool}" is not covered by this runtime's grant layers.`;
+  return lead + ` ${restated} ` +
+    `${replayConsequence(cacheTtlFor(approval, args), { egressBound: egressBound(approval, args) })} ${egressHonesty(approval.egress)}` +
+    (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null
+      ? ` This act has no delivery path under the mediated posture — the mediator speaks plain HTTP and CONNECT ` +
+        `only (#57), so approving records consent but materializes NO usable connectivity.`
+      : '') +
+    (approval.egress === 'proxy' && args?.delivery === 'mediator' && args?.url == null && args?.port == null
+      ? ` The grant this approval materializes names the host only: it carries plain HTTP, while a tunneled act ` +
+        `(CONNECT) to it would be refused at the wire — a tunnel opens only where the operator was shown the port (#56).`
+      : '') +
+    (args?.effectClass === null && typeof args?.command === 'string' && args.command
+      ? ` This command's local effects are not statically provable as read-only, so the approval covers exactly ` +
+        `this command — a differently-phrased or differently-tailed command asks again (#26).`
+      : '');
+}
+
+/**
  * The answerer: claim our ask, delegate the decision downstream, then
  * materialize. Registered before operator answerers are composed, so
  * `next()` reaches the real decider; if none exists the outcome is the
@@ -713,30 +800,17 @@ export function approvalPlugin(opts = {}) {
       // correlation survive concurrent asks for the same tool.
       if (exec?.agent) approval.recordAsk(exec.agent, tool, { fp: v.fingerprint, root, session, args, callId: exec.callId, secretRefs, methodClass: args?.methodClass ?? null });
       report('ask');
+      // #107: the ask's reason leads with its CAUSE, not the constant
+      // "uncovered" banner (which is every ask's rule and carries zero
+      // bits) — the classifier names why THIS ask fired and the builder
+      // renders it as the first sentence; a denial surfaces this same text
+      // to the Subject, so the cause the agent reads is the real one
+      const cause = classifyAskCause(approval.store, {
+        target: { ...args }, session, now: Date.now(), egress: approval.egress,
+        hasMethodClass: Object.hasOwn(args ?? {}, 'methodClass'),
+      });
       const env = buildEnvelope({ gate: 'AG', ruleId: v.ruleId,
-        reason: `"${tool}" is not covered by this runtime's grant layers` +
-          (secretRefs.length
-            ? ` — this call references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
-              `approving it materializes a session-scoped, TTL-bounded, revocable (grants-revoke) secret grant and the credential is injected into the confined execution ` +
-              `without entering this conversation`
-            : '') +
-          `. ${replayConsequence(cacheTtlFor(approval, args), { egressBound: egressBound(approval, args) })} ${egressHonesty(approval.egress)}` +
-          (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'methodClass') && args.methodClass == null
-            ? ` This target's method class could not be derived statically, so NO egress grant will materialize from ` +
-              `approving — the mediator refuses its connections by name (D-7).`
-            : '') +
-          (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null
-            ? ` This act has no delivery path under the mediated posture — the mediator speaks plain HTTP and CONNECT ` +
-              `only (#57), so approving records consent but materializes NO usable connectivity.`
-            : '') +
-          (approval.egress === 'proxy' && args?.delivery === 'mediator' && args?.url == null && args?.port == null
-            ? ` The grant this approval materializes names the host only: it carries plain HTTP, while a tunneled act ` +
-              `(CONNECT) to it would be refused at the wire — a tunnel opens only where the operator was shown the port (#56).`
-            : '') +
-          (args?.effectClass === null && typeof args?.command === 'string' && args.command
-            ? ` This command's local effects are not statically provable as read-only, so the approval covers exactly ` +
-              `this command — a differently-phrased or differently-tailed command asks again (#26).`
-            : ''),
+        reason: askReason({ tool, args, secretRefs, cause, approval }),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };
     };
