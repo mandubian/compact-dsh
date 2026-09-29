@@ -233,5 +233,36 @@ test('classifyAskCause: the rephrase class is route-keyed — same host:port, di
   store.cacheSet('fp_aaaaaaaaaaaaaaaa', now, 60_000, canonicalTarget({ url: 'https://same.example/first' }));
   assert.equal(classifyAskCause(store, { target: { url: 'https://same.example/second' }, session: 's', now, egress: undefined }).kind, 'rephrase',
     'the operator already paid for this route under another phrasing');
+  assert.equal(classifyAskCause(store, { target: { url: 'https://same.example/second' }, session: 's', now, egress: undefined }).lapsed, false,
+    'a live entry is coverage the phrasing excluded');
   assert.equal(classifyAskCause(store, { target: { host: 'other.example' }, session: 's', now, egress: undefined }).kind, 'first-touch');
+});
+
+test('classifyAskCause: a lapsed same-route entry is rephrase-with-lapse, never a silent first touch (Copilot review #109)', () => {
+  const store = new GrantStore();
+  const now = 1_700_000_000_000;
+  // #40's lazy deletion: an entry whose TTL passed but whose fingerprint was
+  // never probed again still sits in the map — it is history, not coverage
+  store.cacheSet('fp_bbbbbbbbbbbbbbbb', now - 120_000, 60_000, canonicalTarget({ url: 'https://stale.example/old' }));
+  const cause = classifyAskCause(store, { target: { url: 'https://stale.example/new' }, session: 's', now, egress: undefined });
+  assert.deepEqual({ kind: cause.kind, lapsed: cause.lapsed }, { kind: 'rephrase', lapsed: true },
+    'the lead must say the earlier approval lapsed, not imply reusable coverage — and never claim nothing ever covered');
+  // and the builder renders the lapse
+  const reason = askReason({
+    tool: 'net.fetch', args: { url: 'https://stale.example/new' }, cause, approval: createApproval({}),
+  });
+  assert.match(reason, /was approved before, but only as the exact phrasing approved — and that approval has lapsed — /);
+});
+
+test('a secret act that is ALSO the underivable class carries BOTH disclosures (Copilot review #109)', async () => {
+  const booted = boot({ egress: 'proxy', secretRefs: ['GH_TOKEN'] });
+  const body = await ask(booted, {
+    name: 'bash',
+    arguments: { url: 'https://github.com/api', host: 'github.com', methodClass: null, delivery: 'mediator',
+      command: 'curl -H "Authorization: Bearer $GH_TOKEN" https://github.com/api' },
+  });
+  assert.match(body, /^"bash" references declared secret \$GH_TOKEN/, 'the injection disclosure still leads');
+  assert.match(body, /method class is not statically derivable — approval covers exactly this command and materializes NO egress grant \(D-7\)/,
+    'the D-7 disclosure rides right behind it — what approving writes AND what it cannot deliver, neither dropped');
+  assertDemoted(body, 'references declared secret', 'secret + underivable');
 });

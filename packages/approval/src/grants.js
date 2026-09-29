@@ -233,9 +233,12 @@ export class GrantStore {
  *   expired        — a covering row lapsed by TTL
  *   spent          — a covering row exhausted its budget (a spent grant IS
  *                    an expired one: widening requires a new decision)
- *   rephrase       — a live cached approval covers this target's route under
- *                    a different fingerprint: approval covers the exact
- *                    phrasing it approved, so this act asks anew (#26)
+ *   rephrase       — a cached approval covers this target's route under a
+ *                    different fingerprint: approval covers the exact
+ *                    phrasing it approved, so this act asks anew (#26);
+ *                    `lapsed: true` when that entry's TTL is past (the
+ *                    lazy deletion of #40 leaves the row — history, not
+ *                    coverage)
  *   classless-grant — a LIVE network row reaches the target but carries no
  *                    method class: under the mediated posture the mediator
  *                    refuses classless rows by name, so the gate must not
@@ -267,11 +270,16 @@ export function classifyAskCause(store, { target, session, now, egress, hasMetho
   if (expiredRow) return { kind: 'expired', grant: expiredRow };
   const spentRow = rows.filter(g => !g.revokedAt && g.maxUses != null && g.uses >= g.maxUses).sort(newest)[0];
   if (spentRow) return { kind: 'spent', grant: spentRow };
-  // the cache is fingerprint-keyed; the rephrase question is target-keyed
+  // the cache is fingerprint-keyed; the rephrase question is target-keyed.
+  // Liveness is part of the truth (#40's lazy deletion leaves lapsed rows in
+  // the map): a live entry is coverage the phrasing excluded, a lapsed one
+  // is history only — the lead says which
   const route = targetKey(target);
   if (route != null) {
     for (const e of store.cache.values()) {
-      if (targetKey(e.target) === route) return { kind: 'rephrase' };
+      if (targetKey(e.target) === route) {
+        return { kind: 'rephrase', lapsed: !!(e.expiresAt != null && e.expiresAt <= now) };
+      }
     }
   }
   if (egress === 'proxy' && hasMethodClass) {

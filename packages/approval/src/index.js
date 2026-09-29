@@ -543,6 +543,9 @@ export function askReason({ tool, args, secretRefs = [], cause, approval }) {
   const bits = targetBitsOf(canonicalTarget(args));
   const targetText = bits || 'this target';
   const underivable = approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'methodClass') && args.methodClass == null;
+  // the D-7 cause sentence, shared by its lead and the combined case below
+  const d7 = `"${tool}" needs the network but its method class is not statically derivable — approval covers exactly this command ` +
+    `and materializes NO egress grant (D-7): the mediator refuses its connections by name.`;
   let lead;
   if (secretRefs.length) {
     // the injection agreement is the highest-stakes consequence an approval
@@ -552,9 +555,13 @@ export function askReason({ tool, args, secretRefs = [], cause, approval }) {
       `approving it materializes the injection grant — session-scoped, TTL-bounded, revocable (grants-revoke) — and the credential is available to this command inside the ` +
       `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints.` +
       (bits ? ` Target: ${bits}.` : '');
+    // a secret act under the mediated posture can ALSO be the underivable
+    // class: what approving writes (injection) AND what it cannot deliver
+    // (no egress grant) are both decision-grade — neither drops (the proxy
+    // honesty paragraph below otherwise overclaims alone)
+    if (underivable) lead += ` ${d7}`;
   } else if (underivable) {
-    lead = `"${tool}" needs the network but its method class is not statically derivable — approval covers exactly this command ` +
-      `and materializes NO egress grant (D-7): the mediator refuses its connections by name.`;
+    lead = d7;
   } else {
     const iso = (ts) => { try { return new Date(ts).toISOString(); } catch { return 'an unrecorded time'; } };
     const g = cause?.grant;
@@ -569,7 +576,8 @@ export function askReason({ tool, args, secretRefs = [], cause, approval }) {
         lead = `A live grant for ${targetText} (${g.id}) carries no method class, and the mediator refuses classless rows by name — ` +
           `this classed act asks. Approving materializes a classed grant the wire can deliver (D-7).`; break;
       case 'rephrase':
-        lead = `${targetText} was approved before, but only as the exact phrasing approved — this differently-shaped act on the ` +
+        lead = `${targetText} was approved before, but only as the exact phrasing approved` +
+          `${cause.lapsed ? ' — and that approval has lapsed' : ''} — this differently-shaped act on the ` +
           `same target asks anew (#26).`; break;
       default:
         lead = `First touch: nothing has ever covered ${targetText} in this runtime — no grant row, no cached approval. ` +
