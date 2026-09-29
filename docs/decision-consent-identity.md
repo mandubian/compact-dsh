@@ -1,10 +1,22 @@
 # Decision record — consent identity is risk identity (fingerprint effect classes, G3/G5 residual)
 
-**Status: PROPOSED — awaiting adjudication.** Drafted 2026-09-22 against
+**Status: ADOPTED (status updated 2026-09-25 — the header now moves with the
+enforcement it describes).** Drafted 2026-09-22 against
 [#26](https://github.com/mandubian/compact-dsh/issues/26) and the secret-hygiene
-audit's G3/G5 ([#8](https://github.com/mandubian/compact-dsh/issues/8)). Constitutional
-under A-4 (recorded before the work); not enforcement until adopted — nothing
-here changes a fingerprint, a grant, or an envelope.
+audit's G3/G5 ([#8](https://github.com/mandubian/compact-dsh/issues/8)). What
+adoption has already moved, per position (details at each heading):
+
+- **Position 2 (G5) — ADOPTED** (the query joins the replay identity;
+  `canonicalQuery`, secret-hygiene slice `6e46f58`, PR #63).
+- **Position 3 (G3) — ADOPTED** (the rendering split;
+  `redactEmbeddedSecrets` on every rendered surface, `6e46f58`, PR #63; the
+  deciding-preview masking `35f7bae`, PR #9).
+- **Position 1 — ADOPTED in full (2026-09-25)**: the network half (the
+  method class joins the ask identity and the grant; the #38 phase-3 slice,
+  `f8216f3`) and the bash effect-class half (the closed read-only vocabulary,
+  class+verb identity, the null-class command-scoped fallback) — adjudicated
+  in `docs/decision-bash-effect-class.md`, adopted by the slices #85 (option
+  A) and #88 (option B).
 
 ## The principle
 
@@ -36,6 +48,16 @@ The fingerprint hashes `{tool, canonicalTarget}` only:
 
 ### 1. Effect class joins the fingerprint — derived by ONE authority (#26)
 
+**Status: ADOPTED in full (2026-09-25).** The network half: the method class
+rides the ask identity and the grant — `fingerprint.js` hashes the declared
+class, the grant stores it, the mediator enforces it per connection (the #38
+phase-3 slice, `f8216f3`). The bash effect-class half: adjudicated in
+[`docs/decision-bash-effect-class.md`](decision-bash-effect-class.md) and
+enforced by the adoption slices [#85](https://github.com/mandubian/compact-dsh/pull/85)
+(option A — the command-scoped fallback) and
+[#88](https://github.com/mandubian/compact-dsh/pull/88) (option B — the
+closed read-only vocabulary, class+verb identity, the compound rider closed).
+
 Extend the fingerprint payload with an **effect class**, derived by the same
 static analysis that already gates network targets and informs read-only vs
 workspace-write (no second derivation, no drift):
@@ -55,6 +77,10 @@ Register: I-5/R-3 conduct refinement (evidence text), no clause re-grading.
 
 ### 2. G5 — replay identity stays canonical target identity; the wording stops overclaiming
 
+**Status: ADOPTED** (the query joins the replay identity — `canonicalQuery`,
+sorted name=value pairs, one-way payload only; secret-hygiene slice `6e46f58`,
+PR #63; the residual wording lives in the ask and the decision notes).
+
 Tightening (cache keyed on the full URL) reintroduces the hygiene problem G3
 fights: query strings are where credentials ride, and putting them into
 fingerprints, `approvals.json`, and attestation lines persists exactly the
@@ -68,6 +94,11 @@ narrows the residual further: the method class travels with the identity even
 when the query does not.)
 
 ### 3. G3 — keep the path load-bearing; shape-hash it where it is rendered, not where it is granted
+
+**Status: ADOPTED** (the rendering split — every rendered surface passes
+through the credential-shape catalogue `redactEmbeddedSecrets`; the identity
+keeps the path verbatim; `6e46f58`, PR #63, and the deciding-preview masking
+`35f7bae`, PR #9).
 
 Stripping path components wholesale breaks `UrlPrefix` grant scoping — the
 path is grant semantics, not decoration. Proposed: the identity keeps the path
@@ -83,19 +114,25 @@ accepted because that file is Enforcer state (`protectedState`), not Subject-
 or record-readable. If that file ever leaves the Enforcer boundary, position 3
 must be revisited (A-4 discipline).
 
-## What adoption would touch
+## What adoption touched — all of it, landed
 
-1. `fingerprint.js` (effect class in the payload — golden vectors gain the new
-   axis; canonicalization of existing fields does not move), `evaluate.js`
-   (nothing — the verdict already carries the fingerprint), grants
-   (`parseAllowlistLikePattern` + `patternMatches` gain the method axis).
-2. The analyzer boundary: one authority, one import direction (approval reads
-   the classification; the analyzer never reads approval state).
+1. `fingerprint.js`: the declared method class joins the payload (`f8216f3`),
+   the query joins it (`6e46f58`), and the bash effect class joins it — the
+   class+verb identity for provable reads, the command-scoped fallback for
+   unprovable ones (`#85` + `#88`); canonicalization of the existing fields
+   never moved, `evaluate.js` needed nothing (the verdict already carries the
+   fingerprint), and grants carry the method axis as they always have.
+2. The analyzer boundary held as sketched: one authority, one import
+   direction — the effect class is derived by the same analyzer that finds
+   network targets and method classes; approval reads the classification and
+   never derives it.
 3. Wording: ask consequence sentence + decision note + receipt ("canonical
-   target" phrasing), per position 2.
-4. Preview/budget-line shape-hashing, per position 3.
-5. Register evidence lines for I-5 (fingerprint effect classes), G3/G5
-   residuals as documented posture.
+   target" phrasing), per position 2 — landed; the ask gained the
+   unprovable-command sentence per position 1's bash half.
+4. Preview/budget-line shape-hashing, per position 3 — landed.
+5. Register evidence lines for I-5: the method-class half (in #38's slice)
+   and the bash half (moved with its adoption slices, `#85` + `#88`) — the
+   register moved with the enforcement, never before it (A-4).
 
 ## Non-goals
 
@@ -106,3 +143,95 @@ must be revisited (A-4 discipline).
   record folds this one's method-class axis in for the network family.
 - No autonoetic credential vault — dsh's CredentialRef model stands; G2's
   output-side secret detection is its own adjudication.
+
+## The approval-at-rest adjudication (#75) — ADOPTED: option C (2026-09-25)
+
+Status: **adopted by the Principal (2026-09-25): option C — the declared
+residual.** The store stays plaintext behind the owner-only plumbing
+(`0600` file, `0700` state root); the at-rest residual is declared and the
+trust statement is one sentence an operator can hold: *the approvals file is
+Enforcer state — the same trust class as `~/.ssh/id_rsa`: owner-only on disk,
+and at-rest copies (backups, snapshots, volume images) are the operator's
+backup policy, exactly as they are for the private key.* **Option B remains
+the adjudicated upgrade path** — if a composition ever DECLARES at-rest
+copies as an adversary, B lands with its `UrlPrefix` semantics change
+adjudicated in the same slice, never quietly. **Option A requires a
+key-placement design first**: without the split key it claims protection its
+placement cannot prove. Drafted 2026-09-24 from the issue; the register
+evidence moved with this adoption (A-4, `[baseline-update]`).
+
+**The finding.** G3's adjudication kept the true URL path in the persisted
+canonical targets (`approvals.json` cache entries and `UrlPrefix` grant rows)
+because identity must stay exact — a redacted identity collides distinct
+credentials and lets one webhook's approval replay for another. The residual
+was declared (I-8), and the plumbing was hardened: the store file is `0600` on
+every flush (the rename re-asserts it), created dirs are `0700`. What those
+edits deliberately did NOT answer: **is there an at-rest design that removes
+the plaintext without corrupting matching semantics?** Recorded so it is
+adjudicated, not improvised — design decisions, not unilateral fixes.
+
+**The threat boundary, stated honestly first.** No file mode, and no
+encryption with a key that boots beside the data, defends against the
+operator's own uid or root — that class is out of reach by construction. The
+launcher's `0700` state root already excludes other local users, and the
+owner-only store file closes the relocation regressions. What remains exposed
+is **at-rest copies** — backups, snapshots, volume images of the state dir
+that travel without the operator's keyring. That is the only adversary any
+option below actually addresses.
+
+**Option A — encrypted vault (autonoetic's design).** Persist `vault:k:ref`
+placeholders; decrypt on load; hydrate true values in memory. What the vault
+bought there: secrets were *inputs the agent requested* — artifacts carried
+references because nothing matched against the value. Why it does not
+transplant: here a path credential is part of the operation's *identity* —
+allow-once replay, revocation sweeps, and `UrlPrefix` coverage all compare the
+live call against the stored form, so every consumer (matching, the egress
+mediator's per-connection reads, `describePattern`) needs reconstruction
+machinery. What it would buy here: protection of at-rest copies — and only if
+the operator splits the key onto other media; with the key in the same trust
+root (the default, F-5), it is ceremony wearing a lock. Cost: a store format
+bump (v3), a hydration layer, a key-management surface. (The record's
+"no autonoetic vault" non-goal stands — that refusal was the CredentialRef
+*delivery* model; this option is about the store's persisted *identity*, which
+is why it is adjudicated here rather than assumed.)
+
+**Option B — HMAC-encoded matching (no vault, no key distribution).** The
+secret always rides *live args* at ask/fingerprint time; the persisted form
+only ever needs to be **compared**, never reconstructed. Encode the persisted
+target as `{cleanPrefix, mac(tail)}` with a per-store salt; revocation
+matching becomes prefix-equality + mac-equality. What it buys: the plaintext
+genuinely leaves the file — at-rest copies included — with no key to co-locate
+or split. What it costs: it quietly downgrades `UrlPrefix` semantics
+(prefix-over-path becomes prefix + exact tail — the grant stops covering
+paths the operator's click implied), it touches the security-critical
+matching path (subtle-bug surface where none exists today), and it is a store
+format bump (v3) with migration, every renderer agreeing on the encoding.
+
+**Option C — declared residual (the current posture).** Keep plaintext, keep
+the declared residual, keep the owner-only plumbing. The store is Enforcer
+state (`protectedState`), operator-owned — the same trust class as
+`~/.ssh/id_rsa`. Zero churn, zero new machinery, and the G3 residual stays
+exactly as documented.
+
+| | at-rest copies | matching semantics | churn | new key surface |
+|---|---|---|---|---|
+| **A** encrypted vault | protected only with a split key — ceremony otherwise | unchanged, but every consumer reconstructs | store v3 + hydration | key management |
+| **B** HMAC matching | tail plaintext removed (clean prefix remains) | `UrlPrefix` downgraded to prefix + exact tail | store v3 + migration | per-store salt only |
+| **C** declared residual | exposed, as declared | unchanged | none | none |
+
+**The decision (2026-09-25)**: C. The reasons, recorded where the next
+reader can weigh them: A and B both derive their real protection from the
+same single act — putting a secret on other media — which is a deployment
+decision (encrypted backups, an encrypted volume) the operator can make
+without the runtime growing a crypto surface whose strength depends on where
+its key happened to be placed; B's cost is permanent (`UrlPrefix` semantics,
+the matching-path rewrite) while its benefit is conditional on a threat model
+nothing declares today; and with a co-located salt, B degrades to
+obfuscation — low-entropy paths plus an offline dictionary is not a race a
+MAC wins. The doctrine stands, now as the adopted posture's own limit:
+**an at-rest mechanism that cannot fail loudly should not claim more than
+its key placement proves** — C claims exactly what its file modes prove, and
+the residual (same-uid/root, at-rest copies) is declared in the same breath
+as the posture. If that ever stops being enough, the path back here is
+recorded: B, adjudicated with its semantics change; A, with a key-placement
+design first.

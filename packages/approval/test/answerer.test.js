@@ -251,6 +251,8 @@ test('a decided ask injects a plugin-sourced note through the agent', async () =
   assert.equal(injected.length, 1, 'one note per decision');
   assert.equal(injected[0].source?.kind, 'plugin');
   assert.equal(injected[0].source?.plugin, 'compact-approval');
+  assert.equal(injected[0].source?.form, 'notice');
+  assert.equal(injected[0].source?.summary, 'Approval: "bash" allowed once by the operator');
   const text = injected[0].content?.[0]?.text ?? '';
   assert.match(text, /\[fp_[0-9a-f]{16}\]/, 'the fingerprint is on the note');
   assert.match(text, /was allowed once/);

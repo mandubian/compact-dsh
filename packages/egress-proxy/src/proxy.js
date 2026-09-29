@@ -10,8 +10,9 @@
 // port-scanning it — per-session networks close it; see index.js.) Every
 // CONNECTION re-reads the grant rows — coverage, liveness, class — so a TTL
 // that lapses or a revocation that lands closes what is already open (live
-// tunnels are tracked against the grant that opened them and destroyed when
-// it stops covering).
+// tunnels AND in-flight plain-HTTP exchanges are tracked against the grant
+// that opened them and destroyed when it stops covering — #79: the response
+// streaming back and the body streaming out alike, not just the next attempt).
 //
 // What it deliberately does NOT do:
 //   - intercept TLS. HTTPS is filtered on the CONNECT authority; the tunnel
@@ -34,7 +35,7 @@
 import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { connect as dial, isIP } from 'node:net';
 import { lookup as dnsLookup } from 'node:dns';
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 import { patternMatches } from 'compact-dsh-approval';
 
 /** The acting gate every refusal from here is stamped with (R-3/I-4). */
@@ -79,11 +80,11 @@ function patternReaches(grant, { host, port, url, tunnel }) {
 
 function refuse(res, envelope, status = 403) {
   res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8', 'proxy-agent': 'compact-dsh-egress-proxy' });
-  res.end(envelope.text);
+  res.end(bandReason(envelope));
 }
 
 function rawRefuse(socket, envelope, statusLine = 'HTTP/1.1 403 Forbidden') {
-  if (socket.writable) socket.end(`${statusLine}\r\ncontent-type: text/plain; charset=utf-8\r\n\r\n${envelope.text}\n`);
+  if (socket.writable) socket.end(`${statusLine}\r\ncontent-type: text/plain; charset=utf-8\r\n\r\n${bandReason(envelope)}\n`);
   else socket.destroy();
 }
 
@@ -137,10 +138,31 @@ export function classifyConnection(rows, { host, port, methodClass = null, url =
     };
   }
   if (tunnel) {
+    // CONNECT (#56, option A — port-explicit tunnels): what rides inside is
+    // opaque by decision (no interception) — the class AND the protocol are
+    // unobservable, so the tunnel surface is consent-shaped at the only seam
+    // that can carry it: the grant must NAME the port. A bare-host grant keeps
+    // covering plain HTTP but opens no tunnel — the operator was shown the
+    // host, never a port. Over-asks, never overclaims (the method-class
+    // lattice's own direction).
+    const portNamed = live.filter(g => g.pattern?.kind === 'HostAndPort');
+    if (portNamed.length === 0) {
+      return {
+        ok: false, status: 403,
+        envelope: buildEnvelope({
+          gate: GATE, ruleId: 'portless-grant',
+          reason: `a live grant covers ${host} but names no port — a tunnel opens only where the operator was shown the port (#56): ` +
+            `plain HTTP carries under the host grant, CONNECT does not. A port enters a grant through the evidence ` +
+            `(a URL's scheme port, an nc-style pairing) or a declared registry fact — never guessed`,
+          lawfulNextMoves: LAWFUL_MOVES,
+        }),
+      };
+    }
     // CONNECT: what rides inside is opaque by decision (no interception), so
-    // the class cannot be checked here — a live, classed grant for the host
-    // is what opens a tunnel, and that opacity is the declared residual.
-    return { ok: true, grant: live[0] };
+    // the class cannot be checked here — a live, classed, PORT-EXPLICIT grant
+    // is what opens a tunnel, and that opacity is the declared residual
+    // (residual 2: the port is what was consented, not the protocol).
+    return { ok: true, grant: portNamed[0] };
   }
   if (methodClass == null) {
     return {
@@ -328,6 +350,7 @@ export function createEgressProxy({
   onRefusal = null,
 } = {}) {
   const tunnels = new Map();   // upstream socket -> {host, port, grantId}
+  const exchanges = new Map(); // in-flight plain-HTTP request -> {host, port, grantId, res}
   const sockets = new Set();   // client sockets, destroyed on close
   let closed = false;
 
@@ -441,6 +464,11 @@ export function createEgressProxy({
         res.writeHead(upstreamRes.statusCode, upstreamRes.headers);
         upstreamRes.pipe(res);
       });
+      // the exchange is tracked like a tunnel (#79): mid-flight enforcement
+      // must see it, or a revoked grant leaves a streaming response (worse,
+      // a streaming upload) running to completion
+      exchanges.set(upstream, { host: authority.host, port: authority.port, grantId: verdict.grant.id, res });
+      upstream.on('close', () => exchanges.delete(upstream));
       upstream.on('error', (error) => {
         const envelope = buildEnvelope({
           gate: GATE, ruleId: 'upstream',
@@ -513,21 +541,26 @@ export function createEgressProxy({
   });
   server.on('error', (error) => logger?.error?.(`compact-dsh-egress-proxy: listener error: ${error.message}`));
 
-  // Mid-flight enforcement: a grant that lapses or is revoked closes the
-  // tunnels it opened — TTL expiry and revocation are the same mechanism,
-  // checked on the same clock, for the same reason.
+  // Mid-flight enforcement: a grant that lapses or is revoked closes what it
+  // opened — tunnels and plain-HTTP exchanges alike (#79) — TTL expiry and
+  // revocation are the same mechanism, checked on the same clock, for the
+  // same reason.
   const reaper = setInterval(() => {
     if (closed) return;
     const rows = rowsFor();
     const liveIds = new Set(rows.filter(g => g.methodClass != null && isLive(g, now())).map(g => g.id));
-    for (const [upstream, tunnel] of [...tunnels]) {
-      if (liveIds.has(tunnel.grantId)) continue;
-      const row = rows.find(g => g.id === tunnel.grantId);
+    const cut = (kind, map, open, upstream) => {
+      if (liveIds.has(open.grantId)) return;
+      const row = rows.find(g => g.id === open.grantId);
       logger?.warn?.(
-        `compact-dsh-egress-proxy: closing a live tunnel to ${tunnel.host}:${tunnel.port} — its grant ` +
+        `compact-dsh-egress-proxy: closing a live ${kind} to ${open.host}:${open.port} — its grant ` +
         `${row ? (row.revokedAt ? 'was revoked' : 'expired') : 'no longer exists'} (#38)`);
-      upstream.destroy();   // the client socket goes down through the pipe's close handler
-    }
+      map.delete(upstream);      // forgotten at cut time — the close event can lag the destroy by a turn
+      upstream.destroy();        // the CONNECT case: the client socket goes down through the pipe's close handler
+      open.res?.destroy();       // the plain-HTTP case: the client side dies with it — the in-flight body stops (#79)
+    };
+    for (const [upstream, open] of [...tunnels]) cut('tunnel', tunnels, open, upstream);
+    for (const [upstream, open] of [...exchanges]) cut('exchange', exchanges, open, upstream);
   }, recheckMs);
   reaper.unref?.();
 
@@ -535,6 +568,7 @@ export function createEgressProxy({
     server,
     address: () => server.address(),
     tunnelCount: () => tunnels.size,
+    exchangeCount: () => exchanges.size,
     async start() {
       await new Promise((resolve, reject) => {
         const onError = (error) => reject(new Error(
@@ -557,6 +591,8 @@ export function createEgressProxy({
       clearInterval(reaper);
       for (const t of [...tunnels.keys()]) t.destroy();
       tunnels.clear();
+      for (const [u, open] of [...exchanges]) { u.destroy(); open.res?.destroy(); }
+      exchanges.clear();
       for (const s of [...sockets]) s.destroy();
       sockets.clear();
       server.close();

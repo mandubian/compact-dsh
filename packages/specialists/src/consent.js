@@ -34,7 +34,7 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 
 /** The gate name every MA-4 refusal carries. */
 export const GATE = 'CS';
@@ -175,11 +175,11 @@ export function gateAddress(registry, { toolName, senderId, recipientId }) {
       reason: `an address act must name both its author and its target to be attributable; this one names ${senderId == null ? 'no author' : 'no target'}`,
       lawfulNextMoves: ['reissue the call with the target agent id', 'escalate to your Principal'],
     });
-    return { kind: 'deny', reason: env.text };
+    return { kind: 'deny', reason: bandReason(env) };
   }
   if (String(senderId) === String(recipientId)) return null;  // a Subject's own attention is its own
   if (registry.covering({ recipient: recipientId, sender: senderId, kind: act.kind }).length > 0) return null;
-  return { kind: 'deny', reason: addressRefusal({ sender: senderId, recipient: recipientId, act }).text };
+  return { kind: 'deny', reason: bandReason(addressRefusal({ sender: senderId, recipient: recipientId, act })) };
 }
 
 /**

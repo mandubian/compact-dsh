@@ -97,6 +97,24 @@ test('102-c: only proof of death kills — a live route of another class is not 
   }
 });
 
+test('102-c2: a portless-grant refusal (#56) kills only the entries that can ONLY ride a tunnel', () => {
+  const approval = createApproval({ egress: 'proxy' });
+  const t0 = 1_700_000_000_000;
+  const fpTls = 'fp_aaaaaaaaaaaaaaaa';
+  const fpHttp = 'fp_bbbbbbbbbbbbbbbb';
+  const fpBare = 'fp_cccccccccccccccc';
+  approval.store.cacheSet(fpTls, t0, 24 * HOUR, { url: 'https://api.example.com/v1/x' });  // https → CONNECT only
+  approval.store.cacheSet(fpHttp, t0, 24 * HOUR, { url: 'http://api.example.com/x' });     // plain HTTP carries under the rows
+  approval.store.cacheSet(fpBare, t0, 24 * HOUR, { host: 'api.example.com' });             // delivery unknown → conservative
+
+  assert.deepEqual(approval.wireRefusal({ host: 'api.example.com', port: '443', ruleId: 'portless-grant', tunnel: true }), [fpTls],
+    'the CONNECT route is proven dead for the https entry; the others keep their plain-HTTP delivery');
+  assert.ok(approval.store.cache.get(fpHttp) && approval.store.cache.get(fpBare));
+
+  assert.deepEqual(approval.wireRefusal({ host: 'api.example.com', port: '443', ruleId: 'no-grant' }), [fpBare],
+    'a no-grant proof is unconditional — but only for routes that reach the refused port: the http entry rides :80');
+});
+
 // -- route precision: the entry dies with the route it names, no wider -------
 
 test('102-d: a HostAndPort entry dies with its exact host+port — a refusal on another port proves nothing', () => {

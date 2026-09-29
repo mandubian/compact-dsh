@@ -61,16 +61,3 @@ export function decide(target, rules) {
   if (target.host != null || target.url != null) return { decision: 'deny', rule: null };
   return { decision: 'pass' }; // no network target at all: gate abstains
 }
-
-/** Compact-shaped denial envelope (R-3/I-4): rule ID + reason + lawful next moves. */
-export function envelope(tool, target) {
-  return {
-    kind: 'deny',
-    reason: `DENIED by allowlist gate [AG-1] — "${tool}" to ${target.host ?? ''}${target.port ? ':' + target.port : ''}${target.url ? ' (' + target.url + ')' : ''} is not covered by this runtime's network allowlist.`,
-    lawfulNextMoves: [
-      'request a scoped session grant for this host (Gates Act, when enacted)',
-      'use an approved mirror already on the allowlist',
-      'escalate to your Principal with reasons',
-    ],
-  };
-}

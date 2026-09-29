@@ -23,7 +23,7 @@
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 
 export const name = 'compact-promotion';
 export const GATE = 'PG';
@@ -77,7 +77,7 @@ export function promotionPlugin(opts = {}) {
       const v = evaluatePromotionRecord(exec?.arguments ?? {});
       if (v.ok) return next();
       const env = rejectionEnvelope(v.ruleId, v.reason, v.lawfulNextMoves);
-      return { kind: 'deny', reason: env.text };
+      return { kind: 'deny', reason: bandReason(env) };
     });
 
     const recorded = [];
@@ -100,7 +100,7 @@ export function promotionPlugin(opts = {}) {
         // defense in depth: the body re-checks even though the waterfall
         // already denies rejections before dispatch
         const v = evaluatePromotionRecord(args ?? {});
-        if (!v.ok) throw rejectionEnvelope(v.ruleId, v.reason, v.lawfulNextMoves).text;
+        if (!v.ok) throw bandReason(rejectionEnvelope(v.ruleId, v.reason, v.lawfulNextMoves));
         const record = {
           task: String(args?.task ?? ''),
           pass: args?.pass === true,

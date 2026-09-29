@@ -23,7 +23,7 @@
 
 import { createHash } from 'node:crypto';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 import { fingerprint, REFUSAL_EVENT } from 'compact-dsh-approval';
 import { Guard, TRIPS } from './trips.js';
 import { classifyToolResult } from './classify.js';
@@ -121,7 +121,7 @@ export function loopguardPlugin(opts = {}) {
       const annotationTrip = g.observeAnnotation(`${trip.id}:${trip.message}`);
       const effective = annotationTrip ?? trip;
       injectCorrective(ctx, exec, effective);
-      return { kind: 'deny', reason: tripEnvelope(effective).text };
+      return { kind: 'deny', reason: bandReason(tripEnvelope(effective)) };
     });
 
     ctx.on('tools/result', (exec, result) => {
@@ -157,7 +157,7 @@ export function loopguardPlugin(opts = {}) {
           lawfulNextMoves: ['retry the call', 'use a different tool for this operation', 'escalate to your Principal'],
         });
         if (trip) injectCorrective(ctx, exec, trip);
-        return { kind: 'block', feedback: [{ type: 'text', text: env.text }] };
+        return { kind: 'block', feedback: [{ type: 'text', text: bandReason(env) }] };
       });
     }
 
@@ -193,10 +193,16 @@ function injectCorrective(ctx, exec, trip) {
   try {
     const agent = exec?.agent;
     if (!agent || typeof agent.inject !== 'function') return;
+    // form:'notice' + summary: the trip is visible on the web transcript's
+    // collapsed context row without expanding — a denied loop leaves a mark
     if (trip.denyAll || trip.behavioral === false) {
-      agent.inject(createUserMessage({ content: [{ type: 'text', text: haltProse(trip) }], source: { kind: 'plugin', plugin: 'compact-loopguard' } }));
+      agent.inject(createUserMessage({ content: [{ type: 'text', text: haltProse(trip) }],
+        source: { kind: 'plugin', plugin: 'compact-loopguard', form: 'notice',
+          summary: `LoopGuard ${trip.id} ${trip.label}: all further calls denied (session halt)` } }));
     } else {
-      agent.inject(createUserMessage({ content: [{ type: 'text', text: correctiveProse(trip) }], source: { kind: 'plugin', plugin: 'compact-loopguard' } }));
+      agent.inject(createUserMessage({ content: [{ type: 'text', text: correctiveProse(trip) }],
+        source: { kind: 'plugin', plugin: 'compact-loopguard', form: 'notice',
+          summary: `LoopGuard ${trip.id} ${trip.label}: calls denied until your Principal's next message` } }));
     }
   } catch { /* a failed injection must never break the denial */ }
 }

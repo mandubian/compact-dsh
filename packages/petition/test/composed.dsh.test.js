@@ -106,6 +106,8 @@ test('composed: a conforming decision is PUSHED to the petitioner, not left to b
   assert.match(t, /DECISION \(redirected\)/);
   assert.match(t, /motivation: the body stays generic by design/);
   assert.equal(m.injected[0].source.plugin, 'compact-petition');
+  assert.equal(m.injected[0].source.form, 'notice');
+  assert.match(m.injected[0].source.summary, /^Petition pt_[a-z0-9_-]+: answered$/);
 });
 
 test('composed: a dissent rides along with the decision it dissents from (A-5)', async () => {

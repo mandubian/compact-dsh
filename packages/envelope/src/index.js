@@ -6,3 +6,17 @@ export function buildEnvelope({ gate, ruleId, reason, lawfulNextMoves }) {
     (moves ? `\nLawful next moves:\n${moves}` : '');
   return { gate, ruleId, reason, lawfulNextMoves: lawfulNextMoves ?? [], text: reasonText };
 }
+
+// The audience projections and the band tier (docs/concept-envelope-rendering.md):
+// the gloss lives here too (band-time data — see src/gloss.js); projections
+// decide nothing and narrow nothing (R-3 floor, lint-enforced).
+export {
+  instructionalText,
+  operatorCard,
+  askCard,
+  bandReason,
+  resolveTier,
+  bandTier,
+  BAND_TIERS,
+} from './project.js';
+export { GLOSS, WILDCARD_GLOSS, glossFor } from './gloss.js';

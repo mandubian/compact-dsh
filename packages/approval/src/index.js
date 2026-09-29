@@ -39,7 +39,7 @@ import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget, canonicalQuery } from './fingerprint.js';
 import { parseAllowlistLikePattern } from './pattern.js';
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope, bandReason } from 'compact-envelope';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
 export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, evaluate, fingerprint, canonicalTarget, canonicalQuery, parseAllowlistLikePattern, DEFAULTS };
@@ -63,14 +63,18 @@ export const REFUSAL_EVENT = 'compact-approval/refusal';
  *   - classless-grant: rows reach but none is classed — and since rows are
  *     read live-or-not, this proves no classed row EVER reached the route,
  *     so no cached approval for it was ever deliverable;
- *   - expired / revoked: the classed rows that reached it stopped covering.
+ *   - expired / revoked: the classed rows that reached it stopped covering;
+ *   - portless-grant (#56): a CONNECT refused because no live row NAMES the
+ *     port — proof the TUNNEL route is dead, scoped in wireRefusal to the
+ *     entries whose delivery can only be a tunnel (https: targets), since
+ *     plain HTTP carries under the same host rows.
  * A refusal carrying one of these kills the exec-cache entries routed to the
  * refused (host, port). Deliberately NOT deaths: 'method-class' (a live
  * route of the covered class remains — killing would out-run the proof) and
  * everything upstream of the grant question (malformed, use-connect,
  * unknown-method, forbidden-address, upstream, internal).
  */
-const DELIVERY_DEATH_RULES = new Set(['no-grant', 'classless-grant', 'expired', 'revoked']);
+const DELIVERY_DEATH_RULES = new Set(['no-grant', 'classless-grant', 'expired', 'revoked', 'portless-grant']);
 
 function refusalPayload({ kind, verdict, ruleId, tool, fingerprint, root, session }) {
   return { kind, verdict, ruleId, tool, fingerprint, root, session, at: Date.now() };
@@ -277,7 +281,8 @@ export function createApproval(opts = {}) {
             tool, fingerprint: fp, target: entry.target ?? {},
             grantedAt: entry.grantedAt, expiresAt: entry.expiresAt,
           }) }],
-          source: { kind: 'plugin', plugin: 'compact-approval' },
+          source: { kind: 'plugin', plugin: 'compact-approval', form: 'notice',
+            summary: `Replay: "${oneLine(tool) || 'unknown-tool'}" running under a prior operator approval` },
         }));
         approval.replayNotes.set(key, now);
       } catch { /* the trace is a receipt, never a gate — and not yet spent */ }
@@ -300,7 +305,10 @@ export function createApproval(opts = {}) {
     wireRefusal: (fact) => {
       try {
         if (!DELIVERY_DEATH_RULES.has(fact?.ruleId)) return [];
-        return approval.store.killCacheForRoute({ host: fact?.host, port: fact?.port });
+        return approval.store.killCacheForRoute({
+          host: fact?.host, port: fact?.port,
+          tunnelOnly: fact?.ruleId === 'portless-grant',
+        });
       } catch { return []; }
     },
   };
@@ -381,6 +389,21 @@ export function approvalTranscriptNote({ tool, fingerprint, target }, outcome, {
 }
 
 /**
+ * The collapsed-row summary for the decision note: what the web transcript
+ * shows WITHOUT expanding (the note's `form: 'notice'` presentation — a
+ * producer-declared form upstream's chat renders with its summary on the
+ * row). One line, always; the full note text is the expanded body.
+ */
+export function approvalNoticeSummary({ tool }, outcome) {
+  const t = oneLine(tool) || 'unknown-tool';
+  switch (outcome) {
+    case 'allowed-once': return `Approval: "${t}" allowed once by the operator`;
+    case 'rejected': return `Approval: "${t}" denied by the operator — did not run`;
+    default: return `Approval: "${t}" closed ${outcome ?? 'unavailable'} — did not run`;
+  }
+}
+
+/**
  * The transcript note for an exec-cache REPLAY (#40). The exec-cache is
  * cross-session by design — the operator approved one exact operation, and
  * "once" names the decision, not the grant's consumption — but cross-session
@@ -424,9 +447,15 @@ function cacheTtlFor(approval, args) {
   return Math.min(ttl, approval.egressGrantTtlMs);
 }
 
-/** Does approving this act materialize an egress grant? (proxy + derivable class + a network target) */
+/**
+ * Does approving this act materialize an egress grant? Exactly the answerer's
+ * own condition — proxy + derivable class + a mediator delivery path (#57) +
+ * a network target — so the cap and the ask's "no longer than the egress
+ * grant" never speak of a grant the answerer will not write.
+ */
 function egressBound(approval, args) {
-  return approval.egress === 'proxy' && args?.methodClass != null && egressPatternFor(canonicalTarget(args)) != null;
+  return approval.egress === 'proxy' && args?.methodClass != null && args?.delivery === 'mediator' &&
+    egressPatternFor(canonicalTarget(args)) != null;
 }
 
 function replayConsequence(ttlMs, { egressBound: bound = false } = {}) {
@@ -539,7 +568,7 @@ async function answerRequest(approval, req, next) {
       // not pin) would otherwise materialize a row the wire can never carry,
       // a pretend coverage — the ask already said so before the operator
       // decided.
-      if (approval.egress === 'proxy' && rec.methodClass && rec.args?.delivery === 'mediator') {
+      if (egressBound(approval, rec.args)) {
         const pattern = egressPatternFor(canonicalTarget(rec.args));
         if (pattern) {
           approval.store.addSessionGrant({
@@ -553,6 +582,10 @@ async function answerRequest(approval, req, next) {
     // answered, for every outcome, on the browser and terminal paths alike
     // (this wrapper sees both). An agent without inject (test shapes) skips
     // the note; a throwing inject must never take the decision path down.
+    // form:'notice' + summary: the web transcript renders the one-line
+    // account on the collapsed context row (readable without expanding),
+    // the full note as the expanded body — "an approval happened" is visible
+    // at a glance, which is the point of a trace.
     if (typeof agent?.inject === 'function') {
       try {
         agent.inject(createUserMessage({
@@ -564,7 +597,8 @@ async function answerRequest(approval, req, next) {
             ? ` The approved injection grant${rec.secretRefs.length > 1 ? 's are' : ' is'} live for this session ` +
               `(${rec.secretRefs.map(r => '$' + r).join(', ')}), TTL-bounded.`
             : '') }],
-          source: { kind: 'plugin', plugin: 'compact-approval' },
+          source: { kind: 'plugin', plugin: 'compact-approval', form: 'notice',
+            summary: approvalNoticeSummary(view, outcome) },
         }));
       } catch { /* the note is a trace, never a gate */ }
     }
@@ -644,7 +678,7 @@ export function approvalPlugin(opts = {}) {
         try { ctx.emit?.(REFUSAL_EVENT, refusalPayload({ kind: 'ask', verdict: 'ask', ruleId: 'I-5/secret-use', tool, fingerprint: fp, root, session })); } catch { /* accounting must not break enforcement */ }
         const env = buildEnvelope({ gate: 'AG', ruleId: 'I-5/secret-use',
           reason: `"${tool}" references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
-            `approving it materializes the injection grant — session-scoped, TTL-bounded, revocable — and the credential is available to this command inside the ` +
+            `approving it materializes the injection grant — session-scoped, TTL-bounded, revocable (grants-revoke) — and the credential is available to this command inside the ` +
             `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints. ` +
             replayConsequence(approval.execCacheTtlMs),
           lawfulNextMoves: ['rephrase without the secret reference', 'escalate to your Principal'] });
@@ -671,7 +705,7 @@ export function approvalPlugin(opts = {}) {
         const env = buildEnvelope({ gate: 'AG', ruleId: 'I-5/flood-cap',
           reason: `too many pending approvals for this root (${v.ruleId})`,
           lawfulNextMoves: ['wait for pending approvals to resolve', 'withdraw an older request', 'escalate to your Principal'] });
-        return { kind: 'deny', reason: env.text };
+        return { kind: 'deny', reason: bandReason(env) };
       }
       // pending-approval / dedup-pending → the human gate. Record the ask for
       // the answerer's decision correlation (needs the agent object: the host
@@ -683,7 +717,7 @@ export function approvalPlugin(opts = {}) {
         reason: `"${tool}" is not covered by this runtime's grant layers` +
           (secretRefs.length
             ? ` — this call references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
-              `approving it materializes a session-scoped, TTL-bounded, revocable secret grant and the credential is injected into the confined execution ` +
+              `approving it materializes a session-scoped, TTL-bounded, revocable (grants-revoke) secret grant and the credential is injected into the confined execution ` +
               `without entering this conversation`
             : '') +
           `. ${replayConsequence(cacheTtlFor(approval, args), { egressBound: egressBound(approval, args) })} ${egressHonesty(approval.egress)}` +
@@ -694,6 +728,14 @@ export function approvalPlugin(opts = {}) {
           (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null
             ? ` This act has no delivery path under the mediated posture — the mediator speaks plain HTTP and CONNECT ` +
               `only (#57), so approving records consent but materializes NO usable connectivity.`
+            : '') +
+          (approval.egress === 'proxy' && args?.delivery === 'mediator' && args?.url == null && args?.port == null
+            ? ` The grant this approval materializes names the host only: it carries plain HTTP, while a tunneled act ` +
+              `(CONNECT) to it would be refused at the wire — a tunnel opens only where the operator was shown the port (#56).`
+            : '') +
+          (args?.effectClass === null && typeof args?.command === 'string' && args.command
+            ? ` This command's local effects are not statically provable as read-only, so the approval covers exactly ` +
+              `this command — a differently-phrased or differently-tailed command asks again (#26).`
             : ''),
         lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'] });
       return { kind: 'ask', reason: env.text };

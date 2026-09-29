@@ -58,9 +58,50 @@ export function fingerprint(tool, args) {
   // keyed on the old query-stripped fingerprint simply never match again and
   // expire within the TTL — fail-closed, never fail-open.
   const q = canonicalQuery(args?.url);
+  // #26's bash half (docs/decision-bash-effect-class.md, option A): a
+  // target-less call's command IS its identity. canonicalTarget extracts only
+  // host/port/url, so a bare bash command contributed nothing and every
+  // command hashed to the same fingerprint — approving `ls /` admitted
+  // `rm -rf` for the cache TTL. The command joins the payload exactly as the
+  // gate's secret-reference path already hashes it: allow-once covers exactly
+  // this command, never a blanket over the tool. Target-ful calls are
+  // untouched (the network family's phrasing abstraction stands; the finding
+  // gates fingerprint per-target), and no normalization — a whitespace
+  // variant is a new ask, because normalization is abstraction. Persisted
+  // entries keyed on the old constant fingerprint never match again and
+  // expire within the TTL — fail-closed, never fail-open.
+  // #26's bash half, option A: a target-less call's command IS its identity —
+  // canonicalTarget extracts only host/port/url, so a bare bash command
+  // contributed nothing and every command hashed to the same fingerprint. The
+  // command joins the payload exactly as the gate's secret-reference path
+  // already hashes it: allow-once covers exactly this command, never a
+  // blanket over the tool.
+  //
+  // #26's bash half, option B (adopted on top of A, then TIGHTENED on the
+  // Principal's review): the effect axis exists as the null-class fallback
+  // ONLY. A command the classifier cannot prove read-only — mutating,
+  // off-vocabulary, unresolvable, a non-bash wrapper (effectClass null) —
+  // carries the exact-command payload for target-ful calls too: that is what
+  // closes the measured compound rider (`curl x && rm -rf /workspace` stops
+  // sharing the plain read's identity). A PROVABLE read keeps the payload it
+  // already had (the network family's own — zero churn), and a target-less
+  // call is command-scoped regardless of class: for a local read the risk
+  // axis is the arguments — which files the act touches — so `ls /tmp` and
+  // `ls /etc` are different acts and one approval never covers the other
+  // (the G5 doctrine at the bash layer: approving ?page=1 never covers
+  // ?page=2). No class+verb identity, no normalization anywhere — a
+  // whitespace variant is a new ask. Persisted entries keyed on any
+  // superseded payload shape never match again and expire within the TTL —
+  // fail-closed, never fail-open.
+  const isTargetless = Object.keys(t).length === 0;
+  const effectClass = args?.effectClass;   // 'read' | null (unprovable) | undefined (undeclared)
+  const command = (isTargetless || effectClass === null) && typeof args?.command === 'string' && args.command.length > 0
+    ? args.command
+    : null;
   const payload = JSON.stringify({
     tool: String(tool),
     ...t,
+    ...(command ? { command } : {}),
     ...(methodClass ? { methodClass } : {}),
     ...(q != null ? { urlQuery: q } : {}),
   });

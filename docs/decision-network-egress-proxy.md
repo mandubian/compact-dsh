@@ -60,11 +60,11 @@ The proxy is an HTTP/HTTPS forwarder (no other protocol has a route):
 | Surface | What the proxy does |
 |---|---|
 | plain HTTP | client sends the absolute URI; the proxy checks `host:port` + method class against **this session's** live grants, then resolves the name **itself** and forwards |
-| HTTPS | client sends `CONNECT host:port`; the authority is checked against this session's live grants (host+port — a tunnel's *class* cannot be observed without interception, see residuals), then a byte tunnel: TLS end-to-end, never terminated |
+| HTTPS | client sends `CONNECT host:port`; the authority is checked against this session's live grants, and the grant must NAME the port (`HostAndPort` — a bare-host grant carries plain HTTP and the CONNECT is refused by name, #56 option A; a tunnel's *class* cannot be observed without interception, see residuals), then a byte tunnel: TLS end-to-end, never terminated |
 | DNS | the container never resolves: the hostname travels to the proxy in the request line / `CONNECT` (verified below: on the internal bridge, `getent` fails); the proxy resolves, classifies the answer and dials the validated address — public unicast only by default, a rebinding answer refused by name (`#55`'s resolve-then-pin) |
 | redirect | the proxy **never follows one** — the client's next request or `CONNECT` re-enters the check, so a cross-host redirect is refused with a named reason: *a new host is a new grant* |
-| method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7). Enforced per plain-HTTP request; a `CONNECT` is admitted under any live, classed grant for its authority — what rides inside an opaque tunnel is unobservable **by the decision not to intercept**, declared as residual 2 rather than pretended checked. Coverage is a lattice: a write grant covers the read to the same target, never the reverse |
-| TTL, revocation | the store is the single authority, checked per connection; an established tunnel is tracked against its grant, so **revocation closes mid-flight tunnels** — the route dies, not just the next attempt |
+| method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7). Enforced per plain-HTTP request; a `CONNECT` is admitted only under a live, classed grant that names its port (#56 option A) — what rides inside an opaque tunnel is unobservable **by the decision not to intercept**, declared as residual 2 rather than pretended checked. Coverage is a lattice: a write grant covers the read to the same target, never the reverse |
+| TTL, revocation | the store is the single authority, checked per connection; an established tunnel **and every in-flight plain-HTTP exchange** are tracked against their grant, so **revocation — or a lapsed TTL — cuts what is already open** (#79): the streaming response and the streaming upload alike, not just the next attempt |
 | other protocols | no route exists at all (ICMP, UDP, raw sockets): unreachable by construction, not filtered |
 
 **Session binding is the socket, not a credential.** One listener per session,
@@ -85,7 +85,7 @@ choice reads as decided, not defaulted:
 - **The policy is the product, not the plumbing.** What the mediator enforces
   — the session-scoped, TTL-bounded, revocable grant table read *directly*
   from the approval store, the method-class lattice (#26), the per-connection
-  re-check, mid-flight tunnel kill on revocation, and refusals that are
+  re-check, mid-flight kill on revocation (tunnels and plain-HTTP exchanges alike), and refusals that are
   Compact envelopes naming their cause and lawful next moves — is the CF
   grant family expressing itself at the wire. No shipped proxy has these
   concepts; each offers a config-time ACL engine instead, and the ask and the
@@ -271,7 +271,10 @@ ran).
    (`curl --proxytunnel`, SSH over CONNECT) — is unobservable too: the
    method-class axis (#26) and any protocol distinction hold only outside a
    tunnel; "no other protocol has a route" is true of clients that do not
-   tunnel, not of the enforced capability. The wire's privacy is the
+   tunnel, not of the enforced capability. Since the #56 adjudication the
+   tunnel surface is consent-shaped (option A): a CONNECT opens only under a
+   grant that NAMES the port — the operator saw the host AND the port; what
+   they never see is the bytes. The wire's privacy is the
    Subject's; the record's completeness is the operator's; neither is traded
    for the other.
 3. **Host services on the mediator's interface are reachable** from the
@@ -340,12 +343,13 @@ surviving session re-asks and re-materializes its own entry and grant
 Non-goals (unchanged consent identity, #102): a classless act still asks; a
 read grant still never covers it; the ask disclosures stand as they were.
 
-## The tunnel-surface adjudication (#56) — DRAFTED, PENDING DECISION
+## The tunnel-surface adjudication (#56) — ADOPTED: option A (2026-09-24)
 
-Status: the three options below are **drafted for adjudication, none adopted**
-(2026-09-23, phase-3 review). The record adopts one by amendment; the register
-evidence and, where the option says so, the enforcement move with it — never
-before.
+Status: **adopted by the Principal (2026-09-24): option A — port-explicit
+tunnels — with the registry-port companion**, drafted 2026-09-23 in the
+phase-3 review. The record, the register evidence and the enforcement moved in
+the same slice; B and C remain below as the considered-and-set-aside
+alternatives, not open questions.
 
 **The finding.** A `CONNECT` is admitted under *any* live, classed grant
 covering its authority, and the relay is protocol-blind: a **read** grant
@@ -466,23 +470,26 @@ gap inside one.
 | **B** port allowlist | no | composition config | posture-wide, not per-consent | allowlist edit | one allowlist entry, posture-wide |
 | **C** declare only | no | none | host-only | already there | carried — any port under a portless grant |
 
-**The recommendation, not the decision**: A, with its transport half, the
-registry companion declared as a host set, and its three operator
-conditions — it is the only option whose tunnel surface is consent-shaped,
-which is the direction the record's own identity doctrine (#26: the operator
-is shown what the grant covers) points. B is the
-stopgap if the SSH path (below) needs a tunnel guard before A lands; once A
-holds, a posture-wide port list mostly restates the grant table — two truths
-over one grant, the doubling this record already refuses for budgets. C is the
-honest floor the record already stands on.
-The decision is the Principal's; whichever is adopted amends this record and
-moves the register evidence in the same slice that enforces it.
+**The decision**: A, with the registry-port companion — it is the only
+option whose tunnel surface is consent-shaped, the direction the record's own
+identity doctrine (#26: the operator is shown what the grant covers) points.
+Adopted 2026-09-24. The enforcement lives in `classifyConnection` (a tunnel
+admits only under a `HostAndPort` grant — the refusal `[EG/portless-grant]`
+names the missing consent), the companion in the analyzer's `registryPorts`
+(tier-2 declared facts: the TLS registries 443, apt's plain-http sources 80),
+and the ask gained the sentence that says a portless grant carries plain HTTP
+only. B remains the additive low-friction step (a composition-level
+`tunnelPorts` may still compose with A); C was the honest floor the record
+stood on until today. The companion also re-drew the package acts'
+fingerprints — the port joins the consent identity (#26) — so persisted cache
+entries keyed on the portless form never match again and expire within their
+TTL: fail-closed, the #8 G5 precedent.
 
 ## Phase 3 — the implementation slice, specified so it lands mechanically
 
 1. **`packages/egress-proxy`**: the mediator (per-session listeners, HTTP +
    `CONNECT`, DNS at the proxy, method classes, per-connection grant checks,
-   tunnel tracking for mid-flight revocation), refusing loudly at every seam.
+   tunnel and exchange tracking for mid-flight revocation), refusing loudly at every seam.
 2. **Materialization**: `egressHonesty('proxy')`; `allowed-once` on a network
    target materializes the `(host, port, method-class)` session grant when the
    posture is `proxy`; the fingerprint carries the method class (#26's network
@@ -498,7 +505,7 @@ moves the register evidence in the same slice that enforces it.
      reason, lawful next moves);
    - same-grant redirect to another host → **refused** (*new host, new grant*);
    - grant TTL expired → **refused**;
-   - revocation → **kills the mid-flight tunnel**, not only the next attempt;
+   - revocation → **kills the mid-flight tunnel or plain-HTTP exchange**, not only the next attempt;
    - plus the identity axis: read grant + `POST` → refused; another session's
      grant → refused; unknown method → refused.
 
@@ -509,3 +516,42 @@ HTTP/2 upgrades (an upgrade rides the same request-line check — noted, not
 specified); UDP/QUIC/ICMP (unreachable by construction); the mediator-container
 fallback profile (only if the native cell fails); and #26's bash effect-class
 half, which keeps its own record and adjudication.
+
+### SSH/SCP under the mediator — the extension path, recorded (#57 review)
+
+(#57 — the phase-3 review finding that approvals materialized grants the
+mediator's HTTP/CONNECT surface can never carry; fixed in the same slice by
+the no-delivery rule: an act the mediator cannot carry materializes no grant.)
+
+When SSH/SCP delivery is wanted, the answer is wiring and honesty, **not a new
+plugin** — recorded here so the reasoning survives the review that produced
+it. The `CONNECT` relay is protocol-agnostic TCP to a granted `host:port`, and
+SSH clients already speak forward-proxies natively (`ProxyCommand` /
+`ProxyJump`, or `corkscrew`): the mediator sees encrypted bytes to `host:22`,
+and SSH host-key verification keeps working end-to-end — no interception, by
+decision. Three seams carry the support:
+
+1. **Delivery vocabulary** (`egressDeliveryOf`, remote-access): ssh/scp and
+   git's scp-form remote flip from `null` to `'mediator'` — one set
+   membership; the ask, the grant materialization, and the method-class axis
+   (git push = write, clone = read — already derived from the verbs) flow
+   unchanged.
+2. **Confine-time client config** (sandbox-docker/blessed): the provider
+   already injects `HTTP_PROXY`; SSH needs its equivalent — inject
+   `GIT_SSH_COMMAND` or mount an `ssh_config` whose `ProxyCommand` points at
+   the session's listener. The injection seam exists; this is a new passenger
+   on it.
+3. **A record amendment** (`[baseline-update]`): the delivery surface widens,
+   so this record's residuals and the register evidence move with it — and
+   the #56 adjudication (the pending decision over which grants open
+   `CONNECT` tunnels, and on which ports) is a **prerequisite**, since
+   admitting SSH widens the population of opaque tunnels: class is enforced
+   at the gate (push = write, clone = read), the wire stays opaque — residual
+   2, the declared tunnel opacity in the residuals above, said so first.
+
+Explicitly out, by the same decision that refuses the planted CA: a
+protocol-aware SSH mediator — terminating SSH to inspect commands, scp paths,
+or host keys crosses the trust boundary the Compact has no authority over. If
+`ProxyCommand` ever proves too awkward for a client, the additive fallback is
+a SOCKS5 listener inside the same `egress-proxy` package — same plugin, same
+grant store, same per-connection checks.

@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="100%" role="img" aria-label="compact-dsh: why and what. Left — the usual harness: an agent with every power of the machine, a hollow y/N gate, a log anyone can rewrite, refusals with no reason. Right — the same agent under law: one waterfall every act rides, refusals that teach, a record that proves itself, a self-model every turn, a boot that refuses to lie. Bottom — how it stays honest: no standing claimed while the law is a draft, register checked in CI, offline auditor, declared gaps printed at boot. Status: draft v0.5, not ratified, 40 of 62 clauses enforced.">
+  <!--
+    compact-dsh — "why and what" plate for the README.
+    Adaptive: light/dark via prefers-color-scheme. Edit in place; keep text
+    >= 15px (README renders ~0.69x). Clause IDs reference compact.md.
+  -->
+  <style>
+    .bg{fill:#ffffff}
+    .mut{fill:#59636e}
+    .card{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1.5}
+    .card-law{fill:#fff8c5;stroke:#9a6700;stroke-width:1.6}
+    .band{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1.5}
+    .badcard{fill:#ffebe9;stroke:#a13a3a;stroke-width:1.2}
+    .term{fill:#161b22;stroke:#30363d;stroke-width:1}
+    .chip{fill:#ffffff;stroke:#d0d7de;stroke-width:1}
+    .t-title{font:700 40px "Iowan Old Style",Palatino,Georgia,serif;fill:#1f2328}
+    .t-sub{font:italic 400 19px "Iowan Old Style",Palatino,Georgia,serif;fill:#59636e}
+    .t-h{font:700 20px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2328}
+    .t-b{font:400 15px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2328}
+    .t-s{font:400 13.5px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#59636e}
+    .t-m{font:700 12.5px ui-monospace,"SF Mono",Menlo,Consolas,monospace;fill:#e6edf3}
+    .t-ms{font:400 12.5px ui-monospace,"SF Mono",Menlo,Consolas,monospace;fill:#8b949e}
+    .t-mi{font:700 12.5px ui-monospace,"SF Mono",Menlo,Consolas,monospace;fill:#1f2328}
+    .t-mc{font:700 11.5px ui-monospace,"SF Mono",Menlo,Consolas,monospace;fill:#1f2328}
+    .t-lab{font:700 13px ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:.14em}
+    .c-law{fill:#9a6700} .c-bad{fill:#a13a3a} .c-ok{fill:#1c7a4a}
+    .t-mut{font:400 15px -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#59636e}
+    .l-arrow{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+    @media (prefers-color-scheme:dark){
+      .bg{fill:#0d1117} .mut{fill:#8b949e}
+      .card{fill:#161b22;stroke:#30363d} .card-law{fill:#272115;stroke:#d4a72c}
+      .band{fill:#161b22;stroke:#30363d} .badcard{fill:#25171c;stroke:#ff7a72}
+      .term{fill:#010409;stroke:#30363d} .chip{fill:#161b22;stroke:#30363d}
+      .t-title{fill:#e6edf3} .t-sub{fill:#8b949e} .t-h{fill:#e6edf3}
+      .t-b{fill:#e6edf3} .t-s{fill:#8b949e}
+      .t-m{fill:#e6edf3} .t-ms{fill:#8b949e} .t-mi{fill:#e6edf3} .t-mc{fill:#e6edf3}
+      .c-law{fill:#d4a72c} .c-bad{fill:#ff7a72} .c-ok{fill:#3fb950}
+      .t-mut{fill:#8b949e}
+    }
+  </style>
+
+  <rect width="1200" height="800" class="bg"/>
+
+  <!-- title -->
+  <text x="48" y="62" class="t-title">compact-dsh</text>
+  <text x="48" y="96" class="t-sub">The Compact, running — the law enforced by machinery, not promised by prose</text>
+  <line x1="48" y1="118" x2="1152" y2="118" stroke="#d0d7de" stroke-width="1"/>
+
+  <!-- LEFT: the usual harness -->
+  <rect x="40" y="146" width="520" height="414" rx="12" class="badcard"/>
+  <text x="64" y="184" class="t-lab c-bad">THE USUAL HARNESS</text>
+  <text x="64" y="214" class="t-h">every power, and a prayer</text>
+  <!-- terminal mock -->
+  <rect x="64" y="234" width="472" height="102" rx="8" class="term"/>
+  <g class="t-m">
+    <text x="80" y="262">$ curl https://internal-api.corp/admin/export</text>
+    <text x="80" y="284">Allow? [y/N] <tspan class="c-bad" fill="#ff7a72">y</tspan></text>
+    <text x="80" y="306" class="t-ms">(connected — export complete)</text>
+  </g>
+  <g class="t-b">
+    <text x="64" y="368">— the gate asked; nobody reads ask #400</text>
+    <text x="64" y="398">— the log can be rewritten — by its own operator</text>
+    <text x="64" y="428">— when refused: a raw error. No rule, no way back</text>
+    <text x="64" y="458">— when it loops: forty turns of the same failure</text>
+    <text x="64" y="488">— shell secrets are one <tspan font-family="ui-monospace,Menlo,Consolas,monospace" font-size="13.5">printenv</tspan> from the record</text>
+  </g>
+  <rect x="64" y="506" width="472" height="34" rx="6" fill="none" stroke="#a13a3a" stroke-width="1"/>
+  <text x="300" y="528" text-anchor="middle" class="t-s">optimized to finish. nothing else is optimized at all.</text>
+
+  <!-- center arrow -->
+  <text x="600" y="322" text-anchor="middle" class="t-mc c-law">not better</text>
+  <text x="600" y="340" text-anchor="middle" class="t-mc c-law">prompts —</text>
+  <text x="600" y="358" text-anchor="middle" class="t-mc c-law">machinery</text>
+  <line x1="568" y1="374" x2="632" y2="374" stroke="#9a6700" stroke-width="3" marker-end="url(#a-law)"/>
+  <text x="600" y="398" text-anchor="middle" class="t-s">under law</text>
+
+  <!-- RIGHT: this harness -->
+  <rect x="640" y="146" width="520" height="414" rx="12" class="card-law"/>
+  <text x="664" y="184" class="t-lab c-law">THIS HARNESS</text>
+  <text x="664" y="214" class="t-h">the same agent, under law</text>
+  <g class="t-b">
+    <text x="664" y="252">→ <tspan font-weight="700">one waterfall every act must ride</tspan> — no side door</text>
+    <text x="692" y="274" class="t-s">allowlist → analysis → approval ladder → confinement (I-5)</text>
+    <text x="664" y="308">→ <tspan font-weight="700">refusals that teach</tspan> — rule + lawful next moves</text>
+    <text x="692" y="330" class="t-s">the agent corrects within the law, not against it (R-3/I-4)</text>
+    <text x="664" y="364">→ <tspan font-weight="700">a record that proves itself</tspan> — hash-chained</text>
+    <text x="692" y="386" class="t-s">tampering is detectable years later, offline (I-2/R-7)</text>
+    <text x="664" y="420">→ <tspan font-weight="700">a self-model every turn</tspan> — the runtime's word</text>
+    <text x="692" y="442" class="t-s">capabilities, budgets, standing, debts — over memory (R-1)</text>
+    <text x="664" y="476">→ <tspan font-weight="700">a boot that refuses to lie</tspan></text>
+    <text x="692" y="498" class="t-s">unenforced law or corrupt state: refuse to start (F-5/D-8)</text>
+  </g>
+  <line x1="664" y1="516" x2="1136" y2="516" stroke="#9a6700" stroke-width="1" stroke-dasharray="5 4"/>
+  <g class="t-m">
+    <text x="664" y="542" class="c-law">lawful exits · petition rights (R-9/R-11/R-12)</text>
+  </g>
+
+  <!-- BOTTOM: honesty band -->
+  <rect x="40" y="584" width="1120" height="164" rx="12" class="band"/>
+  <text x="64" y="620" class="t-lab c-law">HOW IT STAYS HONEST</text>
+  <g>
+    <rect x="64" y="636" width="258" height="40" rx="8" class="chip"/>
+    <text x="80" y="661" class="t-mi">F-5 · standing declared</text>
+    <rect x="336" y="636" width="270" height="40" rx="8" class="chip"/>
+    <text x="352" y="661" class="t-mi">D-8 · register gated in CI</text>
+    <rect x="620" y="636" width="258" height="40" rx="8" class="chip"/>
+    <text x="636" y="661" class="t-mi">I-7 · offline verification</text>
+    <rect x="892" y="636" width="244" height="40" rx="8" class="chip"/>
+    <text x="908" y="661" class="t-mi">gaps declared, not hidden</text>
+  </g>
+  <text x="64" y="712" class="t-s">what it is <tspan font-weight="700">not</tspan>: a sandbox product · a policy PDF · a trust badge · an alignment technique — it is the enforcement layer that makes those checkable</text>
+  <g font-family="ui-monospace,Menlo,Consolas,monospace" font-size="12.5">
+    <rect x="64" y="726" width="120" height="26" rx="13" fill="none" stroke="#9a6700"/>
+    <text x="124" y="743" text-anchor="middle" class="c-law" fill="#9a6700">draft v0.5</text>
+    <rect x="196" y="726" width="130" height="26" rx="13" fill="none" stroke="#a13a3a"/>
+    <text x="261" y="743" text-anchor="middle" class="c-bad" fill="#a13a3a">not ratified</text>
+    <rect x="338" y="726" width="220" height="26" rx="13" fill="none" stroke="#1c7a4a"/>
+    <text x="448" y="743" text-anchor="middle" class="c-ok" fill="#1c7a4a">40 of 62 clauses enforced</text>
+    <rect x="570" y="726" width="170" height="26" rx="13" fill="none" stroke="#d0d7de"/>
+    <text x="655" y="743" text-anchor="middle" class="t-s">Phase 8 complete</text>
+    <rect x="752" y="726" width="210" height="26" rx="13" fill="none" stroke="#d0d7de"/>
+    <text x="857" y="743" text-anchor="middle" class="t-s">no standing claimed (F-5)</text>
+  </g>
+
+  <defs>
+    <marker id="a-law" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9a6700"/>
+    </marker>
+  </defs>
+</svg>

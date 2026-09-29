@@ -36,7 +36,7 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 import { CAPABILITY_PARTS, assessParts, unboundMessage } from './parts.js';
 
 export { CAPABILITY_PARTS, assessParts, unboundMessage };
@@ -133,7 +133,7 @@ export function apply(ctx, config = {}) {
           'escalate to your Principal',
         ],
       });
-      return { kind: 'deny', reason: env.text };
+      return { kind: 'deny', reason: bandReason(env) };
     }
     const p = forbidden.get(exec?.name);
     if (!p) return next();
@@ -149,7 +149,7 @@ export function apply(ctx, config = {}) {
         'petition for the capability to be adopted with its clauses bound (R-11)',
       ],
     });
-    return { kind: 'deny', reason: env.text };
+    return { kind: 'deny', reason: bandReason(env) };
   });
 
   const service = {

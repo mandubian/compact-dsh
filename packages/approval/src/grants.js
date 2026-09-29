@@ -183,10 +183,13 @@ export class GrantStore {
    * its exact host and port; a bare-host target (ExactHost) is host-scoped —
    * the mediator reads host-scoped grants as covering any port they name, so
    * the entry dies with the host. Entries without a derivable route (an
-   * unparsable target never granted) are untouched. Returns the killed
+   * unparsable target never granted) are untouched. `tunnelOnly` narrows the
+   * kill to entries whose delivery can only be a tunnel — an `https:` URL
+   * target (the #56 rule: a portless refusal proves the CONNECT route dead
+   * while plain HTTP carries under the same rows). Returns the killed
    * fingerprints.
    */
-  killCacheForRoute({ host, port } = {}) {
+  killCacheForRoute({ host, port, tunnelOnly = false } = {}) {
     const killed = [];
     const h = host == null ? null : String(host).toLowerCase();
     if (h == null || h === '') return killed;
@@ -196,7 +199,11 @@ export class GrantStore {
       const reaches = route?.kind === 'HostAndPort'
         ? route.value.host === h && route.value.port === p
         : route?.kind === 'ExactHost' && route.value === h;
-      if (reaches) { this.cache.delete(fp); killed.push(fp); }
+      if (!reaches) continue;
+      if (tunnelOnly && typeof e.target?.url !== 'string') continue;
+      if (tunnelOnly && !e.target.url.startsWith('https:')) continue;
+      this.cache.delete(fp);
+      killed.push(fp);
     }
     return killed;
   }

@@ -132,3 +132,54 @@ test('mount path patterns: canonical prefix coverage with a ro ceiling', () => {
   // non-path targets never match a path pattern
   assert.equal(patternMatches(ro, { host: 'data.example' }), false);
 });
+
+test('bash: a target-less call is command-scoped (#26 bash half, option A)', () => {
+  const bf = (args) => fingerprint('bash', args);
+  // the identical command is the same act — replay identity holds
+  assert.equal(bf({ command: 'ls /' }), bf({ command: 'ls /' }));
+  // different commands are different identities: ls → rm -rf asks, always
+  assert.notEqual(bf({ command: 'ls /' }), bf({ command: 'ls /b' }));
+  assert.notEqual(bf({ command: 'ls /' }), bf({ command: 'rm -rf /' }), 'the read never covers the destructive act');
+  // normalization stays out: whitespace is phrasing the operator was shown
+  assert.notEqual(bf({ command: 'ls /' }), bf({ command: 'ls  /' }));
+  assert.notEqual(bf({ command: 'ls / ' }), bf({ command: 'ls /' }));
+  // an empty command contributes nothing — the payload stays tool-only, as before
+  assert.equal(bf({}), bf({ command: '' }));
+  assert.equal(bf({}), bf({}));
+  // a target-ful call ignores the command text: the network family's
+  // phrasing abstraction stands (curl -sS vs curl, same target → one identity)
+  const withTarget = { url: 'https://api.example.com/v1', host: 'api.example.com' };
+  assert.equal(bf({ ...withTarget, command: 'curl -sS https://api.example.com/v1' }), bf({ ...withTarget, command: 'curl https://api.example.com/v1' }));
+  // and a target-ful fingerprint never collides with a command-scoped one
+  assert.notEqual(bf(withTarget), bf({ command: 'curl https://api.example.com/v1' }));
+});
+
+test('bash: the effect axis (option B on top of A, tightened) — every target-less call is command-scoped; unprovable commands are command-scoped target-ful too', () => {
+  const bf = (args) => fingerprint('bash', args);
+  const READ = (command) => ({ command, effectClass: 'read', effectVerbs: ['ls'] });
+  // the tightening (Principal's review): for a local read the risk axis is
+  // the ARGUMENTS — which files the act touches — so a re-phrased read asks
+  // again; only the identical command re-runs. `ls /tmp` never covers `ls /etc`.
+  assert.notEqual(bf(READ('ls /')), bf(READ('ls /b')), 'the arguments are the data selection — different acts');
+  assert.equal(bf(READ('ls /')), bf(READ('ls /')), 'the identical command replays');
+  // a different verb is trivially a different identity: `ls`→`cat` asks
+  assert.notEqual(bf(READ('ls /')), bf({ command: 'cat /x', effectClass: 'read', effectVerbs: ['cat'] }));
+  // an UNPROVABLE command falls back to A's exact-command payload — the
+  // measured compound rider closes: the plain read and its rm-rf rider are
+  // different identities (target-ful, both synthesized by the analyzer)
+  const target = { url: 'https://api.example.com/v1', host: 'api.example.com' };
+  assert.equal(bf({ ...target, command: 'curl https://api.example.com/v1', methodClass: 'read', effectClass: 'read', effectVerbs: ['curl'] }),
+               bf({ ...target, command: 'curl https://api.example.com/v1', methodClass: 'read' }),
+               'a provable read keeps the network family\'s payload — zero churn');
+  assert.notEqual(bf({ ...target, command: 'curl https://api.example.com/v1', methodClass: 'read' }),
+                  bf({ ...target, command: 'curl https://api.example.com/v1 && rm -rf /workspace', methodClass: 'read', effectClass: null }),
+                  'the rider no longer shares the plain read\'s replay identity');
+  // non-bash wrappers: null class → command-scoped, target-ful included
+  assert.notEqual(bf({ ...target, command: 'python -c "curl x"', methodClass: 'read', effectClass: null }),
+                  bf({ ...target, command: 'python -c "curl x && echo more"', methodClass: 'read', effectClass: null }));
+  // target-less: the effect declaration changes nothing — command-scoped
+  // is command-scoped, whichever way the classifier spoke (one behavior)
+  assert.equal(bf(READ('ls /')), bf({ command: 'ls /' }), 'declared or undeclared, the identical command is one identity');
+  assert.notEqual(bf(READ('ls /')), bf(READ('ls /b')));
+  assert.notEqual(bf(READ('ls /')), bf({ command: 'rm -rf /', effectClass: null }), 'the read class never covers the unprovable act');
+});

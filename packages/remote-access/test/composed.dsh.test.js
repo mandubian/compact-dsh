@@ -161,3 +161,26 @@ test('composed: non-command args are not scanned (fs contents are not commands)'
   assert.equal(executed, 1, 'file contents mentioning curl are not network access');
   assert.equal(asked.count, 0);
 });
+
+test('composed: the compound rider closes (#26 B) — an rm-rf tail no longer rides the plain read\'s approval', async () => {
+  const { tools, asked } = await boot({ operator: 'allowed-once' });
+  tools.register(bashProbe);
+  executed = 0;
+  const agent = makeAgent('sess-ra-rider');
+
+  const plain = 'curl https://rider.example/v1';
+  await run(tools, agent, plain);
+  assert.equal(executed, 1);
+  assert.equal(asked.count, 1, 'the plain read asks once');
+
+  await run(tools, agent, plain);
+  assert.equal(asked.count, 1, 'the identical read replays (provable read, class identity unchanged)');
+
+  await run(tools, agent, `${plain} && rm -rf /workspace`);
+  assert.equal(asked.count, 2, 'the rider asks AGAIN — its tail is unprovable, so its identity is command-scoped');
+  assert.ok(asked.reasons[1].includes('not statically provable as read-only'), 'the ask says so before the decision');
+  assert.equal(executed, 3, 'and runs once approved (plain, its replay, then the rider)');
+
+  await run(tools, agent, `${plain} && rm -rf /elsewhere`);
+  assert.equal(asked.count, 3, 'a differently-tailed rider is a different command — no cross-command identity');
+});

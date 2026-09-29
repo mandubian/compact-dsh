@@ -98,3 +98,34 @@ links **offline, with no cooperation from the Enforcer** — which is the whole
 point of I-7: a verifier that had to ask the Enforcer whether the Enforcer had
 behaved would verify nothing. Without a chain the auditor still runs, and says
 plainly that it is relying on log completeness alone.
+
+## The Subject reads it too (R-2)
+
+> Every Subject may read the record of acts done in its name and on its
+> behalf. […] Audit is not a privilege of operators; it is a right of the
+> subject.
+
+The composition masks the record root and the chain dir from every confined
+call, because a Subject that can write its evidence can rewrite it. That
+masking also removed the read. For a while the record was complete and
+readable only by the operator and the offline auditor, and the register
+called R-2 a `convention` resting on a log the Subject could not reach (#67).
+
+`record_read` (`packages/record/src/read.js`, registered by the provider) is
+the read path through the Enforcer:
+
+- **Verified before rendered.** Each read uses the chained persistence, so the
+  slice is checked against the chain first. A failure answers as an alarm
+  naming the break, the same fail-closed rule the record keeps (D-7).
+- **In its name and on its behalf.** It covers the Subject's own session and
+  those of its delegated descendants. The lineage is walked upward from the
+  target's *durable* header (`parentSession`), not from a live registry.
+  Anything else is refused with its reason.
+- **Acts, not minds.** In a descendant's record, the reasoning-bearing events
+  (`assistant/message`, `assistant/attempt`, `compaction/summary`,
+  `request/context`) are listed by seq and type with their content withheld.
+  R-10 keeps another Member's unstated reasoning private, and R-2 grants acts.
+  Listing them keeps the record's shape visible: nothing is hidden, only
+  withheld.
+- **Fresh and citable.** The target's buffered writer is flushed first, and
+  every answer names the verified range and the chain head.

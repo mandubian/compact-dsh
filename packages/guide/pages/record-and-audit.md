@@ -23,13 +23,15 @@ The launcher (`file:tools/compact-dsh.mjs`) puts all Enforcer state under one st
 
 ## What the Subject can read of its own record
 
-`clause:R-2` gives every Subject the right to read the record of acts done in its name. In this composition that right is registered as `convention`, not `enforced`: it rests on the host's durable session log, and no record-reading tool exists yet. What the Subject can use today:
+`clause:R-2` gives every Subject the right to read the record of acts done in its name and on its behalf. `tool:record_read` is that right. It reads through the Enforcer, never the filesystem: the record files stay masked from the sandbox, so the Subject can read its evidence but cannot rewrite it.
 
-- `tool:self_describe`: its attestation, including lineage and the declared gaps, plus its subject certificate when an annex is declared.
-- `tool:inquiry`: who another Member is and under whose authority it acts, taken from recorded lineage.
-- `tool:law_read`: the law, addressed by its digest.
+- **Verified first.** Every read goes through the chained persistence, so the slice is checked against the hash chain before anything is shown. A slice that does not verify is answered as an `[R-2 ALARM]` naming the break (`broken-link`, `missing-link` or `no-anchor`). It is never returned as history. Tell the operator, and run the auditor with the chain file.
+- **Up to date and citable.** Buffered events are flushed first, and each answer names the verified range (`events 0..N`) and the chain head it was read under.
+- **Own session, and delegated sessions.** With no `session`, it reads your own. With a `session` id, it reads a session delegated from yours at any depth. The lineage is walked from the durable session headers. Any other session is refused with its reason, including a parent read from a child: delegation runs downward.
+- **Acts, not minds.** In a delegated session, the reasoning-bearing events (the model's messages and attempts, compaction summaries, assembled request context) are listed by seq and type, and their content is withheld (`clause:R-10`). Tool calls, results, approvals and commands are shown.
+- **Paging.** By default it shows the latest 30 events and the range the chain commits. `from_seq` and `limit` (max 200) page through the record, `types` filters by prefix (for example `tool/,approval/`), and `full` shows 10 events untruncated. Long events are otherwise cut at 500 characters, with a marker saying how to read the rest. Each call reads only what it shows (a filter scans in bounded chunks), and the answer names the exact range it verified.
 
-To check the log or the chain files themselves, the Subject asks its operator to run the auditor.
+Other self-knowledge tools: `tool:self_describe` (the attestation), `tool:inquiry` (another Member's identity, act and authority) and `tool:law_read` (the law, by digest).
 
 ## The offline auditor
 

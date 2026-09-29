@@ -37,11 +37,16 @@ test('git network subcommands extract the remote; local subcommands pass', () =>
   assert.deepEqual(findings('git diff HEAD~1'), []);
 });
 
-test('package managers resolve through the default registry map', () => {
-  assert.deepEqual(targets('npm install lodash'), [{ host: 'registry.npmjs.org' }]);
-  assert.deepEqual(targets('pip install requests'), [{ host: 'pypi.org' }]);
-  assert.deepEqual(targets('cargo install ripgrep'), [{ host: 'crates.io' }]);
-  assert.deepEqual(targets('docker pull ubuntu:24.04'), [{ host: 'registry-1.docker.io' }]);
+test('package managers resolve through the default registry map, port declared (#56 A)', () => {
+  // the port is a declared per-ecosystem fact (tier 2): the grant NAMES it, so
+  // the tunnel the act actually needs is what the operator was shown
+  assert.deepEqual(targets('npm install lodash'), [{ host: 'registry.npmjs.org', port: '443' }]);
+  assert.deepEqual(targets('pip install requests'), [{ host: 'pypi.org', port: '443' }]);
+  assert.deepEqual(targets('cargo install ripgrep'), [{ host: 'crates.io', port: '443' }]);
+  assert.deepEqual(targets('docker pull ubuntu:24.04'), [{ host: 'registry-1.docker.io', port: '443' }]);
+  // apt's default sources are plain http — the declared port is 80, not 443
+  assert.deepEqual(targets('apt-get install -y jq'), [{ host: 'archive.ubuntu.com', port: '80' }]);
+  assert.deepEqual(targets('apt install jq'), [{ host: 'archive.ubuntu.com', port: '80' }]);
 });
 
 test('opaque findings: a network verb with no resolvable target fails closed', () => {

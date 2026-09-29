@@ -1,0 +1,248 @@
+# Concept — the envelope and its audiences (R-3, I-4, and who is listening)
+
+*The spec the gloss table (`packages/guide/`), the structured-fields renderers,
+and the tiered band copy cite. Written before the work, per the house
+accountability mechanism.*
+
+## The envelope is doing two jobs, and only one is styled
+
+R-3 and I-4 make every refusal name the rule that caused it and the lawful
+next moves available — the denial envelope. The same shape reaches three
+readers through four surfaces:
+
+| Surface | Who reads it | What they get today | The problem |
+|---|---|---|---|
+| the durable record (I-2) | the auditor, years later | the canonical envelope text | none — this is the identity |
+| the Subject, in band | the agent that was refused | the canonical envelope text | none for a deep model; see T2 below |
+| the terminal ask (attended) | the operator | tool, command, target, fingerprint | structured, but assumes the law is known |
+| the web transcript / approval card | the operator | the same text through the host's renderer | one collapsed paragraph; no example; no operator action |
+
+The last row is the observed failure (live web page, 2026-09-24): the
+`[RA/D-7/opaque-network]` envelope renders as a single block, the reason
+presupposes the law ("static analysis cannot gate it per-host (fail-closed)"),
+and nothing tells the operator what *they* can do. The envelope was designed
+as "the same shape for humans and agents" — same **content** is not the same
+as same **presentation**.
+
+Two code facts make the status quo fragile as well as unstyled:
+
+- The text is flattened at build time. `buildEnvelope()` returns structured
+  fields (`ruleId`, `reason`, `lawfulNextMoves`) *and* a pre-flattened `text`;
+  the text is what travels.
+- The shape is maintained by convention, not by one code path. The shared
+  builder (`packages/envelope`) serves `approval`, `loopguard`, `blessed`,
+  `capability-gate` — but `packages/allowlist-gate` carries its **own local
+  builder** (`src/allowlist.js`) and re-stringifies by hand
+  (`src/index.js`, the deny path). Two producers of "the same" shape.
+
+## The principle: one envelope, many renderings
+
+The secret-hygiene adjudication (G3, `docs/decision-secret-hygiene.md`)
+already established the split this generalizes: credential paths are *masked
+in every rendering* and *exact in fingerprints, grants, and matching*. The
+rendering is not the identity. Applied to envelopes:
+
+- The **canonical envelope** — rule ID, reason, lawful next moves, the exact
+  text — is the identity. It lands on the record (I-2) and in the Subject's
+  in-band copy. Golden vectors keep it byte-stable.
+- A **rendering** is a projection of the structured fields for one audience.
+  Renderings may reorganize, gloss, and exemplify. They may never *decide*
+  anything (the decision reads the canonical fields), never narrow the moves
+  (R-3 names *the lawful next moves available* — all of them, at every tier),
+  and never misstate the rule — a gloss that contradicts the rule it renders
+  is enforcement fraud in prose (D-8). Renderings are declared and
+  machine-checked so drift is a build failure, not a discovery.
+
+This is presentation-only by construction: no new event vocabulary, no change
+to what is recorded, no change to any decision path.
+
+## The audience ladder
+
+| Tier | Reader | Form | Preserves |
+|---|---|---|---|
+| **T0 — record** | auditor, Witness | the canonical envelope, byte-exact | everything (I-2) |
+| **T1 — agent, full** | the default Subject in band | the canonical envelope text (today's form) | rule + all moves, verbatim (R-3) |
+| **T2 — agent, instructional** | a lighter model, a smaller context | lead with the *instruction*: refused, do-not-retry-as-is, then the moves | rule + all moves (compressed prose, not narrowed options) |
+| **T3 — operator** | the human | plain-language card: what happened, why it protects them, a worked example, per-move actions, raw envelope one click away | the raw envelope, reachable |
+
+The insight the ladder encodes: a lighter model does not need *less law* — it
+needs less prose and more procedure. R-3's floor (rule ID + lawful next moves)
+is the invariant every tier carries; a lint asserts it rather than trusting
+the renderer.
+
+F-4 symmetry: the same machinery serves every audience — the deep model's
+full-fidelity copy is the default tier, the human gets the richest *gloss*,
+and no tier is privileged over another. The LoopGuard's corrective
+`agent.inject` prose is the precedent: the Enforcer already authors
+instructional text; T2 applies that discipline to envelopes.
+
+## The words, plainly
+
+The ladder brought in a few terms of art — some coined here, some inherited.
+This is the whole vocabulary, in plain language:
+
+The runtime speaks over three **channels**, and it matters which is which:
+
+```text
+one envelope (the canonical text — the single source of truth)
+   |
+   |-- the BAND (Enforcer -> Subject's context): carries T1 or T2 -- the tier picks
+   |-- the OPERATOR CHANNEL (the ask surface): carries the canonical disclosure -- structured by the web ask card, still no static prose
+   `-- the RECORD (what is written down): archives whatever a channel carried -- read as T0
+```
+
+| Term | Plain meaning |
+|---|---|
+| **envelope** (the canonical one) | the refusal or ask itself: which rule refused, why, and the lawful next moves. `buildEnvelope()` produces it; its `text` is the exact string R-3 and I-4 require. It is the single source of truth — every rendering below is derived from it and can be checked against it. |
+| **band copy** | the string the runtime actually emits to the Subject's context for one act — the denial or ask text as the agent receives it. "Band" as in channel: it is the link between Enforcer and Subject. Whatever is emitted on it is also what the record keeps — *the band text is the recorded text*. Coined by this design; not law vocabulary. |
+| **band tier** | the switch on the band. The band's reader is the agent, and exactly two projections may ride it: **T1** (tier `full`, the default) or **T2** (tier `instructional`). Declared by the operator, never guessed; an unknown value refuses. |
+| **T0 … T3** | the four projections, not four laws. **T1** and **T2** are the two forms the band can carry — the band tier picks between them. **T3** never rides the band. The first live capture (2026-09-25) found the one ask surface that existed (upstream's web card) collapsing whitespace and rendering no markdown, so the gloss-wrapped card tripled the ask into a wall and was retired — the ask carried the canonical disclosure alone. The second live capture (2026-09-28) closed the gap from the other side: the composition now ships its own web client card (`packages/card/`), which takes over the ask surface and re-lays the canonical disclosure out — rule chip, line breaks intact, the moves as a real list, the verbatim text one disclosure away — without adding a word of static prose. The gloss-wrapped `askCard` stays a tested projection, still retired for asks. **T0** is not emitted anywhere at all: it is the record's stored copy of what a channel carried — the auditor's reading, years later. One sentence holds it together: *the tier chooses what the agent is told (T1 vs T2); the record archives whatever was told (T0); the card is what the operator is shown (T3).* |
+| **gloss** | the per-rule human explanation — title, why, a blocked/lawful example, the instructional line — in `packages/envelope/src/gloss.js`. The raw material the T2 and T3 projections are built from. |
+| **wire lint** | the approval suite's check that the envelope shape (rule + lawful moves) is present on the *actually emitted* reason — on the wire, not on a helper. |
+| **register anchor** | the lint rule that a gloss must cite at least one clause its own gate's plugin enforces — tying prose to the register's attribution, not just to clauses that exist. |
+| **waterfall** | dsh's `tools/pre-execute` pipeline: every tool call passes through every gate in order; a gate returns a denial or delegates to the next. |
+
+**The gate codes.** The envelope header is `[GATE/ruleId]` — which gate
+refused, under which rule. The GATE segment is a runtime mnemonic, not law
+vocabulary; the ruleId is often a law clause itself (`I-5/secret-use`), a
+runtime identity (`AG-1`, the allowlist rule; the `fp_…` fingerprint of the
+exact operation), or a gate-specific verdict name (`EG/no-grant`). The full
+set:
+
+| Code | Gate |
+|---|---|
+| **AG** | Approval Gate — the allowlist and the five-layer approval evaluator |
+| **RA** | the remote-access analyzer (network findings) |
+| **LG** | the LoopGuard (the 12 trip conditions, `LG-1`…`LG-12`) |
+| **EG** | the egress mediator (per-connection verdicts) |
+| **MG** | mount grants |
+| **SC** | supply chain (sandbox image provenance, CF-2) |
+| **CF** | confinement (the workspace anchor) |
+| **PG** | the promotion evidence gate |
+| **CG** | the capability gate |
+| **CS** | consent-scoped address |
+| **PT** | the petition channel |
+
+Everything else — Principal, Subject, Enforcer, Witness, petition, the
+clause codes (R-3, I-4, D-7…) — is law vocabulary, defined in
+[compact.md](https://github.com/mandubian/compact/blob/main/compact.md), with
+the short versions in the README's "The vocabulary, in two tables".
+
+## The gloss record: one row, four projections
+
+One record per rule that an envelope can carry, hosted beside the guide
+(whose charter — interpretive aid, no force, machine-checked citations —
+fits exactly):
+
+```js
+{
+  rule: 'RA/D-7/opaque-network',
+  title: 'The network target is not named',
+  why: `The runtime protects hosts one at a time. This command reaches for
+        the network without naming a host, so there is nothing to approve —
+        a "yes" here would approve anything.`,
+  example: { blocked: ['curl $URL', 'git push origin'],
+             lawful:  ['curl https://api.example.com/v1'] },
+  instruction: `Do not retry this command as-is. Name the host literally,
+                or ask your operator for the concrete target.`,
+  operatorMoves: { // canonical move → what the operator can literally do
+    'rephrase with a literal host or URL …': 'reply with the concrete URL',
+    'escalate to your Principal': 'the agent will ask you; decide there',
+  },
+  cites: ['R-3', 'I-4', 'D-7'],
+}
+```
+
+The same wget envelope, projected:
+
+- **T0/T1** — exactly today's text (unchanged).
+- **T2** — `Refused [RA/D-7/opaque-network]: the network target is not
+  named. Do not retry this command as-is — name the host literally, or ask
+  your operator. Lawful next moves: — rephrase with a literal host or URL so
+  the request can be gated per-host — use an approved alternative — escalate
+  to your Principal`
+- **T3** — *✗ Not run: `wget` needs the network but doesn't say where to.
+  The runtime gates network access per host — with no host named, there is
+  nothing to approve.* (rule RA/D-7/opaque-network) · **What can happen next:**
+  the agent rephrases with a literal URL — the ask becomes approvable for
+  that host · you reply with the concrete target, e.g. `use https://…` · or
+  the task continues without this fetch · ▾ raw envelope.
+
+Note what T3 refuses to do: it does not hide "fail-closed" — it explains it
+(*if nobody can answer, the call does not run — that is the feature*), and
+the raw envelope stays one click away. Comprehensibility that launders the
+mechanism is the one thing this composition cannot do honestly.
+
+## Machine-checks
+
+1. **Coverage** — every gate/rule combination the envelope builders can emit
+   has a gloss. The lint walks the builders (the AG, RA, LG, CF, EG families
+   and the shared builder), not a hand-written list.
+2. **Citations resolve** — every gloss `cites[]` resolves through the guide's
+   existing citation machinery against the register (the same discipline as
+   the guide pages and `verify-register`).
+3. **The R-3 floor survives projection** — for every gloss, the T2 projection
+   must contain the rule ID and *every* canonical move string (a superset
+   check) within a declared line budget; the T3 rendering must render every
+   move somewhere. A tier that drops a move is a build failure.
+4. **The identity is byte-stable** — the canonical golden vectors are
+   untouched; renderers consume the structured fields only. The manual
+   re-stringification in `packages/allowlist-gate` (and any second builder)
+   is retired onto the shared fields.
+5. **Renderings never decide** — asserted by construction: the renderers read
+   the same structured fields the decision already used, write nothing, and
+   provide no service the constitution couples on.
+
+## What changes per surface
+
+- `packages/envelope/` — hosts the gloss records (band-time data — moved from
+  the guide, whose aid must never be load-bearing) and the projection module
+  (T2, T3) over the structured fields; the canonical `text` is untouched.
+- The gateway ask (`reason`) — carries the **canonical disclosure alone**
+  (live capture, 2026-09-25: the upstream web card collapses whitespace, so
+  the gloss-wrapped T3 card tripled the ask into a wall); `askCard` stays a
+  tested projection, still retired for asks.
+- The web ask card (`packages/card/`, live capture 2026-09-28) — a static
+  web client plugin the composition mounts on the web surface only: it
+  registers a higher-priority takeover on dsh's composer chain, and when the
+  pending interaction is an approval it renders the canonical text
+  **structured** — the `[GATE/ruleId]` chip, the reason with its line breaks
+  intact, every move as a list row, the verbatim text one disclosure away,
+  and the same two outcomes on the same waterfall. It adds no prose (the
+  2026-09-25 principle holds: the ask's disclosure is the canonical reason),
+  drops nothing (every line after the moves marker renders — the R-3 floor
+  survives the layout), and degrades to the upstream face with pre-wrap for
+  any ask that does not parse as a canonical envelope. Declining the select
+  leaves upstream's panel everything else.
+- The terminal operator prompter — renders whatever reason the ask carries,
+  indented, beside the command/target/fingerprint preview it already shows.
+- `packages/guide/` — the gloss reading door (`gloss_read`): the Subject
+  passes the `GATE/ruleId` its envelope named and reads the rule's gloss
+  from the live table — why the gate exists, the worked example, what to
+  do, what the operator can do — with the standing on every answer (the
+  envelope prevails; a disagreeing gloss is a lint failure). R-3 and R-6 at
+  the same door: `law_read` serves the law, `gloss_read` serves the
+  runtime's interpretation of the rule that fired. No page restates the
+  table — a second copy is the drift the lint exists to prevent.
+
+## Declared gaps and open questions
+
+- **~~Web client rendering is unverified~~ — answered, twice.** The first
+  live capture (2026-09-25) found upstream's card collapsing whitespace and
+  rendering no markdown. The second (2026-09-28) stopped needing upstream's
+  card at all: dsh's client-module system lets the composition ship a static
+  browser plugin, so the ask surface is now compact's own renderer
+  (`packages/card/`), verified live — a real `AG/fp_…` ask rendered the
+  structured card and the deny→Subject-informed loop closed end to end.
+  Upstream's headline no longer decides what the operator sees.
+- **How T2 is selected** — decided: operator-declared per composition
+  (`COMPACT_ENVELOPE_TIER=instructional`; default `full`; an unknown value
+  refuses rather than degrading). Per-model auto-detection was rejected —
+  guessing the audience from a route name is the Enforcer guessing (D-7);
+  per-agent override waits for a second agent class. The adjudication is
+  recorded at [decision-envelope-tier.md](decision-envelope-tier.md).
+- **Language** — English only at first; the runtime has one working language.
+  i18n of glosses is not taken.
+- **What the gloss is not** — it is not law, not a register entry, not
+  coupled on. Where a gloss and the canonical envelope disagree, the envelope
+  wins and the gloss is a bug with a failing lint.

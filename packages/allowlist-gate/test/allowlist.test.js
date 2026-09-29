@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAllowlist, extractTarget, decide, envelope } from '../src/allowlist.js';
+import { parseAllowlist, extractTarget, decide } from '../src/allowlist.js';
+import { denyEnvelope } from '../src/index.js';
 
 test('ExactHost matches bare host, refuses other ports', () => {
   const rules = parseAllowlist(['api.example.com']);
@@ -34,10 +35,9 @@ test('calls without a network target abstain, not deny', () => {
 });
 
 test('denial envelope carries rule ID, reason, lawful next moves (R-3)', () => {
-  const env = envelope('terminal.exec', {host:'evil.example'});
-  assert.equal(env.kind, 'deny');
-  assert.ok(env.reason.includes('[AG-1]'));
-  assert.ok(env.reason.includes('evil.example'));
+  const env = denyEnvelope('terminal.exec', {host:'evil.example'});
+  assert.ok(env.text.startsWith('[AG/AG-1]'));
+  assert.ok(env.text.includes('evil.example'));
   assert.ok(Array.isArray(env.lawfulNextMoves) && env.lawfulNextMoves.length >= 1);
   assert.ok(env.lawfulNextMoves.some(m => /escalate/.test(m)));
 });

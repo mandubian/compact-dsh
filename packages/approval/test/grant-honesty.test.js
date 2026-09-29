@@ -33,8 +33,9 @@ function boot(opts = {}) {
 
 const AGENT = { id: 's1' };
 const SECRET_CALL = { command: 'curl -H "Authorization: Bearer $GH_TOKEN" https://api.example.com', url: 'https://api.example.com' };
+// the analyzer's shape under proxy: an HTTP(S) act carries delivery 'mediator' (#57)
 const READ = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'read', delivery: 'mediator' };
-const WRITE = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'write' };
+const WRITE = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'write', delivery: 'mediator' };
 
 // -- #64: secret grants are revocable by the operator ------------------------
 
@@ -103,8 +104,15 @@ test('#65: under proxy the exec-cache entry lives no longer than the egress gran
   assert.equal(v.verdict, 'pending-approval', 'never allowed-then-refused-expired');
 });
 
-test('#65: without an egress grant the cache keeps its own TTL (none posture, classless act)', async () => {
-  for (const [opts, args] of [[{ egress: 'none' }, READ], [{ egress: 'proxy' }, { ...READ, methodClass: null }]]) {
+test('#65: without an egress grant the cache keeps its own TTL (none posture, classless act, undeliverable act)', async () => {
+  const cases = [
+    [{ egress: 'none' }, READ],
+    [{ egress: 'proxy' }, { ...READ, methodClass: null }],
+    // #57 × #65: an act the mediator cannot carry (ssh, raw tcp) materializes
+    // no egress grant, so neither the cap nor the ask may speak of one
+    [{ egress: 'proxy' }, { host: 'git.example.com', methodClass: 'write', delivery: null }],
+  ];
+  for (const [opts, args] of cases) {
     const { approval, answer } = boot({ ...opts, execCacheTtlMs: 24 * 3600_000 });
     const ask = approval.gate({ name: 'bash', arguments: args, agent: AGENT, callId: 'c1' });
     assert.match(ask.reason, /for 24h, across sessions/);
@@ -113,7 +121,26 @@ test('#65: without an egress grant the cache keeps its own TTL (none posture, cl
     await answer({ toolName: 'bash', agent: AGENT, callId: 'c1' });
     const [[, entry]] = [...approval.store.cache.entries()];
     assert.ok(entry.expiresAt >= before + 24 * 3600_000 - 5);
+    assert.equal(egressGrantsFor(approval.store, 's1').length, 0, 'and no egress grant was written');
   }
+});
+
+test('#56: a portless host ask says the tunnel is not covered — plain HTTP carries, CONNECT does not', async () => {
+  // the analyzer's tier-3 shape: curl/wget to a bare host (no URL, no port) —
+  // the materialized ExactHost grant covers plain HTTP, never the tunnel
+  const { approval } = boot({ egress: 'proxy' });
+  const args = { host: 'api.example.com', methodClass: 'read', delivery: 'mediator' };
+  const ask = approval.gate({ name: 'bash', arguments: args, agent: AGENT, callId: 'c1' });
+  assert.match(ask.reason, /names the host only/, ask.reason);
+  assert.match(ask.reason, /#56/, 'the ask names the decision the rule comes from');
+
+  // a URL act names its scheme port (tier 1) — no tunnel caveat applies
+  const urlAsk = approval.gate({ name: 'bash', arguments: READ, agent: AGENT, callId: 'c2' });
+  assert.doesNotMatch(urlAsk.reason, /names the host only/, urlAsk.reason);
+
+  // a port-explicit host act (tier 1 pairing or tier-2 registry fact) — ditto
+  const portAsk = approval.gate({ name: 'bash', arguments: { host: 'db.internal', port: '5433', methodClass: 'write', delivery: 'mediator' }, agent: AGENT, callId: 'c3' });
+  assert.doesNotMatch(portAsk.reason, /names the host only/, portAsk.reason);
 });
 
 // -- #66: the gate honours the method class ---------------------------------

@@ -58,7 +58,7 @@ test('composed: uncovered host is denied by the gate before execution', async ()
   const result = await tools.execute({ name: 'net_probe', arguments: { host: 'evil.example' }, signal: new AbortController().signal });
   const s = JSON.stringify(result);
   assert.ok(!executed, 'a denied probe must not execute');
-  assert.ok(s.includes('[AG-1]'), 'denial must carry the gate rule id — got: ' + s.slice(0, 300));
+  assert.ok(s.includes('[AG/AG-1]'), 'denial must carry the gate rule id — got: ' + s.slice(0, 300));
   assert.ok(s.includes('Lawful next moves'), 'denial must carry lawful next moves');
 });
 
@@ -69,5 +69,5 @@ test('composed: allowed host passes the gate and executes', async () => {
   const result = await tools.execute({ name: 'net_probe', arguments: { host: 'api.example.com' }, signal: new AbortController().signal });
   assert.ok(executed, 'an allowed probe must execute');
   const s = JSON.stringify(result);
-  assert.ok(!s.includes('[AG-1]'), 'allowed probe must not carry a denial envelope');
+  assert.ok(!s.includes('[AG/AG-1]'), 'allowed probe must not carry a denial envelope');
 });

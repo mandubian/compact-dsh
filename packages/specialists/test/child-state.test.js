@@ -144,6 +144,8 @@ test('the parent is informed without polling, and the notice is attributed to th
   ctx.emit('subagent/start', { runId: 'r1', id: 'c1', provider: 'spawn', local: true });
   assert.equal(parent.injected.length, 1, 'the parent asked for nothing and was told anyway');
   assert.equal(parent.injected[0].source.plugin, CHILD_STATE_PLUGIN);
+  assert.equal(parent.injected[0].source.form, 'notice');
+  assert.equal(parent.injected[0].source.summary, 'Delegation started');
   const text = parent.injected[0].content[0].text;
   assert.match(text, /Child delegation started/);
   assert.match(text, /depth 1/, 'the recorded delegation depth travels with the notice (MA-2 ties in)');

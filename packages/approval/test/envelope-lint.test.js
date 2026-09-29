@@ -22,7 +22,13 @@ function boot(opts = {}) {
 // The lint: one shape check applied to every refusal the plugin can emit.
 function assertEnvelope(shape, reason, label) {
   assert.ok(reason, `${label}: a refusal carries a reason`);
-  assert.match(reason, /^\[AG\//, `${label}: the reason names the gate + rule ID`);
+  // slice 3: asks render the T3 operator card — the canonical envelope is
+  // embedded verbatim, so the gate + rule ID may appear past position 0
+  // slice 3: asks render the T3 operator card — the canonical envelope is
+  // embedded verbatim. The marker must sit at a LINE START: that is the
+  // exact invariant the operator answerer's routing reads (the card embeds
+  // the envelope past position 0, on its own line)
+  assert.match(reason, /(^|\n)\[AG\//, `${label}: the reason names the gate + rule ID at a line start`);
   assert.ok(reason.includes('Lawful next moves'), `${label}: the reason lists lawful next moves`);
   const moves = reason.split('\n').filter(l => l.startsWith('— '));
   assert.ok(moves.length >= 1, `${label}: at least one lawful next move`);

@@ -152,7 +152,13 @@ export function bindChildState(ctx, { registry = new ChildStateRegistry(), now =
       if (typeof parent?.inject !== 'function') return;
       parent.inject(createUserMessage({
         content: [{ type: 'text', text: transitionProse(record, registry.childrenOf(record.parentId)) }],
-        source: { kind: 'plugin', plugin: CHILD_STATE_PLUGIN },
+        // form:'notice' + summary: the delegation transition is visible on
+        // the web transcript's collapsed context row — MA-3's honesty about
+        // children reaches the page, not only the parent's context
+        source: { kind: 'plugin', plugin: CHILD_STATE_PLUGIN, form: 'notice',
+          summary: record.state === 'settled'
+            ? `Delegation settled — ${record.stopReason ?? 'no stop reason recorded'}`
+            : 'Delegation started' },
       }));
     } catch { /* a failed notice must never break the child's lifecycle */ }
   };

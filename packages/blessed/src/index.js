@@ -14,7 +14,7 @@ import { apply as applyEgressProxy } from 'compact-dsh-egress-proxy';
 import { apply as applySelfModel } from 'compact-dsh-self-model';
 import { apply as applySpecialists } from 'compact-dsh-specialists';
 import { canonicalizeBestEffort } from 'compact-dsh-sandbox-docker';
-import { buildEnvelope } from 'compact-envelope';
+import { buildEnvelope,bandReason } from 'compact-envelope';
 
 export const name = 'compact-blessed';
 export const inject = ['tools', 'approval', 'commands', 'systemPrompt', 'sessionProjections', 'subagents', 'sessionPersistence', 'compact-record', 'sandboxPolicy'];
@@ -346,7 +346,7 @@ export function workspaceAnchorDecision(sessionCwd, bootRoot) {
       'escalate to your Principal',
     ],
   });
-  return { kind: 'deny', reason: env.text };
+  return { kind: 'deny', reason: bandReason(env) };
 }
 
 /**
