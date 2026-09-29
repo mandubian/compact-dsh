@@ -150,20 +150,23 @@ composition:
 npm run compact -- --web     # chat at 127.0.0.1:3080, loopback-only by design
 ```
 
-**Any other provider (OpenRouter, verified live).** The multi-provider
-adapter mounts dormant until your settings document supplies a route. Put
-this in `~/.compact-dsh/settings.yaml` — the key resolves **by name** from
-your shell, never stored in the file:
+**Any other provider (OpenRouter and the Z.ai coding plan, both verified
+live).** The multi-provider adapter mounts dormant until your settings
+document supplies a route. Put this in `~/.compact-dsh/settings.yaml` — the
+key resolves **by name** from your shell (or from
+`~/.compact-dsh/.credentials.yaml`), never stored in the settings file:
 
 ```yaml
 llm-pi-ai:
   providers:
     openrouter:
       apiKeyEnv: OPENROUTER_API_KEY
+    zai:                    # the Z.ai coding-plan endpoint (api.z.ai/api/coding/paas/v4)
+      apiKeyEnv: ZAI_API_KEY
 
 agent-default-model:
-  provider: openrouter
-  model: deepseek/deepseek-chat-v3.1   # any id in the route's catalog
+  provider: zai
+  model: glm-5.3-flash      # any id in the route's catalog
 ```
 
 Behind a corporate proxy? Node's fetch ignores `https_proxy` by default —
