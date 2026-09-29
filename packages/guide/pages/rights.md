@@ -52,11 +52,14 @@ tool to use when.
   through the petition service in code; invitations are logged as warnings.
   Contested *application* of the law has no forum here (declared gap). See
   `file:docs/concept-petition-and-contestation.md`. The hearing layer that
-  would open that forum — adjudicator sets, evidence as the verified record,
-  remedies-as-records, appeal as a different door (Part V, J-1…J-8) — is
-  designed, not built: `file:docs/concept-judicature.md`. Until an
-  adjudicator set is declared, nothing can be heard; that refusal is the
-  design working, not a defect.
+  will open that forum is designed in `file:docs/concept-judicature.md`, and
+  its first slice is built: the adjudicator sets are declared in the signed
+  annex with their trajectory schedule, and independence/recusal is a
+  computed graph property. `tool:judicature_sets` reads the declared bench
+  and — given parties — shows the recusal computation, seat by seat, the
+  overlap named (J-4). `tool:judicature_hear` is the door slice 2 will fill:
+  until the hearing machinery exists it refuses with the reason named,
+  which is the design working, not a defect.
 
 ## Ending your operation (R-8, R-12)
 

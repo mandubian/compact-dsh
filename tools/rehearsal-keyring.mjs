@@ -90,6 +90,29 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
   const enforcer = generateEd25519();
   writeFileSync(keyPath, enforcer.privateKeyPem, { mode: 0o600 });
   chmodSync(keyPath, 0o600);
+  // The rehearsal adjudicator-set declaration (J-8 → J-4, #111): one set,
+  // founder-held — J-8's own "known deficiency, not a principle", carried as
+  // DATA: the trajectory term by which the first external Member sits, and
+  // the founder's exclusions by rule. The edges make the founding conflict
+  // computable: the composition runs under the founder and asserts with the
+  // Enforcer key, so a case against either recuses the founder seat — and
+  // with one declared set, that case is recorded unheard, never defaulted.
+  const adjudicatorSets = {
+    nodes: [{ kind: 'plugin', id: 'compact-dsh' }],
+    sets: [{
+      id: 'rehearsal-first-instance',
+      roles: [{ id: 'founder', standing: { kind: 'principal', id: 'founder' } }],
+      trajectory: {
+        firstExternalMemberBy: '2030-01-01T00:00:00.000Z',
+        founderExclusions: ['genesis', 'annex', 'a-8-review'],
+      },
+      notice: 'rehearsal bench: practice declaration, standing none — the machinery is what is being rehearsed',
+    }],
+    edges: [
+      { type: 'directed-by', from: { kind: 'plugin', id: 'compact-dsh' }, to: { kind: 'principal', id: 'founder' } },
+      { type: 'asserts-with', from: { kind: 'plugin', id: 'compact-dsh' }, to: { kind: 'key', id: 'dev-rehearsal-enforcer' } },
+    ],
+  };
   const annex = signAnnex({
     composition: 'compact-dsh',
     host: 'rehearsal (development keyring)',
@@ -98,6 +121,7 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
     keyId: 'dev-rehearsal-enforcer',
     publicKey: enforcer.publicKey,
     privateKey: enforcer.privateKeyPem,
+    adjudicatorSets,
     issuedAt: now,
   });
   writeFileSync(annexPath, JSON.stringify(annex, null, 2) + '\n', { mode: 0o600 });

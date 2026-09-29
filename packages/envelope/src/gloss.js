@@ -413,6 +413,24 @@ export const GLOSS = {
     instruction: 'Name the rule that refused you when you can. The unnamed flag still counts, but a named one can be acted on.',
     cites: ['R-11', 'R-3'],
   },
+
+  // ── JG — the hearing layer (Part V) ──
+
+  'JG/set-undeclared': {
+    title: 'No adjudicator set is declared — nothing can be heard',
+    why: 'The hearing layer refuses a case because no adjudicator set is declared in the annex. This is the layer’s first honest behavior, not a defect: a hearing before its bench would have two moves — refuse, or sit the Enforcer down — and the second is the theater D-8 forbids.',
+    example: { blocked: ['judicature_hear with no declared set — the refusal names J-8 and the lawful next moves'], lawful: ['judicature_sets to read what is declared (or that nothing is), then petition (R-11) for a set declaration'] },
+    instruction: 'Read the declared sets with judicature_sets; a set is declared in the signed annex with its trajectory schedule. Until one exists, the petition channel is the door that is open.',
+    cites: ['J-8', 'D-7', 'D-8'],
+  },
+
+  'JG/hearing-unbuilt': {
+    title: 'The bench is declared, the hearing is not built',
+    why: 'Adjudicator sets exist and verify, but the hearing machinery — cases, evidence, judgments, dissents — is a later slice. Convening a panel the runtime cannot lawfully seat would be decorative justice; the door refuses with the reason named and shows the recusal computation it CAN do.',
+    example: { blocked: ['judicature_hear after sets are declared — refused with the slice named, and the panel that would resolve shown'], lawful: ['judicature_sets with parties to see the recusal computation, seat by seat, overlap named (J-4)'] },
+    instruction: 'The independence check is live even where the hearing is not: pass parties to judicature_sets and watch the bench recuse by graph, not by conscience.',
+    cites: ['J-4', 'J-8', 'D-7'],
+  },
 };
 
 // Wildcards cover the two families whose ruleIds are composed at run time:

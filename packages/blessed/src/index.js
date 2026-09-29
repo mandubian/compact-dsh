@@ -7,6 +7,7 @@ import { apply as applyExit } from 'compact-dsh-exit';
 import { apply as applyGuide } from 'compact-dsh-guide';
 import { apply as applyLoopguard } from 'compact-dsh-loopguard';
 import { apply as applyPetition } from 'compact-dsh-petition';
+import { apply as applyJudicature } from 'compact-dsh-judicature';
 import { promotionPlugin } from 'compact-dsh-promotion';
 import { apply as applyRemoteAccess } from 'compact-dsh-remote-access';
 import { apply as applySandbox, normalizeProvenanceRecords } from 'compact-dsh-sandbox-docker';
@@ -497,6 +498,10 @@ export async function apply(ctx, config = {}) {
   await mount('compact-self-model', applySelfModel, { enforcer: options.enforcer }, ['tools']);
   await mount('compact-exit', applyExit, {}, ['tools']);
   await mount('compact-petition', applyPetition, {}, ['tools']);
+  // the hearing layer's slice-1 surface: the declared bench (J-8/J-4) and
+  // the fail-closed door — the annex that declares sets is the same signed
+  // affidavit the record anchors ride, so it is passed through, not re-read
+  await mount('compact-judicature', applyJudicature, { annexPath: options.enforcer?.annexPath }, ['tools']);
   await mount('compact-emergency', applyEmergency, {}, ['tools']);
   // the ecosystem guide: no clause is enforced here — it is what the Subject
   // reads to explain this runtime to its operator (and to itself) — so it is

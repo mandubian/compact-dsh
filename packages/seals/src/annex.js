@@ -61,6 +61,12 @@ export function verifyAnnex({ annex, expectedLawDigest, now = Date.now() }) {
   if (annex.expiresAt && new Date(annex.expiresAt).getTime() <= now) {
     throw new SealError('annex-expired', `the enforcer annex expired at ${annex.expiresAt} — an expired annex blesses nothing`);
   }
+  if (annex.adjudicatorSets !== undefined && !(
+    annex.adjudicatorSets && typeof annex.adjudicatorSets === 'object'
+    && Array.isArray(annex.adjudicatorSets.sets) && Array.isArray(annex.adjudicatorSets.edges))) {
+    throw new SealError('annex-malformed',
+      'malformed enforcer annex: adjudicatorSets, when present, must be { sets: [...], edges: [...] } — the section is part of the signed affidavit (J-8), and a shape that will not parse refuses the boot');
+  }
   return {
     enforcerKey: annex.enforcer.publicKey,
     keyId: annex.enforcer.keyId,
@@ -70,7 +76,7 @@ export function verifyAnnex({ annex, expectedLawDigest, now = Date.now() }) {
 }
 
 /** Build a signed annex (rehearsal tooling; requires the enforcer private key). */
-export function signAnnex({ composition, host, lawDigest, registerDigest = null, keyId, publicKey, privateKey, expiresAt = null, issuedAt = new Date().toISOString() }) {
+export function signAnnex({ composition, host, lawDigest, registerDigest = null, keyId, publicKey, privateKey, expiresAt = null, adjudicatorSets = null, issuedAt = new Date().toISOString() }) {
   const annex = {
     kind: 'enforcer-annex',
     composition,
@@ -80,6 +86,7 @@ export function signAnnex({ composition, host, lawDigest, registerDigest = null,
     enforcer: { keyId, publicKey },
     issuedAt,
     ...(expiresAt ? { expiresAt } : {}),
+    ...(adjudicatorSets ? { adjudicatorSets } : {}),
     standing: 'none — rehearsal under the development keyring; conveys no standing (F-5: the annex binds by refuse-to-start and verifiability, not by blessing)',
     declaration: REHEARSAL_DECLARATION,
   };

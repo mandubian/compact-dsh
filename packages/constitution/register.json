@@ -657,7 +657,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: no adjudicating machinery exists; the deficiency mirrors the Compact's own J-8 trajectory — the hearing layer's shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
+      "evidence": "judicature: no adjudicating machinery exists; the deficiency mirrors the Compact's own J-8 trajectory — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -666,7 +666,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: the record is now tamper-evident (I-2, compact-record), so evidence exists — but no adjudicating machinery consumes it; the hearing/panel layer is still absent (see J-8) — the hearing layer's shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
+      "evidence": "judicature: the record is now tamper-evident (I-2, compact-record), so evidence exists — but no adjudicating machinery consumes it; the hearing/panel layer is still absent (see J-8) — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -675,25 +675,33 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: hearing machinery does not exist — the hearing layer's shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
+      "evidence": "judicature: hearing machinery does not exist — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
       "enforcedBy": [],
       "verifiers": []
     },
     {
       "clause": "J-4",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "judicature: adjudicator sets are undeclared (see J-8) — the hearing layer's shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-judicature",
+      "service": "compact-judicature",
+      "evidence": "impartiality is mechanical: recusal and set independence are reachability over the annex-declared standing graph (nodes = declared standing, edges = the closed cross-examinable vocabulary), computed per seat with the overlap named, per set, and between sets — runnable in-band (judicature_sets) and offline (tools/verify-judicature.mjs); a malformed or dangling declaration refuses the boot (D-7); the checks bind to Members not sessions (F-6), and the pre-I-1 re-keying window is declared (docs/concept-judicature.md, #111)",
+      "enforcedBy": [
+        "packages/judicature/src/sets.js",
+        "packages/judicature/src/index.js",
+        "packages/seals/src/annex.js"
+      ],
+      "verifiers": [
+        "packages/judicature/test/sets.test.js",
+        "packages/judicature/test/composed.dsh.test.js",
+        "tools/judicature.test.mjs"
+      ]
     },
     {
       "clause": "J-5",
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: the PETITION door is built and enforced (R-11, compact-petition); the APPEAL door is not — J-5 distinguishes them and appeal is heard under Part V, which does not exist here (J-8) — the hearing layer's shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
+      "evidence": "judicature: the PETITION door is built and enforced (R-11, compact-petition); the APPEAL door is not — J-5 distinguishes them and appeal is heard under Part V, which does not exist here (J-8) — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -702,7 +710,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: remedies-as-records land with the amendment queue — the hearing layer's shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
+      "evidence": "judicature: remedies-as-records land with the amendment queue — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -711,18 +719,27 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: precedent machinery does not exist — the hearing layer's shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
+      "evidence": "judicature: precedent machinery does not exist — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
       "enforcedBy": [],
       "verifiers": []
     },
     {
       "clause": "J-8",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "adjudicator sets: undeclared — a known deficiency, disclosed in the annex — the hearing layer's shape is designed in docs/concept-judicature.md (#99); design-first: no code before the page lands",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-judicature",
+      "service": "compact-judicature",
+      "evidence": "adjudicator sets are DECLARED in the signed annex (rehearsal declaration carried by tools/rehearsal-keyring.mjs): roles with standing provenance over a declared dependency graph, the trajectory as data (first external Member by a fixed term — expiry derived from the clock at read, never stored — and the founder's rule-based exclusions), the fail-closed gate family JG ([JG/set-undeclared] while undeclared, [JG/hearing-unbuilt] until slice 2), and an external-Witness seat remaining impossible until I-1 keys exist — the founding deficiency carried as data, not prose (docs/concept-judicature.md, #111)",
+      "enforcedBy": [
+        "packages/judicature/src/sets.js",
+        "packages/judicature/src/index.js",
+        "packages/seals/src/annex.js",
+        "tools/rehearsal-keyring.mjs"
+      ],
+      "verifiers": [
+        "packages/judicature/test/sets.test.js",
+        "packages/judicature/test/composed.dsh.test.js",
+        "tools/judicature.test.mjs"
+      ]
     },
     {
       "clause": "A-1",

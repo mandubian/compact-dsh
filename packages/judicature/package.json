@@ -1,0 +1,25 @@
+{
+  "name": "compact-dsh-judicature",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Part V slice 1: adjudicator-set declarations in the signed annex (J-8), independence and recusal as a verified graph property (J-4), and the fail-closed JG gate family — until a set is declared, nothing is heard.",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+  },
+  "dependencies": {
+    "compact-dsh-constitution": "0.1.0",
+    "compact-dsh-seals": "0.1.0",
+    "compact-envelope": "0.1.0"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}
