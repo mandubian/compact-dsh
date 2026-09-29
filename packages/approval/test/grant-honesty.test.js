@@ -33,7 +33,7 @@ function boot(opts = {}) {
 
 const AGENT = { id: 's1' };
 const SECRET_CALL = { command: 'curl -H "Authorization: Bearer $GH_TOKEN" https://api.example.com', url: 'https://api.example.com' };
-const READ = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'read' };
+const READ = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'read', delivery: 'mediator' };
 const WRITE = { url: 'https://api.example.com/v1', host: 'api.example.com', methodClass: 'write' };
 
 // -- #64: secret grants are revocable by the operator ------------------------

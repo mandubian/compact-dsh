@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Context } from '@deepseek-ai/cordis';
 import { request as httpRequest } from 'node:http';
-import { GrantStore } from 'compact-dsh-approval';
+import { GrantStore, createApproval } from 'compact-dsh-approval';
 import { apply, name, ensureEgressNetwork } from '../src/index.js';
 
 const tick = () => new Promise((r) => setImmediate(r));
@@ -147,4 +147,57 @@ test('NOT declared: the service resolves (F-5) while the capability stays absent
     /mediated egress posture is NOT declared.*COMPACT_EGRESS=proxy/);
   assert.equal(ctx.get(name)?.declared, false, 'the enforced register row resolves — F-5 is satisfied by a service that binds nothing');
   service.closeAll();
+});
+
+// -- the wire teaches the gate (#102): the wired seam, over a real socket -----
+
+test('#102: a real EG/no-grant refusal through a wired listener kills the approval store\'s cached entry', async (t) => {
+  const approval = createApproval({ egress: 'proxy' });   // store + the wireRefusal policy
+  const ctx = new Context();
+  ctx.provide('compact-approval', approval);
+  await tick();
+  const service = await apply(ctx, { network: 'compact-egress-test', run: inspectRun(), poolSize: 1, recheckMs: 40 });
+  t.after(() => service.closeAll());
+  const url = new URL(service.envFor('session-a').HTTP_PROXY);
+
+  // the issue's shape: a cached approval (the classless act's 24h entry) with
+  // no grant of its own — its delivery rode a grant era that is now gone
+  const fp = 'fp_c47925ecdeadbeef';
+  approval.store.cacheSet(fp, Date.now(), 24 * 60 * 60 * 1000, { url: 'http://nowhere.example/x' });
+
+  const status = await new Promise((resolve, reject) => {
+    const req = httpRequest({
+      host: url.hostname, port: url.port, method: 'GET',
+      path: 'http://nowhere.example/x', headers: { host: 'nowhere.example' },
+    }, (res) => {
+      let body = '';
+      res.on('data', (d) => { body += d; });
+      res.on('end', () => resolve({ code: res.statusCode, body }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+  assert.equal(status.code, 403);
+  assert.match(status.body, /\[EG\/no-grant\]/);
+
+  assert.deepEqual(approval.store.cache.has(fp), false,
+    'the refusal taught the gate: the entry no longer outlives a delivery the mediator refuses');
+});
+
+test('#102: a gate without the seam (an older approval shape) degrades to no-op — enforcement intact', async (t) => {
+  const { service, store } = await boot({ poolSize: 1, store: new GrantStore() });
+  t.after(() => service.closeAll());
+  const url = new URL(service.envFor('session-a').HTTP_PROXY);
+  store.cacheSet('fp_aaaaaaaaaaaaaaaa', Date.now(), 60_000, { url: 'http://nowhere.example/x' });
+
+  const status = await new Promise((resolve, reject) => {
+    const req = httpRequest({
+      host: url.hostname, port: url.port, method: 'GET',
+      path: 'http://nowhere.example/x', headers: { host: 'nowhere.example' },
+    }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+    req.on('error', reject);
+    req.end();
+  });
+  assert.equal(status, 403);
+  assert.ok(store.cache.get('fp_aaaaaaaaaaaaaaaa'), 'no wireRefusal on the gate → nothing killed, nothing crashed');
 });

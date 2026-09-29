@@ -175,6 +175,33 @@ export class GrantStore {
   revokeFingerprint(fp) { return this.cache.delete(fp); }
 
   /**
+   * #102 — the wire teaches the gate: a mediator refusal that proves the
+   * route dead kills every exec-cache entry whose canonical target resolves
+   * to that route, so a cached approval survives exactly as long as its
+   * delivery demonstrably works. Reach mirrors the mediator's own rule
+   * (egress-proxy proxy.js `patternReaches`): a HostAndPort target dies with
+   * its exact host and port; a bare-host target (ExactHost) is host-scoped —
+   * the mediator reads host-scoped grants as covering any port they name, so
+   * the entry dies with the host. Entries without a derivable route (an
+   * unparsable target never granted) are untouched. Returns the killed
+   * fingerprints.
+   */
+  killCacheForRoute({ host, port } = {}) {
+    const killed = [];
+    const h = host == null ? null : String(host).toLowerCase();
+    if (h == null || h === '') return killed;
+    const p = port == null ? '' : String(port);
+    for (const [fp, e] of this.cache) {
+      const route = egressPatternFor(e.target);
+      const reaches = route?.kind === 'HostAndPort'
+        ? route.value.host === h && route.value.port === p
+        : route?.kind === 'ExactHost' && route.value === h;
+      if (reaches) { this.cache.delete(fp); killed.push(fp); }
+    }
+    return killed;
+  }
+
+  /**
    * Consume one use of a budgeted grant (no-op for unlimited grants). A store
    * METHOD, not a helper: durable stores flush it — a restart must never
    * resurrect spent budget.
@@ -209,6 +236,34 @@ export function patternMatches(pattern, target) {
     case 'HostAndPort': return target.host === pattern.value.host && target.port === pattern.value.port;
     default: return false;
   }
+}
+
+/**
+ * The egress pattern for a canonical target (#38 phase 3). A connection is a
+ * (host, port) fact, so: URL findings become HostAndPort on their scheme's
+ * port (explicit port kept), an explicit host+port keeps both, and a bare
+ * host stays HOST-SCOPED (ExactHost — the analyzer found the host and said
+ * nothing about ports; the mediator reads that kind as covering any port it
+ * names, because narrowing below the shown unit is a grant the operator never
+ * made). Unparsable/absent target → null: nothing to grant.
+ */
+export function egressPatternFor(target) {
+  if (typeof target?.url === 'string') {
+    try {
+      const u = new URL(target.url);
+      return {
+        kind: 'HostAndPort',
+        value: { host: u.hostname.toLowerCase(), port: String(u.port || (u.protocol === 'https:' ? '443' : '80')) },
+      };
+    } catch { return null; }
+  }
+  if (typeof target?.host === 'string') {
+    if (target.port != null && target.port !== '') {
+      return { kind: 'HostAndPort', value: { host: target.host.toLowerCase(), port: String(target.port) } };
+    }
+    return { kind: 'ExactHost', value: target.host.toLowerCase() };
+  }
+  return null;
 }
 
 /** Which live grants cover this target? (never expired, never revoked, never spent) */

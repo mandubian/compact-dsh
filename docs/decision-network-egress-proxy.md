@@ -302,6 +302,44 @@ ran).
    extend the policy explicitly at composition (`addressAllowed`) — an
    exception declared at the seam that owns it, never a silent default.
 
+## The wire teaches the gate (#102) — ADOPTED (Option B)
+
+The phase-3 record left one coherence gap, closed 2026-09-29. #65 caps a
+cached approval to the egress grant it materializes — but only for acts whose
+method class was derivable, because only those materialize a grant. A
+**classless** act (`methodClass: null`) caches the full runtime TTL with NO
+grant of its own: under the mediated posture its delivery rides whatever
+classed grant of the session reaches the target — often another approval's
+one-hour grant. When that grant lapsed, the entry still had ~23h of gate-yes
+left over a wire that answers `[EG/no-grant]` every time: an agent looping on
+a refusal its own context called approved. Ask-time, the gate cannot know
+which grants will exist later; the wire can observe which exist NOW.
+
+Two options were drafted; **B is adopted**:
+
+- **A (rejected as primary, kept as fallback):** cap by need, not
+  materialization — `cacheTtlFor` caps whenever the act needs the mediator,
+  class or no class. One line, but it guesses: it bounds only the TTL
+  mismatch, not revocation, not any other delivery death.
+- **B (adopted):** the mediator hands each EG refusal to the gate as a wire
+  fact (`onRefusal` → `approval.wireRefusal`); a refusal whose rule PROVES
+  the route dead — `no-grant`, `classless-grant`, `expired`, `revoked` —
+  kills the exec-cache entries routed to the refused (host, port). The entry
+  survives exactly as long as its delivery demonstrably works, and self-heals
+  for every delivery death. `method-class` is deliberately NOT a death: a
+  live route of the covered class remains, so killing would out-run the
+  proof. Reach mirrors the mediator's own (`HostAndPort` exact, bare-host
+  host-scoped); kills are durable store mutations; a gate without the seam
+  degrades to no-op; a throwing seam never breaks a refusal.
+
+Residual (declared): the exec-cache is runtime-wide while refusals are
+session-scoped, so one session's dead route kills the entry for all — the
+surviving session re-asks and re-materializes its own entry and grant
+(coherence over convenience, the same trade #64's revoke-kills-cache made).
+
+Non-goals (unchanged consent identity, #102): a classless act still asks; a
+read grant still never covers it; the ask disclosures stand as they were.
+
 ## The tunnel-surface adjudication (#56) — DRAFTED, PENDING DECISION
 
 Status: the three options below are **drafted for adjudication, none adopted**
@@ -347,7 +385,53 @@ find their registries as bare hosts (`{host}` → `ExactHost`), yet speak
 HTTPS, so the analyzer must derive the scheme port for them (`npm install`
 materializes `registry.npmjs.org:443`, not a portless row) or the mediated
 posture breaks its most common surface. Same for any bare-host act that
-facts pin to http/https.
+facts pin to http/https. And the companion is a host *set*, not one port: the
+map names one registry per ecosystem, while pip fetches its files from
+`files.pythonhosted.org`, apt's default sources include `security.ubuntu.com`,
+Docker Hub needs `auth.docker.io` and a blob CDN, cargo reads `index.crates.io`
+and downloads from `static.crates.io`, and `go` checks `sum.golang.org`. Each
+second host is a new host, hence a new grant — refused under every option
+alike, #56 aside — so tier 2 declares, per ecosystem, the `(host, port)` pairs
+an install reaches, and A's over-ask is measured after that fix, not charged
+to it.
+
+**A's second half — the transport the evidence named.** A port is not a
+scheme: `curl http://example.com/api` materializes `HostAndPort example.com:80`,
+and under the port rule alone that row opens a tunnel. Clients never `CONNECT`
+for `http://` — they send the absolute URI — so all a tunnel to `:80` buys is
+an exit from the one check the wire does enforce: a read grant carries a `POST`
+inside `CONNECT example.com:80` that the plain-HTTP path refuses by name. Phase
+3's *read grant + `POST` → refused* holds only while the Subject chooses the
+framing that lets it be checked. So the row carries its transport, decided by
+the evidence that made it: an `https://` URL (and, with the SSH path, `ssh` →
+22) sets `tunnel`; an `http://` URL does not; a hand-minted `host:port`
+(`/grants-grant`) sets it, the operator having typed the port. A row without
+the field opens no tunnel (D-7, the classless precedent: absence is no
+coverage). `egressPatternFor` already reads the scheme when it builds the row —
+one field, not a new mechanism.
+
+**A's operator conditions — never asked for a port, never approving a
+failure.** Under A a port comes from the evidence (tier 1) or a declared fact
+(tier 2), never from the operator; the operator writes one only when
+hand-minting (`/grants-grant example.com:443`), where a bare `example.com`
+mints a plain-HTTP-only row and the command's reply says so. The failure A must
+design out is *approved, then refused at the wire* — #57's rule, extended: the
+ask says before the decision what the wire will not carry. Three conditions,
+adopted with A or A is not adopted:
+
+1. **The registry companion lands with A, never after.** Without it every
+   package install is approved, then refused.
+2. **A host-only ask names its limit in the operator's words** —
+   "`example.com`: plain HTTP only, no HTTPS" — never "tunnel" or `CONNECT`;
+   and the wire's refusal names the fix (re-run with `https://`, or grant
+   `example.com:443`), not only the cause.
+3. **Scheme-less `curl`/`wget` is tier 1 by the verb's convention.** Both
+   speak HTTP by default and follow a same-host redirect to HTTPS
+   (`curl -L example.com`), so the ask shows "`example.com` — HTTP (:80) and
+   HTTPS (:443)" and one consent materializes two rows, each shown: `:80`
+   plain, `:443` with `tunnel`. The `:80` row stays plain, so the transport
+   half holds. One ask, several rows, every row in the ask — the same shape
+   the host-set companion needs.
 
 **Option B — a composition-level tunnel port allowlist.** The composition
 declares `tunnelPorts` (default `443`); a `CONNECT` to a port outside the
@@ -369,17 +453,28 @@ adjudication). Cost: consent granularity on tunneled acts is host-only — the
 operator's "read" click admits a duplex channel, and the exfiltration
 residual becomes the whole story for everything inside a tunnel.
 
+**What no option changes.** On the port every option admits — `443` — a read
+grant still carries writes inside TLS: over HTTPS the class axis is enforced at
+the gate and nowhere on the wire, by the decision not to intercept. A and B
+narrow *where* a tunnel reaches, never *what* rides it, and exfiltration to a
+granted host stays residual 1. A bounds the tunnel; it does not close #26's
+gap inside one.
+
 | | over-asks | churn | tunnel consent shape | SSH path | custom connector on `:8443` |
 |---|---|---|---|---|---|
-| **A** port-explicit tunnels | some (needs the registry-port companion) | grants + ask | operator saw the port | natural (`:22` shown) | refused at the wire unless evidence, facts or the composition name it |
+| **A** port-explicit tunnels | some (needs the registry companion, as a host set) | grants + ask | operator saw the port and the scheme | natural (`:22` shown) | refused at the wire unless evidence, facts or the composition name it |
 | **B** port allowlist | no | composition config | posture-wide, not per-consent | allowlist edit | one allowlist entry, posture-wide |
 | **C** declare only | no | none | host-only | already there | carried — any port under a portless grant |
 
-**The recommendation, not the decision**: A, with the registry-port companion
-— it is the only option whose tunnel surface is consent-shaped, which is the
-direction the record's own identity doctrine (#26: the operator is shown what
-the grant covers) points. B is the defensible low-friction first step and
-composes with A later; C is the honest floor the record already stands on.
+**The recommendation, not the decision**: A, with its transport half, the
+registry companion declared as a host set, and its three operator
+conditions — it is the only option whose tunnel surface is consent-shaped,
+which is the direction the record's own identity doctrine (#26: the operator
+is shown what the grant covers) points. B is the
+stopgap if the SSH path (below) needs a tunnel guard before A lands; once A
+holds, a posture-wide port list mostly restates the grant table — two truths
+over one grant, the doubling this record already refuses for budgets. C is the
+honest floor the record already stands on.
 The decision is the Principal's; whichever is adopted amends this record and
 moves the register evidence in the same slice that enforces it.
 

@@ -112,4 +112,5 @@ PersistentGrantStore.prototype.addSecretGrant = flushed('addSecretGrant');
 PersistentGrantStore.prototype.revokeSecretGrant = flushed('revokeSecretGrant');
 PersistentGrantStore.prototype.cacheSet = flushed('cacheSet');
 PersistentGrantStore.prototype.revokeFingerprint = flushed('revokeFingerprint');
+PersistentGrantStore.prototype.killCacheForRoute = flushed('killCacheForRoute');
 PersistentGrantStore.prototype.consumeUse = flushed('consumeUse');

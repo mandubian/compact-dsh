@@ -42,11 +42,27 @@ const DEFAULT_POOL = 16;
 const DEFAULT_NO_PROXY = 'localhost,127.0.0.1,::1';
 
 export async function apply(ctx, config = {}) {
-  const store = ctx.get?.('compact-approval')?.store;
+  const gate = ctx.get?.('compact-approval');
+  const store = gate?.store;
   if (!store) {
     throw new Error('compact-dsh-egress-proxy: the approval grant store (compact-approval) is the mediator\'s only ' +
       'authority — a composition without it cannot enforce grants, only pretend to (composition coupling, D-8)');
   }
+
+  // #102 — the wire teaches the gate: each EG refusal that proves a route
+  // dead reaches the gate's exec cache through ITS policy (`wireRefusal`),
+  // so a cached approval never outlives a delivery the mediator has refused.
+  // The gate decides which rules mean death; this side only reports and
+  // notes what the teaching killed. A gate without the seam (an older
+  // approval) degrades to no-op — enforcement above is intact.
+  const wireRefusal = (fact) => {
+    const killed = gate.wireRefusal?.(fact) ?? [];
+    if (killed.length) {
+      ctx.logger?.info?.(
+        `compact-dsh-egress-proxy: EG/${fact.ruleId} refusal for ${fact.host}:${fact.port} killed ` +
+        `${killed.length} cached approval(s) — the wire teaches the gate (#102)`);
+    }
+  };
 
   const declared = typeof config.network === 'string' && config.network.trim() !== '' && config.network !== 'none';
 
@@ -94,6 +110,7 @@ export async function apply(ctx, config = {}) {
       now: config.now,
       logger: ctx.logger,
       resolveGrants: () => (slot.sessionId ? networkGrantsForSession(store, slot.sessionId) : []),
+      onRefusal: wireRefusal,
     });
     const address = await slot.proxy.start();
     slot.url = `http://${net.gateway}:${address.port}`;

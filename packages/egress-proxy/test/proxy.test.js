@@ -43,7 +43,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // -- fixture: origin + echo server + one mediator bound on loopback ----------
 
-async function fixture({ rows = () => [], lookup = testLookup, addressAllowed = () => true } = {}) {
+async function fixture({ rows = () => [], lookup = testLookup, addressAllowed = () => true, onRefusal = null } = {}) {
   LOOKUP_LOG.length = 0;
   const seen = [];
   const origin = createHttpServer((req, res) => {
@@ -70,6 +70,7 @@ async function fixture({ rows = () => [], lookup = testLookup, addressAllowed = 
     lookup,
     addressAllowed,
     logger: null,
+    onRefusal,
   });
   const address = await proxy.start();
 
@@ -417,4 +418,53 @@ test('the address vocabulary: every space the policy can refuse has a name (#55)
   assert.equal(addressClassOf('::ffff:8.8.8.8'), 'public');
   assert.equal(addressClassOf('64:ff9b::a00:1'), 'private', 'NAT64-embedded 10.0.0.1');
   assert.equal(addressClassOf('not-an-ip'), 'invalid');
+});
+
+// -- the wire teaches the gate (#102): every EG refusal is handed over --------
+
+test('102-a: each refusal is reported as a wire fact — rule, host, port, class, tunnel', async (t) => {
+  const refusals = [];
+  const f = await fixture({
+    rows: () => [],
+    onRefusal: (fact) => refusals.push(fact),
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/x`);
+  assert.equal(res.status, 403);
+  const tunnel = await connectVia(f.proxyPort, `origin.test:${f.echoPort}`);
+  assert.equal(tunnel.ok, false);
+  tunnel.socket.destroy();
+
+  assert.deepEqual(refusals, [
+    { ruleId: 'no-grant', host: 'origin.test', port: String(f.originPort), methodClass: 'read', url: `http://origin.test:${f.originPort}/x`, tunnel: false },
+    { ruleId: 'no-grant', host: 'origin.test', port: String(f.echoPort), methodClass: null, url: null, tunnel: true },
+  ], 'both refusal surfaces report — plain HTTP and CONNECT alike');
+});
+
+test('102-b: a delivery death reports its rule; an allowed connection reports nothing', async (t) => {
+  const refusals = [];
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { expiresAt: Date.now() - 1_000, id: 'sg_dead' })],
+    onRefusal: (fact) => refusals.push(fact),
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/late`);
+  assert.equal(res.status, 403);
+  assert.deepEqual(refusals.map(r => r.ruleId), ['expired']);
+
+  refusals.length = 0;
+  const live = await fixture({ rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_live' })], onRefusal: (fact) => refusals.push(fact) });
+  t.after(live.cleanup);
+  assert.equal((await viaProxy(live.proxyPort, `http://origin.test:${live.originPort}/ok`)).status, 200);
+  assert.deepEqual(refusals, [], 'delivery WORKING is not a fact the gate needs');
+});
+
+test('102-c: a throwing consumer never breaks the refusal (the wire teaches, not governs)', async (t) => {
+  const f = await fixture({ rows: () => [], onRefusal: () => { throw new Error('the gate hiccuped'); } });
+  t.after(f.cleanup);
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/x`);
+  assert.equal(res.status, 403, 'the refusal stands, seam or no seam');
+  assert.ok(res.body.includes(`[${GATE}/no-grant]`));
 });

@@ -325,10 +325,24 @@ export function createEgressProxy({
   addressAllowed = publicUnicastOnly,
   now = () => Date.now(),
   logger = null,
+  onRefusal = null,
 } = {}) {
   const tunnels = new Map();   // upstream socket -> {host, port, grantId}
   const sockets = new Set();   // client sockets, destroyed on close
   let closed = false;
+
+  /**
+   * #102 — every EG refusal is handed to the composition as a wire fact
+   * ({ruleId, host, port, methodClass, url, tunnel}), so the gate can teach
+   * its exec cache which routes stopped delivering. The mediator REPORTS;
+   * deciding what a refusal means for cached approvals is the gate's policy,
+   * never this listener's. A throwing consumer must never break a refusal.
+   */
+  const reportRefusal = (verdict, facts) => {
+    if (verdict.ok || typeof onRefusal !== 'function') return;
+    try { onRefusal({ ruleId: verdict.envelope?.ruleId ?? null, ...facts }); }
+    catch { /* the wire teaches; it must never take the refusal down */ }
+  };
 
   const rowsFor = () => {
     const rows = resolveGrants();
@@ -402,7 +416,10 @@ export function createEgressProxy({
         }), 400);
       }
       const verdict = decide({ host: authority.host, port: authority.port, methodClass, url: authority.url, tunnel: false });
-      if (!verdict.ok) return refuse(res, verdict.envelope, verdict.status);
+      if (!verdict.ok) {
+        reportRefusal(verdict, { host: authority.host, port: authority.port, methodClass, url: authority.url, tunnel: false });
+        return refuse(res, verdict.envelope, verdict.status);
+      }
 
       // the grant covered the NAME; the dial goes to the PINNED address (#55)
       let pinned;
@@ -453,7 +470,10 @@ export function createEgressProxy({
       }), 'HTTP/1.1 400 Bad Request');
     }
     const verdict = decide({ host, port: targetPort, methodClass: null, url: null, tunnel: true });
-    if (!verdict.ok) return rawRefuse(clientSocket, verdict.envelope);
+    if (!verdict.ok) {
+      reportRefusal(verdict, { host, port: targetPort, methodClass: null, url: null, tunnel: true });
+      return rawRefuse(clientSocket, verdict.envelope);
+    }
 
     // the grant covered the NAME; the tunnel goes to the PINNED address (#55)
     let pinned;
