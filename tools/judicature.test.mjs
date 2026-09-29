@@ -137,3 +137,18 @@ test('no --annex is a usage refusal, and keyring artifacts stay private', async 
   const mode = (readdirSync(dir), (readFileSync(priv), (await import('node:fs')).statSync(priv).mode & 0o777));
   assert.equal(mode, 0o600, 'the enforcer private key stays 0600');
 });
+
+test('an unknown or malformed --sets ask refuses cleanly, never a stack trace (review #118)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'jg-verify-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const annexPath = ensureKeyring(dir);
+  // unknown set id: a named refusal with exit 1, not an uncaught exception
+  const unknown = run(['--annex', annexPath, '--sets', 'rehearsal-first-instance,ghost']);
+  assert.equal(unknown.code, 1);
+  assert.match(unknown.stderr, /independence refused \(sets-malformed\)/);
+  assert.doesNotMatch(unknown.stderr, /at /, 'no stack trace — the tool refuses, it does not crash');
+  // a single value is a usage refusal before anything is asked
+  const solo = run(['--annex', annexPath, '--sets', 'rehearsal-first-instance']);
+  assert.equal(solo.code, 1);
+  assert.match(solo.stderr, /exactly two declared set ids/);
+});

@@ -40,11 +40,15 @@ test('a well-formed declaration validates and carries its parts', () => {
 });
 
 test('fail-closed: the malformed shapes each refuse (D-7)', () => {
-  const refuses = (s, detail) => assert.throws(() => validateAdjudicatorSets(s), SetError, detail);
+  // enforcerKey is passed so the fixture's own edges never dangle — each
+  // case must refuse for ITS OWN reason, not one masked by another (the
+  // empty-set-id case once passed only because the edge check fired first)
+  const refuses = (s, detail) => assert.throws(
+    () => validateAdjudicatorSets(s, { enforcerKey: 'enforcer-key' }), SetError, detail);
   refuses(undefined, 'no section');
   refuses({}, 'not the section shape');
   refuses({ sets: [], edges: [] }, 'empty declaration is no declaration');
-  refuses({ ...section(), sets: [{ ...section().sets[0], id: '' }] }, 'set id');
+  refuses({ ...section(), sets: [{ ...section().sets[0], id: 7 }] }, 'non-string set id');
   refuses({ ...section(), sets: [{ ...section().sets[0], roles: [] }] }, 'no roles');
   refuses({ ...section(), sets: [{ ...section().sets[0], roles: [{ id: 'x', standing: { kind: 'witness', id: 'w' } }] }] },
     'witness standing is pending I-1 — declaring it now would be the fraud');
@@ -61,6 +65,14 @@ test('fail-closed: the malformed shapes each refuse (D-7)', () => {
     'dangling edge — an edge to nowhere is the lie the affidavit discipline catches');
   refuses({ ...section(), edges: [{ type: 'directed-by', from: { kind: 'principal', id: 'alice' }, to: { kind: 'principal', id: 'alice' } }] },
     'self-loop');
+});
+
+test('an empty set id refuses for its own reason, unmasked (review #118)', () => {
+  // once passed only because the fixture's edge dangled first — Copilot
+  const s = structuredClone(section());
+  s.sets[0].id = '';
+  assert.throws(() => validateAdjudicatorSets(s, { enforcerKey: 'enforcer-key' }),
+    /set without a non-empty string id/);
 });
 
 test('recusal is reachability, and the overlap is named (J-4)', () => {

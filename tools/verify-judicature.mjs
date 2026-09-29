@@ -82,7 +82,16 @@ export function verifyJudiciary({ annex, now = Date.now(), parties = [], setPair
   }
   if (setPair) {
     const [a, b] = setPair;
-    const out = independenceBetweenSets(validated, a, b);
+    let out;
+    try {
+      out = independenceBetweenSets(validated, a, b);
+    } catch (e) {
+      if (e instanceof SetError) {
+        failures.push(`independence refused (${e.code}): ${e.message}`);
+        return { ok: false, lines, failures };
+      }
+      throw e;
+    }
     lines.push(`independence ${a} vs ${b}: ${out.independent ? 'INDEPENDENT' : 'SUBORDINATE'}`);
     for (const o of out.overlap) lines.push(`  overlap ${o.a}/${o.b}: ${o.path.join(' → ')}`);
   }
@@ -99,7 +108,12 @@ export function main(argv = process.argv.slice(2)) {
     process.stderr.write('verify-judicature: --annex <path> is required\n');
     process.exit(1);
   }
-  const setPair = arg('sets') ? arg('sets').split(',').map((s) => s.trim()) : null;
+  const rawSets = arg('sets');
+  if (rawSets !== undefined && String(rawSets).split(',').filter((s) => s.trim()).length !== 2) {
+    process.stderr.write('verify-judicature: --sets takes exactly two declared set ids, A,B\n');
+    process.exit(1);
+  }
+  const setPair = rawSets ? rawSets.split(',').map((s) => s.trim()) : null;
   const { ok, lines, failures } = verifyJudiciary({
     annex: JSON.parse(readFileSync(annexPath, 'utf8')),
     parties: parseParties(arg('parties')),

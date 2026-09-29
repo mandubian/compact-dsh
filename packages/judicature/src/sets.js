@@ -111,7 +111,7 @@ export function validateAdjudicatorSets(section, { enforcerKey = null } = {}) {
 
   const seenSetIds = new Set();
   for (const set of section.sets) {
-    if (!isNodeShape(set) && !(set && typeof set.id === 'string')) throw bad('a set without a string id');
+    if (!(set && typeof set.id === 'string' && set.id.length > 0)) throw bad('a set without a non-empty string id');
     if (seenSetIds.has(set.id)) throw bad(`duplicate set id "${set.id}"`);
     seenSetIds.add(set.id);
     if (!Array.isArray(set.roles) || set.roles.length === 0) throw bad(`set "${set.id}" declares no roles`);
