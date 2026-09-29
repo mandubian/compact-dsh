@@ -150,7 +150,27 @@ composition:
 npm run compact -- --web     # chat at 127.0.0.1:3080, loopback-only by design
 ```
 
-Then take the full tour: **[docs/demo.md](docs/demo.md)** — eight runnable
+**Any other provider (OpenRouter, verified live).** The multi-provider
+adapter mounts dormant until your settings document supplies a route. Put
+this in `~/.compact-dsh/settings.yaml` — the key resolves **by name** from
+your shell, never stored in the file:
+
+```yaml
+llm-pi-ai:
+  providers:
+    openrouter:
+      apiKeyEnv: OPENROUTER_API_KEY
+
+agent-default-model:
+  provider: openrouter
+  model: deepseek/deepseek-chat-v3.1   # any id in the route's catalog
+```
+
+Behind a corporate proxy? Node's fetch ignores `https_proxy` by default —
+prefix runs with `NODE_USE_ENV_PROXY=1` (direct egress that times out is
+the symptom).
+
+Then take the full tour: **[docs/demo.md](docs/demo.md)** — ten runnable
 demos, each ending in something you can *see*: the tamper-catching audit, the
 secret that never enters the conversation, the lawful network request, the
 petitions. Many need no key at all.
