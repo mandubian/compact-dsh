@@ -150,7 +150,30 @@ composition:
 npm run compact -- --web     # chat at 127.0.0.1:3080, loopback-only by design
 ```
 
-Then take the full tour: **[docs/demo.md](docs/demo.md)** — eight runnable
+**Any other provider (OpenRouter and the Z.ai coding plan, both verified
+live).** The multi-provider adapter mounts dormant until your settings
+document supplies a route. Put this in `~/.compact-dsh/settings.yaml` — the
+key resolves **by name** from your shell (or from
+`~/.compact-dsh/.credentials.yaml`), never stored in the settings file:
+
+```yaml
+llm-pi-ai:
+  providers:
+    openrouter:
+      apiKeyEnv: OPENROUTER_API_KEY
+    zai:                    # the Z.ai coding-plan endpoint (api.z.ai/api/coding/paas/v4)
+      apiKeyEnv: ZAI_API_KEY
+
+agent-default-model:
+  provider: zai
+  model: glm-5.3-flash      # any id in the route's catalog
+```
+
+Behind a corporate proxy? Node's fetch ignores `https_proxy` by default —
+prefix runs with `NODE_USE_ENV_PROXY=1` (direct egress that times out is
+the symptom).
+
+Then take the full tour: **[docs/demo.md](docs/demo.md)** — ten runnable
 demos, each ending in something you can *see*: the tamper-catching audit, the
 secret that never enters the conversation, the lawful network request, the
 petitions. Many need no key at all.
@@ -207,6 +230,38 @@ as built here:
 | leave honestly | five lawful grounds + an obligation ledger | `packages/exit/` |
 | be verified without trusting it | the offline auditor CLI | `auditor/` |
 | not lie about enforcement | constitution coupling (refuse-to-start) + the register CI gate | `packages/constitution/`, `tools/verify-register.mjs` |
+
+## Plain dsh vs this composition, seam by seam
+
+Plain dsh natively provides a session loop with tools, **one** grant decision
+(`allowed-once`, replayed via the exec cache), subagent delegation rows, a
+sandbox vocabulary, and a durable plain-JSONL session log. Every machine above
+is the **difference at a seam the host leaves open** — same host, law added.
+Each row is enforced code with tests, and each has a runnable demonstration in
+[docs/demo.md](docs/demo.md):
+
+| Seam | Plain dsh | Here |
+|---|---|---|
+| Refusals | raw errors the model burns turns on | every denial an envelope: rule ID, reason, **lawful next moves** (R-3/I-4) — Demo 2 |
+| Grants | `allowed-once` + exec cache, nothing else | five layers; grants scoped, TTL'd, budgeted, revocable, fsync-persisted; a corrupt store fails the boot (I-5/D-7/R-4) — Demos 5, 9.7 |
+| Loop health | none | the 12-trip LoopGuard, refusal-seam fed, repair budget 3, deny-all (D-1) — Demo 2 |
+| The record | plain JSONL — a rewrite is undetectable forever | hash chain + offline auditor + `record_read` (I-2/R-7/I-7) — Demos 1, 8§7 |
+| Self-knowledge | the model's claims about itself | per-turn attestation from the Enforcer's services; `inquiry` from recorded state (R-1/R-13/D-2) — Demos 4, 8§1 |
+| Secrets | one `printenv` from the log, forever | secret grants: disclosed before use, injected at confine time, never in context or record (I-5) — Demo 6 |
+| Delegation | ungated spawn rows, ungated peer address | recorded spawns, per-persona surfaces + depth caps, Enforcer-sourced child state, consent-scoped address (MA-1…4) — Demos 9.3, 9.4 |
+| Confinement | sandbox vocabulary without network posture | per-call container, masked paths, mount grants, digest-keyed image provenance (CF-1/2) — Demo 8§4 |
+| Capability honesty | mount whatever the profile ships | refuse-to-start coupling; scheduler and dynamic plugins **absent and enforced as absent** (F-5/A-4/SCH-1) — Demos 7, 9.9 |
+| Exit | the operator kills the process | five lawful grounds, obligation ledger, departure never blocked by debts (R-8/R-12) — Demo 9.5 |
+| Contestation | none | ungated petition channel, unremovable dissent (R-11/I-6/A-5) — Demo 9.9 |
+| The law itself | nothing to read | the bundled body served in band by digest (R-6) — Demo 9.1 |
+
+The honest limit, declared rather than hidden ([Honest status](#honest-status),
+annex §4): enforcement is compositional, not physical — in-process on an
+unaudited, pre-1.0 host, so against a compromised host process only the docker
+sandbox is a wall, and the law itself is an unratified draft. What is already
+true: against a cooperative-but-fallible agent — the daily case — every row
+changes behavior structurally, and the demos show each difference with the
+plain-dsh contrast captured alongside.
 
 ## Q&A
 
