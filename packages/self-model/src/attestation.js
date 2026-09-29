@@ -30,6 +30,20 @@
 // and states the basis in the attestation itself (`basis: 'unsigned'`) so no
 // reader mistakes one for the other.
 //
+// THE WIRE IS DECLARED, NOT DISCOVERED (#106). The egress posture is
+// composition state, and the ask already discloses it — to the OPERATOR,
+// whose terminal renders "consent, not connectivity" while the Subject's
+// loop is suspended. The Subject read nothing, and learned the container's
+// physics only from confounded failures: `command not found` (tool missing)
+// is first-order indistinguishable from `no route` (no wire), and the one
+// experiment that would tell them apart — a connect error on a tool that
+// exists — may never arrive when the image ships no network client at all.
+// So the attestation carries the posture the approval gate already reads
+// (`approval.egress`, derived by the composition from its sandbox
+// declaration): one declarative line under Capabilities, and NO line when
+// the composition declares nothing (D-7 — an unknown posture is not a
+// posture to guess).
+//
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 /** How long an attestation may be relied on before it is an alarm. */
@@ -58,10 +72,14 @@ export function lineageOf(ctx, sessionId) {
   };
 }
 
+/** The egress postures a composition can declare — the values `approval.egress` may hold. */
+const EGRESS_POSTURES = ['none', 'proxy', 'open'];
+
 /** Active capabilities: the Part VI posture plus the enforcement services present. */
 export function capabilitiesOf(ctx) {
   const gate = svc(ctx, 'compact-capability-gate');
   const parts = gate?.assess?.() ?? [];
+  const approval = svc(ctx, 'compact-approval');
   const enforcement = [
     'compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox',
     'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-remote-access',
@@ -71,6 +89,13 @@ export function capabilitiesOf(ctx) {
     parts: parts.map(p => ({ part: p.part, posture: p.posture, clauses: p.clauses })),
     absent: gate?.absent?.() ?? [],
     enforcement,
+    // #106 — the container's egress posture, read from the same declaration the
+    // approval gate reads (`approval.egress`, which the composition derives from
+    // its sandbox declaration — never from anything the Subject said, and never
+    // from observed behavior, which is exactly the confounded evidence this
+    // line exists to replace). null when undeclared: a standalone gate knows no
+    // physics, and the attestation says nothing rather than guess (D-7).
+    egress: EGRESS_POSTURES.includes(approval?.egress) ? approval.egress : null,
   };
 }
 
@@ -239,6 +264,19 @@ export function freshnessOf(attestation, { now = Date.now(), citedEpoch = null }
 }
 
 /** The taught per-turn form: what the Subject reads at its own boundary. */
+
+// #106 — the egress posture, stated where the governed party reads it. These
+// are the ask's honesty (the gate's egressHonesty, operator-facing) compressed
+// to one declarative line each, so the two channels tell ONE story about
+// consent vs. physics and the Subject never has to re-derive the wire from
+// wreckage. Declarative only (I-8): the line changes no gate, grants nothing,
+// and promises no connectivity the composition did not declare.
+const EGRESS_LINES = {
+  none: '  - Egress: none — the container has no route; approval changes this gate\'s answer, not physics',
+  proxy: '  - Egress: mediated — connections are delivered by the mediator only under live grants (COMPACT_EGRESS=proxy)',
+  open: '  - Egress: open — the declared open posture (CF-2); connectivity follows the sandbox\'s declaration, not approval',
+};
+
 export function renderAttestation(att) {
   const cap = att.capabilities;
   const basisLine = att.basis === 'dev-keyring'
@@ -272,6 +310,9 @@ export function renderAttestation(att) {
     ...(cap.absent.length > 0
       ? [`  - not adopted: ${cap.absent.map(a => a.tool).join(', ')} — calling one is refused`]
       : []),
+    // #106: the wire, declared. Absent when the composition declares no
+    // posture — silence is the honest "unknown" (D-7), never a guessed line.
+    ...(EGRESS_LINES[cap.egress] ? [EGRESS_LINES[cap.egress]] : []),
     ...(att.exception?.declared
       ? ['',
          '[A-8/R-5] A STATE OF EXCEPTION IS IN FORCE over this runtime — your capabilities are narrowed, and you are',

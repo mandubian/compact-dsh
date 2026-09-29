@@ -453,6 +453,7 @@ Capabilities in force:
   - SCH — Scheduling: absent (SCH-1)
   - A-4/DYN — The Enforcer's code is constitutional: absent (A-4)
   - not adopted: schedule_create, cordis_define, cordis_run, cordis_stop, cordis_undefine — calling one is refused
+  - Egress: none — the container has no route; approval changes this gate's answer, not physics
 
 Budgets remaining:
   - no live grants: every gated act will ask

@@ -177,6 +177,85 @@ test('the approval gate\'s own declared gap reaches the attestation (#8 G2)', as
   assert.ok(gaps.some(g => /G2/.test(g)), 'the posture is declared where the governed party reads it (I-8)');
 });
 
+// -- #106: the egress posture is declared, not discovered ---------------------
+//
+// The ask tells the OPERATOR that consent is not connectivity; the Subject
+// read nothing and burned asks discovering the wire from confounded failures
+// (`command not found` vs `no route`). The attestation carries the posture the
+// gate already reads — and stays silent when the composition declares none.
+
+test('a declared `none` posture tells the Subject the container has no route (#106)', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  ctx.plugin(stubService('compact-approval', { egress: 'none' }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.capabilities.egress, 'none', 'the posture is composed data, read from the approval declaration');
+  const text = renderAttestation(att);
+  assert.match(text, /Egress: none — the container has no route; approval changes this gate's answer, not physics/,
+    'the line names the physics and separates consent from connectivity');
+});
+
+test('a session under the mediated posture reads the mediated line (#106)', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  ctx.plugin(stubService('compact-approval', { egress: 'proxy' }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.capabilities.egress, 'proxy');
+  const text = renderAttestation(att);
+  assert.match(text, /Egress: mediated — connections are delivered by the mediator only under live grants \(COMPACT_EGRESS=proxy\)/,
+    'the mediated line names how this posture is composed');
+});
+
+test('the declared open posture renders the open line (#106)', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  ctx.plugin(stubService('compact-approval', { egress: 'open' }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.capabilities.egress, 'open');
+  const text = renderAttestation(att);
+  assert.match(text, /Egress: open — the declared open posture \(CF-2\); connectivity follows the sandbox's declaration, not approval/);
+});
+
+test('an undeclared posture renders nothing — silence is the honest unknown (D-7) (#106)', async () => {
+  // no approval service at all
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  let att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.capabilities.egress, null, 'no declaration is null, never a plausible posture');
+  assert.ok(!renderAttestation(att).includes('Egress:'), 'nothing is claimed where nothing was declared');
+
+  // an approval gate composed standalone: present, but it declares no posture
+  ctx.plugin(stubService('compact-approval', { declaredGaps: ['no content-level secret detection over tool output (G2)'] }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+  att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.capabilities.egress, null);
+  assert.ok(!renderAttestation(att).includes('Egress:'), 'the gate\'s presence is not a posture');
+
+  // a value the attestation does not know is not rendered either: the plugin
+  // sanitizes its input, and the attestation does not trust even that
+  ctx.plugin(stubService('compact-approval', { egress: 'surprisingly-fast' }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+  att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.capabilities.egress, null);
+  assert.ok(!renderAttestation(att).includes('Egress:'));
+});
+
+test('the posture line sits inside the capabilities block, below the Part VI enumeration (#106)', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  ctx.plugin(stubService('compact-approval', { egress: 'none' }));
+  for (let i = 0; i < 300 && ctx.get('compact-approval') === undefined; i++) await new Promise(r => setImmediate(r));
+  const lines = renderAttestation(composeAttestation(ctx, { sessionId: 's1' })).split('\n');
+  const egressAt = lines.findIndex(l => l.startsWith('  - Egress:'));
+  const partsAt = lines.findIndex(l => l.startsWith('Capabilities in force:'));
+  const budgetsAt = lines.findIndex(l => l.startsWith('Budgets remaining:'));
+  assert.ok(egressAt > partsAt && egressAt < budgetsAt, 'the posture is a capability-in-force, not a budget or a gap');
+  assert.ok(lines[egressAt].startsWith('  - '), 'the line carries the block\'s bullet form');
+});
+
 test('the declared gaps include the unsigned basis — the limit travels with the claim', async () => {
   const { ctx } = await boot();
   const gaps = gapsOf(ctx);
