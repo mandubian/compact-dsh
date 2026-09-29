@@ -68,6 +68,28 @@ connects an adjudicator role's standing to any party's standing — checked the
 way `verify-register` checks evidence paths exist: mechanically, before
 anything hears.
 
+**The graph is an affidavit, not an oracle (D-8, D-3, I-7).** What it can
+be asked to prove splits into what is *shown* and what is *declared*, and
+the design's honesty lives in the difference. Nodes cannot be forged: a
+seat cannot fake which key asserts it — the annex is signed (F-5) and acts
+land with bound attribution (I-2) — so *who did what* is cryptography, not
+testimony. Edges, however, are declared, and a declaration can omit. The
+cure is cross-examination by records: dependencies leave traces (spawn
+acts, approvals, grants — each on the chain), and I-7 already requires
+that "conformance of the annex to the runtime's actual conduct" be
+checkable by anyone, offline, without the Enforcer's cooperation. A
+dependency the record shows but the declaration omits is not a modeling
+gap — it is D-8's named fraud, and the omission cannot be laundered by
+suppressing the trace, because D-3 makes suppression where a recording
+duty stood the paradigm of violation: the gap becomes the evidence. Where
+the protection honestly ends: the record is tamper-evident, not true from
+birth. A composition fabricated whole from genesis — graph and chain
+together — passes every internal check, which is why none is asked to
+vouch for the inside: the outermost anchor is A-1's distributed root
+("internal agreement, however large, that does not hold the keys enacts
+nothing"), and everything between genesis and that root is checkable
+exactly as far as I-7 reaches.
+
 **Recusal is the same check run per seat (J-1/J-4).** The Enforcer, a
 Principal, or the founder accused or interested is a *party*; an adjudicator
 role whose standing overlaps a party refuses the seat — refused, not
@@ -75,6 +97,27 @@ discretionarily withdrawn, so a recusal is itself a record row with its
 overlap named. Impartiality **challenges** (J-4: "heard before the case") are
 a case with the challenged seat as their only subject: heard by the remaining
 declared seats, before any finding on the merits exists to contaminate.
+
+**The checks bind to Members, not sessions (J-4, F-6).** J-4's sentence is
+Member-level — "no Member may sit" — and F-6 makes the unit travel: "a
+Member's standing travels with its identity and its record". Recusal and
+appellate disjointness are therefore run over Member identity wherever it
+exists, and identity is exactly what I-1 keys will carry: a judge re-keyed
+into a fresh session verifies in as the same Member and the check still
+fails — re-keying launders nothing. Before I-1 the honest window stands
+open: the graph sees keys and lineages, not minds, and "the same agent in
+a newer session" is not distinguishable from a different one by any record
+this composition can keep. The window is guarded the only way this
+composition guards what it cannot verify — by attribution (each judgment
+names the seats that verified in, and the pattern is auditable offline,
+I-7), by affidavit liability (declaring "disjoint" sets one knows to be
+the same actor in fresh clothes is D-8), and by sequence (identity is
+scheduled before the routes that need it: the D-8 appeal, the cascade's
+last rung). And the clause's own ontology explains why the law cannot
+simply demand "different agents": roles attach to what a Member *does*,
+never to what a Member *is* — so the law demands different keys,
+different standing, different Members, and means it as far as records
+reach.
 
 **The cascade's last rung is declared as pending.** J-1: where a whole set
 must recuse, the case passes to the next declared set, "defaulting to
@@ -84,6 +127,16 @@ discipline). So the cascade terminates, honestly: a case whose every declared
 set recuses is recorded as **unheard** — never dismissed, because dismissal
 is itself a judgment and nobody lawful remains to make it. "Unheard" is a
 fact the register can carry; a default panel is the fraud.
+
+**`unheard` is a disposition of the filing, not of the merits.** No
+judgment exists, so nothing becomes res judicata: the origin may be
+re-filed before any later-declared set, and the `unheard` row is citable
+as the history of the attempt. It strands nothing — interim measures
+lapse by their own clock-derived expiry (never stored, the exception
+discipline), so a case nobody could lawfully hear cannot leave a
+suspension live by accident. What `unheard` never becomes is silence: the
+docket says the case was brought, why no lawful panel could reach it, and
+what would have to exist for it to be heard again.
 
 **Founding honesty (J-8).** The first panels are held by the drafters and
 their Witnesses, and the clause calls this "a known deficiency, not a
@@ -124,6 +177,19 @@ slice, and it is the one proceeding where unstated reasoning is admissible
 (J-2/D-3) — because there, the *reasoning of the record's writers* is the
 very thing on trial.
 
+**An upheld annotation changes what a slice can support, not whether it
+verifies (I-2, J-6).** Chain integrity is a property of the links, not of
+the content's truth: verification passes an annotated slice exactly as it
+passes any other, because I-2 offers tamper-evidence, not veracity — and
+no annotation may write inside the range it annotates (beside, never
+inside, per the remedies table below). What it changes is the read: every
+read door surfacing that range surfaces the annotation with it — the same
+"nothing hidden, some things withheld" discipline that governs withheld
+reasoning — so no Member cites the slice without its flag traveling
+along. A judgment that cites an annotated range without addressing the
+annotation in its stated reasons is detectably non-conforming, the same
+way an unargued remedy or an unaddressed prior judgment is.
+
 **No party benefits from the record's silence.** Where a duty of recording
 already existed (the gates, the answerer, the envelopes — every refusal is on
 the bus), a party cannot gain by an absence they caused. A gap where a
@@ -155,6 +221,29 @@ hearing, for the same reason the petition channel passes through no approval
 layer: the Member most likely to need the door is the one currently being
 refused. Filing by *other* Members may ride a flood cap (I-5's own doctrine);
 participation in one's own case may not.
+
+**The record states the claim; no intermediary shapes it.** The design has
+no clerk and no prosecutor, and the absence is constitutional, not
+economic: whoever stands between an accuser and the docket holds a gate
+over the hearing door, and a gate that can mis-shape an accusation can
+quietly kill one (D-8). The filing decomposes instead. The facts need no
+transcription — they are already acts on the record, seq-numbered and
+attributed (I-2, I-5), and the filing cites where they happened; the
+parties are not asserted but derived — the accused is whoever's standing
+sits on the cited acts; the filer supplies only the claim: which clause's
+application is contested. The filing door slice 2 builds is therefore a
+form-checker, never a merits-checker — it refuses malformity (no citable
+act, no seq range) and records the row, nothing else; "no approval step
+and no way to decline to notice" is the petition layer's sentence, and it
+carries over whole. Who may file: the affected Member, ungated and
+uncapped in their own case; other Members, under the flood cap; and for
+D-8 — where the defrauded party is the law itself — anyone, because the
+annex-versus-conduct divergence is verifiable offline by any Witness
+(I-7) and needs no standing beyond eyes. What the system trades for this
+is stated, not hidden: there is no investigation arm, and testimony
+cannot convert unrecorded claims into findings (J-2) — the system
+foregoes the power to discover facts rather than keep a fact-finder
+whose discoveries anyone must take on faith.
 
 **Interim suspension (J-3)** reuses the state-of-exception's hard-won
 discipline: recorded cause, named scope, and an expiry **derived from the
@@ -240,6 +329,19 @@ D-8 appeal route exactly as available as the A-1 trust root is deep:
 declared as pending: **I-1 identity keys**, heard *never, saying so* rather
 than heard by the accused's own class pretending otherwise.
 
+Two consequences of "not subordinate" being a graph property are declared
+here rather than left derivable. First, **a live appeal requires at least
+two declared, disjoint sets** — with one set declared there is no
+appellate authority at all, and the appeal door refuses with the reason
+named, exactly as the hearing door does; a composition that wants the
+second door must declare the second bench. Second, **disjointness runs
+over declared dependency edges, not common ancestry**: two seats under
+one Principal are formally non-subordinate — neither commands the other —
+and that is the declared limit of a single composition's internal
+independence. The clause's answer is not to pretend topology is virtue
+but to schedule the cure: the D-8 class demands externals outright, and
+J-8's trajectory fields put the first external Member on a clock.
+
 The two doors never conflate because the clause makes their outputs
 non-interchangeable: an appeal can re-hear an application until the judgment
 is final, but it can never fix the law; a petition can move the law, but can
@@ -256,14 +358,15 @@ the *law* is wrong routes to R-11 — not to defiance.
    lands every later tool refuses with `[JG/set-undeclared]` — and that
    refusal is the layer's whole honest behavior.
 2. **The case and the hearing (J-2, J-3).** Cases as record-borne
-   proceedings; evidence = chain-verified slices; counsel-equivalent access;
-   interim measures on the exception discipline; judgments and dissents as
-   record rows.
+   proceedings; the filing door as a form-checker, never a merits-checker;
+   evidence = chain-verified slices; counsel-equivalent access; interim
+   measures on the exception discipline; judgments and dissents as record
+   rows.
 3. **Remedies (J-6)**, landing with the amendment queue so a remedy and the
    law it changes share one chain of custody — and so restitution's first
    readable ledger line lands with the machinery that wrote it.
-4. **The appeal door (J-5)** — set-disjoint panels, the D-8 route declared
-   pending: I-1.
+4. **The appeal door (J-5)** — set-disjoint panels (a live appeal needs a
+   second declared set), the D-8 route declared pending: I-1.
 5. **Precedent (J-7)** — the read door and the auto-invitation into the
    collision counter. Last, and only if the page earns them.
 
@@ -279,6 +382,13 @@ the *law* is wrong routes to R-11 — not to defiance.
   cascade's final rung (external Witnesses) is pending: I-1; the honest
   state of a case no lawful panel can reach is a recorded `unheard`, and it
   is not a dismissal.
+- **Until I-1, the layer's depth is topological.** First-instance panels
+  can sit — declared sets, rule-based founder exclusions — but appeal
+  needs two disjoint sets, the D-8 route needs externals, and full-recuse
+  cases go unheard: a composition without identity keys has a hearing
+  layer whose honest steady state is one lawful bench and many named
+  refusals. That is D-7's shape working, not a defect to apologize for;
+  the cure is scheduled (I-1), and until it lands the refusals say so.
 - **Restitution is bounded by resources** — "where resources permit" is
   clause text, and a runtime cannot pay what its operator has not put in the
   trust root. The obligation row is the honest artifact; the reserve is
