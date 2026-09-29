@@ -149,6 +149,24 @@ test('102-f: killCacheForRoute is durable state — the entry cannot resurrect o
   }
 });
 
+test('102-f2: an empty kill pays no flush — the refusal path is hot, the fsync is not (review #103)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wire-refusal-empty-'));
+  try {
+    const path = join(dir, 'approvals.json');
+    const store = new PersistentGrantStore(path);
+    store.cacheSet('fp_aaaaaaaaaaaaaaaa', 1_700_000_000_000, 24 * HOUR, { url: 'https://api.example.com/v1/x' });
+    let flushes = 0;
+    store._flush = () => { flushes += 1; };
+
+    store.killCacheForRoute({ host: 'other.example', port: '443' });
+    assert.equal(flushes, 0, 'nothing killed → nothing changed → the store is already correct on disk');
+    store.killCacheForRoute({ host: 'api.example.com', port: '443' });
+    assert.equal(flushes, 1, 'a real kill flushes — a restart must never resurrect it');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // -- the #65 cap pins the issue names (unchanged by Option B) ------------------
 
 test('102-g: egress-bound acts keep the #65 cap; classless acts stay uncapped at ask-time (the wire heals); headless keeps the full TTL', () => {

@@ -105,6 +105,20 @@ function flushed(method) {
     return out;
   };
 }
+
+// Flush only when the mutator actually mutated: killCacheForRoute rides the
+// mediator's refusal path — machine-driven, and hot exactly when an agent
+// loops against a dead route (#102) — so an empty kill must not pay a
+// whole-store serialize+fsync for nothing. When something WAS killed, the
+// flush is mandatory: a restart must never resurrect a killed entry.
+function flushedWhen(when, method) {
+  const base = GrantStore.prototype[method];
+  return function (...args) {
+    const out = base.apply(this, args);
+    if (when(out)) this._flush();
+    return out;
+  };
+}
 PersistentGrantStore.prototype.addSessionGrant = flushed('addSessionGrant');
 PersistentGrantStore.prototype.revokeSessionGrant = flushed('revokeSessionGrant');
 PersistentGrantStore.prototype.addPlanGrant = flushed('addPlanGrant');
@@ -112,5 +126,5 @@ PersistentGrantStore.prototype.addSecretGrant = flushed('addSecretGrant');
 PersistentGrantStore.prototype.revokeSecretGrant = flushed('revokeSecretGrant');
 PersistentGrantStore.prototype.cacheSet = flushed('cacheSet');
 PersistentGrantStore.prototype.revokeFingerprint = flushed('revokeFingerprint');
-PersistentGrantStore.prototype.killCacheForRoute = flushed('killCacheForRoute');
+PersistentGrantStore.prototype.killCacheForRoute = flushedWhen((killed) => killed.length > 0, 'killCacheForRoute');
 PersistentGrantStore.prototype.consumeUse = flushed('consumeUse');
