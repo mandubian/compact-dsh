@@ -5,6 +5,82 @@ Design-first by decree ([issue #99](https://github.com/mandubian/compact-dsh/iss
 no code before this page lands — this is the one layer where building first
 would build the theater D-8 forbids.*
 
+## The vocabulary, in plain words
+
+This page borrows the vocabulary of courts, and the borrowing is deliberate:
+the institutions map. But no term is used as incantation — each has a
+mechanical meaning here. This section gives both: the courtroom sense, then
+the design's. Read it first; everything after assumes it.
+
+### The bench — who hears
+
+| Term | Plain meaning — in a courtroom, and here |
+|---|---|
+| **adjudicator set** | the pool of judges a jurisdiction declares it has. Here: a named list of adjudicator roles declared in the annex, each role carrying its standing provenance (which key, process, or plugin asserts it) and a dependency list — a declared composition fact, checkable by anyone (J-4). |
+| **role / seat** | one judgeship. Here: a slot in a set, occupied by whatever standing the annex declares — a human Principal, a dedicated out-of-Enforcer session, or (post-I-1) an external Witness — never the Enforcer (J-1). The role is the slot, not the mind in it: roles attach to what a Member *does*, never to what a Member *is*. |
+| **panel** | the judges who actually hear one case. Here: computed at hearing time as *declared set minus recusals minus upheld challenges* — derived, never stored, so there is no cached bench to attack. |
+| **party** | someone whose interests the case touches. Here (J-4's list): the Member accused, their Principal, anyone the outcome pays, and the Enforcer itself when the accusation is against its class. |
+| **recusal** | a judge stepping aside because of a conflict of interest. Here: not a matter of conscience — the same graph check that validates the set, run per seat against this case's parties; a hit means the seat *refuses*, and the refusal is itself a record row naming the overlap. |
+| **impartiality challenge** | a motion arguing a judge is biased. Here: a mini-case whose only subject is the challenged seat, heard by the remaining seats *before* the main case, so no tainted finding exists yet (J-4: "heard before the case"). |
+| **cascade** | the fallback order when a whole court is conflicted: pass to the next one. Here (J-1): a fully-recused set passes the case to the next declared set, defaulting at the last rung to external Witnesses — pending I-1, so the cascade can honestly terminate in `unheard`. |
+| **trajectory fields** | coined by this design, not courtroom vocabulary: the schedule data a set declaration must carry — the fixed term for the first external-Member adjudicator, the founder's exclusions by rule — because "a court whose independence is promised but never scheduled has been promised nothing" (J-8). |
+| **founder / drafters** | those who wrote and ratified the constitution — the founding generation, whose early courts are necessarily staffed by themselves. J-8 calls this "a known deficiency, not a principle": honest, scheduled to end, and excluded by rule from cases touching the genesis. |
+| **external Witness** | a judge from outside the jurisdiction. Here: a Member accredited under A-1/A-7 whose standing is not this operator's — impossible to seat until identity keys exist (I-1), which is why the deep routes are declared pending rather than faked. |
+| **provenance** | where a thing came from — its paper trail. Here: the declared origin of a role's authority (which key/process/plugin asserts it); what makes "who is this seat?" answerable from records instead of from trust. |
+
+### The case — how a dispute moves
+
+| Term | Plain meaning — in a courtroom, and here |
+|---|---|
+| **filing / origin** | the act that starts a case — the complaint. Here: a record row citing the seq ranges of the contested acts plus the filer's claim (which clause's application is contested). No clerk shapes it: the record states the facts, the filer states the claim. |
+| **merits** | the substance of the dispute — did the wrong actually happen — as opposed to procedure (who may hear, in what order). A ruling "on the merits" decides the dispute itself; most of this page's machinery (recusal, challenges, stays) exists so that whatever reaches the merits is untainted. |
+| **disposition** | how a case ends: verdict, dismissal, withdrawal. Here: the outcome row — a judgment, or an `unheard`. |
+| **stay** | a pause of a proceeding. Here: computed, not discretionary — a live integrity challenge stays exactly the cases whose findings would cite the contested seq ranges (a set intersection), never everything (J-2). |
+| **interim measure** | a temporary order before the hearing (a freeze, a suspension). Here (J-3): recorded cause, named scope, expiry derived from the clock — never stored — and reviewed as the first act of the hearing, so a measure cannot silently outlive its justification. |
+| **counsel-equivalent access** | the defense's right to see the evidence against the accused. Here (J-3): `record_read`'s standing extended to the slices cited against you — same verified-read path; acts shown, other Members' unstated reasoning withheld (R-10/R-2). |
+| **testimony** | a party's own account. Here: admissible to contest meaning, application, proportionality, remedy — and structurally unable to convert an unrecorded claim into a finding (J-2: the record is the evidence). |
+| **finding** | a fact the court establishes. Here: a fact proven by cited seq ranges — nothing else. D-7 binds judges as it binds gates: a judgment citing an unverified slice refuses to land. |
+| **judgment** | the decision — what happened, which rules apply, why. Here: a record row (findings, rules applied, reasons), attributed to the seats that verified into the panel. |
+| **dissent** | the minority's recorded disagreement. Here (A-5): recorded with the judgment, reasons required, and no removal operation exists — ever. |
+| **res judicata** | Latin, "a matter judged": once finally decided, the same dispute cannot be re-litigated. Here: only a judgment creates it. An `unheard` creates nothing — the origin can be re-filed — which is why `unheard` is not a dismissal: a dismissal is a judgment, and nobody lawful made one. |
+| **unheard** | coined by this design; no courtroom equivalent, and that is the point — a case that was brought, that no lawful panel could reach, recorded as exactly that. The honest alternative to inventing a default judge (J-1/D-8). |
+
+### The remedies — what a judgment can order
+
+| Term | Plain meaning — in a courtroom, and here |
+|---|---|
+| **remedy** | what the law does for the injured party. Here (J-6): always a compensating record row — nothing is ever erased (I-2). |
+| **annotation** | a margin note tied to a record entry. Here: a row citing the annotated seq range — beside, never inside — that travels with every read of that range. |
+| **restitution** | paying back; making the injured party whole. Here: an obligation row with recorded cause shown, bounded by "where resources permit" (clause text). |
+| **standing** | your legal status — what you may do in the community. A judgment may adjust it, but only through the declared grant machinery (the approval layers), never by writing the gates directly: that would be enforcement fraud with a gavel (D-8). |
+| **referral** | for the gravest classes: the judgment does not punish, it refers — its finding of a law defect rides the petition channel's mechanical amendment invitation (R-11/I-6). |
+| **proportionality** | the response must fit the wrong — no life sentences for parking. Here: owed in the judgment's stated reasons; an unargued remedy is detectably non-conforming, like a vacuous petition response. |
+
+### After the judgment — the two doors
+
+| Term | Plain meaning — in a courtroom, and here |
+|---|---|
+| **precedent** | earlier decisions cited in later ones. Binding precedent must be followed; persuasive precedent may be departed from, with reasons given. Here (J-7): persuasive only, ever — the bench may interpret the Compact, only the community may grow it; a generalizing reading auto-generates an amendment invitation. |
+| **appeal** | one re-hearing, by a higher court. Here (J-5): one re-hearing, "as of right" (no permission step), by a *disconnected* set — not higher in rank, just not subordinate; hears the application on the same record; final, with dissent recorded. A second appeal is refused. |
+| **petition** | not a courtroom move at all — the other door: asking the community whether the law itself is worthy (R-11, built). An appeal can never fix the law; a petition can never reopen a case: the doors' outputs are non-interchangeable by design. |
+
+### Honesty vocabulary — how the system keeps itself true
+
+| Term | Plain meaning |
+|---|---|
+| **affidavit** | a signed statement whose author answers for its truth. The annex is one (D-8: "the annex is an affidavit") — and so is every adjudicator-set declaration; a knowingly false one is the gravest class of violation, because "the defrauded party is the law itself". |
+| **fail closed** | engineering, not law: when uncertain, refuse and say why — never default to allowing. D-7's discipline; `[JG/set-undeclared]` is it applied to this layer: with no declared set, every case is refused with the reason named. |
+| **tamper-evidence vs veracity** | tamper-evidence proves nobody changed the bytes since they were written; it says nothing about whether the bytes were *true* when written. I-2 gives the first, never the second — which is why an upheld annotation flags a slice's truthfulness without touching its chain links. |
+| **topological** | from graph theory: a property of the wiring — which nodes connect to which — not of what the nodes are inside. "The layer's depth is topological" means independence here means "no declared edge", which is weaker than true externality; the reason I-1 is scheduled. |
+| **docket** | the court's list of cases. Here: the record itself — cases are record rows, and an `unheard` row says on its face what would have to exist for the case to be heard. |
+| **trust root** | the outermost set of keys — here A-1's distributed amendment root, a threshold of distinct keyholders (Principals, long-lived Subjects, external Witnesses). "Internal agreement, however large, that does not hold the keys enacts nothing": the anchor of last resort, deliberately outside any single runtime. |
+| **genesis** | the founding records of this composition — the sealed law, the first annex, the keyring manifest. Cases touching it exclude the founder by rule. |
+
+Everything else — Principal, Subject, Enforcer, Witness, Member, and the
+clause codes (J-x, R-x, D-x, I-x, A-x) — is law vocabulary, defined in
+[compact.md](https://github.com/mandubian/compact/blob/main/compact.md),
+with the short versions in the README's "The vocabulary, in two tables".
+
 ## Why this layer cannot be built like the others
 
 Every layer this composition has shipped **administers**: the gates apply
