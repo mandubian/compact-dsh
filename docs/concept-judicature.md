@@ -199,7 +199,10 @@ reach.
 must recuse, the case passes to the next declared set, "defaulting to
 external Witnesses under the A-1 trust root". External Witnesses do not
 exist yet (pending: **I-1 identity keys** — the annex's named-precondition
-discipline). So the cascade terminates, honestly: a case whose every declared
+discipline; the dependency is now designed:
+[concept-member-identity.md](concept-member-identity.md), #116 — external
+Witness accreditation chains to A-1 through organic statute, never a root
+signature over a Witness). So the cascade terminates, honestly: a case whose every declared
 set recuses is recorded as **unheard** — never dismissed, because dismissal
 is itself a judgment and nobody lawful remains to make it. "Unheard" is a
 fact the register can carry; a default panel is the fraud.

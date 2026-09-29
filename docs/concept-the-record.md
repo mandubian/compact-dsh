@@ -89,7 +89,12 @@ detectable by anyone who kept a prior head link.
 Signing links under an identity key (I-1) is the next step, and is deliberately
 not taken: the Compact has published no amendment keys, so a signature would
 attest to a key no verifier could check. The gap is declared in the boot
-record, not papered over.
+record, not papered over. The identity layer that would carry it — Member
+keys bound to a community roll, sessions countersigned by the Member they
+act for — is now designed
+([concept-member-identity.md](concept-member-identity.md), #116); the
+chain anchors already rehearse the authorship limb under the development
+keyring (R-7's rehearsal entry).
 
 ## The auditor consumes it
 

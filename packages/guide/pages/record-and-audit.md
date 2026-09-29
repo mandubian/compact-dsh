@@ -80,6 +80,6 @@ To create an identity set, run `node tools/rehearsal-keyring.mjs ensure <dir>` (
 
 ## None of this conveys standing
 
-The Compact in force is draft v0.5 and is not ratified. Under `clause:F-5`, this composition claims no Compact standing. The keyring holds practice keys owned by a single party. A valid chain, anchor, seal or certificate proves that the code paths work, not identity or authority (`clause:I-1` remains planned). Telling someone otherwise misstates the record.
+The Compact in force is draft v0.5 and is not ratified. Under `clause:F-5`, this composition claims no Compact standing. The keyring holds practice keys owned by a single party. A valid chain, anchor, seal or certificate proves that the code paths work, not identity or authority (`clause:I-1` remains planned). Telling someone otherwise misstates the record. What ratified identity will be — Member keys bound to a community roll, accreditation of external Witnesses through organic statute, sessions countersigned by their Member — is designed, not built: `file:docs/concept-member-identity.md`.
 
 See also: `page:running` for launching, `page:delegation` for child sessions and lineage, `page:rights` for the Subject's remedies.
