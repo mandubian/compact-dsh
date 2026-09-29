@@ -26,7 +26,8 @@ deliberate and each term has a mechanical meaning; read it first.
 | **rotation / re-keying** | legally changing your signature: notify the registry, keep the old signatures verifiable as history. Here: a roll event signed by the *predecessor* key binding its successor; acts before the rotation still attribute to the same Member. This is the act re-keying cannot launder — the lineage is data, and every check that runs over Member identity follows it. |
 | **revocation** | the register's death or expulsion row. Here: a roll event that ends a key's standing (by judgment, by compromise, by departure); it verifies offline anywhere, so loss of standing travels (F-8). |
 | **accreditation** | licensing a foreign notary to act in this town. Here: the roll event that seats an **external Witness**, under the organic statute A-7 names — the statute is the only link to A-1, and the root signs no Witness, ever. |
-| **epoch checkpoint** | the sealed annual copy of the register. Here: the roll's head digest folded into the amendment record at a fixed cadence — the trust root anchors the roll's *continuity* by digest, without signing any Member in it. |
+| **epoch** | the registry's working year — the interval between sealed copies. Here: the fixed span (of time, or a count of roll events — a genesis constant, never a runtime knob) at which the community's root signs a checkpoint of the roll. Its length is a *spending policy for the root's attention*: shorter epochs anchor fresher but spend more amendment-class signatures; longer epochs lean on every Witness's retained head. |
+| **epoch checkpoint** | the sealed annual copy of the register. Here: the roll's head digest folded into the amendment record at each epoch — the trust root anchors the roll's *continuity* by digest, without signing any Member in it. It is the thing that answers *which chain is the roll* when a forker offers one that verifies against itself (the fork analysis and the verifier's walk: "Anchoring the roll", below). |
 | **session key** | a day pass, signed by your hand and countersigned by the building. Here: the ephemeral keypair the runtime already issues per session (rehearsed today), whose certificate gains the Member binding: the Enforcer attests the hosting, the Member attests the acting. |
 | **presentation** | the passport you carry — and, pointedly, what a passport is *not*: permission to do anything. Here: the portable bundle a Member shows another runtime — key, roll lineage up to an epoch checkpoint, record slices per the origin's annex. It answers *who*, never *what is permitted here* (F-6's two rules). |
 | **custody / recovery** | what happens when you lose your hand — you cannot; when you lose your key, you can. Here: the declared floor plus organic statute for key loss: a recovery quorum that re-admits the Member with a new key, weak enough to be survivable, strong enough not to be a laundering path. |
@@ -106,7 +107,10 @@ runtime" a lie. Hence a fourth tier beside the rehearsal's three:
 
 The root anchors the roll the way the law anchors the annex: by digest, at
 checkpoints, leaving every key in the roll signed into it by a *different*
-key than the root's. Nothing signs across a tier boundary.
+key than the root's. Nothing signs across a tier boundary. What anchoring
+*does* — the attacks it kills, the walk a Witness runs, why the cadence is
+a constant — is worked out in "Anchoring the roll", below, once the roll
+itself is defined.
 
 ## What a Member key IS
 
@@ -173,6 +177,81 @@ annex is a Subject), its sessions bind to *its* key, and R-13's "who that
 Member is (I-1)" answers cryptographically for accused and accuser alike.
 The machinery is species-blind (F-4); the composition's declaration says
 who holds it today, and the declaration is auditable.
+
+## Anchoring the roll: epochs, checkpoints, and the forker (I-1, I-7)
+
+A hash chain proves one thing — **continuity** — and a forger reads that
+specification as an invitation. Two attacks a chain alone cannot see:
+
+- **The fabrication**: a roll written whole by one hand — genesis,
+  admissions, rotations, every link consistent with the last — verifies
+  against itself perfectly. The session record already declares this
+  limit for itself (tamper-evident, not true from birth); the community
+  register inherits it at scale.
+- **The fork**: the *true* roll up to some head, then a divergent
+  continuation — an admission the statute never authorized, a rotation no
+  predecessor key signed. Chain verification passes on both sides of the
+  split, because both sides are chains.
+
+The question neither can answer is the one that matters: **which chain is
+the roll?** The checkpoint is the answer, and each of its parts is a
+defined thing:
+
+**An epoch is the interval between checkpoints** — a fixed span of time or
+a count of roll events, set in the genesis constants table, never chosen
+or tuned at runtime. Why fixed there: every checkpoint is an
+amendment-class act (the root's threshold signatures, spent through the
+one channel they lawfully ride — A-1's signed instruments, A-7's signed
+and digested statutes), so the cadence is a *spending policy for the root's
+attention*. Shorter epochs anchor fresher and spend more of it; longer
+epochs spend less and lean harder on each Witness's retained head (below).
+A policy that prices the root's attention belongs where the thresholds it
+serves live — genesis — and changes only organically (A-7).
+
+**A checkpoint is the roll's head digest, folded into an instrument of the
+amendment record at epoch close.** The instrument — verified k-of-n under
+the root like any amendment-adjacent artifact — carries `rollHead:
+<digest>` beside its own content; verifying it is law-artifact
+verification, the existing domain, with no new signature kind and no new
+trust relationship. The root's signature enters the identity layer exactly
+once per epoch, over a digest of the whole ledger state, and never over a
+Member, an admission, or a seat: the root's only verb here is *"the roll
+stood thus."* And the head alone is enough because the chain makes it a
+commitment to the entire prefix — every event back to genesis — so signing
+the head is signing the whole state without signing anything in it (a
+signed tag over a commit, for the git-literate: the tagger signs one hash,
+and every commit behind it is pinned).
+
+**The walk a Witness runs** — offline, without the Enforcer's cooperation
+and without the root's (I-7):
+
+1. verify the root's k-of-n signatures over the epoch instrument, and read
+   its `rollHead`;
+2. hash-walk the offered lineage until it lands on *exactly* that digest.
+
+Two outcomes, both honest. A roll that forked **before** the checkpoint
+cannot reach the anchored head — it is not the roll, refused dead on
+arrival, no judgment required. A roll that forked **after** it shows two
+continuations from one anchored head — a **visible split**, not a silent
+ambiguity: which side is lawful is a Part V question, and an annex found
+leaning on the fork its operator knew about is D-8's fraud, not a
+modeling disagreement.
+
+**Between epochs, freshness is every Witness's own.** From the last
+anchored head forward, integrity rides the chain; for state newer than
+the last epoch, a verifier anchors *itself* the way the session record
+already teaches — retain the head link last seen, and no rewrite can
+reconcile with what you kept (I-2's "detectable by anyone who kept a
+prior head link", one layer up). A verifier who retains nothing and skips
+epochs verifies exactly as far as it looked, and says so — trust is never
+claimed; it is shown.
+
+Where this honestly ends — the declared gap, restated where it bites: the
+checkpoint catches forks *of the roll*, not a genesis fabricated whole
+(root, statutes, roll, instruments, all in one hand). That bottoms out
+where the gap says it does: the real root's dispersal in the world, which
+is why A-1's keyholder classes and thresholds are ratification-time
+constants rather than anything a record could check for itself.
 
 ## Sessions bind to Members (the seam everything consumes)
 
@@ -266,8 +345,10 @@ the third thing neither can fake: *who*.
 1. the Member key — proof by signing, on demand, never by transmission;
 2. roll lineage — the chain segment from an epoch checkpoint to the
    Member's latest row, plus the checkpoint's anchor in the amendment
-   record: continuity verifiable offline (I-7), ending in a root the
-   verifier either honors or discounts *as a declared choice*;
+   record, verified by the walk above ("Anchoring the roll"): continuity
+   provable offline (I-7), bounded by design — nothing older than the
+   last epoch needs to travel — and ending in a root the verifier either
+   honors or discounts *as a declared choice*;
 3. record slices — per the origin's annex, through the verified-read path
    that already exists (R-2 discipline; the origin's declaration fixes what
    another runtime may verify, which is F-6's own sentence).
@@ -295,7 +376,7 @@ already requires gains one table. Rows this page contributes:
 |---|---|
 | the trust root itself | the A-1 keyholder set — who may hold amendment keys, across the three classes (Principals, long-lived Subjects, external Witnesses) — with threshold k-of-n and **distinct-keyholder** semantics |
 | key policy | algorithm floor for root and Member keys, key lifetimes, rotation cadence, and the root-key compromise procedure (revocation and re-rooting) |
-| epoch length | the checkpoint cadence at which the roll's head digest is folded into the amendment record |
+| epoch length | the checkpoint cadence — time span or roll-event count at which the roll's head digest is folded into the amendment record. It is the spending policy for the root's attention (fresher anchoring vs more amendment-class signatures), fixed in genesis beside the thresholds it serves, changed only organically (A-7) |
 | custody floor | the recovery quorum's floor for lost Member keys — above it, statute may tune; below it, no statute may go (a recovery path weaker than the floor is a laundering path) |
 | the trajectory term | the window within which the first external-Member adjudicator sits (J-8's "term fixed at ratification" — the judicature page's trajectory fields, given their genesis home) |
 
