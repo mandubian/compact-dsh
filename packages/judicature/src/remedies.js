@@ -155,7 +155,9 @@ function normalizeStanding(p) {
   if (p && typeof p === 'object') return { kind: p.kind ?? 'process', id: String(p.id) };
   return { kind: 'process', id: String(p) };
 }
-const describe = (p) => (p && typeof p === 'object' ? `${p.kind ?? 'process'}:${p.id}` : `process:${p}`);
+/** Describe a standing exactly as it normalizes — the refusal must name
+ *  the value the check actually parsed, never a re-guessed prefix. */
+const describe = (p) => { const n = normalizeStanding(p); return `${n.kind}:${n.id}`; };
 function isPartyStanding(c, p) {
   const n = normalizeStanding(p);
   return c.parties.some((x) => x.kind === n.kind && x.id === n.id);
