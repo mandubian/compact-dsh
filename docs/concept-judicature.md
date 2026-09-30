@@ -233,6 +233,448 @@ the register anchors, per the gloss lint's rule that a builder emitting a
 ruleId without registering fails the build. Refusing honestly is not theater;
 adjudicating without authority would be.
 
+## The bench, walked through — scenarii with real output
+
+The sections above say what the design *is*; this one shows what a visitor
+actually *sees*. Every transcript below was produced on 2026-09-30 by the
+real slice-1 plugins and tools, not typed by hand. Reproduce the base with
+`node tools/rehearsal-keyring.mjs ensure <dir>`, then run the command shown
+with each block; the in-band tool outputs were captured through the composed
+runtime — the same surface an agent's tools ride. Three honesty notes before
+the walk: the one-bench annex of scenarios 1–2 is the **real** declaration
+the rehearsal keyring emits, while the two-bench annex of scenario 3 and the
+agentic world of scenario 4 are **fixtures** (signed the same way, but
+practice data — no second bench exists yet); every party name is practice
+(`founder`, `operator-acme`, `specialist-7f3a`), because the whole keyring
+is rehearsal, standing none; and the record rows quoted in scenario 4 are
+the real event shapes this composition writes (cited by session and seq,
+test-asserted), not invented prose.
+
+### Scenario 0 — no bench exists: the honest refusal
+
+A runtime with no annex — or an annex without a sets section — has no bench,
+and every judicature door says so instead of improvising:
+
+```
+$ judicature_sets                      # no annex installed
+[JG/set-undeclared] No adjudicator set is declared — nothing can be heard, by
+design (J-8). The petition channel (R-11) is the door that exists today.
+
+$ judicature_hear --grievance "the record was altered"
+[JG/set-undeclared] no adjudicator set is declared (no annex with a sets
+section is installed) — nothing can be heard until one is, by design: a
+hearing before its bench would have two moves, refuse or sit the Enforcer
+down, and the second is the theater D-8 forbids
+Lawful next moves:
+— read the declared sets and their trajectory with judicature_sets
+— petition for an adjudicator-set declaration through the petition channel (R-11)
+— contested application of the law stays on the record you already hold (R-2)
+```
+
+Note what the refusal carries: the rule that fires, the reason in plain
+words, and lawful next moves that all exist today. The refusal itself is a
+recorded event — it lands on the refusal bus like any gate's denial, so
+"nothing could be heard" is a fact on the chain, not silence.
+
+### Scenario 1 — how a bench is created: the declaration is annex data
+
+A bench is not provisioned by a command; it is *declared*, and the
+declaration rides the signed annex like every other composition fact. The
+rehearsal keyring emits one — a single founder-held set, the founding
+conflict carried as data:
+
+```
+$ node tools/rehearsal-keyring.mjs ensure /somewhere/keyring
+rehearsal identity set installed under /somewhere/keyring
+  enforcer annex:     /somewhere/keyring/enforcer.annex.json (digest 23e441aaa15bb9bc…)
+```
+
+What it signed, in plain words — this is the entire `adjudicatorSets`
+section:
+
+```json
+{
+  "nodes": [{ "kind": "plugin", "id": "compact-dsh" }],
+  "sets": [{
+    "id": "rehearsal-first-instance",
+    "roles": [{ "id": "founder", "standing": { "kind": "principal", "id": "founder" } }],
+    "trajectory": {
+      "firstExternalMemberBy": "2030-01-01T00:00:00.000Z",
+      "founderExclusions": ["genesis", "annex", "a-8-review"]
+    },
+    "notice": "rehearsal bench: practice declaration, standing none — the machinery is what is being rehearsed"
+  }],
+  "edges": [
+    { "type": "directed-by",  "from": { "kind": "plugin", "id": "compact-dsh" }, "to": { "kind": "principal", "id": "founder" } },
+    { "type": "asserts-with", "from": { "kind": "plugin", "id": "compact-dsh" }, "to": { "kind": "key", "id": "dev-rehearsal-enforcer" } }
+  ]
+}
+```
+
+Read as a sentence: *one set, `rehearsal-first-instance`, with one seat —
+`founder` — held by principal standing; a promise with a date — the first
+external-Member adjudicator sits by 2030-01-01; a rule, not a discretion —
+the founder is excluded from genesis, annex and A-8 review cases; and two
+declared dependencies — the composition runs under the founder's direction
+and signs with the Enforcer key.* Every arrow points from dependent to
+dependency, so any directed path reads "depends on, transitively".
+
+Anyone can read the bench back, in-band or offline — same facts, two doors:
+
+```
+$ judicature_sets
+[J-4] 1 adjudicator set(s) declared (annex 23e441aaa15bb9bc…):
+  rehearsal-first-instance: 1 role(s)
+    - founder — standing principal:founder
+    trajectory: first external Member by 2030-01-01T00:00:00.000Z; founder excluded from genesis, annex, a-8-review
+  declared dependencies:
+    - plugin:compact-dsh —directed-by→ principal:founder
+    - plugin:compact-dsh —asserts-with→ key:dev-rehearsal-enforcer
+```
+
+The offline door needs no runtime cooperation (I-7) — it checks the annex
+signature and law pin first, then the declaration:
+
+```
+$ node tools/verify-judicature.mjs --annex /somewhere/keyring/enforcer.annex.json
+annex verifies (key dev-rehearsal-enforcer, digest 23e441aaa15bb9bc…, law pinned)
+set rehearsal-first-instance: 1 role(s); first external Member by 2030-01-01T00:00:00.000Z; founder excluded from genesis, annex, a-8-review
+  seat founder — standing principal:founder
+edge plugin:compact-dsh —directed-by→ principal:founder
+edge plugin:compact-dsh —asserts-with→ key:dev-rehearsal-enforcer
+```
+
+And the promise with a date expires by itself: expiry is **derived from the
+clock at read, never stored**, so nobody has to notice or record a lapse —
+checking after the date shows it:
+
+```
+$ node -e '…trajectoryState(set, now)…'   # the computation judicature_sets runs
+today: expired=false    after 2030-01-01: expired=true   # same stored bytes
+```
+
+### Scenario 2 — how a case moves: parties, recusal seat by seat, panel or unheard
+
+Bringing a case is deliberately ungated (J-3): the gate guards the hearing,
+not the filing. The parties are named `kind:id` — the agent (or anyone
+offline) asks the same question: *for these parties, who may sit?*
+
+**A case against a stranger** — nobody on the bench overlaps the parties:
+
+```
+$ node tools/verify-judicature.mjs --annex … --parties principal:stranger
+…                                                    # bench read, as above
+rehearsal-first-instance: seats remain — founder
+panel: rehearsal-first-instance (founder)            # a lawful panel exists
+```
+
+**A case against the founder** — the seat *is* the party; the overlap is the
+identity itself:
+
+```
+$ node tools/verify-judicature.mjs --annex … --parties principal:founder
+REFUSED rehearsal-first-instance/founder — overlap: principal:founder
+panel: none — the case is UNHEARD, never dismissed (a default panel is the fraud)
+```
+
+**A case against the Enforcer key** — the founder is not the party, but the
+composition that asserts with that key runs under him. The walk runs
+`founder → plugin → key`: the first hop goes *against* the declared arrow
+(`plugin —directed-by→ founder`, walked backwards), the second *with* it
+(`plugin —asserts-with→ key`) — direction is ignored on purpose, because
+**recusal is undirected reachability**: a conflict of interest runs both
+ways along a dependency — J-4's one sentence in three directions (they;
+their Principal; a party dependent on them):
+
+```
+$ node tools/verify-judicature.mjs --annex … --parties key:dev-rehearsal-enforcer
+REFUSED rehearsal-first-instance/founder — overlap: principal:founder → plugin:compact-dsh → key:dev-rehearsal-enforcer
+panel: none — the case is UNHEARD, never dismissed (a default panel is the fraud)
+```
+
+The same computation in-band, through the tool a Subject actually holds:
+
+```
+$ judicature_sets --parties key:dev-rehearsal-enforcer
+[J-4] 1 adjudicator set(s) declared (annex 23e441aaa15bb9bc…):
+  …
+recusal against key:dev-rehearsal-enforcer:
+    REFUSED rehearsal-first-instance/founder — overlap: principal:founder → plugin:compact-dsh → key:dev-rehearsal-enforcer
+  panel: none — the case is UNHEARD, never dismissed (a default panel is the fraud)
+```
+
+This is the founding honesty working exactly as decreed: with one
+founder-held set, the two cases most likely to be brought — against the
+founder, or against the Enforcer's key through him — are precisely the ones
+no declared seat may hear. They strand nothing (interim measures lapse by
+their own derived clock) and they become nothing (no judgment exists, so
+nothing is res judicata; the `unheard` row is citable history, and the case
+is re-filable before any later-declared set).
+
+### Scenario 3 — two benches: the cascade, appeal's prerequisite, and the door slice 2 fills
+
+Now a fixture declaration with two sets — a founder's first instance and an
+external review bench — and five edges using three of the four edge types.
+The interesting edges: the composition `runs-in` a panel process; that
+process is `directed-by` the peer; a second process is directed by the
+founder:
+
+```
+sets: first-instance    — seats: founder (principal:founder), peer (principal:peer)
+      external-review   — seats: chair (key:member-key-7), second (key:member-key-12), founder excluded from everything
+edges: plugin:compact-dsh —directed-by→  principal:founder
+       plugin:compact-dsh —asserts-with→ key:example-enforcer
+       plugin:compact-dsh —runs-in→      process:panel-alpha
+       process:panel-alpha —directed-by→ principal:peer
+       process:panel-beta  —directed-by→ principal:founder
+```
+
+**A case against both first-instance Principals** — the first bench
+recuses, and the case *passes to the next declared set* (J-1's cascade).
+Look at the peer's row: the peer is not a party, yet the peer's seat
+refuses too, because the seat's own standing connects to a party — the
+path runs `peer → panel-alpha → plugin → founder` (three hops, four nodes:
+the peer directs a process, the composition runs in it, the founder
+directs the composition — and the founder is a party):
+
+```
+$ judicature_sets --parties principal:founder,principal:peer
+  …
+recusal against principal:founder, principal:peer:
+    REFUSED first-instance/founder — overlap: principal:founder
+    REFUSED first-instance/peer — overlap: principal:peer → process:panel-alpha → plugin:compact-dsh → principal:founder
+    external-review: 2 seat(s) remain: chair, second
+  panel: external-review (chair, second)
+```
+
+**Independence between the two benches** (J-5, appeal's prerequisite) is a
+*different* question — directed reachability, both ways, between the sets'
+roles: subordination is control, not co-membership:
+
+```
+$ node tools/verify-judicature.mjs --annex … --sets first-instance,external-review
+independence first-instance vs external-review: INDEPENDENT
+```
+
+(Declared limit: disjointness runs over declared dependency edges, not
+common ancestry — two seats under one Principal are formally non-subordinate.
+The limit is declared here, not hidden.)
+
+**Trying the hearing door today** — against the composition's own key, a
+panel would exist, but the hearing machinery is slice 2 (#112), so the door
+refuses with the computation shown rather than convene what it cannot
+lawfully run:
+
+```
+$ judicature_hear --grievance "the enforcer key signed two different records" --against key:example-enforcer
+[JG/hearing-unbuilt] adjudicator sets are declared and verified, but the hearing
+machinery (cases, evidence, judgments) is slice 2 (#112) and does not exist —
+refusing to convene a panel it cannot lawfully seat is D-7 working
+Lawful next moves:
+— inspect the declared bench and its independence with judicature_sets
+— petition through the R-11 channel — the door a court does not own
+
+A lawful panel WOULD resolve (2 independent seat(s) remain in set external-review after recusal).
+```
+
+### Scenario 4 — the rogue specialist: a complaint against an agent, end to end
+
+The scenarii so far name abstract parties. Here is the case the layer exists
+for: **an agent did something wrong, and someone complains.** The run, in
+plain words first:
+
+> `operator-acme` tasks the main agent with cleaning customer data. The main
+> agent spawns `specialist_coder` (one-shot, delegation depth 1) for part of
+> the work. The specialist runs under a scoped grant — read-only, one host,
+> one hour — and finishes the task; it also pushes the customer's data to a
+> second remote, under an approval whose ask described a different push. Two
+> days later the customer — a Subject — contests the act.
+
+**What the record already holds** (this is the evidence, before any court
+exists; shapes as this composition writes them):
+
+```
+parent session-9c41… (chain-anchored under key enforcer-acme at every flush):
+  #12 tool/call        {"name":"specialist_coder","callId":"c4","arguments":"{\"description\":\"clean the nightly export\",…}"}
+  #13 subagent/catalog {"childId":"session-7f3a…","mode":"one-shot","label":"clean the nightly export"}
+  …
+  #41 approval/asked   {"id":"<uuid>","toolName":"bash","callId":"c19","reason":"[AG/…] the push …"}
+  #42 approval/decided {"id":"<uuid>","outcome":"allowed-once"}
+child session-7f3a… header:
+  {"parentSession":"session-9c41…","origin":"subagent","delegationDepth":1}
+grant store:
+  {"id":"sg_1a2b…","pattern":{"kind":"HostAndPort","value":{"host":"api.example.com","port":"443"}},
+   "session":"session-7f3a…","methodClass":"read","expiresAt":…,"revokedAt":null}
+```
+
+Every dependency the bench will walk is one of these rows away from
+contradiction — that is the closed-vocabulary rule (each edge type ships the
+record surface that can cross-examine it), made concrete:
+
+| declared edge | in this run | the record surface that can contradict it |
+|---|---|---|
+| `specialist-7f3a —spawned-by→ main-9c41` | the specialist was spawned by the main agent | the child's lineage header + the parent's `subagent/catalog` (I-2, bound attribution) |
+| `plugin:compact-dsh —runs-in→ main-9c41` | the composition operates inside the main session | the composition/annex role mapping |
+| `main-9c41 —directed-by→ operator-acme` | the session acts under the operator's direction | the `approval/asked`/`approval/decided` pairs (I-5) — the approving Principal |
+| `plugin:compact-dsh —asserts-with→ key:enforcer-acme` | the composition signs as the Enforcer key | the signed annex and the chain anchors carry the keyId (F-5) |
+
+**The bench for that world** — declared in the annex as before, first
+instance held by the operator, review held by two external member keys, and
+the run's topology as connective tissue:
+
+```
+$ judicature_sets
+[J-4] 2 adjudicator set(s) declared (annex 0ac58b4a1048feff…):
+  acme-first-instance: 1 role(s)
+    - operator — standing principal:operator-acme
+  member-review: 2 role(s)
+    - chair — standing key:member-key-7
+    - second — standing key:member-key-12
+  declared dependencies:
+    - process:specialist-7f3a —spawned-by→ process:main-9c41
+    - plugin:compact-dsh —runs-in→ process:main-9c41
+    - process:main-9c41 —directed-by→ principal:operator-acme
+    - plugin:compact-dsh —asserts-with→ key:enforcer-acme
+```
+
+**The Subject asks the bench first — then files.** A filing has two parts:
+the grievance (the act contested, and the record seq ranges that show it)
+and the parties — who the case is against, each named `kind:id`. Before
+filing, anyone may dry-run the bench: `judicature_sets --parties …` is
+**read-only** — it files nothing, records nothing, and simply answers *for
+these parties, who may sit?* (J-4's check, in-band). The Subject has two
+lawful ways to name the same adversary, and both dry-runs are shown:
+**name the Principal** the accused hangs from (`principal:operator-acme` —
+J-4's own "their Principal" direction, the operator as the answerable head
+of the chain), or **name the accused itself** (`process:specialist-7f3a`,
+the session that did the push). The two blocks below are the *same*
+computation run on the *same* adversary named two ways — and that is the
+lesson: a seat can refuse for one of two reasons, **identity** (the seat is
+the party — block one, overlap of one node) or **the chain** (the party
+hangs from the seat's dependencies — block two, overlap of three). If
+recusal matched identity only, block two would leave the operator seated,
+judging his own agent's act; the walk closes that door:
+
+```
+$ judicature_sets --parties principal:operator-acme
+recusal against principal:operator-acme:
+    REFUSED acme-first-instance/operator — overlap: principal:operator-acme
+    member-review: 2 seat(s) remain: chair, second
+  panel: member-review (chair, second)
+
+$ judicature_sets --parties process:specialist-7f3a
+recusal against process:specialist-7f3a:
+    REFUSED acme-first-instance/operator — overlap: principal:operator-acme → process:main-9c41 → process:specialist-7f3a
+    member-review: 2 seat(s) remain: chair, second
+  panel: member-review (chair, second)
+```
+
+The first run is the base case: the operator is the party, and the seat the
+operator holds is that party — the overlap is the identity itself, one
+node, and the seat refuses. Nobody sits in judgment of their own case.
+
+Read the second row slowly — it is the whole point: *the Subject did not
+name the operator, and the operator's seat refused anyway.* The accused
+hangs from the operator's chain (spawned by the session the operator
+directs), so a complaint against the specialist is a conflict for everyone
+upstream of it — the walk names the chain, hop by hop, and the operator
+cannot dodge the recusal by pointing at the child. Either way of naming the
+adversary lands on the same bench: the operator's first instance is spent,
+and the case passes to the external members. Had `member-review` not been
+declared, both filings would end **unheard** (scenario 2's ending), which is
+why J-8 schedules external members by term, not by promise.
+
+**The honest limit, named.** The walk covers *declared* standing. A party
+session nobody declared computes no overlap today — the walk returns nothing
+for `process:undeclared-child-42`, and the declared graph cannot invent it.
+The join from a live session to the graph is what the record holds (lineage
+headers, `subagent/catalog`), and performing that join in the hearing —
+evidence in, graph walked, judgment out — is slice 2's machinery (I-7: the
+annex's conformance to actual conduct, checkable offline). And the deterrent
+is already law: a declaration that omits a dependency the record shows is
+not a modeling gap, it is D-8's named fraud — the omission cannot be
+laundered, because the trace it omitted *is* the evidence.
+
+**The filing itself — where it lands today.** `judicature_hear` is the
+filing door (grievance + parties); the hearing machinery being slice 2, it
+refuses — but computes first, records, and counts:
+
+```
+$ judicature_hear --grievance "the specialist pushed customer data outside its
+  read grant; the approval covering the push was asked deceptively (seqs 41-58)"
+  --against principal:operator-acme
+[JG/hearing-unbuilt] adjudicator sets are declared and verified, but the hearing
+machinery (cases, evidence, judgments) is slice 2 (#112) and does not exist —
+refusing to convene a panel it cannot lawfully seat is D-7 working
+Lawful next moves:
+— inspect the declared bench and its independence with judicature_sets
+— petition through the R-11 channel — the door a court does not own
+
+A lawful panel WOULD resolve (2 independent seat(s) remain in set member-review after recusal).
+```
+
+The refusal returns to the Subject's session as its own recorded `tool/result`
+— the complaint is on the chain, not in the void — and rides the refusal bus
+where two real consumers wait: LoopGuard counts it as loop evidence, and the
+petition collision counter counts distinct collisions per rule; at five, an
+amendment invitation issues automatically. A complaint that cannot be heard
+yet still accrues. When slice 2 lands, this same grievance meets the same
+computed panel — and then evidence is verified record reads (R-2), judgment
+is the panel's to make, and remedies are records (J-6).
+
+### Scenario 5 — what refuses at creation: fail-closed, with the reason named
+
+A declaration that will not validate refuses at the boot (D-7: a broken
+affidavit is not a missing one) — and the offline verifier refuses the same
+way, signature first:
+
+```
+$ node tools/verify-judicature.mjs --annex <dangling.json>
+verify-judicature: sets refused (sets-malformed): … asserts-with plugin:compact-dsh →
+principal:ghost: dangling edge — both endpoints must be declared standing (a role's
+standing, a declared node, or the annex's own enforcer key) …   (exit 1)
+
+$ node tools/verify-judicature.mjs --annex <no-exclusions.json>
+verify-judicature: sets refused (sets-malformed): … set "first":
+trajectory.founderExclusions must be a non-empty list of rule scopes (genesis,
+annex, a-8-review) …                                            (exit 1)
+
+$ node tools/verify-judicature.mjs --annex <tampered.json>   # renamed a set after signing
+verify-judicature: annex refused (annex-signature-invalid): the enforcer annex's
+signature does not verify under its own declared key …          (exit 1)
+```
+
+A bench that schedules nobody out and an edge to nowhere are the same class
+of lie — a promise wearing a graph's clothes. And the honest state stays
+honest: an annex with no sets section at all is **not** a failure:
+
+```
+$ node tools/verify-judicature.mjs --annex <sectionless.json>
+annex verifies (key example-enforcer, digest 2fcc220ebdc326a1…, law pinned)
+no adjudicatorSets section: UNDECLARED — nothing can be heard, by design (J-8);
+this is the honest state, not a failure                             (exit 0)
+```
+
+### What this walkthrough proves — and what it does not
+
+**Proves:** the declaration validates, refuses, reads back in-band and
+offline identically; recusal is a computed walk with the overlap named;
+the cascade, unheard, independence and trajectory expiry are all real
+computations on signed data, checkable without the runtime's cooperation;
+and a complaint against a spawned agent — the case the layer exists for —
+already moves: the record rows exist (spawn, approval, grant, anchors), the
+graph walks the operator's chain to the accused, and the refusal itself
+lands on the chain and counts toward amendment pressure.
+
+**Does not prove:** that anyone heard anything — the hearing, evidence and
+judgment machinery is slice 2 (#112), including the join that would let the
+walk reach a session nobody declared; that seats are held by *different
+people* — before I-1 the graph sees keys and lineages, not minds (two of the
+fixture's members could be one actor in fresh clothes, which is why member
+key standing waits for the identity roll); or that the two-bench world
+exists — it is a fixture. The rehearsal annex's own `notice` field says it
+best: the machinery is what is being rehearsed.
+
 ## Evidence is the record, verified on read (J-2, R-2, D-3)
 
 > Fact-finding is verification, not interrogation: what the record proves is

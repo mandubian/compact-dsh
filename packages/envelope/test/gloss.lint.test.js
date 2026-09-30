@@ -45,13 +45,14 @@ const GATE_PACKAGES = {
   CG: ['packages/capability-gate/src'],
   CS: ['packages/specialists/src'],
   PT: ['packages/petition/src'],
+  JG: ['packages/judicature/src'],
 };
 
 // package → default gate for files without their own GATE constant
 const PACKAGE_GATE = {
   approval: 'AG', 'allowlist-gate': 'AG', 'remote-access': 'RA', loopguard: 'LG',
   'egress-proxy': 'EG', promotion: 'PG', 'capability-gate': 'CG', petition: 'PT',
-  specialists: 'CS', blessed: 'CF', 'sandbox-docker': null, // per-file GATE consts
+  specialists: 'CS', blessed: 'CF', judicature: 'JG', 'sandbox-docker': null, // per-file GATE consts
 };
 
 // a rule id is word characters, hyphens and slashes — this filters the other
@@ -258,6 +259,7 @@ const PACKAGE_REGISTER_PLUGINS = {
   promotion: ['compact-promotion'],
   'capability-gate': ['compact-capability-gate'],
   petition: ['compact-petition'],
+  judicature: ['compact-judicature'],
   specialists: ['compact-specialists', 'compact-dsh-specialists'],
   blessed: ['compact-dsh-blessed'],
   'sandbox-docker': ['compact-sandbox-docker'],

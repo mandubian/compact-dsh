@@ -258,6 +258,34 @@ Semantics decisions (reviewed, each with a regression test):
 - **Witness**: `auditor/` offline CLI; external Witnesses per A-1 trust
   root (does not exist yet — J-8 deficiency, disclosed).
 
+### 3a. Adjudicator sets (J-8 → J-4, declared)
+
+The hearing layer's first slice is declared, not prose: the signed annex
+carries the set declaration as data, and `tools/verify-judicature.mjs`
+cross-examines it offline the way any Witness may (I-7). The rehearsal
+declaration (standing: none, like everything under this keyring):
+
+| Declared | Shape |
+|---|---|
+| set `rehearsal-first-instance` | one role — `founder`, standing `principal:founder` |
+| trajectory | first external-Member adjudicator by 2030-01-01 (expiry derived from the clock at read, never stored); founder excluded by rule from genesis, annex, A-8 reviews |
+| declared dependencies | the composition `plugin:compact-dsh` is directed-by `principal:founder` and asserts-with `key:dev-rehearsal-enforcer` |
+
+The founding conflict is therefore computable, which is the point: a case
+against the founder, or against the composition's own key through it,
+recuses the only declared seat and the case is recorded **unheard** — never
+dismissed, never defaulted (J-1). Until a second, disjoint set exists there
+is no appellate authority either (J-5); and no seat can be a witness until
+identity keys exist (I-1). This is J-8's "known deficiency, not a
+principle": carried as data, on a schedule, checkable by anyone.
+
+The whole walk — how the declaration is created and read back, how a case
+moves seat by seat to a panel or to unheard, how the cascade and the
+independence check behave with two benches, and what refuses at creation —
+is shown with real captured output in
+[concept-judicature.md](../docs/concept-judicature.md) ("The bench, walked
+through").
+
 ## 4. Trust-model honesty
 
 The dsh host is unaudited, pre-1.0, and in-process; the enforcement here is
