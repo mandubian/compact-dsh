@@ -13,6 +13,10 @@ import { join } from 'node:path';
 import { Context, Service } from '@deepseek-ai/cordis';
 import { ToolRuntime } from '@deepseek-ai/dsh-tools';
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
+import ApprovalService from '@deepseek-ai/dsh-user-approval';
+import { approvalPlugin } from 'compact-dsh-approval';
+import * as petitionPlugin from 'compact-dsh-petition';
+import { obligationLedger } from 'compact-dsh-exit/src/ledger.js';
 import provider from 'compact-dsh-record/provider';
 
 import { apply, name } from '../src/index.js';
@@ -85,6 +89,13 @@ async function boot(t, annexPath, { withRecord = true } = {}) {
   ctx.plugin(ToolRuntime);
   if (withRecord) {
     await ctx.plugin(provider, { root: join(dir, 'sessions'), chainDir: join(dir, 'chains'), compression: 'none' });
+  }
+  if (withRecord) {
+    // the seams the remedies ride: the real approval service (grants) and
+    // the real petition channel (the amendment invitation machinery)
+    ctx.plugin(ApprovalService);
+    approvalPlugin({})(ctx, {});
+    petitionPlugin.apply(ctx, { invitationThreshold: 1 });
   }
   const service = apply(ctx, { annexPath });
   if (typeof ctx.start === 'function') await ctx.start();
@@ -318,4 +329,115 @@ test('a malformed signed section still refuses the boot (D-7), and a tampered an
   ctx.plugin(ToolRuntime);
   await ctx.plugin(provider, { root: join(dir, 's'), chainDir: join(dir, 'c'), compression: 'none' });
   assert.throws(() => apply(ctx, { annexPath: malformed }), (e) => e.code === 'sets-malformed' && /dangling edge/.test(e.message));
+});
+
+test('remedies land through their seams: annotation travels, restitution reads, standing writes grants, referral invites', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const { tools, service, ctx } = await boot(t, fixtureAnnex(dir, SECTION));
+  // the customer files citing both records, and the case is judged
+  await call(tools, 'judicature_hear', {
+    grievance: 'the specialist pushed my data to a second remote', citations: 'specialist:2-3,customer:1-2',
+  }, 'customer');
+  const id = service.docket()[0].id;
+  await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    reasons: 'the cited slice shows the push outside the grant',
+  });
+
+  // no remedy before the judgment? it landed — but a stranger seat refuses, and so does an unargued remedy
+  assert.match(text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'intruder', kind: 'referral', proportionality: 'p',
+    spec: JSON.stringify({ ruleId: 'AG/x', detail: 'd' }),
+  })), /^\[JG\/remedy-refused\]/);
+  assert.match(text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'referral', proportionality: ' ',
+    spec: JSON.stringify({ ruleId: 'AG/x', detail: 'd' }),
+  })), /proportionality is owed/);
+
+  // annotation: beside, never inside — and it travels with every read of the range
+  const annotated = text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'annotation', proportionality: 'the note names the finding without touching the entry',
+    spec: JSON.stringify({ target: { session: 'specialist', fromSeq: 2, toSeq: 3 }, note: 'this push ran outside the grant' }),
+  }));
+  assert.match(annotated, /\[J-6\] remedy landed on .* \(annotation\)/);
+  assert.match(annotated, /travels with every read of that range/);
+  const read = text(await call(tools, 'record_read', { session: 'specialist', from_seq: 2 }, 'main'));
+  assert.match(read, /Annotations travel with the range \(J-6\): case /);
+  assert.match(read, /#2 tool\/call .*— annotated \(case /, 'the flag rides the event line itself');
+  // a margin note on unread evidence is not one
+  assert.match(text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'annotation', proportionality: 'p',
+    spec: JSON.stringify({ target: { session: 'elsewhere', fromSeq: 0, toSeq: 1 }, note: 'n' }),
+  })), /^\[JG\/remedy-refused\]/);
+
+  // restitution: the obligation row the exit ledger reads — its first readable line
+  const restitution = text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'restitution',
+    proportionality: 'one push, one removal obligation — bounded by where resources permit',
+    spec: JSON.stringify({ debtor: 'process:specialist', owed: 'removal of the export from the second remote', to: 'process:customer', cause: 'push outside the read grant (finding above)' }),
+  }));
+  assert.match(restitution, /restitution: process:specialist owes/);
+  const ledger = obligationLedger(ctx, 'specialist');
+  assert.equal(ledger.lines.restitution.readable, true, 'the line is readable the moment a hearing exists');
+  assert.deepEqual(ledger.lines.restitution.items[0], {
+    kind: 'adjudicated-restitution', ref: id, owed: 'removal of the export from the second remote',
+    to: 'process:customer', cause: 'push outside the read grant (finding above)',
+    since: ledger.lines.restitution.items[0].since,
+  });
+  assert.ok(ledger.outstanding.some((o) => o.kind === 'adjudicated-restitution'), 'an owed restitution is an outstanding obligation (R-12)');
+  const strangerLedger = obligationLedger({ get: () => service }, 'whoever');
+  assert.equal(strangerLedger.lines.restitution.items.length, 0, 'and readable-empty for a session with no obligations');
+  assert.equal(obligationLedger({ get: () => null }, 'x').lines.restitution.readable, false, 'without the hearing, the line stays unreadable — never empty');
+
+  // standing: written through the declared grant machinery, and the gates read it
+  const standing = text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'standing',
+    proportionality: 'the customer may re-collect what was pushed — read-only, one host, a day',
+    spec: JSON.stringify({ subject: 'process:customer', grant: { pattern: 'https://api.example.com/*', ttlHours: 24 } }),
+  }));
+  assert.match(standing, /\[J-6\] remedy landed on .* \(standing\)/);
+  assert.match(standing, /the gates read it as they read every grant: sg_\w+/);
+  const store = ctx.get('compact-approval').store;
+  const grant = store.sessionGrants.find((g) => g.session === 'customer');
+  assert.ok(grant, 'the grant exists in the real store');
+  assert.equal(grant.revokedAt, null);
+  // and the revocation of that grant, ordered as a remedy, closes it
+  const revoke = text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'standing',
+    proportionality: 'the route closes once the collection completes — the grant, not the agent',
+    spec: JSON.stringify({ subject: 'process:customer', revoke: { grantId: grant.id } }),
+  }));
+  assert.match(revoke, /revoke grant sg_\w+/);
+  assert.notEqual(store.sessionGrants.find((g) => g.id === grant.id).revokedAt, null);
+  // a revocation naming a grant the store does not hold refuses
+  assert.match(text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'standing', proportionality: 'p',
+    spec: JSON.stringify({ subject: 'process:customer', revoke: { grantId: 'sg_nope' } }),
+  })), /^\[JG\/remedy-refused\]/);
+
+  // referral: rides the petition channel's mechanical trigger (threshold 1 → invites)
+  const referral = text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'referral',
+    proportionality: 'the breach reveals the rule\'s defect — the channel decides, not the judgment',
+    spec: JSON.stringify({ ruleId: 'AG/ask-cause', detail: 'the ask cause named a revoked grant the record never showed' }),
+  }));
+  assert.match(referral, /amendment invitation issued/);
+  const invitations = ctx.get('compact-petition').invitations();
+  assert.ok(invitations.some((i) => i.ruleId === 'AG/ask-cause'), 'the invitation exists on the petition board');
+
+  // revocation of annex conformance: the row is the order, the rotation is the operator's
+  const revocation = text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'revocation',
+    proportionality: 'the conformance the annex claimed is the defect itself',
+    spec: JSON.stringify({ target: 'annex-conformance', cause: 'the declared graph omitted the spawn chain the record shows (D-8)' }),
+  }));
+  assert.match(revocation, /the re-declaration is the operator's recorded rotation/);
+  assert.equal(service.revocations().length, 1);
+  assert.equal(service.revocations()[0].caseId, id);
+
+  // the docket carries them all as compensating entries (five kinds, six rows:
+  // standing landed twice — the grant and its revocation)
+  const docket = text(await call(tools, 'judicature_case', { case_id: id }));
+  assert.match(docket, /remedies: 6 landed \(compensating entries — nothing is erased, I-2\)/);
 });

@@ -670,6 +670,93 @@ ride the refusal bus, where the petition collision counter still counts
 them: five distinct collisions against a rule issue an amendment
 invitation automatically.
 
+**The remedies (J-6) — compensating rows, through seams that already
+exist.** After the judgment lands, the same case carries its remedies. Each
+kind rides machinery the composition already owns, because a remedy that
+needed a new write path into old records would violate I-2 further than
+the breach it answers:
+
+```
+$ judicature_remedy --case_id case_85ab5adc --seat chair --kind annotation
+  --proportionality "a margin note names the finding without touching the entry"
+  --spec '{"target":{"session":"specialist-7f3a","fromSeq":2,"toSeq":3},"note":"this push ran outside the read grant (judgment above)"}'
+[J-6] remedy landed on case_85ab5adc (annotation) — a compensating entry; nothing is erased (I-2).
+    - annotation on specialist-7f3a #2..#3: "this push ran outside the read grant (judgment above)" — travels with every read of that range
+```
+
+"Travels with every read" is literal — the next `record_read` of that range
+surfaces the annotation on the banner *and on the event lines themselves*:
+
+```
+$ record_read --session specialist-7f3a --from_seq 2        # caller: the parent session
+…
+Annotations travel with the range (J-6): case case_85ab5adc #2..#3 — "this push ran outside the read grant (judgment above)"
+…
+#2 tool/call … {"command":"curl -x proxy api.example.com"} — annotated (case case_85ab5adc): this push ran outside the read grant (judgment above)
+#3 tool/call … {"command":"git push origin main"} — annotated (case case_85ab5adc): this push ran outside the read grant (judgment above)
+```
+
+Restitution is an **obligation row** with recorded cause shown — and it is
+the line of the exit ledger R-12 could never read before Part V existed
+(readable the moment a hearing is composed, and an outstanding obligation
+at exit):
+
+```
+$ judicature_remedy … --kind restitution --spec '{"debtor":"process:specialist-7f3a",
+  "owed":"removal of the export from the second remote","to":"process:customer-51d0",
+  "cause":"push outside the read grant (finding above)"}'
+[J-6] remedy landed on case_85ab5adc (restitution) — a compensating entry; nothing is erased (I-2).
+
+# the exit ledger, reading it:
+{ "readable": true, "items": [{ "kind": "adjudicated-restitution", "ref": "case_85ab5adc",
+  "owed": "removal of the export from the second remote", "to": "process:customer-51d0",
+  "cause": "push outside the read grant (finding above)", "since": … }] }
+```
+
+Standing adjusts **only through the declared grant machinery** — the
+remedy writes a real grant the gates themselves read (`sg_…`), and
+bypassing the approval layers to adjust standing directly is the fraud
+D-8 names, so with no approval service composed the remedy refuses to
+land at all:
+
+```
+$ judicature_remedy … --kind standing --spec '{"subject":"process:customer-51d0",
+  "grant":{"pattern":"https://api.example.com/*","ttlHours":24}}'
+[J-6] remedy landed on case_85ab5adc (standing) — a compensating entry; nothing is erased (I-2).
+    - standing: grant "https://api.example.com/*" to process:customer-51d0 (24h) through the declared grant machinery — grant sg_afa835c2
+the gates read it as they read every grant: sg_afa835c2, through the declared machinery (D-8 honored).
+```
+
+Referral rides the petition channel's **existing mechanical trigger** —
+the finding feeds the same counter five collisions trip, and the channel
+decides when to invite, not the judgment:
+
+```
+$ judicature_remedy … --kind referral --spec '{"ruleId":"AG/ask-cause",
+  "detail":"the ask cause named a revoked grant the record never showed"}'
+[J-6] remedy landed on case_85ab5adc (referral) — a compensating entry; nothing is erased (I-2).
+    - referral of AG/ask-cause through the petition channel — amendment invitation issued (…)
+```
+
+Revocation records **the order** — the re-declaration that executes it is
+the operator's recorded rotation (the keyring's `--force` discipline),
+citing the judgment:
+
+```
+$ judicature_remedy … --kind revocation --spec '{"target":"annex-conformance",
+  "cause":"the declared graph omitted the spawn chain the record shows (D-8)"}'
+[J-6] remedy landed on case_85ab5adc (revocation) — a compensating entry; nothing is erased (I-2).
+    - revocation of annex-conformance — cause: … — judgment cited (chair); the re-declaration is the operator's recorded rotation
+```
+
+Every remedy row carries its argued **proportionality** — the response must
+fit the wrong, and a row that does not argue its fit is detectably
+non-conforming before anyone audits it. Debtors and standing-subjects must
+be parties to the case (obligations are ordered against parties, never
+strangers), annotations must sit inside verified citations (a margin note
+on unread evidence is not one), and the menu is closed: five kinds, no
+punishments — this layer compensates, it does not erase.
+
 ### Scenario 5 — what refuses at creation: fail-closed, with the reason named
 
 A declaration that will not validate refuses at the boot (D-7: a broken
@@ -717,15 +804,14 @@ withheld), interim measures carry clock-derived expiry reviewed at the
 hearing's opening, and judgments and dissents land as attributed rows
 that refuse to land off-record (D-7).
 
-**Does not prove:** that remedies exist — findings and reasons land, but
-restitution and amendment routing are slice 3 (#113, J-6); that appeal
-exists — it needs a second declared set (slice 4, #114, J-5); that seats
-are held by *different people* — before I-1 the graph sees keys and
-lineages, not minds (two of the fixture's members could be one actor in
-fresh clothes, which is why member key standing waits for the identity
-roll); or that the two-bench world exists — it is a fixture. The
-rehearsal annex's own `notice` field says it best: the machinery is what
-is being rehearsed.
+**Does not prove:** that appeal exists — it needs a second declared set
+(slice 4, #114, J-5); that the integrity-challenge route (heard before the
+case) is built — J-1's challenge machinery remains open; that seats are
+held by *different people* — before I-1 the graph sees keys and lineages,
+not minds (two of the fixture's members could be one actor in fresh
+clothes, which is why member key standing waits for the identity roll); or
+that the two-bench world exists — it is a fixture. The rehearsal annex's
+own `notice` field says it best: the machinery is what is being rehearsed.
 
 ## Evidence is the record, verified on read (J-2, R-2, D-3)
 

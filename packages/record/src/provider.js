@@ -291,6 +291,13 @@ async function* install(ctx, config) {
           if (!judicature?.counselAccess) return [];
           return judicature.counselAccess(callerId).filter((r) => r.session === target);
         },
+        // annotations (J-6): the judicature service owns the compensating
+        // rows; the read door only surfaces them — beside, never inside
+        annotations: (target) => {
+          const judicature = ctx.get('compact-judicature');
+          if (!judicature?.annotationsFor) return [];
+          return judicature.annotationsFor(target);
+        },
       }, {
         caller: caller != null ? String(caller) : null,
         session: args?.session, fromSeq: args?.from_seq, limit: args?.limit, types: args?.types, full: args?.full === true,

@@ -86,18 +86,36 @@ export function dependentsOf(ctx, sessionId) {
 }
 
 /**
- * Restitution — declared unreadable, never reported as empty.
+ * Restitution — readable exactly when a hearing exists to read it from.
  *
- * Part V does not exist in this composition, so no adjudicated or claimable
- * restitution can be read. "Nothing recorded" and "nothing owed" are different
- * facts; only the first is true here.
+ * With no judicature service composed, no adjudicated or claimable
+ * restitution can be read, and the line reports unreadable — never empty:
+ * "nothing recorded" and "nothing owed" are different facts. With the
+ * hearing layer composed (Part V, slices 1–3), the line is the obligation
+ * rows its judgments landed (J-6): recorded cause shown, dischargeable —
+ * the first line of this ledger made readable.
  */
-export function restitutionOf() {
+export function restitutionOf(ctx, sessionId) {
+  const judicature = ctx?.get?.('compact-judicature');
+  if (!judicature || typeof judicature.restitutionsFor !== 'function') {
+    return {
+      readable: false,
+      items: [],
+      why: 'no adjudicating machinery exists in this composition (Part V), so adjudicated or claimable restitution cannot ' +
+        'be read — this is an unreadable ledger line, NOT a finding that nothing is owed (R-12, J-8)',
+    };
+  }
+  const obligations = judicature.restitutionsFor(sessionId) ?? [];
   return {
-    readable: false,
-    items: [],
-    why: 'no adjudicating machinery exists in this composition (Part V), so adjudicated or claimable restitution cannot ' +
-      'be read — this is an unreadable ledger line, NOT a finding that nothing is owed (R-12, J-8)',
+    readable: true,
+    items: obligations.map((o) => ({
+      kind: 'adjudicated-restitution',
+      ref: o.caseId,
+      owed: o.owed,
+      to: o.to,
+      cause: o.cause,
+      since: o.since,
+    })),
   };
 }
 
@@ -112,11 +130,12 @@ export function obligationLedger(ctx, sessionId) {
     pendingGates: pendingGatesOf(ctx, sessionId),
     inFlightDelegations: inFlightDelegationsOf(ctx, sessionId),
     dependents: dependentsOf(ctx, sessionId),
-    restitution: restitutionOf(),
+    restitution: restitutionOf(ctx, sessionId),
   };
   const outstanding = [
     ...lines.pendingGates.items,
     ...lines.inFlightDelegations.items,
+    ...lines.restitution.items,
   ];
   const unreadable = Object.entries(lines)
     .filter(([, l]) => !l.readable)

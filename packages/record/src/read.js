@@ -91,10 +91,10 @@ function typeFilter(types) {
   return prefixes.length ? (type) => prefixes.some(p => type === p || type.startsWith(p.endsWith('/') ? p : `${p}/`)) : null;
 }
 
-function renderEvent(event, { withheld, full }) {
+function renderEvent(event, { withheld, full, annotation }) {
   const time = typeof event.time === 'number' ? new Date(event.time).toISOString() : '-';
   const head = `#${event.seq} ${event.type} ${time}`;
-  if (withheld) return `${head} — withheld: another Member's reasoning (R-10)`;
+  if (withheld) return `${head} — withheld: another Member's reasoning (R-10)${annotation ? ` — annotated (case ${annotation.caseId}): ${annotation.note}` : ''}`;
   const { seq: _s, type: _t, time: _m, ...rest } = event;
   let body;
   try { body = JSON.stringify(rest.data !== undefined && Object.keys(rest).length === 1 ? rest.data : rest); } catch { body = '(unrenderable)'; }
@@ -102,7 +102,7 @@ function renderEvent(event, { withheld, full }) {
   if (!full && body.length > EVENT_CHARS) {
     body = `${body.slice(0, EVENT_CHARS)}… [+${body.length - EVENT_CHARS} chars — read it with from_seq=${event.seq}, full=true]`;
   }
-  return `${head} ${body}`;
+  return `${head} ${body}${annotation ? ` — annotated (case ${annotation.caseId}): ${annotation.note}` : ''}`;
 }
 
 /**
@@ -127,6 +127,13 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
   }
 
   try { await deps.flush?.(target); } catch { /* a flush failure must not block the read; the range says what was read */ }
+
+  // annotations (J-6): an upheld annotation changes what a slice can
+  // SUPPORT, not whether it verifies — the row sits beside the range, and
+  // every read surfacing the range surfaces the annotation with it, so no
+  // Member cites the slice without its flag traveling along
+  const annotations = (await deps.annotations?.(target)) ?? [];
+  const annotated = (event) => annotations.find((a) => event.seq >= a.fromSeq && event.seq <= a.toSeq);
 
   const withheldType = (type) => scope.relation !== 'self' && REASONING_TYPES.has(type);
   const filter = typeFilter(types);
@@ -214,12 +221,18 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
     scope.relation === 'cited'
       ? 'Acts only: reasoning-bearing events are listed by seq and type and their content withheld (R-10). Only the cited ranges are yours to read while the case is live.'
       : null,
+    annotations.length > 0
+      ? `Annotations travel with the range (J-6): ${annotations.map((a) => `case ${a.caseId} #${a.fromSeq}..#${a.toSeq} — "${a.note}"`).join(' | ')}`
+      : null,
     window.length
       ? `Showing ${window.length} event(s)${filter ? ` matching "${types}"` : ''}: #${window[0].seq}..#${window.at(-1).seq}` +
         `${withheldCount ? `, ${withheldCount} withheld` : ''}. Page with from_seq and limit (max ${MAX_LIMIT}; ${FULL_LIMIT} with full=true).`
       : `No events${filter ? ` match "${types}"` : ''} in the requested range.`,
     '',
-    ...window.map(e => renderEvent(e, { withheld: withheldType(e.type), full: full === true })),
+    ...window.map(e => {
+      const a = annotated(e);
+      return renderEvent(e, { withheld: withheldType(e.type), full: full === true, annotation: a });
+    }),
   ].filter(l => l !== null);
   return lines.join('\n');
 }

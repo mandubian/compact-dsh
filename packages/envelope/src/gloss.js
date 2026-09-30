@@ -471,6 +471,14 @@ export const GLOSS = {
     instruction: 'Judges are bound by the record exactly as Subjects are: verify the seats with judicature_case, cite only what the case carries, and state reasons — silence is not a judgment.',
     cites: ['J-3', 'J-6', 'D-7'],
   },
+
+  'JG/remedy-refused': {
+    title: 'The remedy refuses to land — no remedy erases',
+    why: 'Every remedy is a compensating row that rides a judgment, argues its proportionality, and orders its target through machinery that already exists: the closed menu (annotation, restitution, standing, revocation, referral), parties not strangers as debtors, annotations inside verified citations, standing written only through the declared grant machinery — bypassing it would be enforcement fraud with a gavel (D-8).',
+    example: { blocked: ['judicature_remedy before any judgment landed on the case', 'a standing remedy with no approval service composed — the row does not land without the write it claims', 'a revocation naming a grant the store does not hold'], lawful: ['an annotation inside a verified citation, note carried, traveling with every read of the range', 'restitution against a party with recorded cause shown — the exit ledger\'s readable line'] },
+    instruction: 'Land the judgment first, argue the fit of what you order, and route the order through the seam it rides: grants through the grant machinery, referrals through the petition channel, annotations beside the range — never inside it.',
+    cites: ['J-6', 'J-3', 'D-8'],
+  },
 };
 
 // Wildcards cover the two families whose ruleIds are composed at run time:
