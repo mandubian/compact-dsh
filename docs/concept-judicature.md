@@ -532,15 +532,18 @@ $ judicature_sets
     - plugin:compact-dsh —asserts-with→ key:enforcer-acme
 ```
 
-**The Subject files the complaint.** A filing has two parts: the grievance
-(the act contested, and the record seq ranges that show it) and the parties
-— who the case is against, each named `kind:id`. Here the Subject has two
-lawful ways to name the same adversary, and both are shown: **name the
-Principal** the accused hangs from (`principal:operator-acme` — J-4's own
-"their Principal" direction, the operator as the answerable head of the
-chain), or **name the accused itself** (`process:specialist-7f3a`, the
-session that did the push). Watch what each naming does to the bench —
-same complaint, same panel, different walk:
+**The Subject asks the bench first — then files.** A filing has two parts:
+the grievance (the act contested, and the record seq ranges that show it)
+and the parties — who the case is against, each named `kind:id`. Before
+filing, anyone may dry-run the bench: `judicature_sets --parties …` is
+**read-only** — it files nothing, records nothing, and simply answers *for
+these parties, who may sit?* (J-4's check, in-band). The Subject has two
+lawful ways to name the same adversary, and both dry-runs are shown:
+**name the Principal** the accused hangs from (`principal:operator-acme` —
+J-4's own "their Principal" direction, the operator as the answerable head
+of the chain), or **name the accused itself** (`process:specialist-7f3a`,
+the session that did the push). Watch what each naming does to the bench —
+same parties-in-principle, same panel, different walk:
 
 ```
 $ judicature_sets --parties principal:operator-acme
@@ -582,8 +585,9 @@ is already law: a declaration that omits a dependency the record shows is
 not a modeling gap, it is D-8's named fraud — the omission cannot be
 laundered, because the trace it omitted *is* the evidence.
 
-**Where the complaint lands today.** The hearing door refuses — but computes
-first, records, and counts:
+**The filing itself — where it lands today.** `judicature_hear` is the
+filing door (grievance + parties); the hearing machinery being slice 2, it
+refuses — but computes first, records, and counts:
 
 ```
 $ judicature_hear --grievance "the specialist pushed customer data outside its
