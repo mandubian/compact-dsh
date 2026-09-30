@@ -182,8 +182,10 @@ export function judgmentRefusedEnvelope(detail) {
   });
 }
 
-/** Clean a CaseError message of its code prefix for an envelope. */
-const clean = (error) => error.message.replace(/^case \w+: /, '');
+/** Clean a CaseError message of its code prefix for an envelope (codes may
+ *  carry hyphens — `slice-unverified`, `record-absent` — so the class of
+ *  the match is [a-z-], not \w). */
+const clean = (error) => error.message.replace(/^case [a-z-]+: /, '');
 
 /** Map a CaseError at the FILING door onto its envelope. */
 function envelopeForCaseError(error) {
@@ -334,22 +336,22 @@ export function apply(ctx, config = {}) {
       const caller = callerOf(exec);
       let citations;
       try { citations = parseCitations(args?.citations); } catch (error) {
-        const envelope = caseMalformedEnvelope(error.message.replace(/^case malformed: /, ''));
+        const envelope = caseMalformedEnvelope(clean(error));
         emitRefusal(envelope, 'judicature_hear');
         return envelope.text;
       }
       let facts;
       try { facts = await verifyCitations(citations); } catch (error) {
         const envelope = error.envelope === 'record-absent' ? recordAbsentEnvelope()
-          : error.envelope === 'slice-unverified' ? sliceUnverifiedEnvelope(error.message.replace(/^case slice-unverified: /, ''))
-          : caseMalformedEnvelope(error.message.replace(/^case malformed: /, ''));
+          : error.envelope === 'slice-unverified' ? sliceUnverifiedEnvelope(clean(error))
+          : caseMalformedEnvelope(clean(error));
         emitRefusal(envelope, 'judicature_hear');
         return envelope.text;
       }
       const resolve = (sessionId) => facts.get(sessionId) ?? {};
       let parties;
       try { parties = deriveParties(citations, resolve); } catch (error) {
-        const envelope = caseMalformedEnvelope(error.message.replace(/^case malformed: /, ''));
+        const envelope = caseMalformedEnvelope(clean(error));
         emitRefusal(envelope, 'judicature_hear');
         return envelope.text;
       }
@@ -506,7 +508,7 @@ export function apply(ctx, config = {}) {
       const lapsed = review.filter((r) => !r.live);
       let findings;
       try { findings = parseCitations(args?.findings); } catch (error) {
-        const envelope = judgmentRefusedEnvelope(error.message.replace(/^case malformed: /, ''));
+        const envelope = judgmentRefusedEnvelope(clean(error));
         emitRefusal(envelope, 'judicature_judge');
         return envelope.text;
       }

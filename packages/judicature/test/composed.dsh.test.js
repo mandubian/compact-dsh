@@ -174,6 +174,7 @@ test('a tampered slice is not evidence: [JG/slice-unverified], the case stays un
   assert.match(out, /^\[JG\/slice-unverified\]/);
   assert.match(out, /broken-link|missing-link|no-anchor/);
   assert.match(out, /integrity challenge/);
+  assert.doesNotMatch(out, /case slice-unverified:/, 'no raw CaseError prefix leaks into the envelope reason (review #119)');
   assert.equal(service.docket().length, 0);
 });
 
