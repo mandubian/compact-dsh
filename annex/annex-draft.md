@@ -279,6 +279,13 @@ is no appellate authority either (J-5); and no seat can be a witness until
 identity keys exist (I-1). This is J-8's "known deficiency, not a
 principle": carried as data, on a schedule, checkable by anyone.
 
+The whole walk — how the declaration is created and read back, how a case
+moves seat by seat to a panel or to unheard, how the cascade and the
+independence check behave with two benches, and what refuses at creation —
+is shown with real captured output in
+[concept-judicature.md](../docs/concept-judicature.md) ("The bench, walked
+through").
+
 ## 4. Trust-model honesty
 
 The dsh host is unaudited, pre-1.0, and in-process; the enforcement here is
