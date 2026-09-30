@@ -378,11 +378,13 @@ panel: none — the case is UNHEARD, never dismissed (a default panel is the fra
 ```
 
 **A case against the Enforcer key** — the founder is not the party, but the
-composition that asserts with that key runs under him. The walk:
-`founder ←directed-by— plugin —asserts-with→ enforcer-key`, traversed
-against two arrow directions, because **recusal is undirected reachability**:
-a conflict of interest runs both ways along a dependency — J-4's one sentence
-in three directions (they; their Principal; a party dependent on them):
+composition that asserts with that key runs under him. The walk runs
+`founder → plugin → key`: the first hop goes *against* the declared arrow
+(`plugin —directed-by→ founder`, walked backwards), the second *with* it
+(`plugin —asserts-with→ key`) — direction is ignored on purpose, because
+**recusal is undirected reachability**: a conflict of interest runs both
+ways along a dependency — J-4's one sentence in three directions (they;
+their Principal; a party dependent on them):
 
 ```
 $ node tools/verify-judicature.mjs --annex … --parties key:dev-rehearsal-enforcer
@@ -429,8 +431,11 @@ edges: plugin:compact-dsh —directed-by→  principal:founder
 
 **A case against both first-instance Principals** — the first bench
 recuses, and the case *passes to the next declared set* (J-1's cascade).
-Look at the peer's row: the peer is not a party, but panel-alpha — which the
-peer directs — is four hops from the founder, and the founder is a party:
+Look at the peer's row: the peer is not a party, yet the peer's seat
+refuses too, because the seat's own standing connects to a party — the
+path runs `peer → panel-alpha → plugin → founder` (three hops, four nodes:
+the peer directs a process, the composition runs in it, the founder
+directs the composition — and the founder is a party):
 
 ```
 $ judicature_sets --parties principal:founder,principal:peer
