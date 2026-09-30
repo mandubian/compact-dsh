@@ -62,11 +62,13 @@ export function landRemedy(c, { kind, seat, proportionality, spec, now = Date.no
   if (!REMEDY_KINDS.includes(kind)) {
     throw new CaseError('malformed', `"${kind}" is not a remedy — the menu is closed: ${REMEDY_KINDS.join(', ')} (J-6)`);
   }
-  if (c.judgment == null) {
+  const operative = c.appeal?.judgment ?? c.judgment;
+  if (operative == null) {
     throw new CaseError('unjudged', 'no judgment has landed on this case — a remedy rides a judgment, and there is no remedy without one to carry it (J-6)');
   }
-  if (typeof seat !== 'string' || !c.panel.seats.includes(seat)) {
-    throw new CaseError('seat', `seat "${seat}" is not among the panel's resolved seats (${c.panel.seats.join(', ')}) — a remedy is attributed to the seat that verified in`);
+  const operativePanel = c.appeal?.panel?.status === 'panel' ? c.appeal.panel : c.panel;
+  if (typeof seat !== 'string' || !operativePanel.seats.includes(seat)) {
+    throw new CaseError('seat', `seat "${seat}" is not among the operative panel's resolved seats (${operativePanel.seats.join(', ')}) — a remedy is attributed to the seat that verified in`);
   }
   if (typeof proportionality !== 'string' || !proportionality.trim()) {
     throw new CaseError('malformed', 'proportionality is owed on every remedy row — the response must fit the wrong, and a row that does not argue its fit is detectably non-conforming (J-6)');

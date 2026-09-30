@@ -757,6 +757,60 @@ strangers), annotations must sit inside verified citations (a margin note
 on unread evidence is not one), and the menu is closed: five kinds, no
 punishments — this layer compensates, it does not erase.
 
+**The appeal (J-5) — a different door, to a disjoint bench.** The
+customer, aggrieved by the reading, appeals *the application* — not the
+law (that is the petition door's question). One appeal, as of right, no
+leave step; the appellate panel resolves from sets **disjoint** from the
+first panel's, and the re-hearing runs on the **same record**:
+
+```
+$ judicature_appeal --case_id case_6e11b78f --grounds "the grant was read host-scoped
+  where its pattern scopes by path — the record shows the push covered"
+[J-5] appeal filed on case_6e11b78f by process:customer-51d0 — as of right, once.
+  grounds: the grant was read host-scoped where its pattern scopes by path — the record shows the push covered
+  appellate panel: member-review (chair, second) — disjoint from acme-first-instance by declared edges.
+The appeal re-hears on the SAME record: judicature_judge from one of these seats, disposition affirm or depart.
+```
+
+The appellate judgment **affirms or departs** — and departure names the
+first judgment (itself now a citable row) and argues it; the judgment is
+final, with dissent recorded:
+
+```
+$ judicature_judge --case_id … --seat chair --findings "specialist-7f3a:2-3"
+  --rules "D-3, J-2" --reasons "the record shows the push ran inside the path-scoped grant"
+  --disposition depart --departure_grounds "the first judgment read 'read grant' as host-scoped;
+  the pattern is path-scoped and the cited slice shows the covered path"
+  --dissent_seat second --dissent_reasons "the pattern text is ambiguous; affirm was the lawful reading"
+[J-5] appellate judgment landed on case_6e11b78f — departed at seat chair; FINAL (a second appeal is refused; the petition door never closes).
+  …
+  appeal: filed … by process:customer-51d0 — "the grant was read host-scoped where its pattern scopes by path…"
+    appellate panel: member-review (chair, second) — disjoint from acme-first-instance, by declared edges
+    appellate judgment: departed at seat chair — FINAL (a second appeal is refused; the petition door never closes)
+      departs from the first judgment (seat first-seat): the first judgment read "read grant" as host-scoped; …
+      dissent: seat second, reasons recorded (A-5)
+```
+
+A second appeal is refused — the door closes, and the refusal itself
+routes the convinced Member to the door that never does:
+
+```
+$ judicature_appeal --case_id … --grounds "once more"      # caller: the specialist
+[JG/appeal-refused] the appeal refuses: an appeal already exists on this case — a second
+judgment is final and a second appeal is refused; the door closes, the petition door never
+does: an appeal can never fix the law, a petition can never reopen a case
+```
+
+Two honest walls, both declared rather than discovered: a composition
+declaring **one set** has no appellate authority at all, and the appeal
+door refuses `[JG/appeal-unavailable]` naming exactly that — a composition
+that wants the second door must declare the second bench. And where a
+party is of the **Enforcer's own class** (the enforcer key, the
+composition itself), the appellate panel must include external Witnesses
+(D-8) — pending I-1, that route is recorded **heard never, saying so**
+(`[JG/appeal-witnesses-pending]`), never the accused's own class
+pretending otherwise.
+
 ### Scenario 5 — what refuses at creation: fail-closed, with the reason named
 
 A declaration that will not validate refuses at the boot (D-7: a broken
@@ -804,14 +858,16 @@ withheld), interim measures carry clock-derived expiry reviewed at the
 hearing's opening, and judgments and dissents land as attributed rows
 that refuse to land off-record (D-7).
 
-**Does not prove:** that appeal exists — it needs a second declared set
-(slice 4, #114, J-5); that the integrity-challenge route (heard before the
-case) is built — J-1's challenge machinery remains open; that seats are
-held by *different people* — before I-1 the graph sees keys and lineages,
-not minds (two of the fixture's members could be one actor in fresh
-clothes, which is why member key standing waits for the identity roll); or
-that the two-bench world exists — it is a fixture. The rehearsal annex's
-own `notice` field says it best: the machinery is what is being rehearsed.
+**Does not prove:** that the integrity-challenge route (heard before the
+case) is built — J-1's challenge machinery remains open; that external
+Witnesses exist — the D-8 appeal route is recorded heard-never until I-1
+identity keys land (#116), and the cascade's last rung stays unreachable;
+that seats are held by *different people* — before I-1 the graph sees keys
+and lineages, not minds (two of the fixture's members could be one actor
+in fresh clothes, which is why member key standing waits for the identity
+roll); or that the two-bench world exists — it is a fixture. The
+rehearsal annex's own `notice` field says it best: the machinery is what
+is being rehearsed.
 
 ## Evidence is the record, verified on read (J-2, R-2, D-3)
 

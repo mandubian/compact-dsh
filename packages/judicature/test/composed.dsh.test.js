@@ -441,3 +441,84 @@ test('remedies land through their seams: annotation travels, restitution reads, 
   const docket = text(await call(tools, 'judicature_case', { case_id: id }));
   assert.match(docket, /remedies: 6 landed \(compensating entries — nothing is erased, I-2\)/);
 });
+
+test('the appeal door (J-5): one as of right, a disjoint bench, final with dissent', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const twoSets = JSON.parse(JSON.stringify(SECTION));
+  twoSets.sets.push({
+    id: 'review',
+    roles: [
+      { id: 'chair', standing: { kind: 'key', id: 'member-key-7' } },
+      { id: 'second', standing: { kind: 'key', id: 'member-key-12' } },
+    ],
+    trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
+  });
+  const { tools, service } = await boot(t, fixtureAnnex(dir, twoSets));
+  await call(tools, 'judicature_hear', {
+    grievance: 'the specialist pushed my data to a second remote', citations: 'specialist:2-3,customer:1-2',
+  }, 'customer');
+  const id = service.docket()[0].id;
+  await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    reasons: 'the push ran outside the grant',
+  });
+
+  // the appeal, as of right, from a party — to the disjoint bench
+  const appeal = text(await call(tools, 'judicature_appeal', {
+    case_id: id, grounds: 'the grant was read host-scoped where the pattern is path-scoped',
+  }, 'customer'));
+  assert.match(appeal, /\[J-5\] appeal filed on/);
+  assert.match(appeal, /appellate panel: review \(chair, second\) — disjoint from first by declared edges/);
+  assert.match(appeal, /as of right, once/);
+
+  // re-hearing: first-panel seats cannot judge the appeal; depart without grounds refuses
+  assert.match(text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'J-2', reasons: 'r', disposition: 'affirm',
+  })), /not among the APPELLATE panel/);
+  assert.match(text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'chair', findings: 'specialist:2-3', rules: 'J-2', reasons: 'r', disposition: 'depart',
+  })), /departure names the first judgment and argues it/);
+
+  // the appellate judgment that departs, with a dissent — final
+  const landed = text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'chair', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    reasons: 'the record shows the push ran inside the path-scoped grant',
+    disposition: 'depart', departure_grounds: 'the first judgment read the grant host-scoped; the pattern scopes by path',
+    dissent_seat: 'second', dissent_reasons: 'the pattern text is ambiguous; affirm was the lawful reading',
+  }));
+  assert.match(landed, /\[J-5\] appellate judgment landed on/);
+  assert.match(landed, /departed at seat chair; FINAL/);
+  assert.match(landed, /departs from the first judgment: /);
+  assert.match(landed, /dissent: seat second, reasons recorded/);
+
+  // finality: a second appeal is refused; the petition door named
+  const second = text(await call(tools, 'judicature_appeal', {
+    case_id: id, grounds: 'once more',
+  }, 'specialist'));
+  assert.match(second, /^\[JG\/appeal-refused\]/);
+  assert.match(second, /a second judgment is final/);
+  assert.match(second, /petition door never does/);
+  // and remedies now ride the OPERATIVE panel (the appellate seats)
+  const remedy = text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'chair', kind: 'annotation', proportionality: 'the corrected reading deserves its margin note',
+    spec: JSON.stringify({ target: { session: 'specialist', fromSeq: 2, toSeq: 3 }, note: 'inside the path-scoped grant (appellate finding)' }),
+  }));
+  assert.match(remedy, /\[J-6\] remedy landed on/);
+  assert.equal(service.appeal(id).judgment.disposition, 'depart');
+});
+
+test('with one declared set there is no appellate authority: [JG/appeal-unavailable]', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const { tools, service } = await boot(t, fixtureAnnex(dir, SECTION));
+  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer');
+  const id = service.docket()[0].id;
+  await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+  });
+  const out = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'the scope was read too widely' }, 'customer'));
+  assert.match(out, /^\[JG\/appeal-unavailable\]/);
+  assert.match(out, /no appellate authority at all/);
+  assert.equal(service.appeal(id), null, 'nothing records where no authority exists');
+});

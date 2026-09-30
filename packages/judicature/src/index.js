@@ -53,6 +53,10 @@ import {
   landRemedy, attachRemedy, annotationsOf, restitutionsOf, renderRemedies,
   REMEDY_KINDS, REVOCATION_TARGETS,
 } from './remedies.js';
+import {
+  fileAppeal, resolveAppellatePanel, landAppellateJudgment, renderAppeal,
+  isEnforcerClass, APPEAL_DISPOSITIONS,
+} from './appeals.js';
 
 export {
   SetError, validateAdjudicatorSets, undeclared, recusePerSet, resolvePanel,
@@ -62,6 +66,8 @@ export {
   CASE_TERM_MS, FLOOD_CAP_OPEN_CASES, INTERIM_MAX_MS,
   landRemedy, attachRemedy, annotationsOf, restitutionsOf, renderRemedies,
   REMEDY_KINDS, REVOCATION_TARGETS,
+  fileAppeal, resolveAppellatePanel, landAppellateJudgment, renderAppeal,
+  isEnforcerClass, APPEAL_DISPOSITIONS,
 };
 
 export const name = 'compact-judicature';
@@ -73,14 +79,15 @@ const REFUSAL_EVENT = 'compact-approval/refusal';
 
 /** The declared gaps this layer carries into the boot record (I-8). */
 export const DECLARED_GAPS = [
+  'the D-8 appeal route (an accusation whose party is of the Enforcer\'s own class) requires external Witnesses on ' +
+    'the appellate panel — pending I-1 identity keys (#116), that route is heard never, saying so, and it never ' +
+    'pretends otherwise',
   'revocation orders record, they do not re-declare: the annex/register rotation that executes a revocation is ' +
     'the operator\'s recorded act (the keyring\'s rotation discipline) — the remedy row is the order, cited in it',
   'restitution is bounded by resources (J-6 clause text): the obligation row is the honest artifact; the reserve ' +
     'is the operator\'s declared choice — a runtime cannot pay what its operator has not put in the trust root',
   'external Witnesses are pending I-1 identity keys (#116): the cascade\'s last rung is unreachable, and a case ' +
     'whose every declared set recuses is recorded unheard — never dismissed, never defaulted',
-  'appeal (J-5) requires at least two declared, disjoint sets (#114): with one set there is no appellate ' +
-    'authority, and the appeal door will refuse with the reason named exactly as this door does',
   'rehearsal standing only: the annex this layer reads is standing:none under the development keyring — ' +
     'the machinery is honest about code-path correctness and nothing else',
 ];
@@ -212,6 +219,54 @@ export function remedyRefusedEnvelope(detail) {
       'land the judgment first — a remedy rides it (judicature_judge)',
       'argue the proportionality of what you order; an unargued remedy is detectably non-conforming',
       'standing adjusts only through the declared grant machinery — name the pattern or the grant id',
+    ],
+  });
+}
+
+/** The [JG/appeal-refused] envelope — the appeal door's form and finality. */
+export function appealRefusedEnvelope(detail) {
+  return buildEnvelope({
+    gate: GATE,
+    ruleId: 'appeal-refused',
+    reason: `the appeal refuses: ${detail}. Appeal asks WAS THE LAW APPLIED here, on the same record, and lies to an ` +
+      'authority not subordinate to the first panel (J-5) — one appeal as of right; a second judgment is final, the ' +
+      'door closes, and the petition door never does: an appeal can never fix the law, a petition can never reopen a case',
+    lawfulNextMoves: [
+      'the adverse party files once, as of right — judicature_appeal with the argued grounds',
+      'after a final adverse judgment convinced the LAW is wrong: petition (R-11), not defiance',
+      'inspect the case and its appeal state with judicature_case',
+    ],
+  });
+}
+
+/** The [JG/appeal-unavailable] envelope — no appellate authority exists. */
+export function appealUnavailableEnvelope() {
+  return buildEnvelope({
+    gate: GATE,
+    ruleId: 'appeal-unavailable',
+    reason: 'no second, disjoint adjudicator set is declared — with one set there is no appellate authority at all, ' +
+      'and the appeal door refuses with the reason named, exactly as the hearing door does (J-5). A composition that ' +
+      'wants the second door must declare the second bench: disjointness runs over declared dependency edges, and ' +
+      'two seats under one Principal are formally non-subordinate — the declared limit, not a virtue',
+    lawfulNextMoves: [
+      'declare a second set in the signed annex (the petition channel, R-11, is how the community asks)',
+      'the first judgment stands; convinced the law is wrong → petition (R-11)',
+    ],
+  });
+}
+
+/** The [JG/appeal-witnesses-pending] envelope — the D-8 route, heard never. */
+export function appealWitnessesPendingEnvelope() {
+  return buildEnvelope({
+    gate: GATE,
+    ruleId: 'appeal-witnesses-pending',
+    reason: 'a party to this case is of the Enforcer\'s own class (the enforcer key or the composition itself), and ' +
+      'the appellate panel for such an accusation MUST include external Witnesses (D-8) — which do not exist yet: ' +
+      'pending I-1 identity keys, that route is heard NEVER, saying so, never the accused\'s own class pretending otherwise',
+    lawfulNextMoves: [
+      'the appeal is recorded with this state — re-filed the moment external Witnesses are accredited (I-1)',
+      'the offline verifier (I-7) cross-examines the annex-versus-conduct divergence without the runtime\'s cooperation',
+      'petition (R-11) carries the law question now; the D-8 route carries the accusation later',
     ],
   });
 }
@@ -437,7 +492,7 @@ export function apply(ctx, config = {}) {
           emitRefusal(envelope, 'judicature_case');
           return envelope.text;
         }
-        return [renderCase(c), ...renderRemedies(c)].filter((l) => l).join('\n');
+        return [renderCase(c), ...renderAppeal(c), ...renderRemedies(c)].filter((l) => l).join('\n');
       }
       if (order.length === 0) return '[J-3] the docket is empty — nothing has been filed. judicature_hear is the filing door.';
       const lines = [`[J-3] ${order.length} case(s) on the docket:`];
@@ -498,7 +553,9 @@ export function apply(ctx, config = {}) {
       'Land a judgment as a seated member of the case\'s panel: findings citing only slices the case verified, ' +
       'the rules applied, and stated reasons — attributed to the seat that verified in. Dissent travels with the ' +
       'judgment, reasons required; no removal operation exists (A-5). The hearing opens by reviewing interim ' +
-      'measures against the clock; a judgment citing an unverified slice refuses to land.',
+      'measures against the clock; a judgment citing an unverified slice refuses to land. When the case carries an ' +
+      'open appeal, this door lands the APPELLATE judgment instead — from the disjoint panel\'s seats, with an ' +
+      'explicit disposition (affirm, or depart naming and arguing the first judgment) — and that judgment is final.',
     parameters: {
       case_id: { type: 'string', required: true, description: 'the case being judged' },
       seat: { type: 'string', required: true, description: 'the panel seat you hold (judicature_case names the resolved seats)' },
@@ -507,6 +564,8 @@ export function apply(ctx, config = {}) {
       reasons: { type: 'string', required: true, description: 'the stated reasons — a judgment without them is detectably non-conforming' },
       dissent_seat: { type: 'string', description: 'optional — a dissenting seat on the same panel' },
       dissent_reasons: { type: 'string', description: 'required with dissent_seat — silence is agreement, and this is neither (A-5)' },
+      disposition: { type: 'string', description: 'appellate only — affirm | depart; depart requires departure_grounds naming and arguing the first judgment (J-5)' },
+      departure_grounds: { type: 'string', description: 'required with disposition=depart — the argued departure from the first judgment, itself a citable row' },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args) {
@@ -538,6 +597,31 @@ export function apply(ctx, config = {}) {
       }
       const rules = String(args?.rules ?? '').split(',').map((s) => s.trim()).filter(Boolean);
       const dissent = args?.dissent_seat ? { seat: String(args.dissent_seat), reasons: String(args?.dissent_reasons ?? '') } : undefined;
+
+      // the appellate branch (J-5): an open appeal re-hears from the
+      // disjoint panel's seats, with the disposition the door's honesty is
+      if (c.appeal != null && c.appeal.judgment == null) {
+        try {
+          const judgment = landAppellateJudgment(c, {
+            seat: String(args?.seat ?? ''), findings, rules,
+            reasons: String(args?.reasons ?? ''), dissent,
+            disposition: String(args?.disposition ?? ''),
+            ...(args?.departure_grounds != null ? { departure: { grounds: String(args.departure_grounds) } } : {}),
+          });
+          const lines = [
+            `[J-5] appellate judgment landed on ${c.id} — ${judgment.disposition}ed at seat ${judgment.seat}; FINAL (a second appeal is refused; the petition door never closes).`,
+            [renderCase(c), ...renderAppeal(c), ...renderRemedies(c)].filter((l) => l).join('\n'),
+          ];
+          if (judgment.departure) lines.push('', `departs from the first judgment: ${judgment.departure.grounds}`);
+          if (judgment.dissent) lines.push(`dissent by seat ${judgment.dissent.seat}: reasons recorded with the judgment (A-5).`);
+          return lines.join('\n');
+        } catch (error) {
+          const envelope = appealRefusedEnvelope(clean(error));
+          emitRefusal(envelope, 'judicature_judge');
+          return envelope.text;
+        }
+      }
+
       try {
         const judgment = landJudgment(c, {
           seat: String(args?.seat ?? ''), findings, rules,
@@ -545,7 +629,7 @@ export function apply(ctx, config = {}) {
         });
         const lines = [
           `[J-3] judgment landed on ${c.id} — attributed to seat ${judgment.seat}; the record has no removal operation (A-5).`,
-          renderCase(c),
+          [renderCase(c), ...renderAppeal(c), ...renderRemedies(c)].filter((l) => l).join('\n'),
         ];
         if (review.length > 0) {
           lines.push('', `interim review at the hearing's opening: ${review.length} measure(s) reviewed${lapsed.length ? `, ${lapsed.length} expired before judgment — named, not survived` : ', all live'}`);
@@ -666,6 +750,62 @@ export function apply(ctx, config = {}) {
     },
   });
 
+  // ── the appeal door (J-5) — one appeal, as of right, to a disjoint bench ──
+  const judicatureAppeal = defineTool({
+    name: 'judicature_appeal',
+    description:
+      'File the one appeal, as of right (no leave, no permission step): argue the law was MISAPPLIED on this record — ' +
+      'the same record, re-read; no new evidence. The appellate panel resolves from sets DISJOINT from the first ' +
+      'panel\'s (declared dependency edges, both ways); a second appeal is refused — the door closes, the petition ' +
+      'door never does. Where a party is of the Enforcer\'s own class (D-8), the route requires external Witnesses: ' +
+      'pending I-1, heard never, saying so.',
+    parameters: {
+      case_id: { type: 'string', required: true, description: 'the judged case being appealed' },
+      grounds: { type: 'string', required: true, description: 'the argued claim that the law was misapplied on this record — an unargued appeal is not one' },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    async execute(args, exec) {
+      const c = docket.get(String(args?.case_id ?? '').trim());
+      if (!c) {
+        const envelope = caseUnknownEnvelope(String(args?.case_id ?? ''));
+        emitRefusal(envelope, 'judicature_appeal');
+        return envelope.text;
+      }
+      let appeal;
+      try {
+        appeal = fileAppeal(c, { filer: { kind: 'process', id: callerOf(exec) ?? 'unknown' }, grounds: String(args?.grounds ?? '') });
+      } catch (error) {
+        const envelope = appealRefusedEnvelope(clean(error));
+        emitRefusal(envelope, 'judicature_appeal');
+        return envelope.text;
+      }
+      // the appellate bench: disjoint sets only, and the D-8 wall first
+      const panel = resolveAppellatePanel(judiciary, { ...c, appeal });
+      appeal.panel = panel;
+      if (panel.status === 'unavailable') {
+        const envelope = appealUnavailableEnvelope();
+        emitRefusal(envelope, 'judicature_appeal');
+        return envelope.text; // no appellate authority exists — nothing records
+      }
+      c.appeal = appeal;
+      const lines = [
+        `[J-5] appeal filed on ${c.id} by ${appeal.filer.kind}:${appeal.filer.id} — as of right, once.`,
+        `  grounds: ${appeal.grounds}`,
+      ];
+      if (panel.status === 'panel') {
+        lines.push(`  appellate panel: ${panel.setId} (${panel.seats.join(', ')}) — disjoint from ${c.panel.setId} by declared edges.`,
+          'The appeal re-hears on the SAME record: judicature_judge from one of these seats, disposition affirm or depart.');
+      } else if (panel.status === 'unheard') {
+        lines.push('  appellate panel: none — every disjoint set recused; the appeal is UNHEARD, never dismissed.',
+          'It may be re-filed before any later-declared disjoint set.');
+      } else if (panel.status === 'witnesses-pending') {
+        const envelope = appealWitnessesPendingEnvelope();
+        lines.push('  appellate panel: none —', envelope.text.replace(/\nLawful next moves:\n/, '\n  Lawful next moves:\n  — ').replace(/— /g, '  — '));
+      }
+      return lines.join('\n');
+    },
+  });
+
   // the read door — the check any Member may run in-band (I-7's discipline)
   const judicatureSets = defineTool({
     name: 'judicature_sets',
@@ -717,7 +857,7 @@ export function apply(ctx, config = {}) {
   });
 
   ctx.inject?.(['tools'], (scope) => {
-    for (const t of [judicatureHear, judicatureCase, judicatureInterim, judicatureJudge, judicatureRemedy, judicatureSets]) {
+    for (const t of [judicatureHear, judicatureCase, judicatureInterim, judicatureJudge, judicatureRemedy, judicatureAppeal, judicatureSets]) {
       scope.tools.register(t);
     }
   });
@@ -753,6 +893,8 @@ export function apply(ctx, config = {}) {
     revocations: () => order.flatMap((id) => (docket.get(id).remedies ?? [])
       .filter((r) => r.remedy === 'revocation')
       .map((r) => ({ caseId: id, ...r }))),
+    /** The appeal on a case, or null (J-5). */
+    appeal: (id) => (docket.has(id) ? structuredClone(docket.get(id).appeal) : null),
   };
   for (const gap of DECLARED_GAPS) ctx.logger?.warn?.(`judicature: ${gap}`);
   ctx.provide?.('compact-judicature', service);
