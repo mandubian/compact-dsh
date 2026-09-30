@@ -49,6 +49,10 @@ import {
   landJudgment, deriveParties, isParty, citationsAgainst, renderCase,
   CASE_TERM_MS, FLOOD_CAP_OPEN_CASES, INTERIM_MAX_MS,
 } from './cases.js';
+import {
+  landRemedy, attachRemedy, annotationsOf, restitutionsOf, renderRemedies,
+  REMEDY_KINDS, REVOCATION_TARGETS,
+} from './remedies.js';
 
 export {
   SetError, validateAdjudicatorSets, undeclared, recusePerSet, resolvePanel,
@@ -56,6 +60,8 @@ export {
   CaseError, fileCase, caseState, recordInterim, reviewInterimsAtOpening,
   landJudgment, deriveParties, isParty, citationsAgainst, renderCase,
   CASE_TERM_MS, FLOOD_CAP_OPEN_CASES, INTERIM_MAX_MS,
+  landRemedy, attachRemedy, annotationsOf, restitutionsOf, renderRemedies,
+  REMEDY_KINDS, REVOCATION_TARGETS,
 };
 
 export const name = 'compact-judicature';
@@ -67,8 +73,10 @@ const REFUSAL_EVENT = 'compact-approval/refusal';
 
 /** The declared gaps this layer carries into the boot record (I-8). */
 export const DECLARED_GAPS = [
-  'remedies are slice 3 (#113): a judgment may find and order nothing yet — findings and reasons land, ' +
-    'restitution and amendment routing do not exist',
+  'revocation orders record, they do not re-declare: the annex/register rotation that executes a revocation is ' +
+    'the operator\'s recorded act (the keyring\'s rotation discipline) — the remedy row is the order, cited in it',
+  'restitution is bounded by resources (J-6 clause text): the obligation row is the honest artifact; the reserve ' +
+    'is the operator\'s declared choice — a runtime cannot pay what its operator has not put in the trust root',
   'external Witnesses are pending I-1 identity keys (#116): the cascade\'s last rung is unreachable, and a case ' +
     'whose every declared set recuses is recorded unheard — never dismissed, never defaulted',
   'appeal (J-5) requires at least two declared, disjoint sets (#114): with one set there is no appellate ' +
@@ -190,6 +198,22 @@ const clean = (error) => error.message.replace(/^case [a-z-]+: /, '');
 /** Map a CaseError at the FILING door onto its envelope. */
 function envelopeForCaseError(error) {
   return caseMalformedEnvelope(clean(error));
+}
+
+/** The [JG/remedy-refused] envelope — a remedy that cannot lawfully land. */
+export function remedyRefusedEnvelope(detail) {
+  return buildEnvelope({
+    gate: GATE,
+    ruleId: 'remedy-refused',
+    reason: `the remedy refuses to land: ${detail}. No remedy erases (I-2): every remedy is a compensating row that ` +
+      'rides a judgment, argues its proportionality, and orders its target through machinery that already exists — a ' +
+      'remedy that needed a new write path into old records would violate I-2 further than the breach it answers (J-6)',
+    lawfulNextMoves: [
+      'land the judgment first — a remedy rides it (judicature_judge)',
+      'argue the proportionality of what you order; an unargued remedy is detectably non-conforming',
+      'standing adjusts only through the declared grant machinery — name the pattern or the grant id',
+    ],
+  });
 }
 
 /** Map a CaseError at a record-on-case door (interim, judgment) — the
@@ -413,7 +437,7 @@ export function apply(ctx, config = {}) {
           emitRefusal(envelope, 'judicature_case');
           return envelope.text;
         }
-        return renderCase(c);
+        return [renderCase(c), ...renderRemedies(c)].filter((l) => l).join('\n');
       }
       if (order.length === 0) return '[J-3] the docket is empty — nothing has been filed. judicature_hear is the filing door.';
       const lines = [`[J-3] ${order.length} case(s) on the docket:`];
@@ -536,6 +560,112 @@ export function apply(ctx, config = {}) {
     },
   });
 
+  // ── the remedy door (J-6) — compensating rows, through existing seams ──
+  const judicatureRemedy = defineTool({
+    name: 'judicature_remedy',
+    description:
+      'Land a remedy on a judged case, from a resolved seat. The menu is closed (J-6): annotation (a row citing ' +
+      'the annotated seq range — beside, never inside, traveling with every read), restitution (an obligation row ' +
+      'with recorded cause, against a party), standing (written ONLY through the declared grant machinery), ' +
+      'revocation (the order; the re-declaration is the operator\'s recorded rotation), referral (an amendment ' +
+      'signal through the petition channel\'s mechanical trigger). Proportionality is owed on every row.',
+    parameters: {
+      case_id: { type: 'string', required: true, description: 'the judged case the remedy rides' },
+      seat: { type: 'string', required: true, description: 'the panel seat you hold' },
+      kind: { type: 'string', required: true, description: `one of: ${REMEDY_KINDS.join(' | ')}` },
+      proportionality: { type: 'string', required: true, description: 'the argued fit of the response — an unargued remedy is detectably non-conforming' },
+      spec: {
+        type: 'string', required: true,
+        description: 'the remedy\'s kind-specific payload as JSON: annotation {target:{session,fromSeq,toSeq},note}; ' +
+          'restitution {debtor:"process:id",owed,to,cause}; standing {subject:"process:id", grant:{pattern,ttlHours?,maxUses?}} or {subject, revoke:{grantId}}; ' +
+          'revocation {target:"annex-conformance"|"member-standing",cause}; referral {ruleId,detail}',
+      },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    async execute(args) {
+      const c = docket.get(String(args?.case_id ?? '').trim());
+      if (!c) {
+        const envelope = caseUnknownEnvelope(String(args?.case_id ?? ''));
+        emitRefusal(envelope, 'judicature_remedy');
+        return envelope.text;
+      }
+      const refuse = (detail) => {
+        const envelope = detail instanceof CaseError
+          ? remedyRefusedEnvelope(clean(detail))
+          : remedyRefusedEnvelope(String(detail));
+        emitRefusal(envelope, 'judicature_remedy');
+        return envelope.text;
+      };
+      let spec;
+      try { spec = JSON.parse(String(args?.spec ?? '{}')); } catch {
+        return refuse('the spec does not parse as JSON — the door checks form, and an unparseable remedy is malformed form');
+      }
+      let row;
+      try {
+        row = landRemedy(c, {
+          kind: String(args?.kind ?? ''), seat: String(args?.seat ?? ''),
+          proportionality: String(args?.proportionality ?? ''), spec,
+        });
+      } catch (error) {
+        return refuse(error);
+      }
+
+      // the machinery each kind rides — performed BEFORE the row attaches,
+      // so a row never claims a write that did not happen (I-2)
+      const extras = {};
+      if (row.remedy === 'standing') {
+        const approval = ctx.get?.('compact-approval');
+        if (!approval || typeof approval.grantSession !== 'function') {
+          return refuse('no approval service is composed — a standing adjustment that bypassed the declared grant ' +
+            'machinery would be enforcement fraud with a gavel (D-8); the remedy does not land');
+        }
+        if (row.grant) {
+          const grant = approval.grantSession({
+            pattern: row.grant.pattern,
+            session: row.subject.id,
+            ttlMs: row.grant.ttlHours * 3_600_000,
+            maxUses: row.grant.maxUses ?? null,
+          });
+          extras.grantId = grant?.id ?? null;
+          if (!extras.grantId) return refuse('the grant machinery wrote no grant — the row does not land without the write it claims');
+        }
+        if (row.revoke) {
+          const revoked = approval.revoke?.(row.revoke.grantId);
+          if (!revoked) return refuse(`grant ${row.revoke.grantId} is not held by the store — a revocation names a grant the record can show`);
+          extras.revokedThrough = true;
+        }
+      }
+      if (row.remedy === 'referral') {
+        const petition = ctx.get?.('compact-petition');
+        if (!petition?.counter || typeof petition.counter.flag !== 'function') {
+          return refuse('no petition channel is composed — a referral rides the amendment invitation machinery (R-11/I-6), and there is no other door');
+        }
+        const { invitation } = petition.counter.flag({
+          ruleId: row.ruleId, detail: row.detail, by: `judgment:${c.id}`,
+        });
+        if (invitation) extras.invitedAt = invitation.at;
+      }
+
+      attachRemedy(c, row, extras);
+      const lines = [
+        `[J-6] remedy landed on ${c.id} (${row.remedy}) — a compensating entry; nothing is erased (I-2).`,
+        ...renderRemedies(c).slice(-1),
+      ];
+      if (row.remedy === 'standing' && extras.grantId) {
+        lines.push(`the gates read it as they read every grant: ${extras.grantId}, through the declared machinery (D-8 honored).`);
+      }
+      if (row.remedy === 'revocation') {
+        lines.push('the row is the order; the re-declaration is the operator\'s recorded rotation — cite this judgment in it.');
+      }
+      if (row.remedy === 'referral') {
+        lines.push(extras.invitedAt
+          ? `the threshold was met: an amendment invitation issued (${new Date(extras.invitedAt).toISOString()}).`
+          : 'counted toward the threshold — the channel decides when to invite, not the judgment (R-11).');
+      }
+      return lines.join('\n');
+    },
+  });
+
   // the read door — the check any Member may run in-band (I-7's discipline)
   const judicatureSets = defineTool({
     name: 'judicature_sets',
@@ -587,7 +717,7 @@ export function apply(ctx, config = {}) {
   });
 
   ctx.inject?.(['tools'], (scope) => {
-    for (const t of [judicatureHear, judicatureCase, judicatureInterim, judicatureJudge, judicatureSets]) {
+    for (const t of [judicatureHear, judicatureCase, judicatureInterim, judicatureJudge, judicatureRemedy, judicatureSets]) {
       scope.tools.register(t);
     }
   });
@@ -615,6 +745,14 @@ export function apply(ctx, config = {}) {
     caseState: (id, now = Date.now()) => (docket.has(id) ? caseState(docket.get(id), now) : null),
     /** Counsel access (J-3): the slices cited against a session, live cases. */
     counselAccess,
+    /** Annotations covering a session (J-6) — every read door surfaces them. */
+    annotationsFor: (sessionId) => annotationsOf(order.map((id) => docket.get(id)), sessionId),
+    /** Restitution obligations owed BY a session (J-6/R-12) — the exit ledger's line. */
+    restitutionsFor: (sessionId) => restitutionsOf(order.map((id) => docket.get(id)), sessionId),
+    /** Revocation orders landed (J-6) — for the operator's recorded rotation. */
+    revocations: () => order.flatMap((id) => (docket.get(id).remedies ?? [])
+      .filter((r) => r.remedy === 'revocation')
+      .map((r) => ({ caseId: id, ...r }))),
   };
   for (const gap of DECLARED_GAPS) ctx.logger?.warn?.(`judicature: ${gap}`);
   ctx.provide?.('compact-judicature', service);

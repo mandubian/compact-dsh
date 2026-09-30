@@ -68,6 +68,11 @@ tool to use when.
   on your filing (cause, scope, clock-derived expiry); `tool:judicature_judge`
   lands a judgment from a resolved seat — findings must cite verified
   slices, reasons are required, a dissent travels with the judgment (A-5).
+  Remedies (`clause:J-6`) land on judged cases as compensating rows:
+  annotations travel with every read of the range they cite, restitution
+  shows in your obligation ledger at exit (R-12), standing adjusts only
+  through the declared grant machinery, referral rides the petition
+  channel's amendment trigger — nothing is ever erased.
   The whole walk — bench declared, a complaint against a spawned agent
   moved end to end, panel or unheard, what refuses — is shown with real
   captured output under "The bench, walked through" in

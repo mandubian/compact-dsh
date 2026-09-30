@@ -89,22 +89,30 @@ a favor.
 ## Unreadable is not empty
 
 R-12 includes "adjudicated or plausibly claimable restitution (recorded cause
-shown)" in the obligation set. Adjudication is Part V, which does not exist in
-this composition.
+shown)" in the obligation set. Adjudication is Part V.
 
 So restitution is reported as an **unreadable ledger line** — never as zero. An
 empty ledger line and an unreadable one are different facts, and conflating
 them is how a debt disappears. Any unreadable line also makes the whole ledger
 `complete: false`: a blind spot is not a clean bill.
 
+Since the hearing layer landed (slices 1–3, #111/#112/#113), the line is
+**readable exactly when a hearing is composed**: the judicature service's
+restitution rows — obligation rows with recorded cause shown, landed by
+judged cases — are the ledger's items, and an owed restitution is an
+outstanding obligation at exit, dischargeable like any other. With no
+hearing composed, the line stays unreadable, and says so — the honesty is
+about what exists, not about what is owed.
+
 ## Declared gaps
 
-- **Restitution is unreadable** — no Part V adjudication exists (J-8). The
-  hearing layer that would read this ledger is now designed
-  ([docs/concept-judicature.md](concept-judicature.md)): J-6's restitution
-  remedy lands as an obligation row with recorded cause shown, which is the
-  first line of this ledger made readable — until an adjudicator set is
-  declared (J-8 → J-4), the line stays unreadable, and says so.
+- **Restitution is readable only where a hearing is composed.** J-6's
+  restitution remedy lands as an obligation row with recorded cause shown
+  ([docs/concept-judicature.md](concept-judicature.md)) — the first line of
+  this ledger made readable. A composition without the judicature service
+  keeps the line unreadable, never empty, and bounded by "where resources
+  permit": the obligation row is the honest artifact; the reserve is the
+  operator's declared choice.
 - **Successor jurisdictions are unimplemented.** R-12's "a group of Members may
   found a successor jurisdiction citing this one as lineage" has no machinery
   here, and obligations recorded as assumed are not enforceable against

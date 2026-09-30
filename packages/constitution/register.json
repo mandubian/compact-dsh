@@ -657,7 +657,7 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: the cascade is real and consumed end to end — a filed case resolves its panel against the derived parties at filing, and a case whose every declared set recuses is recorded unheard (never dismissed, re-filable before any later-declared set); the challenge route (heard before the case) lands with remedies — slice 3 (#113); sets and independence landed in slice 1 (#111), the case and the hearing in slice 2 (#112)",
+      "evidence": "judicature: the cascade is real and consumed end to end — a filed case resolves its panel against the derived parties at filing, and a case whose every declared set recuses is recorded unheard (never dismissed, re-filable before any later-declared set); the challenge route (heard before the case) remains open — remedies landed in slice 3 (#113) without it; sets and independence landed in slice 1 (#111), the case and the hearing in slice 2 (#112)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -721,12 +721,22 @@
     },
     {
       "clause": "J-6",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "judicature: remedies-as-records land with the amendment queue — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-judicature",
+      "service": "compact-judicature",
+      "evidence": "remedies are records: the closed menu lands as compensating rows riding judgments — annotation (beside, never inside, traveling with every read of the range through the record read door), restitution (an obligation row with recorded cause shown, read by the exit ledger as its first readable line, R-12), standing (written only through the declared grant machinery — grants and revocations the gates themselves read), revocation (the order; the re-declaration is the operator's recorded rotation), referral (through the petition channel's mechanical amendment invitation); proportionality owed on every row",
+      "enforcedBy": [
+        "packages/judicature/src/remedies.js",
+        "packages/judicature/src/index.js",
+        "packages/record/src/read.js",
+        "packages/exit/src/ledger.js"
+      ],
+      "verifiers": [
+        "packages/judicature/test/remedies.test.js",
+        "packages/judicature/test/composed.dsh.test.js",
+        "packages/record/test/record-read.dsh.test.js",
+        "packages/exit/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "J-7",
