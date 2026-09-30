@@ -283,6 +283,14 @@ async function* install(ctx, config) {
         head: headOf,
         length: (sessionId) => store.load(sessionId).lastSeq + 1,
         flush: async (sessionId) => { const w = writers.get(sessionId); if (w) await flushWriter(w.handle); },
+        // counsel access (J-3): the judicature service, when composed,
+        // answers which cited slices of this target are cited against the
+        // caller in a live case — the record's standing extends no further
+        counsel: (callerId, target) => {
+          const judicature = ctx.get('compact-judicature');
+          if (!judicature?.counselAccess) return [];
+          return judicature.counselAccess(callerId).filter((r) => r.session === target);
+        },
       }, {
         caller: caller != null ? String(caller) : null,
         session: args?.session, fromSeq: args?.from_seq, limit: args?.limit, types: args?.types, full: args?.full === true,

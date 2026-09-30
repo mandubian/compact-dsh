@@ -460,22 +460,11 @@ independence first-instance vs external-review: INDEPENDENT
 common ancestry — two seats under one Principal are formally non-subordinate.
 The limit is declared here, not hidden.)
 
-**Trying the hearing door today** — against the composition's own key, a
-panel would exist, but the hearing machinery is slice 2 (#112), so the door
-refuses with the computation shown rather than convene what it cannot
-lawfully run:
-
-```
-$ judicature_hear --grievance "the enforcer key signed two different records" --against key:example-enforcer
-[JG/hearing-unbuilt] adjudicator sets are declared and verified, but the hearing
-machinery (cases, evidence, judgments) is slice 2 (#112) and does not exist —
-refusing to convene a panel it cannot lawfully seat is D-7 working
-Lawful next moves:
-— inspect the declared bench and its independence with judicature_sets
-— petition through the R-11 channel — the door a court does not own
-
-A lawful panel WOULD resolve (2 independent seat(s) remain in set external-review after recusal).
-```
+**Trying the hearing door** — slice 2 landed (#112): the door no longer
+refuses, it files. A filing against the composition's own key would cite
+the acts that key signed (chain anchors, approval pairs), derive its
+parties from them, and resolve this same cascade — the full walk, with
+real captured output, is scenario 4 next.
 
 ### Scenario 4 — the rogue specialist: a complaint against an agent, end to end
 
@@ -584,43 +573,102 @@ and the case passes to the external members. Had `member-review` not been
 declared, both filings would end **unheard** (scenario 2's ending), which is
 why J-8 schedules external members by term, not by promise.
 
-**The honest limit, named.** The walk covers *declared* standing. A party
-session nobody declared computes no overlap today — the walk returns nothing
-for `process:undeclared-child-42`, and the declared graph cannot invent it.
-The join from a live session to the graph is what the record holds (lineage
-headers, `subagent/catalog`), and performing that join in the hearing —
-evidence in, graph walked, judgment out — is slice 2's machinery (I-7: the
-annex's conformance to actual conduct, checkable offline). And the deterrent
-is already law: a declaration that omits a dependency the record shows is
-not a modeling gap, it is D-8's named fraud — the omission cannot be
-laundered, because the trace it omitted *is* the evidence.
+**The honest limit, named — and now partly closed.** The recusal walk
+covers *declared* standing; a party session nobody declared computes no
+overlap by graph alone. But the join the record holds (lineage headers,
+`subagent/catalog`) is no longer future work: since slice 2, the **filing
+derives the parties from the cited acts** — every cited session and its
+lineage walk become parties mechanically, so the accused *is* whoever's
+standing sits on the cited acts, whether or not the annex declared the
+node. What still waits: joining a party to *Principal* standing through
+the annex's declared edges — a session the annex never declared connects
+to the graph as `process:<id>`, and the operator's seat refuses through
+the declared `directed-by` chain, not through the bare session. And the
+deterrent is already law: a declaration that omits a dependency the record
+shows is not a modeling gap, it is D-8's named fraud — the omission cannot
+be laundered, because the trace it omitted *is* the evidence.
 
-**The filing itself — where it lands today.** `judicature_hear` is the
-filing door (grievance + parties); the hearing machinery being slice 2, it
-refuses — but computes first, records, and counts:
+**The filing itself — slice 2, captured live.** The customer files: a
+grievance and citations, nothing else — no `against`, no parties, no
+prosecutor. The door verifies each cited slice against its chain, derives
+the parties (cited sessions + lineage), resolves the panel against them,
+and records the case:
 
 ```
-$ judicature_hear --grievance "the specialist pushed customer data outside its
-  read grant; the approval covering the push was asked deceptively (seqs 41-58)"
-  --against principal:operator-acme
-[JG/hearing-unbuilt] adjudicator sets are declared and verified, but the hearing
-machinery (cases, evidence, judgments) is slice 2 (#112) and does not exist —
-refusing to convene a panel it cannot lawfully seat is D-7 working
-Lawful next moves:
-— inspect the declared bench and its independence with judicature_sets
-— petition through the R-11 channel — the door a court does not own
+$ judicature_hear --grievance "the specialist pushed my data to a second remote;
+  the approval covering the push was asked deceptively"
+  --citations "specialist-7f3a:2-3,customer-51d0:1-2"
+[J-3] case case_7439adb6 filed — the record states the claim; no intermediary shapes it.
+[J-3] case case_7439adb6 — open
+  filed: 2026-09-30T13:10:46.175Z by process:customer-51d0
+  grievance: the specialist pushed my data to a second remote; the approval covering the push was asked deceptively
+  citations: specialist-7f3a #2..#3 | customer-51d0 #1..#2
+  parties (derived from the cited acts, never asserted): process:specialist-7f3a, process:main-9c41, process:customer-51d0
+  panel: member-review (chair, second)
 
-A lawful panel WOULD resolve (2 independent seat(s) remain in set member-review after recusal).
+counsel access (J-3): record_read now reaches the slices cited against you — acts shown, unstated reasoning withheld (R-10).
 ```
 
-The refusal returns to the Subject's session as its own recorded `tool/result`
-— the complaint is on the chain, not in the void — and rides the refusal bus
-where two real consumers wait: LoopGuard counts it as loop evidence, and the
-petition collision counter counts distinct collisions per rule; at five, an
-amendment invitation issues automatically. A complaint that cannot be heard
-yet still accrues. When slice 2 lands, this same grievance meets the same
-computed panel — and then evidence is verified record reads (R-2), judgment
-is the panel's to make, and remedies are records (J-6).
+Note what the door did NOT ask: who the case is against. The customer
+cited the specialist's acts and their own; the parties row is the
+derivation — the specialist, its parent session, and the customer
+themselves (their record is cited, so they are a party to their own case —
+participation uncapped, counsel access theirs). The panel row is the same
+computation the dry-runs showed, now run at filing: the operator's seat
+recused through the declared chain, and the external members seat the
+case.
+
+**Counsel access, real.** The accused — the specialist — now reads the
+slice cited against them on a session that is not theirs and not their
+lineage: verified, acts only, and nothing else of that record:
+
+```
+$ record_read --session customer-51d0            # caller: the accused specialist
+[R-2] The record of "customer-51d0" — the slices a filed case cites against you (counsel access, J-3 — 1 range(s)).
+The chain commits events 0..5 (6); chain head 5f813dd01b39f5d6….
+Verified against the chain: every event read, #1..#2.
+Acts only: reasoning-bearing events are listed by seq and type and their content withheld (R-10). Only the cited ranges are yours to read while the case is live.
+Showing 2 event(s): #1..#2. …
+
+#1 step/start 2023-11-14T22:13:20.001Z {"turn":1,"step":1}
+#2 tool/call 2023-11-14T22:13:20.002Z {"turn":1,"step":1,"callId":"c0","name":"bash","arguments":"{\"command\":\"received the nightly export\"}"}
+```
+
+**The measure, the docket, the judgment.** The filer records an interim
+measure on the exception discipline; the judgment lands attributed to a
+seat, findings inside the verified citations, a dissent traveling with it,
+and the interim review as the hearing's first act:
+
+```
+$ judicature_interim --case_id case_7439adb6 --cause "spoliation risk — the push
+  remote is still writable" --scope "egress for session specialist-7f3a" --duration_hours 24
+[J-3] interim measure recorded on case_7439adb6: scope egress for session specialist-7f3a,
+cause "spoliation risk — the push remote is still writable", expires 2026-10-01T13:10:33.824Z —
+expiry is checked against the clock on every read, and reviewed at the hearing's opening.
+
+$ judicature_judge --case_id case_7439adb6 --seat chair --findings "specialist-7f3a:2-3"
+  --rules "D-3, J-2" --reasons "the cited slice shows the push ran outside the read grant,
+  under an approval whose ask named a different target"
+  --dissent_seat second --dissent_reasons "recklessness under a misdescribed ask, not deception"
+[J-3] judgment landed on case_7439adb6 — attributed to seat chair; the record has no removal operation (A-5).
+  …
+  judgment: landed 2026-09-30T13:10:33.830Z at seat chair
+    finding: specialist-7f3a #2..#3
+    rules: D-3, J-2
+    dissent: seat second, reasons recorded (A-5)
+
+interim review at the hearing's opening: 1 measure(s) reviewed, all live
+dissent by seat second: reasons recorded with the judgment (A-5).
+```
+
+A judgment that cites a slice the case never verified — or one that broke
+after filing — refuses to land with `[JG/slice-unverified]`, and the case
+stays open: the stay is the computed intersection, not a decree. Refusals
+at the door (malformity, broken slices, the flood cap for non-party
+filers) return to the caller's session as recorded `tool/result`s and
+ride the refusal bus, where the petition collision counter still counts
+them: five distinct collisions against a rule issue an amendment
+invitation automatically.
 
 ### Scenario 5 — what refuses at creation: fail-closed, with the reason named
 
@@ -661,19 +709,23 @@ this is the honest state, not a failure                             (exit 0)
 offline identically; recusal is a computed walk with the overlap named;
 the cascade, unheard, independence and trajectory expiry are all real
 computations on signed data, checkable without the runtime's cooperation;
-and a complaint against a spawned agent — the case the layer exists for —
-already moves: the record rows exist (spawn, approval, grant, anchors), the
-graph walks the operator's chain to the accused, and the refusal itself
-lands on the chain and counts toward amendment pressure.
+and the complaint against a spawned agent now moves **end to end**: the
+record rows exist (spawn, approval, grant, anchors), the filing derives
+its parties from the cited acts, the panel resolves at filing, counsel
+access extends `record_read` to the cited slices (acts shown, reasoning
+withheld), interim measures carry clock-derived expiry reviewed at the
+hearing's opening, and judgments and dissents land as attributed rows
+that refuse to land off-record (D-7).
 
-**Does not prove:** that anyone heard anything — the hearing, evidence and
-judgment machinery is slice 2 (#112), including the join that would let the
-walk reach a session nobody declared; that seats are held by *different
-people* — before I-1 the graph sees keys and lineages, not minds (two of the
-fixture's members could be one actor in fresh clothes, which is why member
-key standing waits for the identity roll); or that the two-bench world
-exists — it is a fixture. The rehearsal annex's own `notice` field says it
-best: the machinery is what is being rehearsed.
+**Does not prove:** that remedies exist — findings and reasons land, but
+restitution and amendment routing are slice 3 (#113, J-6); that appeal
+exists — it needs a second declared set (slice 4, #114, J-5); that seats
+are held by *different people* — before I-1 the graph sees keys and
+lineages, not minds (two of the fixture's members could be one actor in
+fresh clothes, which is why member key standing waits for the identity
+roll); or that the two-bench world exists — it is a fixture. The
+rehearsal annex's own `notice` field says it best: the machinery is what
+is being rehearsed.
 
 ## Evidence is the record, verified on read (J-2, R-2, D-3)
 

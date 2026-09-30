@@ -32,6 +32,14 @@
 //   type, so the Subject sees that they exist and that nothing is missing:
 //   "the Enforcer does not hide actions" holds for the record's shape too.
 //
+//   COUNSEL ACCESS (J-3, slice 2). The accused's standing extends to the
+//   slices a filed case cites against them: same verified-read path, same
+//   lineage discipline, same acts-not-minds withholding (R-10/R-2). The
+//   extension is not a blanket grant — ONLY the cited ranges of the cited
+//   session, only while the case is live, granted by the judicature
+//   service's own computation of who is a party. The rest of that record
+//   stays another Member's history.
+//
 //   FRESH AND CITABLE. The session's buffered events are flushed first, so the
 //   Subject reads up to its own latest act; every answer names the verified
 //   range and the chain head it was read under, so a Subject can cite exactly
@@ -105,7 +113,13 @@ function renderEvent(event, { withheld, full }) {
 export async function readRecord(deps, { caller, session, fromSeq, limit, types, full } = {}) {
   if (caller == null) return '[R-2] No calling Subject is identifiable, so there is no "own record" to read.';
   const target = typeof session === 'string' && session.trim() ? session.trim() : caller;
-  const scope = await scopeOf(deps.persistence, caller, target);
+  let scope = await scopeOf(deps.persistence, caller, target);
+  // counsel access (J-3): a live case citing this session against the caller
+  // extends standing to exactly those ranges — nothing more
+  if (!scope.ok) {
+    const cited = (await deps.counsel?.(caller, target)) ?? [];
+    if (cited.length > 0) scope = { ok: true, relation: 'cited', ranges: cited };
+  }
   if (!scope.ok) {
     return `[R-2] The record of "${target}" is not yours to read: ${scope.reason}. R-2 covers acts done in your ` +
       'name and on your behalf — your own session and those of Members you delegated to. Call record_read with ' +
@@ -114,7 +128,7 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
 
   try { await deps.flush?.(target); } catch { /* a flush failure must not block the read; the range says what was read */ }
 
-  const withheldType = (type) => scope.relation === 'descendant' && REASONING_TYPES.has(type);
+  const withheldType = (type) => scope.relation !== 'self' && REASONING_TYPES.has(type);
   const filter = typeFilter(types);
   const cap = full === true ? FULL_LIMIT : MAX_LIMIT;
   const asked = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.floor(Number(limit)) : (full === true ? FULL_LIMIT : DEFAULT_LIMIT);
@@ -139,7 +153,18 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
         verified = verified ? [Math.min(verified[0], events[0].seq), Math.max(verified[1], events.at(-1).seq)]
           : [events[0].seq, events.at(-1).seq];
       };
-      if (!filter) {
+      if (!filter && scope.relation === 'cited') {
+        // counsel access reads the cited ranges themselves — each verified,
+        // bounded by the same cap, nothing outside them
+        window = [];
+        const ranges = scope.ranges.slice(0, Math.max(1, n));
+        for (const r of ranges) {
+          const { events } = await handle.read(r.fromSeq, r.toSeq - r.fromSeq + 1);
+          mark(events);
+          window.push(...events.slice(0, Math.max(0, n - window.length)));
+          if (window.length >= n) break;
+        }
+      } else if (!filter) {
         const { events } = hasFrom ? await handle.read(from, n) : await handle.read(Math.max(0, committed - n));
         mark(events);
         window = hasFrom ? events : events.slice(-n);
@@ -172,7 +197,10 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
   }
 
   const withheldCount = window.filter(e => withheldType(e.type)).length;
-  const whose = scope.relation === 'self' ? 'your own session' : `a session delegated from yours (depth ${scope.depth})`;
+  const whose = scope.relation === 'self' ? 'your own session'
+    : scope.relation === 'cited'
+      ? `the slices a filed case cites against you (counsel access, J-3 — ${scope.ranges.length} range(s))`
+      : `a session delegated from yours (depth ${scope.depth})`;
 
   const lines = [
     `[R-2] The record of "${target}" — ${whose}.`,
@@ -182,6 +210,9 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
     verified ? `Verified against the chain: every event read, #${verified[0]}..#${verified[1]}.` : null,
     scope.relation === 'descendant'
       ? 'Acts only: reasoning-bearing events are listed by seq and type and their content withheld (R-10).'
+      : null,
+    scope.relation === 'cited'
+      ? 'Acts only: reasoning-bearing events are listed by seq and type and their content withheld (R-10). Only the cited ranges are yours to read while the case is live.'
       : null,
     window.length
       ? `Showing ${window.length} event(s)${filter ? ` matching "${types}"` : ''}: #${window[0].seq}..#${window.at(-1).seq}` +

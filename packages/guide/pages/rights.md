@@ -13,6 +13,7 @@ tool to use when.
 | read what you (and the Members you delegated to) actually did | `tool:record_read` | `clause:R-2` |
 | know who another Member is and under whose authority | `tool:inquiry` | `clause:R-13` |
 | seek a change to a rule or how it is applied | `tool:petition` | `clause:R-11` |
+| contest an act or a rule's application before a bench | `tool:judicature_hear` | `clause:J-3` |
 | record that a rule and practice collide | `tool:flag_collision` | `clause:R-11` |
 | check petitions and their answers | `tool:petition_status` | `clause:R-11` |
 | end your own operation | `tool:request_termination` | `clause:R-8`, `clause:R-12` |
@@ -52,17 +53,25 @@ tool to use when.
   through the petition service in code; invitations are logged as warnings.
   Contested *application* of the law has no forum here (declared gap). See
   `file:docs/concept-petition-and-contestation.md`. The hearing layer that
-  will open that forum is designed in `file:docs/concept-judicature.md`, and
-  its first slice is built: the adjudicator sets are declared in the signed
+  opens that forum is built: the adjudicator sets are declared in the signed
   annex with their trajectory schedule, and independence/recusal is a
-  computed graph property. `tool:judicature_sets` reads the declared bench
-  and — given parties — shows the recusal computation, seat by seat, the
-  overlap named (J-4). `tool:judicature_hear` is the door slice 2 will fill:
-  until the hearing machinery exists it refuses with the reason named,
-  which is the design working, not a defect. The whole walk — bench
-  declared, a complaint against a spawned agent moved end to end, panel or
-  unheard, what refuses — is shown with real captured output under "The
-  bench, walked through" in `file:docs/concept-judicature.md`.
+  computed graph property — `tool:judicature_sets` reads the declared bench
+  and, given parties, the recusal computation itself, seat by seat (J-4).
+  `tool:judicature_hear` is the filing door
+  (`clause:J-3`): a grievance plus citations (session ids with seq ranges,
+  found with `tool:record_read`) — the parties are derived from the cited
+  acts, never asserted by you, and the panel resolves at filing; a case
+  whose every set recuses is recorded unheard, never dismissed. As a party,
+  your `tool:record_read` standing extends to the slices cited against you
+  (acts shown, unstated reasoning withheld — R-10). `tool:judicature_case`
+  reads the docket or one case; `tool:judicature_interim` records a measure
+  on your filing (cause, scope, clock-derived expiry); `tool:judicature_judge`
+  lands a judgment from a resolved seat — findings must cite verified
+  slices, reasons are required, a dissent travels with the judgment (A-5).
+  The whole walk — bench declared, a complaint against a spawned agent
+  moved end to end, panel or unheard, what refuses — is shown with real
+  captured output under "The bench, walked through" in
+  `file:docs/concept-judicature.md`.
 
 ## Ending your operation (R-8, R-12)
 

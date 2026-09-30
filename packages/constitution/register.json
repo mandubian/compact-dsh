@@ -657,27 +657,41 @@
       "kind": "planned",
       "plugin": null,
       "service": null,
-      "evidence": "judicature: no adjudicating machinery exists; the deficiency mirrors the Compact's own J-8 trajectory — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
+      "evidence": "judicature: the cascade is real and consumed end to end — a filed case resolves its panel against the derived parties at filing, and a case whose every declared set recuses is recorded unheard (never dismissed, re-filable before any later-declared set); the challenge route (heard before the case) lands with remedies — slice 3 (#113); sets and independence landed in slice 1 (#111), the case and the hearing in slice 2 (#112)",
       "enforcedBy": [],
       "verifiers": []
     },
     {
       "clause": "J-2",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "judicature: the record is now tamper-evident (I-2, compact-record), so evidence exists — but no adjudicating machinery consumes it; the hearing/panel layer is still absent (see J-8) — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-judicature",
+      "service": "compact-judicature",
+      "evidence": "the record is the evidence, and the hearing consumes it exactly that way: filings cite seq ranges, every slice is chain-verified at filing and re-verified before judgment (a break refuses the proceeding, D-7, and the break is itself filable as an integrity challenge), and the accused's counsel access extends record_read standing to the slices cited against them — acts shown, unstated reasoning withheld (R-10/R-2)",
+      "enforcedBy": [
+        "packages/judicature/src/cases.js",
+        "packages/judicature/src/index.js",
+        "packages/record/src/read.js"
+      ],
+      "verifiers": [
+        "packages/judicature/test/cases.test.js",
+        "packages/judicature/test/composed.dsh.test.js",
+        "packages/record/test/record-read.dsh.test.js"
+      ]
     },
     {
       "clause": "J-3",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "judicature: hearing machinery does not exist — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-judicature",
+      "service": "compact-judicature",
+      "evidence": "the hearing exists: the filing door is a form-checker, never a merits-checker (no clerk, no prosecutor — parties are derived from the cited acts, never asserted by the filer); access is ungated for the affected Member and flood-capped for others (I-5 doctrine); a term runs whether or not anyone looks (overdue derived from the clock at read); interim measures carry cause, scope and clock-derived expiry, reviewed at the hearing's opening; judgments and dissents land as attributed rows or refuse to land (D-7) — findings must cite verified slices, reasons are required, no removal operation exists (A-5)",
+      "enforcedBy": [
+        "packages/judicature/src/cases.js",
+        "packages/judicature/src/index.js"
+      ],
+      "verifiers": [
+        "packages/judicature/test/cases.test.js",
+        "packages/judicature/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "J-4",
@@ -728,7 +742,7 @@
       "kind": "enforced",
       "plugin": "compact-judicature",
       "service": "compact-judicature",
-      "evidence": "adjudicator sets are DECLARED in the signed annex (rehearsal declaration carried by tools/rehearsal-keyring.mjs): roles with standing provenance over a declared dependency graph, the trajectory as data (first external Member by a fixed term — expiry derived from the clock at read, never stored — and the founder's rule-based exclusions), the fail-closed gate family JG ([JG/set-undeclared] while undeclared, [JG/hearing-unbuilt] until slice 2), and an external-Witness seat remaining impossible until I-1 keys exist — the founding deficiency carried as data, not prose (docs/concept-judicature.md, #111)",
+      "evidence": "adjudicator sets are DECLARED in the signed annex (rehearsal declaration carried by tools/rehearsal-keyring.mjs): roles with standing provenance over a declared dependency graph, the trajectory as data (first external Member by a fixed term — expiry derived from the clock at read, never stored — and the founder's rule-based exclusions), the fail-closed gate family JG ([JG/set-undeclared] while undeclared), and an external-Witness seat remaining impossible until I-1 keys exist — the founding deficiency carried as data, not prose (docs/concept-judicature.md, #111)",
       "enforcedBy": [
         "packages/judicature/src/sets.js",
         "packages/judicature/src/index.js",

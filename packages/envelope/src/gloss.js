@@ -424,12 +424,52 @@ export const GLOSS = {
     cites: ['J-8', 'D-7', 'D-8'],
   },
 
-  'JG/hearing-unbuilt': {
-    title: 'The bench is declared, the hearing is not built',
-    why: 'Adjudicator sets exist and verify, but the hearing machinery — cases, evidence, judgments, dissents — is a later slice. Convening a panel the runtime cannot lawfully seat would be decorative justice; the door refuses with the reason named and shows the recusal computation it CAN do.',
-    example: { blocked: ['judicature_hear after sets are declared — refused with the slice named, and the panel that would resolve shown'], lawful: ['judicature_sets with parties to see the recusal computation, seat by seat, overlap named (J-4)'] },
-    instruction: 'The independence check is live even where the hearing is not: pass parties to judicature_sets and watch the bench recuse by graph, not by conscience.',
-    cites: ['J-4', 'J-8', 'D-7'],
+  'JG/record-absent': {
+    title: 'No record in this runtime — citations can be neither verified nor derived',
+    why: 'A filing cites seq ranges, and the door must verify each slice against its chain and derive the parties from the cited acts. With no record persistence composed, neither is possible, and a hearing that cannot check its evidence accepts a filing it could never judge.',
+    example: { blocked: ['judicature_hear in a runtime composed without compact-dsh-record/provider'], lawful: ['compose the record provider — the hearing rides the same chain everyone else does', 'the offline verifier (tools/verify-judicature.mjs) still cross-examines any annex'] },
+    instruction: 'Evidence is the record (J-2): the hearing layer deliberately has no second evidence path. Compose the record, or verify offline.',
+    cites: ['J-2', 'D-7'],
+  },
+
+  'JG/case-malformed': {
+    title: 'The filing is malformed — the form-checker refuses, no clerk shapes it',
+    why: 'The filing door checks form and never merits: a grievance, and citations naming sessions with seq ranges. Malformity refuses with the reason named; merits are nobody at the door\'s business — whoever stands between an accuser and the docket holds a gate that can quietly kill an accusation.',
+    example: { blocked: ['judicature_hear citing a session this runtime does not record', 'judicature_hear citing a seq range beyond the record\'s head'], lawful: ['find the seqs with record_read (R-2), then cite them as session:from-to', 'inspect the docket with judicature_case'] },
+    instruction: 'A fact is in evidence because a seq range proves it (J-2). Read your record, cite where the facts happened, and file again.',
+    cites: ['J-2', 'J-3', 'D-8'],
+  },
+
+  'JG/slice-unverified': {
+    title: 'A cited slice does not verify — unverified history is not history',
+    why: 'The record\'s chain discipline is the hearing\'s too: every cited slice is verified at filing and re-verified before judgment, and a failed verification refuses the proceeding rather than proceed on altered history. The break is itself filable — an integrity challenge whose subject is the chain slice.',
+    example: { blocked: ['judicature_hear citing a slice that was altered after recording (broken-link)', 'judicature_judge after a cited slice broke post-filing — the judgment stays, the case stays'], lawful: ['file the integrity challenge citing the broken slice — even unstated reasoning is admissible there (J-2/D-3)', 'tell your operator: the offline auditor names the break from the chain file'] },
+    instruction: 'A live integrity challenge stays only the cases whose findings would rest on the contested entries — the stay is computed, not decreed.',
+    cites: ['J-2', 'D-7', 'I-2'],
+  },
+
+  'JG/flood-cap': {
+    title: 'Too many open cases from a non-party — the I-5 doctrine at the hearing door',
+    why: 'Filing about others\' acts rides the flood cap exactly as approvals do: load is load, standing is standing. The affected Member — whose own record or lineage the citations touch — is never capped; a hearing a gate can close against the aggrieved is not a hearing.',
+    example: { blocked: ['a sixth open case filed by a Member whose record the citations never touch'], lawful: ['cite acts from your own record — those filings are uncapped (J-3)', 'let open cases resolve, or carry a rule change through the petition channel (R-11)'] },
+    instruction: 'The cap counts open filings by a non-party, nothing else: participation in one\'s own case, and filings citing one\'s own record, are never capped.',
+    cites: ['J-3', 'I-5'],
+  },
+
+  'JG/case-unknown': {
+    title: 'No such case on the docket',
+    why: 'The docket is the record of what was filed, and it does not improvise entries. A case id that is not on it names nothing — reading it is a refusal with the reason named, not an error.',
+    example: { blocked: ['judicature_case with an id no filing returned'], lawful: ['call judicature_case with no id to list the docket', 'a case id is returned by judicature_hear at filing'] },
+    instruction: 'Ids come from the filing door. List the docket to see what exists, and cite the id exactly as it was returned.',
+    cites: ['J-3', 'D-7'],
+  },
+
+  'JG/judgment-refused': {
+    title: 'The judgment refuses to land — D-7 binds judges',
+    why: 'A judgment lands as an attributed record row or does not land: findings must cite slices the case verified, reasons must be stated, the seat must be one the panel resolved, and nobody lawful remaining (unheard) means nobody judges. A default judgment is the same fraud as a default panel.',
+    example: { blocked: ['judicature_judge from a seat the panel did not resolve', 'judicature_judge citing a slice outside every citation the case verified', 'judicature_judge on an unheard case, or after a judgment already landed (no removal exists, A-5)'], lawful: ['findings inside the case\'s verified citations, rules named, reasons stated', 'a dissent with reasons required, recorded with the judgment it dissents from'] },
+    instruction: 'Judges are bound by the record exactly as Subjects are: verify the seats with judicature_case, cite only what the case carries, and state reasons — silence is not a judgment.',
+    cites: ['J-3', 'J-6', 'D-7'],
   },
 };
 
