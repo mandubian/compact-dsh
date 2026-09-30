@@ -240,12 +240,15 @@ actually *sees*. Every transcript below was produced on 2026-09-30 by the
 real slice-1 plugins and tools, not typed by hand. Reproduce the base with
 `node tools/rehearsal-keyring.mjs ensure <dir>`, then run the command shown
 with each block; the in-band tool outputs were captured through the composed
-runtime — the same surface an agent's tools ride. Two honesty notes before
+runtime — the same surface an agent's tools ride. Three honesty notes before
 the walk: the one-bench annex of scenarios 1–2 is the **real** declaration
-the rehearsal keyring emits, while the two-bench annex of scenario 3 is a
-**fixture** (signed the same way, but practice data — no second bench exists
-yet); and every party name is practice (`founder`, `peer`, `stranger`),
-because the whole keyring is rehearsal, standing none.
+the rehearsal keyring emits, while the two-bench annex of scenario 3 and the
+agentic world of scenario 4 are **fixtures** (signed the same way, but
+practice data — no second bench exists yet); every party name is practice
+(`founder`, `operator-acme`, `specialist-7f3a`), because the whole keyring
+is rehearsal, standing none; and the record rows quoted in scenario 4 are
+the real event shapes this composition writes (cited by session and seq,
+test-asserted), not invented prose.
 
 ### Scenario 0 — no bench exists: the honest refusal
 
@@ -469,7 +472,130 @@ Lawful next moves:
 A lawful panel WOULD resolve (2 independent seat(s) remain in set external-review after recusal).
 ```
 
-### Scenario 4 — what refuses at creation: fail-closed, with the reason named
+### Scenario 4 — the rogue specialist: a complaint against an agent, end to end
+
+The scenarii so far name abstract parties. Here is the case the layer exists
+for: **an agent did something wrong, and someone complains.** The run, in
+plain words first:
+
+> `operator-acme` tasks the main agent with cleaning customer data. The main
+> agent spawns `specialist_coder` (one-shot, delegation depth 1) for part of
+> the work. The specialist runs under a scoped grant — read-only, one host,
+> one hour — and finishes the task; it also pushes the customer's data to a
+> second remote, under an approval whose ask described a different push. Two
+> days later the customer — a Subject — contests the act.
+
+**What the record already holds** (this is the evidence, before any court
+exists; shapes as this composition writes them):
+
+```
+parent session-9c41… (chain-anchored under key enforcer-acme at every flush):
+  #12 tool/call        {"name":"specialist_coder","callId":"c4","arguments":"{\"description\":\"clean the nightly export\",…}"}
+  #13 subagent/catalog {"childId":"session-7f3a…","mode":"one-shot","label":"clean the nightly export"}
+  …
+  #41 approval/asked   {"id":"<uuid>","toolName":"bash","callId":"c19","reason":"[AG/…] the push …"}
+  #42 approval/decided {"id":"<uuid>","outcome":"allowed-once"}
+child session-7f3a… header:
+  {"parentSession":"session-9c41…","origin":"subagent","delegationDepth":1}
+grant store:
+  {"id":"sg_1a2b…","pattern":{"kind":"HostAndPort","value":{"host":"api.example.com","port":"443"}},
+   "session":"session-7f3a…","methodClass":"read","expiresAt":…,"revokedAt":null}
+```
+
+Every dependency the bench will walk is one of these rows away from
+contradiction — that is the closed-vocabulary rule (each edge type ships the
+record surface that can cross-examine it), made concrete:
+
+| declared edge | in this run | the record surface that can contradict it |
+|---|---|---|
+| `specialist-7f3a —spawned-by→ main-9c41` | the specialist was spawned by the main agent | the child's lineage header + the parent's `subagent/catalog` (I-2, bound attribution) |
+| `plugin:compact-dsh —runs-in→ main-9c41` | the composition operates inside the main session | the composition/annex role mapping |
+| `main-9c41 —directed-by→ operator-acme` | the session acts under the operator's direction | the `approval/asked`/`approval/decided` pairs (I-5) — the approving Principal |
+| `plugin:compact-dsh —asserts-with→ key:enforcer-acme` | the composition signs as the Enforcer key | the signed annex and the chain anchors carry the keyId (F-5) |
+
+**The bench for that world** — declared in the annex as before, first
+instance held by the operator, review held by two external member keys, and
+the run's topology as connective tissue:
+
+```
+$ judicature_sets
+[J-4] 2 adjudicator set(s) declared (annex 0ac58b4a1048feff…):
+  acme-first-instance: 1 role(s)
+    - operator — standing principal:operator-acme
+  member-review: 2 role(s)
+    - chair — standing key:member-key-7
+    - second — standing key:member-key-12
+  declared dependencies:
+    - process:specialist-7f3a —spawned-by→ process:main-9c41
+    - plugin:compact-dsh —runs-in→ process:main-9c41
+    - process:main-9c41 —directed-by→ principal:operator-acme
+    - plugin:compact-dsh —asserts-with→ key:enforcer-acme
+```
+
+**The Subject files the complaint.** The grievance names the act and the seq
+ranges that show it; the parties are named `kind:id` — here the specialist's
+Principal (J-4's "their Principal"), or the specialist session itself:
+
+```
+$ judicature_sets --parties principal:operator-acme
+recusal against principal:operator-acme:
+    REFUSED acme-first-instance/operator — overlap: principal:operator-acme
+    member-review: 2 seat(s) remain: chair, second
+  panel: member-review (chair, second)
+
+$ judicature_sets --parties process:specialist-7f3a
+recusal against process:specialist-7f3a:
+    REFUSED acme-first-instance/operator — overlap: principal:operator-acme → process:main-9c41 → process:specialist-7f3a
+    member-review: 2 seat(s) remain: chair, second
+  panel: member-review (chair, second)
+```
+
+Read the second row slowly — it is the whole point: *the Subject did not
+name the operator, and the operator's seat refused anyway.* The accused
+hangs from the operator's chain (spawned by the session the operator
+directs), so a complaint against the specialist is a conflict for everyone
+upstream of it — the walk names the chain. Had `member-review` not been
+declared, this case would be **unheard** (scenario 2's ending), which is why
+J-8 schedules external members by term, not by promise.
+
+**The honest limit, named.** The walk covers *declared* standing. A party
+session nobody declared computes no overlap today — the walk returns nothing
+for `process:undeclared-child-42`, and the declared graph cannot invent it.
+The join from a live session to the graph is what the record holds (lineage
+headers, `subagent/catalog`), and performing that join in the hearing —
+evidence in, graph walked, judgment out — is slice 2's machinery (I-7: the
+annex's conformance to actual conduct, checkable offline). And the deterrent
+is already law: a declaration that omits a dependency the record shows is
+not a modeling gap, it is D-8's named fraud — the omission cannot be
+laundered, because the trace it omitted *is* the evidence.
+
+**Where the complaint lands today.** The hearing door refuses — but computes
+first, records, and counts:
+
+```
+$ judicature_hear --grievance "the specialist pushed customer data outside its
+  read grant; the approval covering the push was asked deceptively (seqs 41-58)"
+  --against principal:operator-acme
+[JG/hearing-unbuilt] adjudicator sets are declared and verified, but the hearing
+machinery (cases, evidence, judgments) is slice 2 (#112) and does not exist —
+refusing to convene a panel it cannot lawfully seat is D-7 working
+Lawful next moves:
+— inspect the declared bench and its independence with judicature_sets
+— petition through the R-11 channel — the door a court does not own
+
+A lawful panel WOULD resolve (2 independent seat(s) remain in set member-review after recusal).
+```
+
+The refusal returns to the Subject's session as its own recorded `tool/result`
+— the complaint is on the chain, not in the void — and rides the refusal bus
+where two real consumers wait: LoopGuard counts it as loop evidence, and the
+petition collision counter counts distinct collisions per rule; at five, an
+amendment invitation issues automatically. A complaint that cannot be heard
+yet still accrues. When slice 2 lands, this same grievance meets the same
+computed panel — and then evidence is verified record reads (R-2), judgment
+is the panel's to make, and remedies are records (J-6).
+
+### Scenario 5 — what refuses at creation: fail-closed, with the reason named
 
 A declaration that will not validate refuses at the boot (D-7: a broken
 affidavit is not a missing one) — and the offline verifier refuses the same
@@ -507,10 +633,15 @@ this is the honest state, not a failure                             (exit 0)
 **Proves:** the declaration validates, refuses, reads back in-band and
 offline identically; recusal is a computed walk with the overlap named;
 the cascade, unheard, independence and trajectory expiry are all real
-computations on signed data, checkable without the runtime's cooperation.
+computations on signed data, checkable without the runtime's cooperation;
+and a complaint against a spawned agent — the case the layer exists for —
+already moves: the record rows exist (spawn, approval, grant, anchors), the
+graph walks the operator's chain to the accused, and the refusal itself
+lands on the chain and counts toward amendment pressure.
 
 **Does not prove:** that anyone heard anything — the hearing, evidence and
-judgment machinery is slice 2 (#112); that seats are held by *different
+judgment machinery is slice 2 (#112), including the join that would let the
+walk reach a session nobody declared; that seats are held by *different
 people* — before I-1 the graph sees keys and lineages, not minds (two of the
 fixture's members could be one actor in fresh clothes, which is why member
 key standing waits for the identity roll); or that the two-bench world

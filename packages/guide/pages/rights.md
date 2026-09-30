@@ -60,9 +60,9 @@ tool to use when.
   overlap named (J-4). `tool:judicature_hear` is the door slice 2 will fill:
   until the hearing machinery exists it refuses with the reason named,
   which is the design working, not a defect. The whole walk — bench
-  declared, case brought, panel or unheard, what refuses — is shown with
-  real captured output under "The bench, walked through" in
-  `file:docs/concept-judicature.md`.
+  declared, a complaint against a spawned agent moved end to end, panel or
+  unheard, what refuses — is shown with real captured output under "The
+  bench, walked through" in `file:docs/concept-judicature.md`.
 
 ## Ending your operation (R-8, R-12)
 
