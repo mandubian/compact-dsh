@@ -542,8 +542,13 @@ lawful ways to name the same adversary, and both dry-runs are shown:
 **name the Principal** the accused hangs from (`principal:operator-acme` —
 J-4's own "their Principal" direction, the operator as the answerable head
 of the chain), or **name the accused itself** (`process:specialist-7f3a`,
-the session that did the push). Watch what each naming does to the bench —
-same parties-in-principle, same panel, different walk:
+the session that did the push). The two blocks below are the *same*
+computation run on the *same* adversary named two ways — and that is the
+lesson: a seat can refuse for one of two reasons, **identity** (the seat is
+the party — block one, overlap of one node) or **the chain** (the party
+hangs from the seat's dependencies — block two, overlap of three). If
+recusal matched identity only, block two would leave the operator seated,
+judging his own agent's act; the walk closes that door:
 
 ```
 $ judicature_sets --parties principal:operator-acme
@@ -559,7 +564,7 @@ recusal against process:specialist-7f3a:
   panel: member-review (chair, second)
 ```
 
-The first run is the simple one: the operator is a party, and the seat the
+The first run is the base case: the operator is the party, and the seat the
 operator holds is that party — the overlap is the identity itself, one
 node, and the seat refuses. Nobody sits in judgment of their own case.
 
