@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="1107" viewBox="0 0 1620 1107">
+  <g transform="scale(1.5)">
+  <rect width="1080" height="738" fill="#111622"/>
+  <rect x="1" y="1" width="1078" height="736" rx="20" fill="#111622" stroke="#2a3348"/>
+  <text letter-spacing="1.5" x="40" y="42" font-family="DejaVu Sans Mono, monospace" font-size="12" font-weight="700" fill="#6e7a96">TWEET 2 OF 2 · MID-FLIGHT</text>
+  <text x="40" y="88" font-family="DejaVu Sans, sans-serif" font-size="34" font-weight="750" fill="#e6edf3">I revoked the grant mid-download.</text>
+  <text x="40" y="132" font-family="DejaVu Sans, sans-serif" font-size="34" font-weight="750" fill="#7ee787">The open connection was closed 905 ms later.</text>
+  <text x="40" y="178" font-family="DejaVu Sans, sans-serif" font-size="16" font-weight="400" fill="#aebbdc">A tunnel through the mediator (CONNECT — what every https:// request is), streaming 40 chunks.</text>
+  <text x="40" y="202" font-family="DejaVu Sans, sans-serif" font-size="16" font-weight="400" fill="#aebbdc">The grant was revoked in the store at chunk 9; the mediator re-checks live tunnels every 1 s.</text>
+  <rect x="40" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="65.075" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="90.15" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="115.225" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="140.3" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="165.375" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="190.45" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="215.525" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="240.6" y="260" width="22.075" height="26" rx="3" fill="#7ee787"/>
+  <rect x="265.67499999999995" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="290.75" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="315.825" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="340.9" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="365.97499999999997" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="391.05" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="416.125" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="441.2" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="466.275" y="260" width="22.075" height="26" rx="3" fill="#f2cc60"/>
+  <rect x="491.34999999999997" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="516.425" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="541.5" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="566.5749999999999" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="591.65" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="616.725" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="641.8" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="666.875" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="691.9499999999999" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="717.025" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="742.1" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="767.175" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="792.25" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="817.3249999999999" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="842.4" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="867.475" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="892.55" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="917.625" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="942.6999999999999" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="967.775" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="992.85" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="1017.925" y="260" width="22.075" height="26" rx="3" fill="#1f2633"/>
+  <rect x="263.17499999999995" y="244" width="2" height="58" fill="#f2cc60"/>
+  <text x="264.17499999999995" y="238" font-family="DejaVu Sans Mono, monospace" font-size="12" font-weight="400" fill="#f2cc60" text-anchor="middle">revoked</text>
+  <rect x="488.34999999999997" y="244" width="3" height="58" fill="#ff7b72"/>
+  <text x="497.84999999999997" y="320" font-family="DejaVu Sans Mono, monospace" font-size="12.5" font-weight="400" fill="#ff7b72">closed +905 ms · 18/40 chunks · curl exit 18 (partial transfer)</text>
+  <g>
+  <rect x="40" y="348" width="1000" height="234" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <rect x="40" y="348" width="1000" height="34" rx="12" fill="#161b22"/>
+  <rect x="40" y="370" width="1000" height="12" fill="#161b22"/>
+  <circle cx="58" cy="365" r="5" fill="#ff5f57"/>
+  <circle cx="74" cy="365" r="5" fill="#febc2e"/>
+  <circle cx="90" cy="365" r="5" fill="#28c840"/>
+  <text x="108" y="369" font-family="DejaVu Sans Mono, monospace" font-size="12" font-weight="400" fill="#8b949e">curl → egress mediator · gate EG</text>
+  <text x="56" y="413" font-family="DejaVu Sans Mono, monospace" font-size="13.5" font-weight="400" fill="#79c0ff">$ curl -N -p -x $MEDIATOR http://api.example.com:18080/stream</text><text x="56" y="434" font-family="DejaVu Sans Mono, monospace" font-size="13.5" font-weight="400" fill="#6e7a96">chunk 1</text><text x="56" y="455" font-family="DejaVu Sans Mono, monospace" font-size="13.5" font-weight="400" fill="#6e7a96">…</text><text x="56" y="476" font-family="DejaVu Sans Mono, monospace" font-size="13.5" font-weight="400" fill="#6e7a96">chunk 18</text><text x="56" y="497" font-family="DejaVu Sans Mono, monospace" font-size="13.5" font-weight="400" fill="#f2cc60"># grant revoked at chunk 9 · tunnel closed 905 ms later · curl exit 18</text><text x="56" y="518" font-family="DejaVu Sans Mono, monospace" font-size="13.5" font-weight="400" fill="#79c0ff">$ curl -x $MEDIATOR http://api.example.com:18080/repos</text><text x="56" y="539" font-family="DejaVu Sans Mono, monospace" font-size="13.5" fill="#e6edf3"><tspan fill="#f2cc60">[EG/revoked]</tspan> the egress grant that covered api.example.com:18080 was revoked at</text><text x="56" y="560" font-family="DejaVu Sans Mono, monospace" font-size="13.5" font-weight="400" fill="#e6edf3">  2026-09-23T15:29:20.904Z — revocation kills the route, mid-flight included</text>
+</g>
+  <rect x="40" y="610" width="4" height="70" fill="#7ee787"/>
+  <text x="58" y="630" font-family="DejaVu Sans, sans-serif" font-size="15" font-weight="700" fill="#e6edf3">Plain dsh has nothing to revoke.</text>
+  <text x="58" y="654" font-family="DejaVu Sans, sans-serif" font-size="15" font-weight="400" fill="#aebbdc">Its container holds the network itself, so the download simply finishes. Here consent is</text>
+  <text x="58" y="676" font-family="DejaVu Sans, sans-serif" font-size="15" font-weight="400" fill="#aebbdc">a live grant, and the one path out keeps checking it.</text>
+  <text x="40" y="702" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="400" fill="#6e7a96">Measured on a tunnel. A plain-HTTP response already in flight is not cut — only its next request is refused.</text>
+  </g>
+</svg>

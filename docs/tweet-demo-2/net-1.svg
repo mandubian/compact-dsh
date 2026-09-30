@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="1089" viewBox="0 0 1620 1089">
+  <g transform="scale(1.5)">
+  <rect width="1080" height="726" fill="#111622"/>
+  <rect x="1" y="1" width="1078" height="724" rx="20" fill="#111622" stroke="#2a3348"/>
+  <text letter-spacing="1.5" x="40" y="42" font-family="DejaVu Sans Mono, monospace" font-size="12" font-weight="700" fill="#6e7a96">TWEET 1 OF 2 · THE NETWORK THAT ASKS</text>
+  <text x="40" y="88" font-family="DejaVu Sans, sans-serif" font-size="34" font-weight="750" fill="#e6edf3">Plain dsh’s network is a switch: on or off.</text>
+  <text x="40" y="132" font-family="DejaVu Sans, sans-serif" font-size="34" font-weight="750" fill="#7ee787">The Compact’s asks who, where, and what for.</text>
+  <text x="40" y="178" font-family="DejaVu Sans, sans-serif" font-size="16" font-weight="400" fill="#aebbdc">One approved curl materialized one grant. Then every connection was checked against it</text>
+  <text x="40" y="202" font-family="DejaVu Sans, sans-serif" font-size="16" font-weight="400" fill="#aebbdc">by the mediator — real plugins, real sockets, real curl. A local origin stands in for the web.</text>
+  <rect x="40" y="238" width="1000" height="40" rx="10" fill="#0d1117" stroke="#2a3348"/>
+  <text x="56" y="264" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="400" fill="#7ee787">GRANT</text>
+  <text x="118" y="264" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="400" fill="#aebbdc">HostAndPort api.example.com:18080 · read · 1h · this session only · revocable</text>
+  <rect x="40" y="296" width="1000" height="58" rx="12" fill="#0d1117" stroke="#2ea04340"/>
+  <circle cx="70" cy="325" r="15" fill="#12351f"/>
+  <text x="70" y="331" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="800" fill="#7ee787" text-anchor="middle">✓</text>
+  <text x="100" y="321" font-family="DejaVu Sans Mono, monospace" font-size="14.5" font-weight="400" fill="#79c0ff">GET  http://api.example.com:18080/repos</text>
+  <text x="100" y="342" font-family="DejaVu Sans, sans-serif" font-size="13.5" font-weight="400" fill="#aebbdc">200 — the origin saw GET /repos</text>
+  <rect x="911.6" y="311" width="112.39999999999999" height="28" rx="14" fill="#12351f" stroke="#2ea04340"/>
+  <text x="967.8000000000001" y="330" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="400" fill="#7ee787" text-anchor="middle">grant covers</text>
+  <rect x="40" y="364" width="1000" height="58" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <circle cx="70" cy="393" r="15" fill="#3a1518"/>
+  <text x="70" y="399" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="800" fill="#ff7b72" text-anchor="middle">✗</text>
+  <text x="100" y="389" font-family="DejaVu Sans Mono, monospace" font-size="14.5" font-weight="400" fill="#79c0ff">POST http://api.example.com:18080/repos</text>
+  <text x="100" y="410" font-family="DejaVu Sans, sans-serif" font-size="13.5" font-weight="400" fill="#aebbdc">403 — the origin never saw it: a read grant is not a write grant</text>
+  <rect x="887" y="379" width="137" height="28" rx="14" fill="#241019" stroke="#ff7b7240"/>
+  <text x="955.5" y="398" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="400" fill="#ff7b72" text-anchor="middle">EG/method-class</text>
+  <rect x="40" y="432" width="1000" height="58" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <circle cx="70" cy="461" r="15" fill="#3a1518"/>
+  <text x="70" y="467" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="800" fill="#ff7b72" text-anchor="middle">✗</text>
+  <text x="100" y="457" font-family="DejaVu Sans Mono, monospace" font-size="14.5" font-weight="400" fill="#79c0ff">GET  http://other.example.com:18080/</text>
+  <text x="100" y="478" font-family="DejaVu Sans, sans-serif" font-size="13.5" font-weight="400" fill="#aebbdc">403 — a new host is a new grant</text>
+  <rect x="919.8" y="447" width="104.19999999999999" height="28" rx="14" fill="#241019" stroke="#ff7b7240"/>
+  <text x="971.9" y="466" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="400" fill="#ff7b72" text-anchor="middle">EG/no-grant</text>
+  <rect x="40" y="500" width="1000" height="58" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <circle cx="70" cy="529" r="15" fill="#3a1518"/>
+  <text x="70" y="535" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="800" fill="#ff7b72" text-anchor="middle">✗</text>
+  <text x="100" y="525" font-family="DejaVu Sans Mono, monospace" font-size="14.5" font-weight="400" fill="#79c0ff">GET  http://api.example.com:18080/redirect → other.example.com</text>
+  <text x="100" y="546" font-family="DejaVu Sans, sans-serif" font-size="13.5" font-weight="400" fill="#aebbdc">the origin answered the first hop; the redirect’s second hop was refused</text>
+  <rect x="919.8" y="515" width="104.19999999999999" height="28" rx="14" fill="#241019" stroke="#ff7b7240"/>
+  <text x="971.9" y="534" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="400" fill="#ff7b72" text-anchor="middle">EG/no-grant</text>
+  <rect x="40" y="568" width="1000" height="58" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <circle cx="70" cy="597" r="15" fill="#3a1518"/>
+  <text x="70" y="603" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="800" fill="#ff7b72" text-anchor="middle">✗</text>
+  <text x="100" y="593" font-family="DejaVu Sans Mono, monospace" font-size="14.5" font-weight="400" fill="#79c0ff">GET  http://api.example.com:18080/repos  · after revoke</text>
+  <text x="100" y="614" font-family="DejaVu Sans, sans-serif" font-size="13.5" font-weight="400" fill="#aebbdc">403 — the refusal names the revocation, with its timestamp</text>
+  <rect x="928" y="583" width="96" height="28" rx="14" fill="#241019" stroke="#ff7b7240"/>
+  <text x="976" y="602" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="400" fill="#ff7b72" text-anchor="middle">EG/revoked</text>
+  <rect x="40" y="646" width="3" height="44" fill="#6e7a96"/>
+  <text x="54" y="663" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="400" fill="#6e7a96">Declared residual: over HTTPS the mediator sees only host:port — it never opens the TLS tunnel,</text>
+  <text x="54" y="683" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="400" fill="#6e7a96">so a read grant admits any method inside it. Host, port, redirect, TTL and revocation still hold.</text>
+  </g>
+</svg>
