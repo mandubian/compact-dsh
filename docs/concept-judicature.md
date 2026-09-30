@@ -532,9 +532,15 @@ $ judicature_sets
     - plugin:compact-dsh —asserts-with→ key:enforcer-acme
 ```
 
-**The Subject files the complaint.** The grievance names the act and the seq
-ranges that show it; the parties are named `kind:id` — here the specialist's
-Principal (J-4's "their Principal"), or the specialist session itself:
+**The Subject files the complaint.** A filing has two parts: the grievance
+(the act contested, and the record seq ranges that show it) and the parties
+— who the case is against, each named `kind:id`. Here the Subject has two
+lawful ways to name the same adversary, and both are shown: **name the
+Principal** the accused hangs from (`principal:operator-acme` — J-4's own
+"their Principal" direction, the operator as the answerable head of the
+chain), or **name the accused itself** (`process:specialist-7f3a`, the
+session that did the push). Watch what each naming does to the bench —
+same complaint, same panel, different walk:
 
 ```
 $ judicature_sets --parties principal:operator-acme
@@ -550,13 +556,20 @@ recusal against process:specialist-7f3a:
   panel: member-review (chair, second)
 ```
 
+The first run is the simple one: the operator is a party, and the seat the
+operator holds is that party — the overlap is the identity itself, one
+node, and the seat refuses. Nobody sits in judgment of their own case.
+
 Read the second row slowly — it is the whole point: *the Subject did not
 name the operator, and the operator's seat refused anyway.* The accused
 hangs from the operator's chain (spawned by the session the operator
 directs), so a complaint against the specialist is a conflict for everyone
-upstream of it — the walk names the chain. Had `member-review` not been
-declared, this case would be **unheard** (scenario 2's ending), which is why
-J-8 schedules external members by term, not by promise.
+upstream of it — the walk names the chain, hop by hop, and the operator
+cannot dodge the recusal by pointing at the child. Either way of naming the
+adversary lands on the same bench: the operator's first instance is spent,
+and the case passes to the external members. Had `member-review` not been
+declared, both filings would end **unheard** (scenario 2's ending), which is
+why J-8 schedules external members by term, not by promise.
 
 **The honest limit, named.** The walk covers *declared* standing. A party
 session nobody declared computes no overlap today — the walk returns nothing
