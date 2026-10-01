@@ -22,10 +22,11 @@
 // ways along a dependency, so the check is reachability over the graph
 // treated as undirected.
 //
-// THE CHECKS BIND TO MEMBERS, NOT SESSIONS (J-4/F-6) — but identity keys
-// are pending (I-1), so pre-I-1 the graph sees keys and lineages, not
-// minds. The vocabulary below is honest about that: it can express
-// standing, not souls.
+// THE CHECKS BIND TO MEMBERS, NOT SESSIONS (J-4/F-6) — since the member
+// roll and session binding landed (identity slices 1–2, #124/#125), a
+// witness seat names the roll digest of an accredited external, and the
+// graph sees keys, lineages, and accreditations. Minds remain the
+// ratification world's to show; the vocabulary stays honest about that.
 
 /** Failure shape for every validation refusal in this module. */
 export class SetError extends Error {
@@ -36,10 +37,14 @@ export class SetError extends Error {
 }
 
 /** The kinds of standing a role (or a party) may assert. Each is a node
- *  kind in the graph. `witness` is deliberately absent: external Witnesses
- *  chain to identity keys that do not exist yet (I-1, pending) — declaring
- *  a witness seat now would be the fraud D-8 names. */
-export const STANDING_KINDS = ['principal', 'process', 'plugin', 'key'];
+ *  kind in the graph. `witness` arrived with the accreditation statute
+ *  (identity slice 3, #126): an external Witness is seated by an
+ *  ACCREDITATION ROW on the member roll — the annex names the roll digest,
+ *  the boot verifies the row, and a witness seat whose accreditation the
+ *  roll cannot show refuses the boot (an accreditation the record
+ *  contradicts is D-8). The root signs no Witness, ever: the chain to A-1
+ *  runs through the statute, a document. */
+export const STANDING_KINDS = ['principal', 'process', 'plugin', 'key', 'witness'];
 
 /** The edge vocabulary — the closed set of declared dependency types an
  *  annex may assert, each with the record surface that cross-examines it.
@@ -90,10 +95,15 @@ function isNodeShape(n) {
  *               notice? } ],
  *     edges: [ { type, from: {kind,id}, to: {kind,id} } ] }
  *
+ * @param {object} [options.witnesses] - the LIVE accredited witness key
+ *   digests (resolved from a verified member roll by the caller). A role
+ *   declaring `witness` standing names a digest this set must contain, or
+ *   the declaration refuses the boot — a seat without a seating is the
+ *   fraud D-8 names, the same in rehearsal as at ratification.
  * @returns {{sets: Array, edges: Array, graph: object, enforcerKey: string|null}}
  * @throws {SetError} sets-malformed
  */
-export function validateAdjudicatorSets(section, { enforcerKey = null } = {}) {
+export function validateAdjudicatorSets(section, { enforcerKey = null, witnesses = null } = {}) {
   const bad = (detail) => new SetError('sets-malformed',
     `malformed adjudicatorSets section: ${detail} — the declaration is a signed affidavit; a shape that will not validate refuses the boot rather than degrade (D-7)`);
   if (!(section && typeof section === 'object' && Array.isArray(section.sets)
@@ -122,7 +132,18 @@ export function validateAdjudicatorSets(section, { enforcerKey = null } = {}) {
       seenRoleIds.add(role.id);
       if (!isNodeShape(role.standing)) throw bad(`role "${role.id}": standing must be { kind, id }`);
       if (!STANDING_KINDS.includes(role.standing.kind)) {
-        throw bad(`role "${role.id}": standing kind "${role.standing.kind}" is not in the vocabulary (${STANDING_KINDS.join(', ')}) — witness standing arrives with I-1 identity keys, not before`);
+        throw bad(`role "${role.id}": standing kind "${role.standing.kind}" is not in the vocabulary (${STANDING_KINDS.join(', ')})`);
+      }
+      if (role.standing.kind === 'witness') {
+        if (!/^[0-9a-f]{64}$/.test(role.standing.id)) {
+          throw bad(`role "${role.id}": witness standing names a member key DIGEST (the accreditation row's coordinate on the roll), not "${role.standing.id}"`);
+        }
+        if (witnesses == null) {
+          throw bad(`role "${role.id}": the annex seats an external Witness but no member roll is composed — witness standing shows an accreditation the roll verifies, and a seat without a seating is the fraud D-8 names`);
+        }
+        if (!witnesses.has(role.standing.id)) {
+          throw bad(`role "${role.id}": no LIVE accreditation on the member roll for ${role.standing.id.slice(0, 12)}… — an accreditation the record contradicts (or does not show) refuses the boot, in rehearsal as at ratification (D-8)`);
+        }
       }
       nodeKeys.add(nodeKey(role.standing));
     }

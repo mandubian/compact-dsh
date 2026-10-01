@@ -65,7 +65,7 @@ export function fileAppeal(c, { filer, grounds, now = Date.now() }) {
       throw new CaseError('final', 'an appeal already exists on this case — a second judgment is final and a second appeal is refused; the door closes, the petition door never does');
     }
     if (c.appeal.panel?.status === 'witnesses-pending') {
-      throw new CaseError('unheard', 'an appeal stands recorded witnesses-pending on this case — heard never until external Witnesses exist (I-1): no judgment has landed, nothing is final, and the recorded appeal holds the door (the accreditation revives the route; it needs no re-filing)');
+      throw new CaseError('unheard', 'an appeal stands recorded witnesses-pending on this case — heard never until a disjoint bench seats an accredited external Witness (D-8): no judgment has landed, nothing is final, and the recorded appeal holds the door (seating one revives the route; it needs no re-filing)');
     }
     throw new CaseError('unheard', 'an appeal stands recorded unheard on this case — every disjoint set recused, no appellate judgment has landed, and nothing is final (J-1: never dismissed); the recorded appeal holds the door, and no set is declared later within this runtime (the annex is fixed at boot)');
   }
@@ -87,22 +87,45 @@ export function fileAppeal(c, { filer, grounds, now = Date.now() }) {
  * DISJOINT from the first panel's set (independence over declared
  * dependency edges, both ways) and retains an independent seat for the
  * case's parties. Returns one of:
- *   { status: 'panel', setId, seats, refusals }
+ *   { status: 'panel', setId, seats, refusals } — for a D-8 case the panel
+ *     INCLUDES an external Witness: the first disjoint set that retains one
+ *     hears, witness seat aboard (D-8's own sentence)
  *   { status: 'unavailable' } — no second disjoint set exists at all
  *   { status: 'unheard' }      — disjoint sets exist, every seat recuses
- *   { status: 'witnesses-pending' } — the D-8 route, heard never (I-1)
+ *   { status: 'witnesses-pending' } — the D-8 route where the composition
+ *     seats no accredited external: heard never, saying so — the wall now
+ *     means "no witness is seated", not "witnesses do not exist"
  */
 export function resolveAppellatePanel(judiciary, c) {
-  if (isEnforcerClass(c.parties, judiciary)) {
-    return { status: 'witnesses-pending' };
-  }
   const firstSetId = c.panel.setId;
   const disjoint = judiciary.sets.filter((s) =>
     s.id !== firstSetId && independenceBetweenSets(judiciary, firstSetId, s.id).independent);
+  const perSet = new Map(recusePerSet(judiciary, c.parties).map((a) => [a.setId, a]));
+  // the witness seats of each disjoint set — D-8's appellate panel must
+  // include at least one, seated by an accreditation the boot verified
+  const witnessSeatsOf = (setId) => {
+    const set = judiciary.sets.find((x) => x.id === setId);
+    return set ? set.roles.filter((r) => r.standing.kind === 'witness').map((r) => r.id) : [];
+  };
+  // THE D-8 ROUTE RUNS FIRST (a claim in the Enforcer's own class records
+  // rather than vanishes for want of a bench): a disjoint set with an
+  // external Witness aboard hears it; none seated, the appeal records
+  // witnesses-pending — the wall now means "no witness is seated", never
+  // "the accused's own class will hear it"
+  if (isEnforcerClass(c.parties, judiciary)) {
+    const refusals = [];
+    for (const s of disjoint) {
+      const row = perSet.get(s.id);
+      if (row) refusals.push(...row.refusals);
+      if (row && row.seats.length > 0 && row.seats.some((seat) => witnessSeatsOf(s.id).includes(seat))) {
+        return { status: 'panel', setId: s.id, seats: row.seats, refusals };
+      }
+    }
+    return { status: 'witnesses-pending' };
+  }
   if (disjoint.length === 0) {
     return { status: 'unavailable' };
   }
-  const perSet = new Map(recusePerSet(judiciary, c.parties).map((a) => [a.setId, a]));
   const refusals = [];
   for (const s of disjoint) {
     const row = perSet.get(s.id);
@@ -134,7 +157,7 @@ export function landAppellateJudgment(c, { seat, disposition, findings, rules, r
     throw new CaseError('unheard', 'the appeal stands recorded unheard — every disjoint set recused, nobody lawful remains to re-hear it; it is never dismissed, and no judgment lands without a lawful seat (J-1)');
   }
   if (c.appeal.panel?.status === 'witnesses-pending') {
-    throw new CaseError('unheard', 'the appeal stands recorded witnesses-pending — a party is of the Enforcer\'s own class (D-8), and that route is heard never until external Witnesses exist (I-1)');
+    throw new CaseError('unheard', 'the appeal stands recorded witnesses-pending — a party is of the Enforcer\'s own class (D-8), and this composition seats no accredited external Witness on a disjoint bench: heard never, saying so, until one is seated (the seating is the accreditation statute\'s to grant)');
   }
   if (c.appeal.panel?.status !== 'panel') {
     throw new CaseError('malformed', 'the appeal has no resolved panel — nobody lawful has been seated to re-hear it');

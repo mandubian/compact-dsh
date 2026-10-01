@@ -22,7 +22,7 @@ the design's. Read it first; everything after assumes it.
 | **party** | someone whose interests the case touches. Here (J-4's list): the Member accused, their Principal, anyone the outcome pays, and the Enforcer itself when the accusation is against its class. |
 | **recusal** | a judge stepping aside because of a conflict of interest. Here: not a matter of conscience — the same graph check that validates the set, run per seat against this case's parties; a hit means the seat *refuses*, and the refusal is itself a record row naming the overlap. |
 | **impartiality challenge** | a motion arguing a judge is biased. Here: a mini-case whose only subject is the challenged seat, heard by the remaining seats *before* the main case, so no tainted finding exists yet (J-4: "heard before the case"). |
-| **cascade** | the fallback order when a whole court is conflicted: pass to the next one. Here (J-1): a fully-recused set passes the case to the next declared set, defaulting at the last rung to external Witnesses — pending I-1, so the cascade can honestly terminate in `unheard`. |
+| **cascade** | the fallback order when a whole court is conflicted: pass to the next one. Here (J-1): a fully-recused set passes the case to the next declared set, defaulting at the last rung to external Witnesses — seatable since the accreditation statute (identity slice 3), and where a composition declares no witness set the cascade still honestly terminates in `unheard`. |
 | **trajectory fields** | coined by this design, not courtroom vocabulary: the schedule data a set declaration must carry — the fixed term for the first external-Member adjudicator, the founder's exclusions by rule — because "a court whose independence is promised but never scheduled has been promised nothing" (J-8). |
 | **founder / drafters** | those who wrote and ratified the constitution — the founding generation, whose early courts are necessarily staffed by themselves. J-8 calls this "a known deficiency, not a principle": honest, scheduled to end, and excluded by rule from cases touching the genesis. |
 | **external Witness** | a judge from outside the jurisdiction. Here: a Member accredited under A-1/A-7 whose standing is not this operator's — impossible to seat until identity keys exist (I-1), which is why the deep routes are declared pending rather than faked. |
@@ -807,7 +807,7 @@ door refuses `[JG/appeal-unavailable]` naming exactly that — a composition
 that wants the second door must declare the second bench. And where a
 party is of the **Enforcer's own class** (the enforcer key, the
 composition itself), the appellate panel must include external Witnesses
-(D-8) — pending I-1, that route is recorded **heard never, saying so**
+(D-8) — seatable since the accreditation statute (identity slice 3), and where no accredited external sits on a disjoint bench the route is recorded **heard never, saying so**
 (`[JG/appeal-witnesses-pending]`), never the accused's own class
 pretending otherwise.
 
@@ -1131,7 +1131,7 @@ the *law* is wrong routes to R-11 — not to defiance.
    law it changes share one chain of custody — and so restitution's first
    readable ledger line lands with the machinery that wrote it.
 4. **The appeal door (J-5)** — set-disjoint panels (a live appeal needs a
-   second declared set), the D-8 route declared pending: I-1.
+   second declared set), the D-8 route unlocked by the accreditation seating (identity slice 3, #126).
 5. **Precedent (J-7)** — the read door and the auto-invitation into the
    collision counter. Last, and only if the page earns them.
 
@@ -1144,9 +1144,10 @@ the *law* is wrong routes to R-11 — not to defiance.
   only what J-1 requires: it can never be the Enforcer, and until a set is
   declared nothing is heard.
 - **Full-recuse cases are unheard, not pending, until I-1 keys exist.** The
-  cascade's final rung (external Witnesses) is pending: I-1; the honest
-  state of a case no lawful panel can reach is a recorded `unheard`, and it
-  is not a dismissal.
+  cascade's final rung (external Witnesses) is seatable only where the
+  composition declares it — witness standing an accreditation row on the
+  member roll verifies; the honest state of a case no lawful panel can
+  reach is a recorded `unheard`, and it is not a dismissal.
 - **Until I-1, the layer's depth is topological.** First-instance panels
   can sit — declared sets, rule-based founder exclusions — but appeal
   needs two disjoint sets, the D-8 route needs externals, and full-recuse

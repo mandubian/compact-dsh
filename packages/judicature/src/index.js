@@ -35,10 +35,10 @@
 // Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
 
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { buildEnvelope } from 'compact-envelope';
-import { verifyAnnex } from 'compact-dsh-seals';
+import { verifyAnnex, parseManifest, verifyRoll } from 'compact-dsh-seals';
 import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 import {
   SetError, validateAdjudicatorSets, undeclared, recusePerSet, resolvePanel,
@@ -86,9 +86,9 @@ const REFUSAL_EVENT = 'compact-approval/refusal';
 
 /** The declared gaps this layer carries into the boot record (I-8). */
 export const DECLARED_GAPS = [
-  'the D-8 appeal route (an accusation whose party is of the Enforcer\'s own class) requires external Witnesses on ' +
-    'the appellate panel — pending I-1 identity keys (#116), that route is heard never, saying so, and it never ' +
-    'pretends otherwise',
+  'the D-8 appeal route (an accusation whose party is of the Enforcer\'s own class) requires an accredited external ' +
+    'Witness on the appellate panel — a composition that seats none records the appeal witnesses-pending, heard ' +
+    'never, saying so: the seating is the accreditation statute\'s to grant, never the accused\'s own class\'s',
   'an open appeal carries no term of its own: the case\'s liveness discipline (CASE_TERM_MS, overdue derived at ' +
     'read) does not extend to the re-hearing, and the docket summary still reads judged while an appeal stands ' +
     'open — the appeal shows in the case\'s full row only',
@@ -99,8 +99,9 @@ export const DECLARED_GAPS = [
     'the operator\'s recorded act (the keyring\'s rotation discipline) — the remedy row is the order, cited in it',
   'restitution is bounded by resources (J-6 clause text): the obligation row is the honest artifact; the reserve ' +
     'is the operator\'s declared choice — a runtime cannot pay what its operator has not put in the trust root',
-  'external Witnesses are pending I-1 identity keys (#116): the cascade\'s last rung is unreachable, and a case ' +
-    'whose every declared set recuses is recorded unheard — never dismissed, never defaulted',
+  'the cascade\'s last rung is seatable only where the composition declares it: witness standing names a roll ' +
+    'digest the boot verifies against a live accreditation row, and a composition that declares no witness set ' +
+    'still records its full-recuse cases unheard — never dismissed, never defaulted (J-1)',
   'rehearsal standing only: the annex this layer reads is standing:none under the development keyring — ' +
     'the machinery is honest about code-path correctness and nothing else',
 ];
@@ -274,10 +275,11 @@ export function appealWitnessesPendingEnvelope() {
     gate: GATE,
     ruleId: 'appeal-witnesses-pending',
     reason: 'a party to this case is of the Enforcer\'s own class (the enforcer key or the composition itself), and ' +
-      'the appellate panel for such an accusation MUST include external Witnesses (D-8) — which do not exist yet: ' +
-      'pending I-1 identity keys, that route is heard NEVER, saying so, never the accused\'s own class pretending otherwise',
+      'the appellate panel for such an accusation MUST include an accredited external Witness (D-8) — this ' +
+      'composition seats none on a disjoint bench: the route is heard NEVER, saying so, never the accused\'s own ' +
+      'class pretending otherwise (the seating is the accreditation statute\'s to grant)',
     lawfulNextMoves: [
-      'the recorded appeal is the claim\'s place in line — when external Witnesses are accredited (I-1) the route hears it; no re-filing is needed, and none is possible while the appeal stands',
+      'the recorded appeal is the claim\'s place in line — seat an accredited external on a disjoint bench and the route hears it; no re-filing is needed, and none is possible while the appeal stands',
       'the offline verifier (I-7) cross-examines the annex-versus-conduct divergence without the runtime\'s cooperation',
       'petition (R-11) carries the law question now; the D-8 route carries the accusation later',
     ],
@@ -327,19 +329,51 @@ export function parseCitations(spec) {
   return out;
 }
 
+/** The LIVE accredited witness digests a verified member roll shows —
+ *  externals seated by an accreditation row (the statute's act), standing
+ *  not revoked. Null when no roll is given: the honest pre-accreditation
+ *  state, in which a witness seat refuses the boot rather than pretending. */
+export function accreditedWitnesses(rollPath, keyringPath) {
+  if (!rollPath || !keyringPath) return null;
+  const roll = JSON.parse(readFileSync(rollPath, 'utf8'));
+  const manifest = parseManifest(readFileSync(keyringPath, 'utf8'));
+  const verdict = verifyRoll({ roll, manifest });
+  if (!verdict.ok) {
+    const first = verdict.findings.find((f) => f.severity === 'error');
+    throw new SetError('sets-malformed', `the member roll composing this bench refuses (${first?.reason}): ${first?.detail} — a witness seat verified against a broken ledger is the fraud D-8 names`);
+  }
+  const live = new Set();
+  for (const [digest, bound] of verdict.byKey) {
+    if (bound.member.class === 'external-witness' && bound.member.state === 'live' && bound.member.lineage.at(-1) === digest) live.add(digest);
+  }
+  return live;
+}
+
 /** Load and validate the sets an annex declares, or the honest empty state.
- *  A malformed section refuses (D-7): a broken affidavit is not a missing one. */
-export function loadJudiciary(annexPath, { now = Date.now() } = {}) {
+ *  A malformed section refuses (D-7): a broken affidavit is not a missing
+ *  one. Witness seats verify against the member roll (identity slice 3,
+ *  #126): the annex names the digest, the roll shows the accreditation,
+ *  and the seating is the statute's act — the root signs no Witness. */
+export function loadJudiciary(annexPath, { now = Date.now(), rollPath = null, keyringPath = null } = {}) {
   if (!annexPath) return undeclared(null);
   const annex = JSON.parse(readFileSync(annexPath, 'utf8'));
   const verified = verifyAnnex({ annex, expectedLawDigest: COMPACT_DIGEST, now });
   if (!annex.adjudicatorSets) return undeclared(verified.keyId);
-  const validated = validateAdjudicatorSets(annex.adjudicatorSets, { enforcerKey: verified.keyId });
-  return { ...validated, annexDigest: verified.annexDigest };
+  const declaresWitness = annex.adjudicatorSets.sets?.some((set) =>
+    set.roles?.some((r) => r.standing?.kind === 'witness')) ?? false;
+  if (declaresWitness && !rollPath) {
+    throw new SetError('sets-malformed', 'the annex seats an external Witness but no member roll is composed (config.rollPath/keyringPath) — witness standing shows an accreditation the roll verifies, never the annex\'s word for it (D-8)');
+  }
+  const witnesses = declaresWitness ? accreditedWitnesses(rollPath, keyringPath) : null;
+  const validated = validateAdjudicatorSets(annex.adjudicatorSets, { enforcerKey: verified.keyId, ...(witnesses != null ? { witnesses } : {}) });
+  return { ...validated, annexDigest: verified.annexDigest, ...(witnesses != null ? { witnessCount: witnesses.size } : {}) };
 }
 
 export function apply(ctx, config = {}) {
-  const judiciary = loadJudiciary(config.annexPath ?? null);
+  const judiciary = loadJudiciary(config.annexPath ?? null, {
+    rollPath: config.rollPath ?? null,
+    keyringPath: config.keyringPath ?? null,
+  });
   const declared = judiciary.sets.length > 0;
   // the member-binding seam (identity slice 2, #125): resolved through the
   // self-model's declared roll when composed; undeclared, resolve() is null
@@ -894,8 +928,8 @@ export function apply(ctx, config = {}) {
       'File the one appeal, as of right (no leave, no permission step): argue the law was MISAPPLIED on this record — ' +
       'the same record, re-read; no new evidence. The appellate panel resolves from sets DISJOINT from the first ' +
       'panel\'s (declared dependency edges, both ways); a second appeal is refused — the door closes, the petition ' +
-      'door never does. Where a party is of the Enforcer\'s own class (D-8), the route requires external Witnesses: ' +
-      'pending I-1, heard never, saying so.',
+      'door never does. Where a party is of the Enforcer\'s own class (D-8), the route requires an accredited ' +
+      'external Witness on the bench: none seated, heard never, saying so.',
     parameters: {
       case_id: { type: 'string', required: true, description: 'the judged case being appealed' },
       grounds: { type: 'string', required: true, description: 'the argued claim that the law was misapplied on this record — an unargued appeal is not one' },
@@ -1065,6 +1099,8 @@ export function apply(ctx, config = {}) {
     revocations: () => order.flatMap((id) => (docket.get(id).remedies ?? [])
       .filter((r) => r.remedy === 'revocation')
       .map((r) => ({ caseId: id, ...r }))),
+    /** LIVE accredited externals seated by this bench (J-1/D-8), 0 when none. */
+    accreditedWitnesses: () => judiciary.sets.reduce((n, set) => n + set.roles.filter((r) => r.standing.kind === 'witness').length, 0),
     /** The appeal on a case, or null (J-5). */
     appeal: (id) => (docket.has(id) ? structuredClone(docket.get(id).appeal) : null),
     /** The precedent index (J-7): every landed judgment with its case id. */
