@@ -629,3 +629,113 @@ test('the D-8 route through the door: witnesses-pending recorded, heard never, s
     case_id: id, seat: 'peer', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
   })), /stands recorded witnesses-pending/);
 });
+
+test('precedent (J-7): citation feeds the invitation, departure argues itself, the read door is bounded', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const { tools, service } = await boot(t, fixtureAnnex(dir, SECTION));
+  const file = async (grievance) => {
+    await call(tools, 'judicature_hear', { grievance, citations: 'specialist:2-3' }, 'customer');
+    return service.docket().at(-1).id;
+  };
+  const judge = (id, extra = {}) => call(tools, 'judicature_judge', {
+    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3',
+    reasons: 'the push ran outside the grant', ...extra,
+  }).then((r) => String(r?.value ?? r));
+
+  // the body of judgments begins: case A lands first
+  const a = await file('the specialist pushed outside its grant');
+  await judge(a);
+
+  // a citation that FOLLOWS: the reliance is recorded, and the reading
+  // generalized feeds the amendment invitation mechanically (threshold 1
+  // in this composition) — one reading vs the pinned text
+  const b = await file('the same push, again');
+  const followed = await judge(b, { cites: a });
+  assert.match(followed, /\[J-3\] judgment landed/);
+  assert.match(followed, /the reading generalized: an amendment invitation issued for D-3 \(1 distinct instances?, threshold 1\)/);
+  assert.match(followed, /the community decides whether the law adopts it or corrects the court/);
+  assert.deepEqual(service.reliedUponBy().get(a), [b]);
+
+  // an argued departure: inconsistency visible without consistency binding
+  const c = await file('a third push, read differently');
+  assert.match(await judge(c, { cites: a, departs: a }),
+    /consistency is owed reasons where it breaks/);
+  const departed = await judge(c, {
+    cites: a, departs: a,
+    precedent_grounds: 'the pattern is path-scoped on this record, and the cited slice shows the covered path',
+  });
+  assert.match(departed, /\[J-3\] judgment landed/);
+  assert.doesNotMatch(departed, /amendment invitation issued/, 'a departure is the court correcting itself — it counts nothing');
+  assert.match(departed, /precedent: departs from case_\w+, argued \(J-7\)/);
+  assert.deepEqual(service.reliedUponBy().get(a), [b], 'only the follower relies; the departer relies on nothing');
+
+  // precedent is a property of judgments: citing an unjudged case refuses
+  const d = await file('a fourth push');
+  assert.match(await judge(d, { cites: d }),
+    /a judgment cannot cite itself/);
+  const e = await file('a fifth push');
+  assert.match(await judge(e, { cites: d }),
+    /has landed no judgment — precedent is a property of judgments, not of cases/);
+
+  // the read door: bounded index, one judgment per read, standing sentence
+  const index = text(await call(tools, 'judicature_precedent', {}));
+  assert.match(index, /\[J-7\] 3 judgment\(s\) on the docket — precedent persuades; it never amends:/);
+  assert.match(index, new RegExp(`${a} — judgment at seat founder — D-3 — .* — relied upon by ${b}`));
+  assert.match(index, new RegExp(`${c} — judgment at seat founder — D-3 — .* — departs ${a}`));
+  assert.match(index, /An interpretive aid with no force/);
+  const one = text(await call(tools, 'judicature_precedent', { case_id: a }));
+  assert.match(one, new RegExp(`\\[J-7\\] judgment on ${a} — landed .* at seat founder, recorded by process:bystander:`));
+  assert.match(one, /reasons: the push ran outside the grant/);
+  assert.match(one, /relied upon by: case_\w+ — the reading generalized; the petition channel hears it \(R-11\)/);
+  assert.match(one, /never binding law \(FED-1\)/);
+  assert.match(text(await call(tools, 'judicature_precedent', { case_id: d })),
+    new RegExp(`no judgment has landed on ${d}`));
+  assert.match(text(await call(tools, 'judicature_precedent', { case_id: 'case_ghost' })),
+    /^\[JG\/case-unknown\]/);
+  // the service surface: the precedent index for other layers
+  assert.equal(service.precedents().length, 3);
+});
+
+test('an appellate judgment reads the body of judgments too (J-5 × J-7)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const twoSets = JSON.parse(JSON.stringify(SECTION));
+  twoSets.sets.push({
+    id: 'review',
+    roles: [
+      { id: 'chair', standing: { kind: 'key', id: 'member-key-7' } },
+      { id: 'second', standing: { kind: 'key', id: 'member-key-12' } },
+    ],
+    trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
+  });
+  const { tools, service } = await boot(t, fixtureAnnex(dir, twoSets));
+  await call(tools, 'judicature_hear', { grievance: 'the push', citations: 'specialist:2-3,customer:1-2' }, 'customer');
+  const first = service.docket()[0].id;
+  await call(tools, 'judicature_judge', {
+    case_id: first, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+  });
+  // the neighbor judgment the appellate panel will read
+  await call(tools, 'judicature_hear', { grievance: 'another push', citations: 'customer:1-2' }, 'customer');
+  const neighbor = service.docket()[1].id;
+  await call(tools, 'judicature_judge', {
+    case_id: neighbor, seat: 'founder', findings: 'customer:1-2', rules: 'D-3', reasons: 'the export covered it',
+  });
+  // the appeal re-hears, citing the neighbor's judgment — and departs from
+  // it with grounds owed
+  await call(tools, 'judicature_appeal', { case_id: first, grounds: 'the scope was read too widely' }, 'customer');
+  assert.match(text(await call(tools, 'judicature_judge', {
+    case_id: first, seat: 'chair', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+    disposition: 'affirm', cites: neighbor, departs: neighbor,
+  })), /consistency is owed reasons/);
+  const landed = text(await call(tools, 'judicature_judge', {
+    case_id: first, seat: 'chair', findings: 'specialist:2-3', rules: 'D-3', reasons: 'the record shows the path covered',
+    disposition: 'affirm', cites: neighbor, departs: neighbor,
+    precedent_grounds: 'the neighbor read the grant host-scoped; the pattern is path-scoped and this record shows the path',
+  }));
+  assert.match(landed, /\[J-5\] appellate judgment landed/);
+  const precedent = text(await call(tools, 'judicature_precedent', { case_id: first }));
+  assert.match(precedent, /appellate judgment — affirmed/);
+  assert.match(precedent, /departs from: case_\w+ — the neighbor read the grant host-scoped/);
+  assert.deepEqual(service.reliedUponBy().get(neighbor), undefined, 'an argued departure relies on nothing');
+});
