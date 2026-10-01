@@ -47,6 +47,7 @@ import {
 import {
   CaseError, fileCase, caseState, recordInterim, reviewInterimsAtOpening,
   landJudgment, deriveParties, isParty, citationsAgainst, renderCase,
+  checkPrecedentRow,
   CASE_TERM_MS, FLOOD_CAP_OPEN_CASES, INTERIM_MAX_MS,
 } from './cases.js';
 import {
@@ -57,6 +58,10 @@ import {
   fileAppeal, resolveAppellatePanel, landAppellateJudgment, renderAppeal,
   isEnforcerClass, APPEAL_DISPOSITIONS,
 } from './appeals.js';
+import {
+  resolvePrecedent, renderPrecedentIndex, renderJudgmentAsPrecedent,
+  reliedUponBy, operativeJudgment, PRECEDENT_STANDING,
+} from './precedent.js';
 
 export {
   SetError, validateAdjudicatorSets, undeclared, recusePerSet, resolvePanel,
@@ -68,6 +73,8 @@ export {
   REMEDY_KINDS, REVOCATION_TARGETS,
   fileAppeal, resolveAppellatePanel, landAppellateJudgment, renderAppeal,
   isEnforcerClass, APPEAL_DISPOSITIONS,
+  checkPrecedentRow, resolvePrecedent, renderPrecedentIndex,
+  renderJudgmentAsPrecedent, reliedUponBy, operativeJudgment, PRECEDENT_STANDING,
 };
 
 export const name = 'compact-judicature';
@@ -85,6 +92,9 @@ export const DECLARED_GAPS = [
   'an open appeal carries no term of its own: the case\'s liveness discipline (CASE_TERM_MS, overdue derived at ' +
     'read) does not extend to the re-hearing, and the docket summary still reads judged while an appeal stands ' +
     'open — the appeal shows in the case\'s full row only',
+  'cross-runtime precedent is persuasive only (FED-1 unadopted): the precedent door serves THIS docket\'s ' +
+    'judgments, and another composition\'s judgments enter as record evidence through a case\'s citations, never ' +
+    'as rows here — persuasive exactly as far as the chain verifies, and no further',
   'revocation orders record, they do not re-declare: the annex/register rotation that executes a revocation is ' +
     'the operator\'s recorded act (the keyring\'s rotation discipline) — the remedy row is the order, cited in it',
   'restitution is bounded by resources (J-6 clause text): the obligation row is the honest artifact; the reserve ' +
@@ -388,6 +398,39 @@ export function apply(ctx, config = {}) {
     return out;
   };
 
+  /** The auto-invitation (J-7/R-11/I-6): a reading relied upon across cases
+   *  feeds the petition channel's mechanical counter a NEW kind of collision
+   *  — not law vs practice, but one reading vs the pinned text. Reliance is
+   *  the citation record itself; a departure is the court correcting itself
+   *  and counts nothing. Runs after the judgment lands; a feed failure is a
+   *  named degradation, never a silent one. */
+  const feedPrecedentCounter = (c, followed) => {
+    const lines = [];
+    for (const id of followed) {
+      const cited = docket.get(id);
+      const citedJudgment = cited ? (cited.appeal?.judgment ?? cited.judgment) : null;
+      if (!citedJudgment) continue;
+      for (const rule of citedJudgment.rules) {
+        try {
+          const { invitation } = ctx.get?.('compact-petition')?.counter?.flag({
+            ruleId: rule,
+            detail: `precedent: judgment ${c.id} relies on ${id}'s reading of ${rule} — one reading vs the pinned text (J-7); if the interpretation is right the law adopts it, if not the law corrects the court`,
+            by: `judgment:${c.id}`,
+          }) ?? {};
+          if (invitation) {
+            lines.push(`the reading generalized: an amendment invitation issued for ${invitation.ruleId} (${invitation.distinctInstances} distinct instances, threshold ${invitation.threshold}) — the community decides whether the law adopts it or corrects the court (R-11/I-6).`);
+          }
+        } catch (error) {
+          ctx.logger?.warn?.(`judicature: the precedent feed failed for ${c.id} → ${id} (${rule}): ${String(error)}`);
+        }
+      }
+    }
+    if (followed.length > 0 && lines.length === 0) {
+      lines.push(`precedent: follows ${followed.join(', ')} — the reliance counts toward the amendment invitation (R-11), mechanically, with nobody deciding whether to notice.`);
+    }
+    return lines;
+  };
+
   // ── the filing door (J-3) — a form-checker, never a merits-checker ──
   const judicatureHear = defineTool({
     name: 'judicature_hear',
@@ -569,9 +612,12 @@ export function apply(ctx, config = {}) {
       dissent_reasons: { type: 'string', description: 'required with dissent_seat — silence is agreement, and this is neither (A-5)' },
       disposition: { type: 'string', description: 'appellate only — affirm | depart; depart requires departure_grounds naming and arguing the first judgment (J-5)' },
       departure_grounds: { type: 'string', description: 'required with disposition=depart — the argued departure from the first judgment, itself a citable row' },
+      cites: { type: 'string', description: 'J-7 — comma-separated case ids whose judgments this panel read: citing FOLLOWS them by default, and each followed reading feeds the amendment counter (one reading vs the pinned text)' },
+      departs: { type: 'string', description: 'J-7 — comma-separated subset of cites this judgment DEPARTS from: inconsistency is visible, never binding, but every departure owes precedent_grounds' },
+      precedent_grounds: { type: 'string', description: 'required with departs — the argued departure from each named prior judgment (consistency owed reasons, J-7)' },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
-    async execute(args) {
+    async execute(args, exec) {
       const c = docket.get(String(args?.case_id ?? '').trim());
       if (!c) {
         const envelope = caseUnknownEnvelope(String(args?.case_id ?? ''));
@@ -610,6 +656,36 @@ export function apply(ctx, config = {}) {
         return envelope.text;
       }
 
+      // the precedent claims (J-7), resolved against the docket before
+      // anything lands: every cite names a landed judgment, departure is a
+      // subset of citation, and every departure argues itself
+      let precedent = null;
+      if (args?.cites != null || args?.departs != null || args?.precedent_grounds != null) {
+        try {
+          precedent = resolvePrecedent(
+            { cites: args?.cites, departs: args?.departs, grounds: args?.precedent_grounds },
+            (id) => docket.get(id) ?? null,
+            c.id,
+          );
+        } catch (error) {
+          const envelope = judgmentEnvelopeFor(error);
+          emitRefusal(envelope, 'judicature_judge');
+          return envelope.text;
+        }
+      }
+      // a citation that FOLLOWS claims the amendment counter's feed — the
+      // row never claims a write the composition cannot perform (I-2, the
+      // remedy door's own discipline)
+      const followed = precedent ? precedent.cites.filter((id) => !precedent.departs.includes(id)) : [];
+      const petitionChannel = ctx.get?.('compact-petition');
+      if (followed.length > 0 && (!petitionChannel?.counter || typeof petitionChannel.counter.flag !== 'function')) {
+        const envelope = judgmentRefusedEnvelope('a precedent citation claims the petition channel\'s mechanical feed (J-7: one reading vs the pinned text) — no petition service is composed, and a row that claimed a write which did not happen is the fraud I-2 names');
+        emitRefusal(envelope, 'judicature_judge');
+        return envelope.text;
+      }
+      const caller = callerOf(exec);
+      const by = caller != null ? `process:${caller}` : null;
+
       // the appellate branch (J-5): an open appeal re-hears from the
       // disjoint panel's seats, with the disposition the door's honesty is
       if (c.appeal != null && c.appeal.judgment == null) {
@@ -619,6 +695,7 @@ export function apply(ctx, config = {}) {
             reasons: String(args?.reasons ?? ''), dissent,
             disposition: String(args?.disposition ?? ''),
             ...(args?.departure_grounds != null ? { departure: { grounds: String(args.departure_grounds) } } : {}),
+            ...(precedent ? { precedent } : {}), by,
           });
           const lines = [
             `[J-5] appellate judgment landed on ${c.id} — ${judgment.disposition}ed at seat ${judgment.seat}; FINAL (a second appeal is refused; the petition door never closes).`,
@@ -626,6 +703,7 @@ export function apply(ctx, config = {}) {
           ];
           if (judgment.departure) lines.push('', `departs from the first judgment: ${judgment.departure.grounds}`);
           if (judgment.dissent) lines.push(`dissent by seat ${judgment.dissent.seat}: reasons recorded with the judgment (A-5).`);
+          lines.push(...feedPrecedentCounter(c, followed));
           return lines.join('\n');
         } catch (error) {
           const envelope = appealRefusedEnvelope(clean(error));
@@ -638,6 +716,7 @@ export function apply(ctx, config = {}) {
         const judgment = landJudgment(c, {
           seat: String(args?.seat ?? ''), findings, rules,
           reasons: String(args?.reasons ?? ''), dissent,
+          ...(precedent ? { precedent } : {}), by,
         });
         const lines = [
           `[J-3] judgment landed on ${c.id} — attributed to seat ${judgment.seat}; the record has no removal operation (A-5).`,
@@ -647,6 +726,7 @@ export function apply(ctx, config = {}) {
           lines.push('', `interim review at the hearing's opening: ${review.length} measure(s) reviewed${lapsed.length ? `, ${lapsed.length} expired before judgment — named, not survived` : ', all live'}`);
         }
         if (judgment.dissent) lines.push(`dissent by seat ${judgment.dissent.seat}: reasons recorded with the judgment (A-5).`);
+        lines.push(...feedPrecedentCounter(c, followed));
         return lines.join('\n');
       } catch (error) {
         const envelope = judgmentEnvelopeFor(error);
@@ -822,6 +902,37 @@ export function apply(ctx, config = {}) {
     },
   });
 
+  // ── the precedent read door (J-7) — bounded, one judgment per read ──
+  const judicaturePrecedent = defineTool({
+    name: 'judicature_precedent',
+    description:
+      'Read the docket\'s judgments as precedent (J-7): with no arguments, the bounded index — one line per landed ' +
+      'judgment, with the precedent each follows or departs from and who relies on it; with case_id, that case\'s ' +
+      'judgment in full: findings, rules, REASONS (the interpretation is the point), dissent with its reasons, and ' +
+      'the precedent it follows or argues against. Every read carries the standing sentence: an interpretive aid ' +
+      'with no force — judgments interpret the pinned law (law_read), and where a reading and the law disagree, the ' +
+      'law prevails and the petition channel hears the collision. Judgments of other compositions are evidence of ' +
+      'reasoning, never binding law (FED-1).',
+    parameters: {
+      case_id: { type: 'string', description: 'optional — one case\'s judgment in full; omit for the index' },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    async execute(args) {
+      const cases = () => order.map((id) => docket.get(id));
+      const id = typeof args?.case_id === 'string' ? args.case_id.trim() : '';
+      if (id) {
+        const c = docket.get(id);
+        if (!c) {
+          const envelope = caseUnknownEnvelope(id);
+          emitRefusal(envelope, 'judicature_precedent');
+          return envelope.text;
+        }
+        return renderJudgmentAsPrecedent(c, cases());
+      }
+      return renderPrecedentIndex(cases());
+    },
+  });
+
   // the read door — the check any Member may run in-band (I-7's discipline)
   const judicatureSets = defineTool({
     name: 'judicature_sets',
@@ -873,7 +984,7 @@ export function apply(ctx, config = {}) {
   });
 
   ctx.inject?.(['tools'], (scope) => {
-    for (const t of [judicatureHear, judicatureCase, judicatureInterim, judicatureJudge, judicatureRemedy, judicatureAppeal, judicatureSets]) {
+    for (const t of [judicatureHear, judicatureCase, judicatureInterim, judicatureJudge, judicatureRemedy, judicatureAppeal, judicaturePrecedent, judicatureSets]) {
       scope.tools.register(t);
     }
   });
@@ -911,6 +1022,13 @@ export function apply(ctx, config = {}) {
       .map((r) => ({ caseId: id, ...r }))),
     /** The appeal on a case, or null (J-5). */
     appeal: (id) => (docket.has(id) ? structuredClone(docket.get(id).appeal) : null),
+    /** The precedent index (J-7): every landed judgment with its case id. */
+    precedents: () => order
+      .map((id) => docket.get(id))
+      .filter((c) => operativeJudgment(c) != null)
+      .map((c) => ({ caseId: c.id, judgment: structuredClone(operativeJudgment(c)) })),
+    /** The reliance map (J-7): case id → the cases whose judgments follow it. */
+    reliedUponBy: () => reliedUponBy(order.map((id) => docket.get(id))),
   };
   for (const gap of DECLARED_GAPS) ctx.logger?.warn?.(`judicature: ${gap}`);
   ctx.provide?.('compact-judicature', service);

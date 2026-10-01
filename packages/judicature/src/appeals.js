@@ -22,7 +22,7 @@
 // include external Witnesses — pending I-1, that route is heard NEVER,
 // saying so, never the accused's own class pretending otherwise.
 
-import { CaseError, isParty } from './cases.js';
+import { CaseError, isParty, checkPrecedentRow } from './cases.js';
 import { recusePerSet, independenceBetweenSets } from './sets.js';
 
 /** What an appellate judgment does with the first one. */
@@ -119,9 +119,11 @@ export function resolveAppellatePanel(judiciary, c) {
  * is the whole honesty of the door: AFFIRM upholds the first judgment on
  * the same record; DEPART names it and argues it — the first judgment is
  * a citable row, and departure from it without naming and arguing it is
- * exactly the non-conformity J-5 refuses.
+ * exactly the non-conformity J-5 refuses. `precedent` carries the same
+ * J-7 claims a first-instance judgment may carry (normalized at the door):
+ * an appellate judgment reads the body of judgments too.
  */
-export function landAppellateJudgment(c, { seat, disposition, findings, rules, reasons, dissent, departure, now = Date.now() }) {
+export function landAppellateJudgment(c, { seat, disposition, findings, rules, reasons, dissent, departure, precedent, by, now = Date.now() }) {
   if (c.appeal == null) {
     throw new CaseError('malformed', 'no appeal exists on this case — there is nothing appellate to land');
   }
@@ -172,11 +174,14 @@ export function landAppellateJudgment(c, { seat, disposition, findings, rules, r
       throw new CaseError('seat', `the dissenting seat "${dissent.seat}" is not among the appellate panel's resolved seats`);
     }
   }
+  const row = checkPrecedentRow(c.id, precedent);
   const judgment = {
     kind: 'appellate-judgment', caseId: c.id, landedAt: now, seat,
     disposition, findings: findings.map((f) => ({ session: String(f.session), fromSeq: f.fromSeq, toSeq: f.toSeq })),
     rules: rules.map((r) => r.trim()), reasons: reasons.trim(),
+    ...(by != null ? { by: String(by) } : {}),
     ...(disposition === 'depart' ? { departure: { from: c.judgment.seat, grounds: departure.grounds.trim() } } : {}),
+    ...(row ? { precedent: row } : {}),
     ...(dissent ? { dissent: { seat: dissent.seat, reasons: dissent.reasons.trim() } } : {}),
   };
   c.appeal.judgment = judgment;

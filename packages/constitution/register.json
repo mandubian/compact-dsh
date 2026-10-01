@@ -746,12 +746,18 @@
     },
     {
       "clause": "J-7",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "judicature: precedent machinery does not exist — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-judicature",
+      "service": "compact-judicature",
+      "evidence": "the precedent machinery exists: the judgment read door (judicature_precedent) is bounded and carries the standing sentence on every read — an interpretive aid with no force, the pinned law prevails, other compositions' judgments are evidence of reasoning never binding law (FED-1); a judgment may CITE prior judgments (follows) or DEPART from them, and every departure names its citation and argues itself — inconsistency visible without consistency binding; a reading relied upon across cases feeds the petition channel's mechanical collision counter a new kind of collision (one reading vs the pinned text), generating the amendment invitation automatically (R-11/I-6) with nobody deciding whether to notice; cross-runtime precedent stays persuasive only, declared",
+      "enforcedBy": [
+        "packages/judicature/src/precedent.js",
+        "packages/judicature/src/index.js"
+      ],
+      "verifiers": [
+        "packages/judicature/test/precedent.test.js",
+        "packages/judicature/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "J-8",

@@ -1041,6 +1041,41 @@ reads another composition's record: as **evidence of reasoning, never as
 binding law** — persuasive across runtimes exactly as far as its chain
 verifies and no further.
 
+Walked through, with real output: the read door is bounded (one line per
+judgment in the index, one judgment per read), and every read carries the
+standing sentence —
+
+```
+$ judicature_precedent
+[J-7] 2 judgment(s) on the docket — precedent persuades; it never amends:
+  case_6e11b78f — judgment at seat founder — D-3, J-2 — 2026-09-30T… — relied upon by case_9a44e0c1
+  case_9a44e0c1 — judgment at seat founder — D-3 — 2026-10-01T… — follows case_6e11b78f
+
+An interpretive aid with no force: this judgment interprets the pinned law (law_read), and where …
+```
+
+A second case citing the first feeds the amendment counter mechanically —
+not law vs practice, but one reading vs the pinned text:
+
+```
+$ judicature_judge --case_id case_9a44e0c1 --seat founder --findings "specialist:2-3"
+  --rules "D-3" --reasons "the same reading holds on this record" --cites case_6e11b78f
+[J-3] judgment landed on case_9a44e0c1 — attributed to seat founder; the record has no removal operation (A-5).
+  …
+  precedent: follows case_6e11b78f (J-7)
+the reading generalized: an amendment invitation issued for D-3 (2 distinct instances, threshold 2) —
+  the community decides whether the law adopts it or corrects the court (R-11/I-6).
+```
+
+And a departure argues itself, or refuses to land:
+
+```
+$ judicature_judge --case_id … --cites case_6e11b78f --departs case_6e11b78f
+[JG/judgment-refused] the judgment refuses to land: departs from case_6e11b78f without argued
+  grounds — consistency is owed reasons where it breaks, and an unargued departure is the
+  non-conformity J-7 exists to refuse. …
+```
+
 ## Appeal is a different door (J-5)
 
 | | Petition (R-11 — built) | Appeal (J-5 — this layer) |

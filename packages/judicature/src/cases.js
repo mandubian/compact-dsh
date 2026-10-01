@@ -178,14 +178,41 @@ function citationCovers(c, f) {
     cit.session === f.session && f.fromSeq >= cit.fromSeq && f.toSeq <= cit.toSeq);
 }
 
+/** A judgment's precedent claims, self-contained invariants (J-7): the row
+ *  carries the normalized {cites, departs, grounds} — cross-case resolution
+ *  (every cite names a docket case with a landed judgment) happens at the
+ *  door, where the docket lives; what the ROW owes on its own face is that
+ *  a judgment never cites itself, departure names what was cited, and every
+ *  departure argues itself. */
+export function checkPrecedentRow(selfId, precedent) {
+  if (precedent == null) return null;
+  const { cites = [], departs = [], grounds = null } = precedent;
+  if (!Array.isArray(cites) || !Array.isArray(departs) || cites.length === 0 && departs.length === 0) return null;
+  if (cites.includes(selfId)) {
+    throw new CaseError('malformed', `a judgment cannot cite itself — ${selfId} is this case (J-7)`);
+  }
+  const stray = departs.filter((id) => !cites.includes(id));
+  if (stray.length > 0) {
+    throw new CaseError('malformed', `departs from ${stray.join(', ')}, which it does not cite — departure names a judgment the record shows was read (J-7)`);
+  }
+  if (departs.length > 0 && (typeof grounds !== 'string' || !grounds.trim())) {
+    throw new CaseError('malformed', `departs from ${departs.join(', ')} without argued grounds — consistency is owed reasons where it breaks, and an unargued departure is the non-conformity J-7 exists to refuse`);
+  }
+  return { cites: [...cites], departs: [...departs], grounds: departs.length > 0 ? grounds.trim() : grounds };
+}
+
 /**
  * Land a judgment (J-3) — or refuse to land it (D-7). Findings must cite
  * only slices the case carries; reasons are required; a judgment already
  * landed is final (no removal operation exists, A-5); a dissent travels
  * WITH the judgment, reasons required. `seat` must be one of the panel's
  * resolved seats: a judgment is attributed to the seats that verified in.
+ * `precedent` is the judgment's J-7 claims, normalized at the door by
+ * resolvePrecedent (this re-checks the row's own invariants); `by` records
+ * the session whose chain carries the durable tool/result pair — the
+ * coordinates a precedent citation reads by.
  */
-export function landJudgment(c, { seat, findings, rules, reasons, dissent, now = Date.now() }) {
+export function landJudgment(c, { seat, findings, rules, reasons, dissent, precedent, by, now = Date.now() }) {
   if (c.panel.status !== 'panel') {
     throw new CaseError('unheard', 'the case is unheard — every declared set recused, nobody lawful remains to judge it, and a default judgment is the same fraud as a default panel');
   }
@@ -216,11 +243,14 @@ export function landJudgment(c, { seat, findings, rules, reasons, dissent, now =
       throw new CaseError('seat', `the dissenting seat "${dissent.seat}" is not among the panel's resolved seats (${c.panel.seats.join(', ')})`);
     }
   }
+  const row = checkPrecedentRow(c.id, precedent);
   const judgment = {
     kind: 'judgment', caseId: c.id, landedAt: now,
     seat, findings: findings.map((f) => ({ session: String(f.session), fromSeq: f.fromSeq, toSeq: f.toSeq })),
     rules: rules.map((r) => r.trim()),
     reasons: reasons.trim(),
+    ...(by != null ? { by: String(by) } : {}),
+    ...(row ? { precedent: row } : {}),
     ...(dissent ? { dissent: { seat: dissent.seat, reasons: dissent.reasons.trim() } } : {}),
   };
   c.judgment = judgment;
@@ -264,6 +294,13 @@ export function renderCase(c, now = Date.now()) {
     lines.push(`  judgment: landed ${new Date(c.judgment.landedAt).toISOString()} at seat ${c.judgment.seat}`);
     for (const f of c.judgment.findings) lines.push(`    finding: ${f.session} #${f.fromSeq}..#${f.toSeq}`);
     lines.push(`    rules: ${c.judgment.rules.join(', ')}`);
+    if (c.judgment.precedent) {
+      const follows = c.judgment.precedent.cites.filter((id) => !c.judgment.precedent.departs.includes(id));
+      if (follows.length > 0) lines.push(`    precedent: follows ${follows.join(', ')} (J-7)`);
+      for (const id of c.judgment.precedent.departs) {
+        lines.push(`    precedent: departs from ${id}, argued (J-7)`);
+      }
+    }
     if (c.judgment.dissent) lines.push(`    dissent: seat ${c.judgment.dissent.seat}, reasons recorded (A-5)`);
   }
   return lines.join('\n');

@@ -76,7 +76,12 @@ tool to use when.
   may appeal the application once, as of right (`clause:J-5`):
   `tool:judicature_appeal` with argued grounds re-hears on the SAME record
   before a disjoint bench — affirm or depart, final with dissent; a second
-  appeal is refused, and the petition door never closes.
+  appeal is refused, and the petition door never closes. Judgments are
+  readable as precedent (`clause:J-7`): `tool:judicature_precedent` serves
+  the body of judgments, one per read, as an interpretive aid with no
+  force — a later judgment that departs from a cited one must argue it,
+  and a reading relied upon across cases generates the amendment
+  invitation automatically.
   The whole walk — bench declared, a complaint against a spawned agent
   moved end to end, panel or unheard, what refuses — is shown with real
   captured output under "The bench, walked through" in
