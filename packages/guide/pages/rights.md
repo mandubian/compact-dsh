@@ -72,7 +72,11 @@ tool to use when.
   annotations travel with every read of the range they cite, restitution
   shows in your obligation ledger at exit (R-12), standing adjusts only
   through the declared grant machinery, referral rides the petition
-  channel's amendment trigger — nothing is ever erased.
+  channel's amendment trigger — nothing is ever erased. The losing party
+  may appeal the application once, as of right (`clause:J-5`):
+  `tool:judicature_appeal` with argued grounds re-hears on the SAME record
+  before a disjoint bench — affirm or depart, final with dissent; a second
+  appeal is refused, and the petition door never closes.
   The whole walk — bench declared, a complaint against a spawned agent
   moved end to end, panel or unheard, what refuses — is shown with real
   captured output under "The bench, walked through" in

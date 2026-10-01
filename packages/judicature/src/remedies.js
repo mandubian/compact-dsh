@@ -62,11 +62,19 @@ export function landRemedy(c, { kind, seat, proportionality, spec, now = Date.no
   if (!REMEDY_KINDS.includes(kind)) {
     throw new CaseError('malformed', `"${kind}" is not a remedy — the menu is closed: ${REMEDY_KINDS.join(', ')} (J-6)`);
   }
-  if (c.judgment == null) {
+  const operative = c.appeal?.judgment ?? c.judgment;
+  if (operative == null) {
     throw new CaseError('unjudged', 'no judgment has landed on this case — a remedy rides a judgment, and there is no remedy without one to carry it (J-6)');
   }
-  if (typeof seat !== 'string' || !c.panel.seats.includes(seat)) {
-    throw new CaseError('seat', `seat "${seat}" is not among the panel's resolved seats (${c.panel.seats.join(', ')}) — a remedy is attributed to the seat that verified in`);
+  if (c.appeal != null && c.appeal.judgment == null && c.appeal.panel?.status === 'panel') {
+    throw new CaseError('unjudged', 'an appeal stands open on this case before a resolved appellate panel — the judgment a remedy would ride is under contest until the appellate disposition lands (J-5/J-6); land the disposition first');
+  }
+  // the operative panel keys off the LANDED judgment, not the panel
+  // resolution: a panel resolving at filing would hand the seats to a bench
+  // that has verified nothing while the seat that judged still stands
+  const operativePanel = c.appeal?.judgment != null ? c.appeal.panel : c.panel;
+  if (typeof seat !== 'string' || !operativePanel.seats.includes(seat)) {
+    throw new CaseError('seat', `seat "${seat}" is not among the operative panel's resolved seats (${operativePanel.seats.join(', ')}) — a remedy is attributed to the seat that verified in`);
   }
   if (typeof proportionality !== 'string' || !proportionality.trim()) {
     throw new CaseError('malformed', 'proportionality is owed on every remedy row — the response must fit the wrong, and a row that does not argue its fit is detectably non-conforming (J-6)');

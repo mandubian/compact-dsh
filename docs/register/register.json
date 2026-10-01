@@ -712,12 +712,18 @@
     },
     {
       "clause": "J-5",
-      "kind": "planned",
-      "plugin": null,
-      "service": null,
-      "evidence": "judicature: the PETITION door is built and enforced (R-11, compact-petition); the APPEAL door is not — J-5 distinguishes them and appeal is heard under Part V, which does not exist here (J-8) — the hearing layer's shape is designed in docs/concept-judicature.md (#99); the page landed (#105); slice 1 (#111) declares sets and the independence check — the hearing itself is slice 2 (#112)",
-      "enforcedBy": [],
-      "verifiers": []
+      "kind": "enforced",
+      "plugin": "compact-judicature",
+      "service": "compact-judicature",
+      "evidence": "the appeal door exists: one appeal as of right (no leave, no permission step) filed by a party with argued grounds; the appellate panel resolves from sets DISJOINT from the first panel's (independence over declared dependency edges, both ways — with one set the door refuses [JG/appeal-unavailable] with the reason named); the appeal re-hears on the SAME record (no new evidence, the first judgment a citable row) and lands an appellate judgment that affirms or departs — departure names and argues the first judgment — final, with dissent (A-5); a second appeal is refused and the petition door named; the D-8 route (a party of the Enforcer's own class) requires external Witnesses and is recorded heard-never, saying so, pending I-1 (#116)",
+      "enforcedBy": [
+        "packages/judicature/src/appeals.js",
+        "packages/judicature/src/index.js"
+      ],
+      "verifiers": [
+        "packages/judicature/test/appeals.test.js",
+        "packages/judicature/test/composed.dsh.test.js"
+      ]
     },
     {
       "clause": "J-6",

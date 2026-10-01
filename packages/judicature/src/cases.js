@@ -126,6 +126,7 @@ export function fileCase({ id, filer, grievance, citations, parties, panel, now 
     panel,
     dueAt: filedAt + termMs, // liveness derived at read from this, never a stored status
     interims: [],
+    appeal: null,
     remedies: [],
     judgment: null,
   };

@@ -479,6 +479,30 @@ export const GLOSS = {
     instruction: 'Land the judgment first, argue the fit of what you order, and route the order through the seam it rides: grants through the grant machinery, referrals through the petition channel, annotations beside the range — never inside it.',
     cites: ['J-6', 'J-3', 'D-8'],
   },
+
+  'JG/appeal-refused': {
+    title: 'The appeal refuses — one as of right, then the door closes',
+    why: 'Appeal asks whether the law was APPLIED rightly, on the same record, and lies to an authority not subordinate to the first panel. One appeal is filed as of right by a party with argued grounds; once the appellate judgment has landed it is final and the door closes — an adverse final judgment convinced the LAW is wrong routes to the petition channel, not to defiance. An appeal recorded unheard or witnesses-pending holds the door too: nothing is final, but the recorded appeal is the one appeal, and the refusal names the recorded state.',
+    example: { blocked: ['judicature_appeal by a Member who was not a party to the case', 'a second appeal after the appellate judgment landed', 'a second filing while an appeal stands recorded unheard or witnesses-pending — nothing is final, and the refusal says so, naming the recorded state', 'an appeal with no argued grounds, or before any judgment exists'], lawful: ['the adverse party files once, with grounds arguing the misapplication on this record', 'after finality: petition (R-11) — the door that never closes'] },
+    instruction: 'The doors\' outputs are non-interchangeable: an appeal can never fix the law, and a petition can never reopen a case. Pick the door by what you contest — the application, or the law.',
+    cites: ['J-5', 'J-3', 'A-5'],
+  },
+
+  'JG/appeal-unavailable': {
+    title: 'No appellate authority — no second disjoint set is declared',
+    why: '"Not subordinate" is the independence graph run between sets: no dependency edge may connect the appellate set\'s standing to the first panel\'s. With one declared set there is no appellate authority at all, and the door refuses with the reason named — a composition that wants the second door must declare the second bench.',
+    example: { blocked: ['judicature_appeal in a composition declaring a single adjudicator set'], lawful: ['declare a second, disjoint set in the signed annex — the petition channel (R-11) is how the community asks', 'the first judgment stands; the law question may still petition'] },
+    instruction: 'Disjointness runs over declared dependency edges, not common ancestry — two seats under one Principal are formally non-subordinate, the declared limit of a single composition\'s internal independence.',
+    cites: ['J-5', 'J-8', 'J-4'],
+  },
+
+  'JG/appeal-witnesses-pending': {
+    title: 'The D-8 appeal route — heard never, saying so',
+    why: 'Where a party to the case is of the Enforcer\'s own class (the enforcer key, the composition itself), the appellate panel MUST include external Witnesses (D-8) — and they do not exist yet. The route is heard never, saying so, rather than heard by the accused\'s own class pretending otherwise; the appeal is recorded with this state and revives when Witnesses are accredited.',
+    example: { blocked: ['judicature_appeal on a case whose derived parties include the enforcer key or the composition — recorded witnesses-pending, heard never'], lawful: ['the offline verifier cross-examines the annex-versus-conduct divergence without the runtime\'s cooperation (I-7)', 'the petition channel carries the law question now'] },
+    instruction: 'This wall is the design working: the alternative to "heard never" is the accused\'s own class judging the accusation, which is the theater D-8 forbids.',
+    cites: ['J-5', 'D-8', 'I-1'],
+  },
 };
 
 // Wildcards cover the two families whose ruleIds are composed at run time:

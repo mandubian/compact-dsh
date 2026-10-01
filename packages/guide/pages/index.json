@@ -265,6 +265,7 @@
         "packages/judicature/src/sets.js",
         "packages/judicature/src/cases.js",
         "packages/judicature/src/remedies.js",
+        "packages/judicature/src/appeals.js",
         "tools/verify-judicature.mjs",
         "docs/concept-judicature.md",
         "packages/record/src/read.js"
