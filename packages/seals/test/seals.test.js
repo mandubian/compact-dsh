@@ -12,6 +12,7 @@ import {
   generateEd25519, signMessage, verifyMessage, sha256Hex,
   messageFor, parseManifest, parseSeal, verifySeal, signSeal, SealError,
   signAnnex, verifyAnnex, annexDigestOf, signSubjectCert, verifySubjectCert,
+  memberKeyDigestOf,
 } from '../src/index.js';
 
 /** A local rehearsal keyring: n fresh authority keys + their private half. */
@@ -162,6 +163,50 @@ test('subject certificates: enforcer-signed, lineage as data, unknown keys and e
   assert.equal(child.parentSubjectId, 'session-1');
   assert.throws(() => verifySubjectCert({ cert, enforcerKey: enforcer.publicKey, expectedSubjectId: 'session-2' }),
     e => e instanceof SealError && e.reason === 'cert-malformed');
+});
+test('member-bound certificates: dual authorship, and every binding refusal names itself (identity slice 2)', () => {
+  const enforcer = generateEd25519();
+  const subject = generateEd25519();
+  const member = generateEd25519();
+  const stranger = generateEd25519();
+  const memberDigest = memberKeyDigestOf(member.publicKey);
+  const cert = signSubjectCert({
+    subjectId: 'session-1', publicKey: subject.publicKey, scope: 'rehearsal', depth: 0,
+    privateKey: enforcer.privateKeyPem,
+    memberKeyDigest: memberDigest, memberPrivateKey: member.privateKeyPem,
+  });
+  // the binding verifies against the MEMBER's public key — and against nothing else
+  assert.deepEqual(
+    verifySubjectCert({ cert, enforcerKey: enforcer.publicKey, memberPublicKey: member.publicKey }),
+    { bound: true, countersignatureVerified: true });
+  // a countersignature that does not verify against the roll's key is no binding
+  assert.throws(() => verifySubjectCert({ cert, enforcerKey: enforcer.publicKey, memberPublicKey: stranger.publicKey }),
+    e => e instanceof SealError && e.reason === 'cert-countersignature-invalid' && /could have forged/.test(e.message));
+  // a digest without a countersignature is a claim, not a binding
+  const stripped = JSON.parse(JSON.stringify(cert));
+  delete stripped.memberCountersignature;
+  assert.throws(() => verifySubjectCert({ cert: stripped, enforcerKey: enforcer.publicKey, memberPublicKey: member.publicKey }),
+    e => e instanceof SealError && e.reason === 'cert-binding-malformed' && /nobody attested/.test(e.message));
+  // a non-string digest is malformed by shape, before any cryptography runs
+  const mistyped = JSON.parse(JSON.stringify(cert));
+  mistyped.memberKeyDigest = 42;
+  assert.throws(() => verifySubjectCert({ cert: mistyped, enforcerKey: enforcer.publicKey, memberPublicKey: member.publicKey }),
+    e => e instanceof SealError && e.reason === 'cert-binding-malformed' && /digest or it is absent/.test(e.message));
+  // the builder refuses half a binding: the digest without the key, the key without the digest
+  assert.throws(() => signSubjectCert({
+    subjectId: 's', publicKey: subject.publicKey, scope: 'rehearsal', privateKey: enforcer.privateKeyPem,
+    memberKeyDigest: memberDigest,
+  }), e => e instanceof SealError && e.reason === 'cert-binding-malformed' && /BOTH the digest and the countersigning key/.test(e.message));
+  assert.throws(() => signSubjectCert({
+    subjectId: 's', publicKey: subject.publicKey, scope: 'rehearsal', privateKey: enforcer.privateKeyPem,
+    memberPrivateKey: member.privateKeyPem,
+  }), e => e instanceof SealError && e.reason === 'cert-binding-malformed');
+  // the unbound shape verifies exactly as before the binding existed
+  const unbound = signSubjectCert({
+    subjectId: 'session-2', publicKey: subject.publicKey, scope: 'rehearsal', depth: 0,
+    privateKey: enforcer.privateKeyPem,
+  });
+  assert.deepEqual(verifySubjectCert({ cert: unbound, enforcerKey: enforcer.publicKey }), { bound: false });
 });
 
 test('interop: the vendored upstream seal verifies over the pinned body with founder public keys only', () => {
