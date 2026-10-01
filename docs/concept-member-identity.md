@@ -357,6 +357,35 @@ Three consequences, declared rather than left derivable:
   was never enacted, verifies as nothing. The gate refuses with the reason
   named; it does not grade externality on impression.
 
+Slice 3 is built and walked — the seating, the boot's verification of it,
+and the first hearing, with real output:
+
+```
+$ node tools/rehearsal-keyring.mjs ensure .rehearsal
+  member roll: .rehearsal/roll.json — 2 admission(s) under the SIMULATED admission
+    statute, 1 external Witness accredited under the SIMULATED accreditation
+    statute, epochs 0–1 checkpointed
+
+$ node tools/rehearsal-keyring.mjs verify .rehearsal
+  member roll OK: 3 entries, 3 member(s) (3 live, 1 external Witness(es)
+    accredited), anchored through seq 2 — dev-keyring, conveys no standing
+
+# the composition declares the bench (the annex names the roll digest; the
+# boot verifies the accreditation row before anything hears):
+#   adjudicatorSets: { sets: [ first-instance…, { id: 'external',
+#     roles: [{ id: 'w1', standing: { kind: 'witness', id: <roll digest> } }] } ] }
+$ # …and a full-recuse case falls through the cascade to the rung:
+  panel: external (w1)
+$ judicature_judge --case_id … --seat w1 --findings "specialist:2-3" …
+[J-3] judgment landed on case_… — attributed to seat w1; the record has no
+  removal operation (A-5).
+
+# the D-8 appellate route, the same seating: an enforcer-class party's
+# appeal resolves its panel to the external — the wall ends where
+# externals begin, and where none is seated it still records
+# witnesses-pending, saying so.
+```
+
 ## Identity travels (F-6)
 
 F-6's two rules make travel safe by making it *boring*: **the host's annex

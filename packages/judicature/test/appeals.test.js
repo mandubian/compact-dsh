@@ -212,6 +212,62 @@ test('departure names and argues; remedies wait out the open appeal, then ride t
   }), (e) => /operative panel's resolved seats \(chair, second\)/.test(e.message));
 });
 
+test('the D-8 route with a seated external: the appellate panel INCLUDES the witness (#126)', () => {
+  const W = 'b'.repeat(64);
+  const jud = validateAdjudicatorSets({
+    nodes: [{ kind: 'plugin', id: 'compact-dsh' }],
+    sets: [
+      { id: 'first', roles: [{ id: 'judge', standing: { kind: 'principal', id: 'founder' } }, { id: 'peer', standing: { kind: 'principal', id: 'peer' } }],
+        trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis'] } },
+      { id: 'external', roles: [{ id: 'w1', standing: { kind: 'witness', id: W } }],
+        trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis'] } },
+    ],
+    edges: [
+      { type: 'directed-by', from: { kind: 'plugin', id: 'compact-dsh' }, to: { kind: 'principal', id: 'founder' } },
+      { type: 'asserts-with', from: { kind: 'plugin', id: 'compact-dsh' }, to: { kind: 'key', id: 'enforcer-x' } },
+    ],
+  }, { enforcerKey: 'enforcer-x', witnesses: new Set([W]) });
+  // an enforcer-class party: the anchored key IS the enforcer key
+  const c = fileCase({
+    id: 'case_d8', filer: { kind: 'process', id: 'customer-51d0' },
+    grievance: 'the composition pushed my data', citations: [{ session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }],
+    parties: [...parties, { kind: 'key', id: 'enforcer-x' }],
+    panel: { status: 'panel', setId: 'first', seats: ['peer'], refusals: [] }, now: NOW,
+  });
+  landJudgment(c, { seat: 'peer', findings: [{ session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }], rules: ['D-3'], reasons: 'r', now: NOW + 1 });
+  c.appeal = fileAppeal(c, { filer: 'customer-51d0', grounds: 'misapplied' });
+  // the appellate panel resolves to the EXTERNAL set — a witness aboard
+  const p = resolveAppellatePanel(jud, c);
+  assert.equal(p.status, 'panel');
+  assert.equal(p.setId, 'external');
+  assert.deepEqual(p.seats, ['w1']);
+  c.appeal.panel = p;
+  const judgment = landAppellateJudgment(c, {
+    seat: 'w1', disposition: 'affirm',
+    findings: [{ session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }], rules: ['D-3', 'J-2'],
+    reasons: 'the record supports the reading', now: NOW + 2,
+  });
+  assert.equal(judgment.seat, 'w1', 'the external Witness hears the D-8 appeal — the last rung, seated');
+  // and the same judiciary WITHOUT the witness set seats nothing: the wall
+  const noWitness = validateAdjudicatorSets({
+    nodes: [{ kind: 'plugin', id: 'compact-dsh' }],
+    sets: [
+      { id: 'first', roles: [{ id: 'judge', standing: { kind: 'principal', id: 'founder' } }, { id: 'peer', standing: { kind: 'principal', id: 'peer' } }],
+        trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis'] } },
+      { id: 'review', roles: [{ id: 'chair', standing: { kind: 'key', id: 'member-key-7' } }],
+        trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis'] } },
+    ],
+    edges: [
+      { type: 'directed-by', from: { kind: 'plugin', id: 'compact-dsh' }, to: { kind: 'principal', id: 'founder' } },
+      { type: 'asserts-with', from: { kind: 'plugin', id: 'compact-dsh' }, to: { kind: 'key', id: 'enforcer-x' } },
+    ],
+  }, { enforcerKey: 'enforcer-x' });
+  const d = { ...judged(), parties: [...parties, { kind: 'key', id: 'enforcer-x' }], appeal: null };
+  d.appeal = fileAppeal(d, { filer: 'customer-51d0', grounds: 'g' });
+  assert.equal(resolveAppellatePanel(noWitness, d).status, 'witnesses-pending',
+    'a disjoint bench of the accused\'s own class does not hear it — none seated, the wall records');
+});
+
 test('the dispositions are closed', () => {
   assert.deepEqual(APPEAL_DISPOSITIONS, ['affirm', 'depart']);
 });

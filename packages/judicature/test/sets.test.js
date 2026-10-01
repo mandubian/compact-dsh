@@ -181,7 +181,20 @@ test('snapshots detach: mutating a returned set does not reach the register', ()
 });
 
 test('the vocabulary is closed and self-documenting', () => {
-  assert.deepEqual(STANDING_KINDS, ['principal', 'process', 'plugin', 'key']);
+  assert.deepEqual(STANDING_KINDS, ['principal', 'process', 'plugin', 'key', 'witness']);
+  // witness standing names a roll digest and refuses without a live
+  // accreditation — the seating the accreditation statute grants (#126)
+  const W = 'b'.repeat(64);
+  const witnessSection = (witnesses) => ({
+    sets: [{ id: 'external', roles: [{ id: 'w1', standing: { kind: 'witness', id: W } }],
+      trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis'] } }],
+    edges: [],
+  });
+  assert.throws(() => validateAdjudicatorSets(witnessSection(), {}),
+    (e) => /no member roll is composed/.test(e.message), 'a witness seat without a roll is the fraud D-8 names');
+  assert.throws(() => validateAdjudicatorSets(witnessSection(new Set(['c'.repeat(64)])), { witnesses: new Set(['c'.repeat(64)]) }),
+    (e) => /no LIVE accreditation/.test(e.message), 'a digest the roll does not accredit refuses the boot');
+  validateAdjudicatorSets(witnessSection(), { witnesses: new Set([W]) });
   for (const [type, def] of Object.entries(EDGE_VOCABULARY)) {
     assert.ok(def.plain.length > 10, `${type}: plain meaning`);
     assert.ok(def.crossExaminedBy.length > 10, `${type}: the record surface that cross-examines it`);

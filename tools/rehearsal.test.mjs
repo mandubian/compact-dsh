@@ -63,9 +63,10 @@ test('rehearsal-amendment: the full A-1 → F-5 loop against a scaffold — seal
     assert.match(dry, /SIMULATED/);
     assert.match(dry, /verify-only/);
     const ledger = JSON.parse(readFileSync(join(kr, 'ledger.json'), 'utf8'));
-    // ensure seeds the ledger with the member roll's two SIMULATED acts (the
-    // admission statute, the epoch-0 checkpoint); this enactment is the third
-    assert.equal(ledger.entries.length, 3);
+    // ensure seeds the ledger with four SIMULATED acts (admission statute,
+    // epoch-0 checkpoint, accreditation statute, epoch-1 checkpoint); this
+    // enactment is the fifth
+    assert.equal(ledger.entries.length, 5);
     const entry = ledger.entries.at(-1);
     assert.equal(entry.kind, 'SIMULATED ENACTMENT');
     assert.ok(entry.reason);
@@ -122,9 +123,9 @@ test('rehearsal-amendment: a tampered amendment is refused before anything is re
     assert.equal(failed, true, 'sealing without authority keys must refuse');
     assert.ok(existsSync(join(root, 'packages', 'constitution', 'src', 'body.js')), 'the scaffold is untouched by the refusal');
     const ledger = JSON.parse(readFileSync(join(kr, 'ledger.json'), 'utf8'));
-    // the two ensure-seeded roll acts plus the one successful enactment; the
+    // the four ensure-seeded roll acts plus the one successful enactment; the
     // refused apply recorded nothing new
-    assert.equal(ledger.entries.length, 3, 'the refused act recorded nothing new');
+    assert.equal(ledger.entries.length, 5, 'the refused act recorded nothing new');
   } finally {
     rmSync(kr, { recursive: true, force: true });
     rmSync(root, { recursive: true, force: true });
@@ -139,12 +140,16 @@ test('rehearsal-keyring: the member roll — statute enacted in simulation, admi
   const dir = mkdtempSync(join(tmpdir(), 'rehearsal-roll-'));
   try {
     run(KEYRING, ['ensure', dir]);
-    // the statute is sealed k-of-n and recorded as SIMULATED, with the
-    // checkpoint's closing recorded beside it in ONE ledger
+    // the statutes are sealed k-of-n and recorded as SIMULATED, with the
+    // checkpoints' closings recorded beside them in ONE ledger (identity
+    // slice 3 adds the accreditation statute and epoch 1)
     const ledger = JSON.parse(readFileSync(join(dir, 'ledger.json'), 'utf8'));
-    assert.equal(ledger.entries.length, 2);
+    assert.equal(ledger.entries.length, 4);
     assert.match(ledger.entries[0].reason, /ADMISSION STATUTE/);
     assert.match(ledger.entries[1].reason, /"the roll stood thus"/);
+    assert.match(ledger.entries[2].reason, /ACCREDITATION STATUTE/);
+    assert.match(ledger.entries[2].reason, /never a Witness/);
+    assert.match(ledger.entries[3].reason, /external Witness's seating is anchored/);
     for (const e of ledger.entries) {
       assert.equal(e.kind, 'SIMULATED ENACTMENT');
       assert.equal(e.standing, 'none');
@@ -154,20 +159,28 @@ test('rehearsal-keyring: the member roll — statute enacted in simulation, admi
     const verdict = verifySeal({ bytes: statuteBytes, subject: 'amendment', seal: statuteSeal, manifest: parseManifest(readFileSync(join(dir, 'keyring.json'), 'utf8')) });
     assert.equal(verdict.conveysStanding, false);
 
-    // the roll: two admissions under the statute's digest, epoch 0 checkpoint
+    // the roll: two admissions under the admission statute's digest, ONE
+    // accreditation under the accreditation statute's, epochs 0–1
     const roll = JSON.parse(readFileSync(join(dir, 'roll.json'), 'utf8'));
     assert.equal(roll.kind, 'rehearsal-member-roll');
     assert.equal(roll.standing.startsWith('none'), true);
-    assert.equal(roll.entries.length, 2);
+    assert.equal(roll.entries.length, 3);
     assert.equal(roll.genesis.admissionStatute.digest, sha256Hex(statuteBytes));
-    assert.ok(roll.entries.every((e) => e.kind === 'admission' && e.grounds.includes('SIMULATED')));
-    assert.equal(roll.checkpoints.length, 1);
-    assert.equal(roll.checkpoints[0].epoch, 0);
+    assert.ok(roll.entries.filter((e) => e.kind === 'admission').every((e) => e.grounds.includes('SIMULATED')));
+    const acc = roll.entries.find((e) => e.kind === 'accreditation');
+    assert.equal(acc.class, 'external-witness');
+    assert.match(acc.grounds, /accreditation statute/);
+    assert.equal(roll.checkpoints.length, 2);
+    assert.equal(roll.checkpoints[1].epoch, 1);
+    const accStatuteBytes = readFileSync(join(dir, 'statute-accreditation.md'));
+    const accSeal = parseSeal(readFileSync(join(dir, 'statute-accreditation.sig.json'), 'utf8'));
+    const accVerdict = verifySeal({ bytes: accStatuteBytes, subject: 'amendment', seal: accSeal, manifest: parseManifest(readFileSync(join(dir, 'keyring.json'), 'utf8')) });
+    assert.equal(accVerdict.conveysStanding, false);
     // the member private halves stay local and owner-only, like every key here
     assert.equal(statSync(join(dir, 'private', 'member-rehearsal-founder.pem')).mode & 0o777, 0o600);
 
     const out = run(KEYRING, ['verify', dir]);
-    assert.match(out, /member roll OK: 2 entries, 2 member\(s\) \(2 live\), anchored through seq 1/);
+    assert.match(out, /member roll OK: 3 entries, 3 member\(s\) \(3 live, 1 external Witness\(es\) accredited\), anchored through seq 2/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -183,8 +196,8 @@ test('auditor --roll: the walk verifies offline, and a tampered roll refuses by 
     assert.match(ok, /auditor: conforming/);
     const full = JSON.parse(run(AUDITOR, [log, '--roll', join(dir, 'roll.json'), '--keyring', join(dir, 'keyring.json')]));
     assert.equal(full.checked.roll, 'verified');
-    assert.equal(full.memberRoll.entries, 2);
-    assert.equal(full.memberRoll.members, 2);
+    assert.equal(full.memberRoll.entries, 3); // 2 admissions + 1 accreditation
+    assert.equal(full.memberRoll.members, 3);
     assert.equal(full.memberRoll.conveysStanding, false);
     assert.ok(full.reliesOn.some((r) => r.includes('member roll') && r.includes('conveys no standing')));
 

@@ -105,7 +105,7 @@ const SECTION = {
  *  `memberDomain` composes the self-model with a declared member binding
  *  (identity slice 2) — judicature then derives MEMBER parties and refuses
  *  a revoked filer. */
-async function boot(t, annexPath, { withRecord = true, signer = null, memberDomain = null } = {}) {
+async function boot(t, annexPath, { withRecord = true, signer = null, memberDomain = null, witnessDomain = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const ctx = new Context();
@@ -145,7 +145,10 @@ async function boot(t, annexPath, { withRecord = true, signer = null, memberDoma
       },
     });
   }
-  const service = apply(ctx, { annexPath });
+  const service = apply(ctx, {
+    annexPath,
+    ...(witnessDomain ? { rollPath: witnessDomain.rollPath, keyringPath: witnessDomain.keyringPath } : {}),
+  });
   if (typeof ctx.start === 'function') await ctx.start();
   for (let i = 0; i < 500 && (!ctx.tools || ctx.get(name) === undefined); i++) {
     await new Promise((r) => setImmediate(r));
@@ -838,4 +841,132 @@ test('a session of a revoked Member cannot file: [JG/member-revoked] cites the r
   const { tools: tools2, service: service2 } = await boot(t, fixtureAnnex(dir2, SECTION));
   await call(tools2, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3' }, 'customer');
   assert.equal(service2.docket().length, 1, 'no binding declared — no member refusal exists to fire');
+});
+
+// ── the external Witness, seated and hearing (identity slice 3, #126):
+// the accreditation statute's seating on the roll, the boot's verification
+// of it, J-1's last rung, and the D-8 appellate bench ──
+import { memberKeyDigestOf as wDigestOf, signRollEvent as wSignEvent, appendRollEvent as wAppend, closeEpoch as wClose, parseManifest as wParseManifest, verifyRoll as wVerifyRoll } from 'compact-dsh-seals';
+
+/** A roll domain with ONE accredited external witness — the seating the
+ *  SIMULATED accreditation statute grants, exactly as the rehearsal genesis
+ *  writes it. */
+function buildWitnessDomain(dir) {
+  mkdirSync(dir, { recursive: true });
+  const auth = [1, 2, 3].map((i) => { const kp = generateEd25519(); return { id: `auth-${i}`, publicKey: kp.publicKey, privateKeyPem: kp.privateKeyPem }; });
+  const manifestText = JSON.stringify({ kind: 'dev-keyring', declaration: 'test keyring', threshold: { k: 2, n: 3 }, keys: auth.map(({ id, publicKey }) => ({ id, publicKey })), rotations: [] }, null, 2);
+  const manifest = wParseManifest(manifestText);
+  writeFileSync(join(dir, 'keyring.json'), manifestText);
+  const privates = new Map(auth.map(({ id, privateKeyPem }) => [id, privateKeyPem]));
+  const quorum = auth.slice(0, 2).map(({ id, privateKeyPem }) => ({ keyId: id, privateKey: privateKeyPem }));
+  const witness = generateEd25519();
+  const digest = wDigestOf(witness.publicKey);
+  const roll = { kind: 'test-roll', version: 1, genesis: { epochLength: { events: 64 }, admissionStatute: { digest: 'a'.repeat(64) } }, entries: [], checkpoints: [] };
+  const NOW2 = '2026-10-01T00:00:00.000Z';
+  const acc = { kind: 'accreditation', memberKeyDigest: digest, class: 'external-witness', memberKey: witness.publicKey, member: 'test-external-witness', holder: 'an external under test', grounds: 'test accreditation statute (SIMULATED)', recordedAt: NOW2 };
+  wAppend(roll, { ...acc, signedBy: wSignEvent(acc, [...quorum, { keyId: digest, privateKey: witness.privateKeyPem }]) });
+  wClose({ roll, epoch: 0, manifest, privateKeys: privates, now: NOW2 });
+  const rollPath = join(dir, 'roll.json');
+  writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n');
+  return { rollPath, keyringPath: join(dir, 'keyring.json'), witnessDigest: digest };
+}
+
+test('J-1\'s last rung, seated: a full-recuse case reaches the accredited external and is HEARD (#126)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildWitnessDomain(dir);
+  // the first-instance set is seated ON THE PARTIES (every seat recuses),
+  // and the external set holds the accredited witness — the cascade's last
+  // rung, declared and verified
+  const section = JSON.parse(JSON.stringify(SECTION));
+  section.sets[0].roles = [
+    { id: 'seated-on-specialist', standing: { kind: 'process', id: 'specialist' } },
+    { id: 'seated-on-customer', standing: { kind: 'process', id: 'customer' } },
+  ];
+  // the founder seat is gone from this declaration, so its edge goes too —
+  // an affidavit declares standing it actually names (D-7)
+  section.edges = section.edges.filter((e) => !(e.type === 'directed-by' && e.to.id === 'founder'));
+  section.sets.push({
+    id: 'external',
+    roles: [{ id: 'w1', standing: { kind: 'witness', id: domain.witnessDigest } }],
+    trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
+    notice: 'the external rung: seated by an accreditation the boot verified against the roll',
+  });
+  const { tools, service } = await boot(t, fixtureAnnex(dir, section), { witnessDomain: domain });
+  assert.equal(service.accreditedWitnesses(), 1);
+  const filed = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer'));
+  // the cascade fell through every conflicted set to the external rung
+  assert.match(filed, /panel: external \(w1\)/);
+  const id = service.docket()[0].id;
+  assert.notEqual(service.caseState(id).status, 'unheard', 'the case is HEARD — the last rung is seatable');
+  const landed = text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'w1', findings: 'specialist:2-3', rules: 'D-3', reasons: 'the external read the record and the record holds',
+  }));
+  assert.match(landed, /\[J-3\] judgment landed/);
+  assert.match(landed, /attributed to seat w1/);
+});
+
+test('the boot refuses a witness seat the roll cannot show — and the annex alone never seats one (#126)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildWitnessDomain(dir);
+  const withWitness = JSON.parse(JSON.stringify(SECTION));
+  withWitness.sets.push({
+    id: 'external',
+    roles: [{ id: 'w1', standing: { kind: 'witness', id: domain.witnessDigest } }],
+    trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
+  });
+  // no roll composed: the annex's word for a seating is not a seating
+  let refused = null;
+  try {
+    await boot(t, fixtureAnnex(dir, withWitness));
+  } catch (e) { refused = e; }
+  assert.ok(refused, 'the boot must refuse');
+  assert.match(refused.message, /no member roll is composed/);
+  assert.match(refused.message, /never the annex's word for it/);
+  // a roll that does not accredit THIS digest: same refusal, the record's word
+  const other = buildWitnessDomain(join(dir, 'other'));
+  let refused2 = null;
+  try {
+    await boot(t, fixtureAnnex(dir, withWitness), { witnessDomain: other });
+  } catch (e) { refused2 = e; }
+  assert.ok(refused2);
+  assert.match(refused2.message, /no LIVE accreditation/);
+});
+
+test('the D-8 appeal, seated end to end: an enforcer-class party\'s appeal is heard by the external (#126)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildWitnessDomain(dir);
+  const signer = fixtureAnnexWithKey(dir, SECTION);
+  const section = signer ? JSON.parse(JSON.stringify(SECTION)) : null;
+  if (section) {
+    section.sets.push({
+      id: 'external',
+      roles: [{ id: 'w1', standing: { kind: 'witness', id: domain.witnessDigest } }],
+      trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
+    });
+  }
+  // the anchored provider: cited sessions derive key:test-enforcer as a
+  // party — the Enforcer's own class, the D-8 route
+  const annexDir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  const anchored = fixtureAnnexWithKey(annexDir, section);
+  const { tools, service } = await boot(t, anchored.annexPath, { signer: anchored, witnessDomain: domain });
+  const filed = text(await call(tools, 'judicature_hear', { grievance: 'the composition itself pushed my data', citations: 'specialist:2-3,customer:1-2' }, 'customer'));
+  assert.match(filed, /key:test-enforcer/, 'the anchor key derives as a party — the Enforcer\'s own class');
+  assert.match(filed, /panel: first \(peer\)/, 'the founder recused through the annex edge; the peer hears the first instance');
+  const id = service.docket()[0].id;
+  await call(tools, 'judicature_judge', { case_id: id, seat: 'peer', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r' });
+  const appeal = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'the application was wrong' }, 'customer'));
+  // the D-8 wall ends where externals begin: the appellate panel is the
+  // external witness, not witnesses-pending
+  assert.match(appeal, /appellate panel: external \(w1\) — disjoint from first by declared edges/);
+  const landed = text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'w1', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    reasons: 'the external re-read the same record and the reading holds',
+    disposition: 'affirm',
+  }));
+  assert.match(landed, /\[J-5\] appellate judgment landed/);
+  assert.match(landed, /affirmed at seat w1/);
+  void signer;
 });

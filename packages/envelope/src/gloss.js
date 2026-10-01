@@ -505,9 +505,9 @@ export const GLOSS = {
   },
 
   'JG/appeal-witnesses-pending': {
-    title: 'The D-8 appeal route — heard never, saying so',
-    why: 'Where a party to the case is of the Enforcer\'s own class (the enforcer key, the composition itself), the appellate panel MUST include external Witnesses (D-8) — and they do not exist yet. The route is heard never, saying so, rather than heard by the accused\'s own class pretending otherwise; the appeal is recorded with this state and revives when Witnesses are accredited.',
-    example: { blocked: ['judicature_appeal on a case whose derived parties include the enforcer key or the composition — recorded witnesses-pending, heard never'], lawful: ['the offline verifier cross-examines the annex-versus-conduct divergence without the runtime\'s cooperation (I-7)', 'the petition channel carries the law question now'] },
+    title: 'The D-8 appeal route — heard never where no external is seated',
+    why: 'Where a party to the case is of the Enforcer\'s own class (the enforcer key, the composition itself), the appellate panel MUST include an accredited external Witness (D-8) — and this composition seats none on a disjoint bench. The route is heard never, saying so, rather than heard by the accused\'s own class pretending otherwise; the appeal is recorded with this state and revives the moment an external is seated (an accreditation the member roll verifies, the statute\'s act — the root signs no Witness).',
+    example: { blocked: ['judicature_appeal on a case whose derived parties include the enforcer key or the composition, where no accredited external sits on a disjoint bench — recorded witnesses-pending, heard never'], lawful: ['seat an accredited external: the annex declares the witness roll digest, the boot verifies the accreditation row (D-8 ends where externals begin)', 'the offline verifier cross-examines the annex-versus-conduct divergence without the runtime\'s cooperation (I-7)', 'the petition channel carries the law question now'] },
     instruction: 'This wall is the design working: the alternative to "heard never" is the accused\'s own class judging the accusation, which is the theater D-8 forbids.',
     cites: ['J-5', 'D-8', 'I-1'],
   },

@@ -63,6 +63,39 @@ roll and nothing else.
   the same parsers and the same loops — swap documents, not code.
 `;
 
+/** The rehearsal ACCREDITATION statute (SIMULATED — A-7's organic shape, the
+ *  external-Witness seating). The chain to the root is a DOCUMENT, not a
+ *  signature path: the root signs this statute as law, the quorum the
+ *  statute names signs the accreditation rows, and the root never signs a
+ *  Witness (docs/concept-member-identity.md §"External Witnesses"). */
+const ACCREDITATION_STATUTE = `# Rehearsal Accreditation Statute (SIMULATED)
+
+NOT an enacted statute. This document rehearses the organic statute that
+seats EXTERNAL WITNESSES (A-7 -> F-3 -> J-1/D-8,
+docs/concept-member-identity.md): the chain to the A-1 trust root runs
+through THIS DOCUMENT, never through a root signature over a Witness. The
+root signs the law the Witness is seated under; the roll carries the
+seating; nothing signs across a tier boundary.
+
+- WHO MAY BE SEATED: a rehearsal entity whose standing is NOT this
+  operator's (the externality requirement — checkable from records: the
+  candidate's key holds no declared edge into this composition's graph),
+  seated under one of the classes: auditor | peer | reviewing Subject.
+- THE ACCREDITING QUORUM: the rehearsal authority keys named in
+  keyring.json, k-of-n with DISTINCT-signer semantics (2-of-3), AND the
+  Witness candidate's own key — possession at seating, exactly as at
+  admission (I-1).
+- DUTIES OF THE SEATED (F-3): a seated external Witness holds D-7, D-3 and
+  D-8 in full — the record's honesty duties, the trace duty, and the
+  no-self-judging duty. An accreditation the record contradicts is the
+  named fraud, auditable offline (I-7).
+- REVOCATION GROUNDS: rehearsal compromise drills; breach of the duties
+  above. A revoked accreditation is a roll row — it stays, verifies, and
+  says revoked, and the seat it held refuses the next boot.
+- STANDING: none. This statute seats rehearsal keys on a rehearsal roll and
+  nothing else; ratification replaces the whole document set.
+`;
+
 /** The rehearsal Members the seed roll admits (slice 2 binds sessions to the
  *  principal; the long-lived Subject exercises the other class honestly). */
 const SEED_MEMBERS = [
@@ -239,10 +272,64 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
     dissent: [],
     standing: 'none',
   });
+
+  // ── the accreditation statute and the external it seats (identity slice
+  // 3, #126): the statute sealed + recorded through the amendment harness
+  //  (the chain to the root through a DOCUMENT, never a root signature over
+  //  a Witness), then the accreditation row on the roll — quorum + the
+  //  candidate's own key — and epoch 1 anchoring the seating ──
+  const accreditationPath = join(dir, 'statute-accreditation.md');
+  writeFileSync(accreditationPath, ACCREDITATION_STATUTE, { mode: 0o600 });
+  const accreditationBytes = readFileSync(accreditationPath);
+  const accreditationDigest = sha256Hex(accreditationBytes);
+  const accreditationSeal = sealArtifact(dir, accreditationBytes, 'amendment', 'statute-accreditation.md');
+  const accreditationVerified = verifySeal({ bytes: accreditationBytes, subject: 'amendment', seal: accreditationSeal, manifest });
+  writeFileSync(join(dir, 'statute-accreditation.sig.json'), JSON.stringify(accreditationSeal, null, 2) + '\n', { mode: 0o600 });
+  recordEnactment(dir, {
+    id: `simulated-enactment-accreditation-${now}`,
+    kind: 'SIMULATED ENACTMENT',
+    amendment: accreditationPath,
+    amendmentDigest: accreditationDigest,
+    seal: { threshold: accreditationVerified.threshold, distinctSigners: accreditationVerified.distinctSigners, basis: 'dev-keyring' },
+    reason: 'rehearsal: the ACCREDITATION STATUTE for external Witnesses, enacted in simulation — the chain to the root through a document, the root signing the law and never a Witness (A-7/J-1/D-8)',
+    decidedBy: 'rehearsal authority keys (practice keys, one entity — NOT the A-1 trust root)',
+    dissent: [],
+    standing: 'none',
+  });
+  const witness = generateEd25519();
+  const witnessPemPath = join(dir, 'private', 'witness-external-1.pem');
+  writeFileSync(witnessPemPath, witness.privateKeyPem, { mode: 0o600 });
+  chmodSync(witnessPemPath, 0o600);
+  const witnessDigest = memberKeyDigestOf(witness.publicKey);
+  const accreditationRow = {
+    kind: 'accreditation', memberKeyDigest: witnessDigest, class: 'external-witness',
+    memberKey: witness.publicKey,
+    member: 'rehearsal-external-witness-1',
+    holder: 'a rehearsal external Witness — standing not this operator\'s, seated by the SIMULATED accreditation statute',
+    grounds: `rehearsal accreditation statute ${accreditationDigest.slice(0, 16)}… (SIMULATED)`,
+    recordedAt: now,
+  };
+  appendRollEvent(roll, {
+    ...accreditationRow,
+    signedBy: signRollEvent(accreditationRow, [...authoritySigners, { keyId: witnessDigest, privateKey: witness.privateKeyPem }]),
+  });
+  closeEpoch({ roll, epoch: 1, manifest, privateKeys: privates, now });
+  recordEnactment(dir, {
+    id: `simulated-checkpoint-1-${now}`,
+    kind: 'SIMULATED ENACTMENT',
+    amendment: 'member roll, epoch 1 checkpoint (the external seated)',
+    amendmentDigest: roll.checkpoints[1].rollHead,
+    seal: { threshold: accreditationVerified.threshold, distinctSigners: accreditationVerified.distinctSigners, basis: 'dev-keyring' },
+    reason: 'rehearsal: roll epoch 1 closed — the external Witness\'s seating is anchored by digest, and the root still signs no Member',
+    decidedBy: 'rehearsal authority keys (practice keys, one entity — NOT the A-1 trust root)',
+    dissent: [],
+    standing: 'none',
+  });
+
   const rollPath = join(dir, 'roll.json');
   writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n', { mode: 0o600 });
 
-  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, rollPath, roll };
+  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, accreditationPath, witnessKeyPath: witnessPemPath, witnessKeyDigest: witnessDigest, rollPath, roll };
 }
 
 /**
@@ -276,7 +363,8 @@ export function verifyRehearsalKeyring(dir) {
       const first = verdict.findings.find((f) => f.severity === 'error');
       throw new SealError('roll-broken', `the member roll refuses: ${first?.reason}: ${first?.detail}`);
     }
-    out.roll = { path: rollPath, ...verdict.summary };
+    const witnesses = verdict.members.filter((m) => m.class === 'external-witness' && m.state === 'live').length;
+    out.roll = { path: rollPath, ...verdict.summary, witnesses };
   }
   return out;
 }
@@ -289,7 +377,7 @@ if (process.argv[1] && process.argv[1].endsWith('rehearsal-keyring.mjs')) {
       console.log(`rehearsal identity set installed under ${resolve(dir)}`);
       console.log(`  authority manifest: ${r.manifestPath}`);
       console.log(`  enforcer annex:     ${r.annexPath} (digest ${r.annexDigest.slice(0, 16)}…)`);
-      console.log(`  member roll:        ${r.rollPath} — ${r.roll.entries.length} admission(s) under the SIMULATED admission statute, epoch 0 checkpointed`);
+      console.log(`  member roll:        ${r.rollPath} — ${r.roll.entries.filter((e) => e.kind === 'admission').length} admission(s) under the SIMULATED admission statute, 1 external Witness accredited under the SIMULATED accreditation statute, epochs 0–1 checkpointed`);
       console.log('  reminder: practice keys — the roll and the annex prove code-path correctness and convey no standing');
     } catch (e) {
       fail(e.message);
@@ -299,7 +387,7 @@ if (process.argv[1] && process.argv[1].endsWith('rehearsal-keyring.mjs')) {
       const r = verifyRehearsalKeyring(resolve(dir));
       console.log(`verify OK: annex self-signature valid; law digest joins the sealed body (${r.lawDigest.slice(0, 16)}…); ${r.manifest.threshold.k}-of-${r.manifest.threshold.n} authority keys on file`);
       if (r.roll) {
-        console.log(`  member roll OK: ${r.roll.entries} entries, ${r.roll.members} member(s) (${r.roll.live} live), anchored through seq ${r.roll.anchoredThrough} — ${r.roll.basis}, conveys no standing`);
+        console.log(`  member roll OK: ${r.roll.entries} entries, ${r.roll.members} member(s) (${r.roll.live} live, ${r.roll.witnesses} external Witness(es) accredited), anchored through seq ${r.roll.anchoredThrough} — ${r.roll.basis}, conveys no standing`);
       }
       console.log('  basis: dev-keyring — code-path correctness proven; ratification, standing, and I-1 identity NOT claimed');
     } catch (e) {
