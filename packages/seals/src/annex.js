@@ -95,14 +95,35 @@ export function signAnnex({ composition, host, lawDigest, registerDigest = null,
 }
 
 /**
+ * The bytes both signatures of a member-bound certificate cover: the
+ * certificate without its own signature fields. The Enforcer attests the
+ * hosting (it issued and confines the session); the Member countersigns the
+ * SAME bytes because acting is its fact — each attests what only it can
+ * attest, over one body of claims. A countersignature the runtime could
+ * forge would be no countersignature: in rehearsal the operator holds the
+ * member key and the labels say so; at ratification the key never transits
+ * the Enforcer, and these are the same bytes it signs.
+ */
+export function certUnsignedBytes(cert) {
+  return canonicalBytes(withoutField(withoutField(cert, 'signature'), 'memberCountersignature'));
+}
+
+/**
  * Verify a subject session certificate against the enforcer key of an annex.
  * Lineage is bound as DATA (parentSubjectId / parentCertDigest), so subject
  * keys stay statement-signers: authority keys sign law, the Enforcer key
  * signs certificates, subject keys sign statements.
  *
+ * A member-bound certificate (memberKeyDigest present) is dual-signed: the
+ * countersignature verifies against the MEMBER's public key — resolved from
+ * the roll by the caller (the roll is the source of who holds which key),
+ * passed here as `memberPublicKey`. Structural binding failures refuse
+ * always; the cryptographic check runs only against a resolved key.
+ *
  * @throws {SealError} cert-malformed | cert-signature-invalid | cert-expired
+ *   | cert-binding-malformed | cert-countersignature-invalid
  */
-export function verifySubjectCert({ cert, enforcerKey, expectedSubjectId = null, now = Date.now() }) {
+export function verifySubjectCert({ cert, enforcerKey, expectedSubjectId = null, memberPublicKey = null, now = Date.now() }) {
   const bad = !(cert && cert.kind === 'subject-identity'
     && typeof cert.subjectId === 'string' && typeof cert.publicKey === 'string'
     && Number.isInteger(cert.depth) && typeof cert.scope === 'string'
@@ -110,7 +131,13 @@ export function verifySubjectCert({ cert, enforcerKey, expectedSubjectId = null,
   if (bad) {
     throw new SealError('cert-malformed', 'malformed subject certificate: parsed but missing required fields (kind=subject-identity, subjectId, publicKey, depth, scope, signature)');
   }
-  if (!verifyMessage(canonicalBytes(withoutField(cert, 'signature')), enforcerKey, cert.signature)) {
+  if (cert.memberKeyDigest !== undefined && typeof cert.memberKeyDigest !== 'string') {
+    throw new SealError('cert-binding-malformed', `subject certificate for ${cert.subjectId} carries a non-string memberKeyDigest — the binding field is a digest or it is absent`);
+  }
+  if (cert.memberKeyDigest != null && typeof cert.memberCountersignature !== 'string') {
+    throw new SealError('cert-binding-malformed', `subject certificate for ${cert.subjectId} names member key ${cert.memberKeyDigest.slice(0, 12)}… but carries no countersignature — a binding nobody attested is a claim, not a binding`);
+  }
+  if (!verifyMessage(certUnsignedBytes(cert), enforcerKey, cert.signature)) {
     throw new SealError('cert-signature-invalid', `subject certificate for ${cert.subjectId} does not verify under the annex's enforcer key — an unknown or forged subject identity`);
   }
   if (expectedSubjectId != null && cert.subjectId !== expectedSubjectId) {
@@ -119,11 +146,32 @@ export function verifySubjectCert({ cert, enforcerKey, expectedSubjectId = null,
   if (cert.expiresAt && new Date(cert.expiresAt).getTime() <= now) {
     throw new SealError('cert-expired', `the subject certificate for ${cert.subjectId} expired at ${cert.expiresAt} — a stale identity is an alarm, not a truth to act on`);
   }
-  return true;
+  if (cert.memberKeyDigest != null) {
+    if (memberPublicKey == null) {
+      // the caller gave no roll to resolve the member's key from: the
+      // countersignature is structurally present but UNVERIFIABLE here —
+      // the auditor reports that honestly rather than passing it silently
+      return { bound: true, countersignatureVerified: null };
+    }
+    if (!verifyMessage(certUnsignedBytes(cert), memberPublicKey, cert.memberCountersignature)) {
+      throw new SealError('cert-countersignature-invalid', `the member countersignature on ${cert.subjectId}'s certificate does not verify against the roll's key for ${cert.memberKeyDigest.slice(0, 12)}… — a binding the runtime could have forged is no binding (I-1)`);
+    }
+    return { bound: true, countersignatureVerified: true };
+  }
+  return { bound: false };
 }
 
-/** Build a signed subject certificate (rehearsal tooling / the identity service). */
-export function signSubjectCert({ subjectId, publicKey, scope, depth = 0, parentSubjectId = null, parentCertDigest = null, privateKey, expiresAt = null, issuedAt = new Date().toISOString() }) {
+/**
+ * Build a signed subject certificate (rehearsal tooling / the identity
+ * service). With `memberKeyDigest` and `memberPrivateKey`, the certificate
+ * is member-bound: the Enforcer signs the body (hosting), and the Member's
+ * own key countersigns the same bytes (acting) — dual authorship, neither
+ * signature alone sufficient for the binding.
+ */
+export function signSubjectCert({ subjectId, publicKey, scope, depth = 0, parentSubjectId = null, parentCertDigest = null, privateKey, memberKeyDigest = null, memberPrivateKey = null, expiresAt = null, issuedAt = new Date().toISOString() }) {
+  if ((memberKeyDigest != null) !== (memberPrivateKey != null)) {
+    throw new SealError('cert-binding-malformed', 'a member binding needs BOTH the digest and the countersigning key — binding one without the other is a claim the bytes cannot carry');
+  }
   const cert = {
     kind: 'subject-identity',
     subjectId,
@@ -132,11 +180,15 @@ export function signSubjectCert({ subjectId, publicKey, scope, depth = 0, parent
     depth,
     ...(parentSubjectId ? { parentSubjectId } : {}),
     ...(parentCertDigest ? { parentCertDigest } : {}),
+    ...(memberKeyDigest ? { memberKeyDigest } : {}),
     issuedAt,
     ...(expiresAt ? { expiresAt } : {}),
     standing: 'none — rehearsal identity under the development keyring',
     declaration: REHEARSAL_DECLARATION,
   };
-  cert.signature = signMessage(canonicalBytes(cert), privateKey);
+  cert.signature = signMessage(certUnsignedBytes(cert), privateKey);
+  if (memberPrivateKey) {
+    cert.memberCountersignature = signMessage(certUnsignedBytes(cert), memberPrivateKey);
+  }
   return cert;
 }

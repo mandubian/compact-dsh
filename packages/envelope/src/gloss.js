@@ -480,6 +480,14 @@ export const GLOSS = {
     cites: ['J-6', 'J-3', 'D-8'],
   },
 
+  'JG/member-revoked': {
+    title: 'A revoked Member cannot act — the roll says so',
+    why: 'Revocation is a roll event, verifiable offline by anyone: the rows stay, verify, and say revoked (F-8). A session whose member binding resolves to a revoked Member refuses the act that would lean on that standing — the refusal cites the roll row, so the standing question is answered from records, never from the runtime\'s word for itself.',
+    example: { blocked: ['judicature_hear from a session whose bound Member is revoked — refused on the cited roll row', 'presenting a pre-revocation session as if standing survived: the row travels with the lineage by construction'], lawful: ['the Member\'s path runs through the roll and the admission statute: rotation is refused to a revoked Member, re-admission is statute\'s to grant', 'other parties continue — one Member\'s revocation touches only its own standing'] },
+    instruction: 'Standing reads from the roll. Verify the row yourself, offline, before contesting it.',
+    cites: ['J-3', 'I-1', 'F-8'],
+  },
+
   'JG/appeal-refused': {
     title: 'The appeal refuses — one as of right, then the door closes',
     why: 'Appeal asks whether the law was APPLIED rightly, on the same record, and lies to an authority not subordinate to the first panel. One appeal is filed as of right by a party with argued grounds; once the appellate judgment has landed it is final and the door closes — an adverse final judgment convinced the LAW is wrong routes to the petition channel, not to defiance. An appeal recorded unheard or witnesses-pending holds the door too: nothing is final, but the recorded appeal is the one appeal, and the refusal names the recorded state.',

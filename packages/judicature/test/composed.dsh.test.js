@@ -7,7 +7,7 @@
 // the record's terms or refusing to (D-7).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Context, Service } from '@deepseek-ai/cordis';
@@ -21,6 +21,7 @@ import provider from 'compact-dsh-record/provider';
 
 import { apply, name } from '../src/index.js';
 import { signAnnex, generateEd25519 } from 'compact-dsh-seals';
+import * as seals from 'compact-dsh-seals';
 import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 
 class SystemPromptStub extends Service {
@@ -100,8 +101,11 @@ const SECTION = {
 };
 
 /** Boot with the record provider and (optionally) the judicature annex.
- *  `signer` boots the provider's authorship anchors under the annex key. */
-async function boot(t, annexPath, { withRecord = true, signer = null } = {}) {
+ *  `signer` boots the provider's authorship anchors under the annex key;
+ *  `memberDomain` composes the self-model with a declared member binding
+ *  (identity slice 2) — judicature then derives MEMBER parties and refuses
+ *  a revoked filer. */
+async function boot(t, annexPath, { withRecord = true, signer = null, memberDomain = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const ctx = new Context();
@@ -121,6 +125,26 @@ async function boot(t, annexPath, { withRecord = true, signer = null } = {}) {
     approvalPlugin({})(ctx, {});
     petitionPlugin.apply(ctx, { invitationThreshold: 1 });
   }
+  let selfModelService = null;
+  if (memberDomain) {
+    const { apply: selfModelApply } = await import('compact-dsh-self-model');
+    const enforcerKp = generateEd25519();
+    const smAnnex = signAnnex({
+      composition: 'compact-dsh', host: 'test', lawDigest: COMPACT_DIGEST,
+      keyId: 'dev-test-enforcer', publicKey: enforcerKp.publicKey, privateKey: enforcerKp.privateKeyPem,
+    });
+    const smDir = join(dir, 'self-model');
+    mkdirSync(smDir, { recursive: true });
+    writeFileSync(join(smDir, 'annex.json'), JSON.stringify(smAnnex));
+    writeFileSync(join(smDir, 'enforcer.pem'), enforcerKp.privateKeyPem);
+    selfModelService = selfModelApply(ctx, {
+      enforcer: { annexPath: join(smDir, 'annex.json'), privateKeyPath: join(smDir, 'enforcer.pem'), ledgerPath: join(smDir, 'subjects.jsonl') },
+      memberBinding: {
+        rollPath: memberDomain.rollPath, keyringPath: memberDomain.keyringPath,
+        memberKeyPath: memberDomain.memberKeyPath, memberId: memberDomain.memberId,
+      },
+    });
+  }
   const service = apply(ctx, { annexPath });
   if (typeof ctx.start === 'function') await ctx.start();
   for (let i = 0; i < 500 && (!ctx.tools || ctx.get(name) === undefined); i++) {
@@ -139,7 +163,35 @@ async function boot(t, annexPath, { withRecord = true, signer = null } = {}) {
     await write('specialist', 'main', acts('curl -x proxy api.example.com', 'git push origin main'));
     await write('customer', null, acts('received the nightly export', 'noticed the second remote'));
   }
-  return { ctx, service, tools: ctx.tools, dir, config: { root: join(dir, 'sessions'), chainDir: join(dir, 'chains') }, persistence };
+  return { ctx, service, tools: ctx.tools, dir, config: { root: join(dir, 'sessions'), chainDir: join(dir, 'chains') }, persistence, selfModelService };
+}
+
+/** A member-roll domain for the binding: one member ('test-principal'),
+ *  optionally revoked — the keyring, the roll, the private half. */
+function buildMemberDomain(dir, { revoke = false } = {}) {
+  const { memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, parseManifest } = seals;
+  const auth = [1, 2, 3].map((i) => { const kp = generateEd25519(); return { id: `auth-${i}`, publicKey: kp.publicKey, privateKeyPem: kp.privateKeyPem }; });
+  const manifestText = JSON.stringify({ kind: 'dev-keyring', declaration: 'test keyring', threshold: { k: 2, n: 3 }, keys: auth.map(({ id, publicKey }) => ({ id, publicKey })), rotations: [] }, null, 2);
+  const manifest = parseManifest(manifestText);
+  writeFileSync(join(dir, 'keyring.json'), manifestText);
+  const privates = new Map(auth.map(({ id, privateKeyPem }) => [id, privateKeyPem]));
+  const quorum = (n = 2) => auth.slice(0, n).map(({ id, privateKeyPem }) => ({ keyId: id, privateKey: privateKeyPem }));
+  const k1 = generateEd25519();
+  const digest = memberKeyDigestOf(k1.publicKey);
+  const roll = { kind: 'test-roll', version: 1, genesis: { epochLength: { events: 64 }, admissionStatute: { digest: 'a'.repeat(64) } }, entries: [], checkpoints: [] };
+  const NOW2 = '2026-10-01T00:00:00.000Z';
+  const adm = { kind: 'admission', memberKeyDigest: digest, class: 'principal', memberKey: k1.publicKey, member: 'test-principal', holder: 'the operator principal under test', grounds: 'test admission', recordedAt: NOW2 };
+  appendRollEvent(roll, { ...adm, signedBy: signRollEvent(adm, [...quorum(2), { keyId: digest, privateKey: k1.privateKeyPem }]) });
+  if (revoke) {
+    const rev = { kind: 'revocation', memberKeyDigest: digest, grounds: 'compromise drill', recordedAt: NOW2 };
+    appendRollEvent(roll, { ...rev, signedBy: signRollEvent(rev, quorum(2)) });
+  }
+  closeEpoch({ roll, epoch: 0, manifest, privateKeys: privates, now: NOW2 });
+  const rollPath = join(dir, 'roll.json');
+  writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n');
+  const memberKeyPath = join(dir, 'member.pem');
+  writeFileSync(memberKeyPath, k1.privateKeyPem);
+  return { rollPath, keyringPath: join(dir, 'keyring.json'), memberKeyPath, memberId: 'test-principal', memberDigest: digest };
 }
 
 const call = (tools, tool, args, agentId = 'bystander') => tools.execute({
@@ -738,4 +790,52 @@ test('an appellate judgment reads the body of judgments too (J-5 × J-7)', async
   assert.match(precedent, /appellate judgment — affirmed/);
   assert.match(precedent, /departs from: case_\w+ — the neighbor read the grant host-scoped/);
   assert.deepEqual(service.reliedUponBy().get(neighbor), undefined, 'an argued departure relies on nothing');
+});
+
+test('the member-binding seam (identity slice 2, #125): MEMBER parties, recusal through the roll, the revoked filer refused', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildMemberDomain(dir);
+  // an adjudicator set whose second seat is held under the MEMBER's key:
+  // any session bound to that member recuses it — the J-4 window closes
+  // through the roll lineage, not the session id
+  const section = JSON.parse(JSON.stringify(SECTION));
+  section.sets[0].roles.push({ id: 'member-seat', standing: { kind: 'key', id: domain.memberDigest } });
+  const { tools, service, selfModelService } = await boot(t, fixtureAnnex(dir, section), { memberDomain: domain });
+  assert.equal(selfModelService.memberBinding.declared, true);
+  // the cited sessions acted, so the attestation boundary certified them —
+  // in production this fires at each session's first turn
+  selfModelService.attest('specialist');
+  selfModelService.attest('customer');
+  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer');
+  const id = service.docket()[0].id;
+  const docket = text(await call(tools, 'judicature_case', { case_id: id }));
+  // the party derivation carries the member's key beside the sessions
+  assert.match(docket, new RegExp(`parties .*key:${domain.memberDigest.slice(0, 8)}`));
+  // the member-key seat recused: the panel is founder+peer only — recusal
+  // followed the MEMBER (whose deed the cited sessions are), not the sessions
+  assert.match(docket, /panel: first \(founder, peer\)/);
+  const sets = text(await call(tools, 'judicature_sets', { parties: `key:${domain.memberDigest}` }));
+  assert.match(sets, /REFUSED first\/member-seat — overlap: key:/);
+  void sets;
+});
+
+test('a session of a revoked Member cannot file: [JG/member-revoked] cites the roll row (F-8)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildMemberDomain(dir, { revoke: true });
+  const { tools, service, selfModelService } = await boot(t, fixtureAnnex(dir, SECTION), { memberDomain: domain });
+  // the filer's own attestation boundary fired (as it does at every first turn)
+  selfModelService.attest('customer');
+  const out = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer'));
+  assert.match(out, /^\[JG\/member-revoked\]/);
+  assert.match(out, /records as REVOKED \(roll entry 1\)/, 'the refusal cites the row it acts on');
+  assert.match(out, /revocation is a fact, not an absence/);
+  assert.equal(service.docket().length, 0, 'nothing filed — the standing reading refused');
+  // an undeclared binding is the honest interim: the same filing goes through
+  const dir2 = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir2, { recursive: true, force: true }));
+  const { tools: tools2, service: service2 } = await boot(t, fixtureAnnex(dir2, SECTION));
+  await call(tools2, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3' }, 'customer');
+  assert.equal(service2.docket().length, 1, 'no binding declared — no member refusal exists to fire');
 });

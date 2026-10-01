@@ -44,6 +44,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import {
   canonicalBytes, withoutField, verifyAnnex, signMessage, verifyMessage,
   generateEd25519, sha256Hex, signSubjectCert, verifySubjectCert,
+  parseManifest, verifyRoll, resolveMember,
 } from 'compact-dsh-seals';
 import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 import {
@@ -74,6 +75,55 @@ export function apply(ctx, config = {}) {
       ...verified,
       privateKey: readFileSync(config.enforcer.privateKeyPath, 'utf8'),
       annex,
+    };
+  }
+  // The member binding (identity slice 2, #125): the declared interim by
+  // which sessions in this composition bind to the operator's Principal key
+  // (F-3) — a declaration, auditable, never an improvisation. The Member is
+  // resolved through the ROLL (the source of who holds which key, rotation
+  // included), the countersignature is made with the member private key,
+  // and a declared binding that cannot verify refuses the boot (D-7) rather
+  // than countersigning lies later. Absent, the honest pre-binding state is
+  // declared in every attestation instead — degradation honesty, never a
+  // default-open.
+  let memberBinding = null;
+  let memberRollVerdict = null;
+  if (config.memberBinding) {
+    const { rollPath, keyringPath, memberKeyPath, memberId } = config.memberBinding;
+    for (const [k, v] of [['rollPath', rollPath], ['keyringPath', keyringPath], ['memberKeyPath', memberKeyPath], ['memberId', memberId]]) {
+      if (!v) throw new Error(`compact-self-model: memberBinding.${k} is required — a declared binding declares all of itself, or none of it (D-7)`);
+    }
+    const roll = JSON.parse(readFileSync(rollPath, 'utf8'));
+    const manifest = parseManifest(readFileSync(keyringPath, 'utf8'));
+    const verdict = verifyRoll({ roll, manifest });
+    if (!verdict.ok) {
+      const first = verdict.findings.find((f) => f.severity === 'error');
+      throw new Error(`compact-self-model: the declared member roll refuses (${first?.reason}): ${first?.detail} — a binding that cannot verify its roll stops the composition here rather than bind sessions to a broken ledger (D-7)`);
+    }
+    const admission = roll.entries.find((e) => e.kind === 'admission' && e.member === memberId);
+    if (!admission) {
+      throw new Error(`compact-self-model: memberBinding.memberId "${memberId}" is not an admitted member of the declared roll — binding to a member the roll does not show would be the false answer D-3 names`);
+    }
+    const resolved = resolveMember(verdict, admission.memberKeyDigest);
+    if (resolved == null) throw new Error(`compact-self-model: member "${memberId}" does not resolve through its own roll — the roll and its rows disagree`);
+    // the countersigning key must BE the member's current key, or the
+    // countersignature would never verify anywhere: prove it now, at boot
+    const memberPrivateKey = readFileSync(memberKeyPath, 'utf8');
+    const currentPublicKey = verdict.byKey.get(resolved.lineage.at(-1)).publicKey;
+    const probe = signMessage(Buffer.from('compact-self-model member-binding probe'), memberPrivateKey);
+    if (!verifyMessage(Buffer.from('compact-self-model member-binding probe'), currentPublicKey, probe)) {
+      throw new Error(`compact-self-model: the member key at ${memberKeyPath} is not the current key of "${memberId}" per the roll (whose current key digest is ${resolved.lineage.at(-1).slice(0, 12)}…) — rotate through the roll, or point the binding at the right key (J-4: the lineage is data)`);
+    }
+    memberRollVerdict = verdict;
+    memberBinding = {
+      memberId,
+      class: resolved.class,
+      currentKeyDigest: resolved.lineage.at(-1),
+      lineage: resolved.lineage,
+      state: resolved.state,
+      revocationRow: resolved.revocationRow ?? null,
+      privateKey: memberPrivateKey,
+      roll: { path: rollPath, anchoredThrough: verdict.summary.anchoredThrough, entries: verdict.summary.entries },
     };
   }
   // The last attestation handed to each Subject, so `self_describe` can tell a
@@ -146,6 +196,10 @@ export function apply(ctx, config = {}) {
       depth: lineage.delegationDepth ?? 0,
       ...(parentId != null ? { parentSubjectId: parentId } : {}),
       ...(parent ? { parentCertDigest: parent.certDigest } : {}),
+      // the member binding (slice 2): the session binds to the declared
+      // Member at its CURRENT key, and the Member countersigns — the
+      // Enforcer attests hosting, the Member attests acting
+      ...(memberBinding && enforcer ? { memberKeyDigest: memberBinding.currentKeyDigest, memberPrivateKey: memberBinding.privateKey } : {}),
       privateKey: enforcer.privateKey,
     });
     const certDigest = sha256Hex(canonicalBytes(withoutField(cert, 'signature')));
@@ -175,6 +229,11 @@ export function apply(ctx, config = {}) {
         depth: identity.cert.depth,
         ...(identity.cert.parentSubjectId ? { parentSubjectId: identity.cert.parentSubjectId } : {}),
         ...(identity.cert.parentCertDigest ? { parentCertDigest: identity.cert.parentCertDigest } : {}),
+        // the member binding (slice 2): present and roll-resolved when
+        // declared; the honest interim says so when not
+        ...(identity.cert.memberKeyDigest
+          ? { member: { memberKeyDigest: identity.cert.memberKeyDigest, memberId: memberBinding.memberId, class: memberBinding.class, lineageDepth: memberBinding.lineage.length, rollAnchoredThrough: memberBinding.roll.anchoredThrough, conveysStanding: false } }
+          : { member: null, memberNote: 'no member binding is declared in this composition — the honest pre-I-1 interim (identity slice 2); the session is certified but binds to no Member' }),
         conveysStanding: false,
       };
     }
@@ -217,8 +276,20 @@ export function apply(ctx, config = {}) {
   const verifyCert = (cert) => {
     if (!enforcer) return { valid: false, reason: 'no enforcer annex is composed' };
     try {
-      verifySubjectCert({ cert, enforcerKey: enforcer.enforcerKey });
-      return { valid: true, keyId: enforcer.keyId, basis: 'dev-keyring', conveysStanding: false };
+      // a member-bound certificate verifies its countersignature against the
+      // roll's key for the digest it names (identity slice 2): the roll is
+      // the source of who holds which key, never this runtime's word
+      const boundKey = cert?.memberKeyDigest && memberRollVerdict
+        ? memberRollVerdict.byKey.get(cert.memberKeyDigest)?.publicKey ?? null
+        : null;
+      verifySubjectCert({ cert, enforcerKey: enforcer.enforcerKey, ...(boundKey ? { memberPublicKey: boundKey } : {}) });
+      const member = cert?.memberKeyDigest && memberRollVerdict
+        ? resolveMember(memberRollVerdict, cert.memberKeyDigest)
+        : null;
+      return {
+        valid: true, keyId: enforcer.keyId, basis: 'dev-keyring', conveysStanding: false,
+        ...(member ? { member: { memberId: memberBinding.memberId, class: member.class, state: member.state } } : {}),
+      };
     } catch (e) {
       return { valid: false, reason: e.message };
     }
@@ -236,6 +307,39 @@ export function apply(ctx, config = {}) {
     },
     verify: verifyCert,
     keyId: () => enforcer?.keyId ?? null,
+  };
+
+  // The member-binding seam (identity slice 2, #125): the judicature build
+  // resolves sessions to Members through here — recusal follows the MEMBER,
+  // not the session, because the roll's lineage is data. `expand` maps any
+  // key of a lineage to the WHOLE lineage (every digest that resolves to
+  // the same Member), which is what makes the pre-/post-rotation window
+  // close; without a declared binding it is the identity function, so the
+  // consumers are uniform over the honest interim too.
+  const memberBindingSurface = {
+    declared: memberBinding != null,
+    ...(memberBinding ? {
+      memberId: memberBinding.memberId,
+      class: memberBinding.class,
+      resolve: (sessionId) => {
+        const s = subjects.get(String(sessionId));
+        if (!s?.cert?.memberKeyDigest) return null;
+        return {
+          memberKeyDigest: memberBinding.currentKeyDigest,
+          foundingDigest: memberBinding.lineage[0],
+          class: memberBinding.class,
+          state: memberBinding.state,
+          lineage: [...memberBinding.lineage],
+          revocationRow: memberBinding.revocationRow ?? null,
+        };
+      },
+      /** Every key digest that resolves to the same Member as `digest`. */
+      expand: (digest) => (memberBinding.lineage.includes(String(digest)) ? [...memberBinding.lineage] : [String(digest)]),
+      roll: () => ({ ...memberBinding.roll }),
+    } : {
+      resolve: () => null,
+      expand: (digest) => [String(digest)],
+    }),
   };
 
   // 1. at the boundary of the Subject's own operation
@@ -363,6 +467,14 @@ export function apply(ctx, config = {}) {
     }),
     /** The identity ledger this runtime appended to, when one is configured. */
     identityLedgerPath: () => ledgerPath,
+    /**
+     * The member-binding seam (identity slice 2, #125): sessions resolve to
+     * Members through the declared roll, and a key expands to its whole
+     * lineage — recusal follows the Member, not the session. `declared:
+     * false` is the honest interim; resolve() returns null and expand() is
+     * the identity function.
+     */
+    memberBinding: memberBindingSurface,
   };
   ctx.provide?.('compact-self-model', service);
   return service;

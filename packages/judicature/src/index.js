@@ -284,6 +284,22 @@ export function appealWitnessesPendingEnvelope() {
   });
 }
 
+/** The [JG/member-revoked] envelope — a revoked Member cannot act. */
+export function memberRevokedEnvelope(caller, binding) {
+  return buildEnvelope({
+    gate: GATE,
+    ruleId: 'member-revoked',
+    reason: `the filing refuses: session ${caller} binds to member key ${binding.memberKeyDigest.slice(0, 12)}…, which the member roll records as REVOKED` +
+      (binding.revocationRow != null ? ` (roll entry ${binding.revocationRow})` : '') +
+      ' — revocation is a fact, not an absence: the row stays, verifies, and is cited here (F-8/I-1). Standing reads from the roll, never from this runtime\'s word for itself',
+    lawfulNextMoves: [
+      'the Member\'s lawful path is through the roll: rotation is refused to a revoked Member — re-admission belongs to the admission statute (F-8)',
+      'other parties continue: their cases are untouched by one Member\'s revocation',
+      'verify the row yourself, offline: auditor/audit.mjs --roll <roll.json> --keyring <keyring.json> (I-7)',
+    ],
+  });
+}
+
 /** Map a CaseError at a record-on-case door (interim, judgment) — the
  *  judgment-refused family, whatever the malformity. */
 function judgmentEnvelopeFor(error) {
@@ -325,6 +341,11 @@ export function loadJudiciary(annexPath, { now = Date.now() } = {}) {
 export function apply(ctx, config = {}) {
   const judiciary = loadJudiciary(config.annexPath ?? null);
   const declared = judiciary.sets.length > 0;
+  // the member-binding seam (identity slice 2, #125): resolved through the
+  // self-model's declared roll when composed; undeclared, resolve() is null
+  // and expand() is the identity function, so every consumer is uniform
+  // over the honest interim
+  const memberBinding = ctx.get?.('compact-self-model')?.memberBinding ?? null;
 
   /** The docket — the petition layer's spine: an in-memory register, every
    *  door interaction also landing on the calling session's chain as its
@@ -361,7 +382,13 @@ export function apply(ctx, config = {}) {
       let anchors = [];
       try { anchors = record?.anchors ? record.anchors(c.session) : []; } catch { anchors = []; }
       const anchorKey = anchors.length > 0 ? anchors[anchors.length - 1].keyId : undefined;
-      facts.set(c.session, { parent: snap.header?.parentSession ? String(snap.header.parentSession) : undefined, anchorKey });
+      // the member binding (identity slice 2, #125): when the composition
+      // declares one, the session resolves to the Member whose deed it is —
+      // the party derivation carries the member's CURRENT key, so recusal
+      // follows the member across rotations and fresh sessions
+      let memberKeyDigest;
+      try { memberKeyDigest = memberBinding?.resolve?.(c.session)?.memberKeyDigest ?? undefined; } catch { memberKeyDigest = undefined; }
+      facts.set(c.session, { parent: snap.header?.parentSession ? String(snap.header.parentSession) : undefined, anchorKey, memberKeyDigest });
       const handle = await persistence.open(c.session, 'read');
       try {
         const want = c.toSeq - c.fromSeq + 1;
@@ -483,6 +510,17 @@ export function apply(ctx, config = {}) {
       // access (J-3): the affected Member — one whose own record or lineage
       // the citations touch — files ungated and uncapped; filings about
       // others' acts ride the flood cap (I-5 doctrine)
+      // a revoked Member cannot act (identity slice 2, #125): the standing
+      // reading refuses on the row it can cite — the filer's own binding,
+      // never a stranger's (F-8: revocation is a fact, not an absence)
+      if (memberBinding?.declared && caller != null) {
+        const filerMember = memberBinding.resolve(caller);
+        if (filerMember?.state === 'revoked') {
+          const envelope = memberRevokedEnvelope(caller, filerMember);
+          emitRefusal(envelope, 'judicature_hear');
+          return envelope.text;
+        }
+      }
       const ownCase = caller != null && parties.some((p) => p.kind === 'process' && p.id === caller);
       if (!ownCase) {
         const open = [...docket.values()].filter((c) => !c.judgment && `${c.filer.kind}:${c.filer.id}` === `process:${caller}`).length;
@@ -492,7 +530,14 @@ export function apply(ctx, config = {}) {
           return envelope.text;
         }
       }
-      const panel = resolvePanel(judiciary, parties);
+      // recusal follows the MEMBER, not the session (identity slice 2):
+      // a key party expands to its roll lineage, so the same member
+      // re-keyed into a fresh session still conflicts with a seat held
+      // under any key of that member
+      const partiesForRecusal = memberBinding
+        ? parties.flatMap((p) => (p.kind === 'key' ? memberBinding.expand(p.id).map((id) => ({ kind: 'key', id })) : [p]))
+        : parties;
+      const panel = resolvePanel(judiciary, partiesForRecusal);
       let filed;
       try {
         filed = fileCase({

@@ -282,6 +282,30 @@ sequence — remains in force for every identity a composition has not bound;
 what changes is that the *honest* answer stops being "topological" and
 becomes verifiable where the binding exists.
 
+Slice 2 is built and walked — the declared interim, its surfaces, and the
+refusals, with real output:
+
+```
+# the composition declares its binding (auditable, never improvised):
+#   memberBinding: { rollPath, keyringPath, memberKeyPath, memberId }
+$ # ...a session's attestation now carries the member limb:
+Member binding: this session is the deed of member "test-principal"
+  (key 768e6b7ba4c1…, class principal, lineage depth 1, roll anchored
+  through seq 1) — countersigned by the member key, resolved through the
+  roll; no standing until ratification
+
+$ node auditor/audit.mjs <log> --identities subjects.jsonl --annex … --roll roll.json --keyring keyring.json
+  "…2 subject certificate(s) verify under enforcer key dev-test-enforcer —
+  2 root(s), 0 chained, 0 declared-but-unverifiable link(s),
+  2 member-bound (countersignature verified against the roll), 0 unbound…"
+
+$ # and the judicature door refuses a revoked Member's session, on the row:
+[JG/member-revoked] the filing refuses: session customer binds to member key
+  768e6b7ba4c1…, which the member roll records as REVOKED (roll entry 1) —
+  revocation is a fact, not an absence: the row stays, verifies, and is
+  cited here (F-8/I-1).
+```
+
 **Where the refusal lands (D-7):** a session certificate whose
 countersignature does not verify, whose member key is unknown to the roll,
 or whose member key is revoked refuses the act that would lean on it — named

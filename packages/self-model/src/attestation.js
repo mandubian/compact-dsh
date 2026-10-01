@@ -300,7 +300,15 @@ export function renderAttestation(att) {
            : att.subject.identity.parentSubjectId
              ? `, parent ${att.subject.identity.parentSubjectId} unchained (no parent digest available at issuance)`
              : '') +
-         ` — development keyring, no standing outside this runtime)`]
+         ` — development keyring, no standing outside this runtime)` +
+         (att.subject.identity.member
+           ? `\nMember binding: this session is the deed of member "${att.subject.identity.member.memberId}" ` +
+             `(key ${att.subject.identity.member.memberKeyDigest.slice(0, 12)}…, class ${att.subject.identity.member.class}, ` +
+             `lineage depth ${att.subject.identity.member.lineageDepth}, roll anchored through seq ${att.subject.identity.member.rollAnchoredThrough}) ` +
+             `— countersigned by the member key, resolved through the roll; no standing until ratification`
+           : att.subject.identity.memberNote
+             ? `\nMember binding: none — ${att.subject.identity.memberNote}`
+             : '')]
       : []),
     `Standing: ${att.subject.standing.claimed} — ${att.subject.standing.reason}`,
     `Law: ${att.law.status ?? 'unknown'}, digest ${att.law.digest ? att.law.digest.slice(0, 16) : 'unknown'}`,

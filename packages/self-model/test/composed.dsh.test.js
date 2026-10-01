@@ -303,3 +303,159 @@ test('composed: the declared egress posture renders identically at the boundary 
   const described = String((await call(ctx.tools, 'self_describe', {}, agent))?.value ?? '');
   assert.ok(described.includes(postureLine), 'self_describe and the browser block agree word for word');
 });
+
+// ── the member binding (identity slice 2, #125): the declared interim by
+// which sessions bind to the operator's Principal — countersigned at both
+// issuance boundaries, surfaced by both tools, resolved through the roll ──
+import { execFileSync } from 'node:child_process';
+import { memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, verifyRoll, resolveMember, parseManifest, signSubjectCert, sha256Hex, canonicalBytes, withoutField, verifySubjectCert } from 'compact-dsh-seals';
+
+const AUDITOR = new URL('../../../auditor/audit.mjs', import.meta.url).pathname;
+const NOW = '2026-10-01T00:00:00.000Z';
+
+/** A roll with one member ('test-principal'), optionally rotated, optionally
+ *  revoked — and the private halves the binding needs. */
+function buildBoundDomain(dir, { rotate = false, revoke = false } = {}) {
+  const auth = [1, 2, 3].map((i) => { const kp = generateEd25519(); return { id: `auth-${i}`, publicKey: kp.publicKey, privateKeyPem: kp.privateKeyPem }; });
+  const manifestText = JSON.stringify({ kind: 'dev-keyring', declaration: 'test keyring', threshold: { k: 2, n: 3 }, keys: auth.map(({ id, publicKey }) => ({ id, publicKey })), rotations: [] }, null, 2);
+  writeFileSync(join(dir, 'keyring.json'), manifestText);
+  const manifest = parseManifest(manifestText);
+  const privates = new Map(auth.map(({ id, privateKeyPem }) => [id, privateKeyPem]));
+  const quorum = (n = 2) => auth.slice(0, n).map(({ id, privateKeyPem }) => ({ keyId: id, privateKey: privateKeyPem }));
+  const k1 = generateEd25519();
+  const k1Digest = memberKeyDigestOf(k1.publicKey);
+  let current = { kp: k1, digest: k1Digest };
+  const roll = { kind: 'test-roll', version: 1, genesis: { epochLength: { events: 64 }, admissionStatute: { digest: 'a'.repeat(64) } }, entries: [], checkpoints: [] };
+  const adm = { kind: 'admission', memberKeyDigest: k1Digest, class: 'principal', memberKey: k1.publicKey, member: 'test-principal', holder: 'the operator principal under test', grounds: 'test admission', recordedAt: NOW };
+  appendRollEvent(roll, { ...adm, signedBy: signRollEvent(adm, [...quorum(2), { keyId: k1Digest, privateKey: k1.privateKeyPem }]) });
+  if (rotate) {
+    const k2 = generateEd25519();
+    const k2Digest = memberKeyDigestOf(k2.publicKey);
+    const rot = { kind: 'rotation', memberKeyDigest: k2Digest, class: 'principal', predecessorKeyDigest: k1Digest, successorKey: k2.publicKey, grounds: 'rotation drill', recordedAt: NOW };
+    appendRollEvent(roll, { ...rot, signedBy: signRollEvent(rot, [{ keyId: k1Digest, privateKey: k1.privateKeyPem }]) });
+    current = { kp: k2, digest: k2Digest };
+  }
+  if (revoke) {
+    const rev = { kind: 'revocation', memberKeyDigest: current.digest, grounds: 'compromise drill', recordedAt: NOW };
+    appendRollEvent(roll, { ...rev, signedBy: signRollEvent(rev, quorum(2)) });
+  }
+  closeEpoch({ roll, epoch: 0, manifest, privateKeys: privates, now: NOW });
+  const rollPath = join(dir, 'roll.json');
+  writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n');
+  const memberKeyPath = join(dir, 'member.pem');
+  writeFileSync(memberKeyPath, current.kp.privateKeyPem);
+  return { rollPath, keyringPath: join(dir, 'keyring.json'), memberKeyPath, memberId: 'test-principal', currentDigest: current.digest, k1, k1Digest };
+}
+
+async function bootBound(t, domain, { withRecord = false } = {}) {
+  const ctx = new Context();
+  t.after(() => ctx.fiber.dispose?.());
+  ctx.plugin(SystemPromptStub);
+  ctx.plugin(AgentsStub);
+  ctx.plugin(ConstitutionStub);
+  ctx.plugin(ToolRuntime);
+  const dir = mkdtempSync(join(tmpdir(), 'composed-bound-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const enforcer = generateEd25519();
+  const annex = signAnnex({
+    composition: 'compact-dsh', host: 'test', lawDigest: constitution.COMPACT_DIGEST,
+    keyId: 'dev-test-enforcer', publicKey: enforcer.publicKey, privateKey: enforcer.privateKeyPem,
+  });
+  const annexPath = join(dir, 'enforcer.annex.json');
+  const keyPath = join(dir, 'enforcer.pem');
+  const ledgerPath = join(dir, 'subjects.jsonl');
+  writeFileSync(annexPath, JSON.stringify(annex));
+  writeFileSync(keyPath, enforcer.privateKeyPem);
+  selfModel.apply(ctx, {
+    enforcer: { annexPath, privateKeyPath: keyPath, ledgerPath },
+    memberBinding: { rollPath: domain.rollPath, keyringPath: domain.keyringPath, memberKeyPath: domain.memberKeyPath, memberId: domain.memberId },
+  });
+  if (typeof ctx.start === 'function') await ctx.start();
+  for (let i = 0; i < 500 && (!ctx.tools || ctx.get('compact-self-model') === undefined); i++) {
+    await new Promise((r) => setImmediate(r));
+  }
+  return { ctx, tools: ctx.tools, agents: ctx.get('agents'), service: ctx.get('compact-self-model'), ledgerPath, enforcerPem: enforcer.privateKeyPem, annexPath };
+}
+
+test('composed: the declared binding countersigns at both boundaries and both tools surface the Member (#125)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bound-domain-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildBoundDomain(dir);
+  const { ctx, tools, agents, service, ledgerPath } = await bootBound(t, domain);
+  agents.add('root');
+  const worker = agents.add('worker', 'root');
+  agents.get('root').status = 'idle';
+  ctx.emit('subagent/start', { id: 'worker', runId: 'run-1', provider: 'spawn' });
+  // both sessions carry the member limb, resolved through the roll
+  const described = String((await call(tools, 'self_describe', {}, agents.get('worker')))?.value ?? '');
+  assert.match(described, /Member binding: this session is the deed of member "test-principal"/);
+  assert.match(described, new RegExp(`key ${domain.currentDigest.slice(0, 12)}…, class principal`));
+  assert.match(described, /countersigned by the member key, resolved through the roll/);
+  const root = service.attest('root');
+  assert.equal(root.subject.identity.member.memberKeyDigest, domain.currentDigest);
+  // the ledger cert is dual-signed and the countersignature verifies
+  // against the roll's key for the digest it names
+  const line = JSON.parse(readFileSync(ledgerPath, 'utf8').trim().split('\n').at(-1));
+  assert.equal(line.cert.memberKeyDigest, domain.currentDigest);
+  assert.ok(line.cert.memberCountersignature);
+  const verdict = verifyRoll({ roll: JSON.parse(readFileSync(domain.rollPath, 'utf8')), manifest: parseManifest(readFileSync(domain.keyringPath, 'utf8')) });
+  const bound = verdict.byKey.get(domain.currentDigest);
+  assert.equal(verifySubjectCert({ cert: line.cert, enforcerKey: service.enforcerAnnex().annex.enforcer.publicKey, memberPublicKey: bound.publicKey }).countersignatureVerified, true);
+  // inquiry answers WHO cryptographically, member limb included
+  const inq = String((await call(tools, 'inquiry', { agent_id: 'worker' }, agents.get('root')))?.value ?? '');
+  assert.match(inq, /member binding: key [0-9a-f]{12}… — countersigned by the member key/);
+  assert.match(inq, /member "test-principal" \(class principal, resolved through the roll\)/);
+  // the service seam judicature consumes
+  const resolved = service.memberBinding.resolve('worker');
+  assert.equal(resolved.memberKeyDigest, domain.currentDigest);
+  assert.equal(resolved.class, 'principal');
+  assert.deepEqual(service.memberBinding.expand(domain.k1Digest), [domain.currentDigest],
+    'a key of the lineage expands to the whole lineage — recusal follows the member, not the session');
+});
+
+
+test('composed: the rotation window closes — a pre-rotation certificate and a post-rotation one bind ONE Member, and the auditor counts both bound (#125)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bound-domain-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildBoundDomain(dir, { rotate: true });
+  const { agents, service, ledgerPath, enforcerPem, annexPath } = await bootBound(t, domain);
+  agents.add('root');
+  // post-rotation issuance: the cert binds the member at its CURRENT key
+  service.attest('root');
+  // a PRE-rotation certificate, as an earlier epoch would have issued it:
+  // enforcer-certified, bound to K1, countersigned by K1 — the same member
+  const preCert = signSubjectCert({
+    subjectId: 'pre-rotation-session', publicKey: generateEd25519().publicKey, scope: 'rehearsal', depth: 0,
+    memberKeyDigest: domain.k1Digest, memberPrivateKey: domain.k1.privateKeyPem,
+    privateKey: enforcerPem,
+  });
+  const preLine = {
+    kind: 'subject-certificate', subjectId: 'pre-rotation-session',
+    certDigest: sha256Hex(canonicalBytes(withoutField(preCert, 'signature'))),
+    issuedAt: preCert.issuedAt, cert: preCert,
+  };
+  const { appendFileSync } = await import('node:fs');
+  appendFileSync(ledgerPath, `${JSON.stringify(preLine)}\n`, { mode: 0o600 });
+
+  // the roll maps K1 and K2 to ONE member — the window the J-4/F-6 check closes
+  const verdict = verifyRoll({ roll: JSON.parse(readFileSync(domain.rollPath, 'utf8')), manifest: parseManifest(readFileSync(domain.keyringPath, 'utf8')) });
+  const pre = resolveMember(verdict, domain.k1Digest);
+  const post = resolveMember(verdict, domain.currentDigest);
+  assert.equal(pre.foundingDigest, post.foundingDigest);
+  assert.equal(pre.state, 'superseded');
+  assert.equal(post.state, 'live');
+
+  // the auditor joins ledger and roll OFFLINE: both bindings verify, by name
+  const log = join(dir, 'log.json');
+  writeFileSync(log, '[]\n');
+  const out = JSON.parse(execFileSync(process.execPath, [
+    AUDITOR, log, '--identities', ledgerPath, '--annex', annexPath,
+    '--roll', domain.rollPath, '--keyring', domain.keyringPath,
+  ], { encoding: 'utf8' }));
+  assert.equal(out.checked.identities, 'verified');
+  assert.equal(out.checked.roll, 'verified');
+  assert.equal(out.identityChain.bound, 2, 'one member, two epochs, both bindings verify against the roll');
+  assert.equal(out.identityChain.unbound, 0);
+  assert.equal(out.identityChain.roots, 2);
+  assert.equal(out.identityChain.chained, 0, 'neither session was spawned here — both are roots of their own lineage');
+});
