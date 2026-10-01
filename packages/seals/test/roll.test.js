@@ -213,3 +213,54 @@ test('anchoring the roll: the forker is refused dead, the unanchored tail is nam
   assert.ok(vs.findings.some((f) => f.reason === 'checkpoint-cadence' && /spending policy/.test(f.detail)));
   void founder;
 });
+
+// ── prior declarations (identity slice 4, #127): the authorship half of
+// R-9's value-scoped limb — the Member's own signature, verifiable offline
+// against the roll, closing the "inert against a dishonest Enforcer" hole ──
+import { signPriorDeclaration, verifyPriorDeclaration } from '../src/declarations.js';
+
+test('prior declarations: the Member signs the ground, the roll attributes it, and the forgery drill refuses', () => {
+  const roll = freshRoll();
+  const founder = admit(roll, { member: 'founder' });
+  closeEpoch({ roll, epoch: 0, manifest, privateKeys, now: NOW });
+  const v = verifyRoll({ roll, manifest });
+
+  // the honest declaration: signed by the Member's own key
+  const decl = signPriorDeclaration({
+    member: 'founder', memberKeyDigest: founder.digest,
+    value: 'no exfiltration of customer data to third-party remotes',
+    privateKey: founder.kp.privateKeyPem, declaredAt: NOW,
+  });
+  const verdict = verifyPriorDeclaration(decl, v);
+  assert.equal(verdict.valid, true, verdict.reason);
+  assert.equal(verdict.member.id, 'founder');
+
+  // THE DRILL: a dishonest Enforcer writes a "prior declaration" into its
+  // own log AFTER the directive — without the Member's signature it is the
+  // false answer D-3 names, and the verifier refuses it by name
+  const forged = { ...decl, value: 'a convenient ground', signature: undefined };
+  assert.equal(verifyPriorDeclaration(forged, v).valid, false);
+  assert.match(verifyPriorDeclaration(forged, v).reason, /missing required fields/);
+  // a signature over somebody else's bytes: authorship is not transferable
+  const wrong = signPriorDeclaration({
+    member: 'founder', memberKeyDigest: founder.digest,
+    value: 'a different ground', privateKey: KEYS[0].privateKey,
+  });
+  assert.match(verifyPriorDeclaration(wrong, v).reason, /does not verify against the roll's key/);
+  // a ground the roll cannot attribute
+  const ghost = signPriorDeclaration({
+    member: 'founder', memberKeyDigest: 'e'.repeat(64),
+    value: 'x', privateKey: founder.kp.privateKeyPem,
+  });
+  assert.match(verifyPriorDeclaration(ghost, v).reason, /the roll never bound/);
+  // the shape gate: an empty ground is not a ground
+  assert.throws(() => signPriorDeclaration({ member: 'm', memberKeyDigest: founder.digest, value: '   ', privateKey: founder.kp.privateKeyPem }),
+    (e) => /an empty ground is not a ground/.test(e.message));
+
+  // a rotation does NOT orphan the declaration: the roll's lineage keeps
+  // every key's public half, so the old signature still verifies
+  const successor = rotate(roll, { class: 'principal' }, founder);
+  const v2 = verifyRoll({ roll, manifest });
+  assert.equal(verifyPriorDeclaration(decl, v2).valid, true, 'authorship survives the Member re-keying — the lineage is data');
+  void successor;
+});

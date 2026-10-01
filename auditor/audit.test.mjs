@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateEd25519, signSeal, signAnnex, annexDigestOf, signSubjectCert, canonicalBytes, withoutField, sha256Hex, memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, parseManifest } from '../packages/seals/src/index.js';
+import { generateEd25519, signSeal, signAnnex, annexDigestOf, signSubjectCert, canonicalBytes, withoutField, sha256Hex, memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, parseManifest, signPriorDeclaration } from '../packages/seals/src/index.js';
 import { extendChain, genesisHash, signAnchor, genesisAnchor, anchorHashOf } from '../packages/record/src/index.js';
 import { COMPACT_BODY, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { audit } from './audit.mjs';
@@ -382,6 +382,39 @@ test('the binding join: --identities × --roll verifies the countersignature aga
     const noRoll = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile: writeIdentityLedger(f, [ledgerLine(boundCert)]) });
     assert.equal(noRoll.checked.identities, 'verified', 'a warning is not an error');
     assert.ok(noRoll.findings.some((x) => x.severity === 'warning' && /this run CANNOT verify/.test(x.detail) && /--roll/.test(x.detail)));
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('the declarations join: --declarations × --roll verifies the Member\'s authorship offline, and the planted ground refuses by name (#127)', () => {
+  const f = rehearsalDir();
+  try {
+    const domain = rollDomain(f.dir, { name: 'decl' });
+    const honest = signPriorDeclaration({
+      member: 'test-member', memberKeyDigest: domain.currentDigest,
+      value: 'no exfiltration of customer data', privateKey: domain.k1.privateKeyPem,
+      declaredAt: '2026-10-01T00:00:00.000Z',
+    });
+    const planted = { kind: 'prior-declaration', member: 'test-member', memberKeyDigest: domain.currentDigest, value: 'a ground that serves the Enforcer', declaredAt: '2026-10-01T01:00:00.000Z' };
+    const declarationsPath = join(f.dir, 'declarations.jsonl');
+    writeFileSync(declarationsPath, [honest, planted].map((r) => JSON.stringify(r)).join('\n') + '\n');
+    const att = audit(LOG, undefined, 0, { rollFile: domain.rollPath, keyringFile: domain.keyringPath, declarationsFile: declarationsPath });
+    assert.equal(att.checked.declarations, 'BROKEN', 'one planted ground poisons the ledger — and names itself');
+    assert.equal(att.declarations.valid, 1);
+    assert.equal(att.declarations.declarations, 2);
+    assert.ok(att.findings.some((x) => x.severity === 'error' && x.rule === 'R-9' && /declaration ledger line 2/.test(x.detail) && /missing required fields/.test(x.detail)));
+    // the honest ledger alone verifies, with the no-standing phrase
+    const honestOnly = join(f.dir, 'honest.jsonl');
+    writeFileSync(honestOnly, JSON.stringify(honest) + '\n');
+    const ok = audit(LOG, undefined, 0, { rollFile: domain.rollPath, keyringFile: domain.keyringPath, declarationsFile: honestOnly });
+    assert.equal(ok.checked.declarations, 'verified');
+    assert.equal(ok.declarations.valid, 1);
+    assert.ok(ok.reliesOn.some((r) => /prior declaration/.test(r) && /conveys no standing/.test(r)));
+    // no --roll: the authorship question is exactly what the roll answers
+    const noRoll = audit(LOG, undefined, 0, { declarationsFile: honestOnly });
+    assert.equal(noRoll.checked.declarations, 'BROKEN');
+    assert.ok(noRoll.findings.some((x) => /requires the member roll/.test(x.detail)));
   } finally {
     f.cleanup();
   }

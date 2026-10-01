@@ -308,7 +308,7 @@ test('composed: the declared egress posture renders identically at the boundary 
 // which sessions bind to the operator's Principal — countersigned at both
 // issuance boundaries, surfaced by both tools, resolved through the roll ──
 import { execFileSync } from 'node:child_process';
-import { memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, verifyRoll, resolveMember, parseManifest, signSubjectCert, sha256Hex, canonicalBytes, withoutField, verifySubjectCert } from 'compact-dsh-seals';
+import { memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, verifyRoll, resolveMember, parseManifest, signSubjectCert, sha256Hex, canonicalBytes, withoutField, verifySubjectCert, signPriorDeclaration } from 'compact-dsh-seals';
 
 const AUDITOR = new URL('../../../auditor/audit.mjs', import.meta.url).pathname;
 const NOW = '2026-10-01T00:00:00.000Z';
@@ -368,7 +368,7 @@ async function bootBound(t, domain, { withRecord = false } = {}) {
   writeFileSync(keyPath, enforcer.privateKeyPem);
   selfModel.apply(ctx, {
     enforcer: { annexPath, privateKeyPath: keyPath, ledgerPath },
-    memberBinding: { rollPath: domain.rollPath, keyringPath: domain.keyringPath, memberKeyPath: domain.memberKeyPath, memberId: domain.memberId },
+    memberBinding: { rollPath: domain.rollPath, keyringPath: domain.keyringPath, memberKeyPath: domain.memberKeyPath, memberId: domain.memberId, declarationsPath: join(dir, 'declarations.jsonl') },
   });
   if (typeof ctx.start === 'function') await ctx.start();
   for (let i = 0; i < 500 && (!ctx.tools || ctx.get('compact-self-model') === undefined); i++) {
@@ -458,4 +458,51 @@ test('composed: the rotation window closes — a pre-rotation certificate and a 
   assert.equal(out.identityChain.unbound, 0);
   assert.equal(out.identityChain.roots, 2);
   assert.equal(out.identityChain.chained, 0, 'neither session was spawned here — both are roots of their own lineage');
+});
+
+test('composed: R-9\'s authorship limb — the Member-signed ground survives a dishonest Enforcer\'s log (#127)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bound-domain-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildBoundDomain(dir);
+  const { service, agents } = await bootBound(t, domain);
+  agents.add('root');
+  const declarationsPath = service.priorDeclarations.path();
+  assert.ok(declarationsPath, 'the declared binding carries a declarations ledger path');
+
+  // the honest path: the Member declares a value ground with its OWN key,
+  // and the service verifies it through the roll
+  const row = service.priorDeclarations.declare({ value: 'no exfiltration of customer data' });
+  const verdict = service.priorDeclarations.verify(row);
+  assert.equal(verdict.valid, true, verdict.reason);
+  assert.equal(verdict.member.id, 'test-principal');
+  // the ledger holds it for the offline auditor
+  const ledgerRow = JSON.parse(readFileSync(declarationsPath, 'utf8').trim());
+  assert.equal(ledgerRow.kind, 'prior-declaration');
+  assert.ok(ledgerRow.signature);
+
+  // THE DRILL: a dishonest Enforcer plants a "prior declaration" in its own
+  // log after the directive — no member signature, authorship unprovable,
+  // the verifier refuses instead of accepting the convenient ground
+  const planted = { ...row, value: 'a ground that serves the Enforcer', signature: undefined, declaredAt: new Date().toISOString() };
+  const refused = service.priorDeclarations.verify(planted);
+  assert.equal(refused.valid, false);
+  assert.match(refused.reason, /missing required fields/);
+  // and a ground signed by a stranger key: authorship is not transferable
+  const wrongKey = signPriorDeclaration({
+    member: 'test-principal', memberKeyDigest: domain.currentDigest,
+    value: 'another convenient ground', privateKey: generateEd25519().privateKeyPem,
+  });
+  assert.match(service.priorDeclarations.verify(wrongKey).reason, /does not verify against the roll's key/);
+
+  // no binding declared: declaring refuses outright — a ground without a
+  // member to attribute it to is the false answer D-3 names
+  const unbound = await bootSigned();
+  try {
+    unbound.service.priorDeclarations.declare({ value: 'x' });
+    assert.fail('declaring without a binding must refuse');
+  } catch (e) {
+    assert.match(e.message, /no member binding is declared/);
+  } finally {
+    unbound.cleanup();
+  }
 });

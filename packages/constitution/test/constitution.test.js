@@ -158,6 +158,26 @@ test('the value-scoped refusal limb is adopted AND its authorship gap is declare
     'the gap reaches the boot attestation, where the governed party can read it (R-1)',
   );
 });
+test('the authorship limb rehearsed on Member-signed declarations: the gap rewords when a member binding is composed (identity slice 4, #127)', () => {
+  const ctx = fakeCtx({ services: ALL_SERVICES });
+  // a composed self-model with a declared member binding: the shield's
+  // authorship half is the Member's own signature, verified through the roll
+  ctx.get = (name) => {
+    if (name === 'compact-self-model') return { memberBinding: { declared: true } };
+    return ALL_SERVICES[name] ?? null;
+  };
+  const att = apply(ctx, {}).attestation();
+  const gap = att.gaps.find(g => g.includes('value-scoped refusal'));
+  assert.ok(gap, 'the limb is still declared — rehearsed is not discharged');
+  assert.match(gap, /Member-signed prior declarations/, 'the authorship half is the Member\'s own key now');
+  assert.match(gap, /identity slice 4/, 'and it names the slice that proved it');
+  assert.match(gap, /machinery, not standing/, 'the rehearsal label travels with it (I-8)');
+  assert.doesNotMatch(gap, /inert against a dishonest one/, 'the old hole is closed in this composition');
+  // without the binding, the honest pre-binding gap stands unchanged
+  const bare = apply(fakeCtx({ services: ALL_SERVICES }), {}).attestation();
+  const bareGap = bare.gaps.find(g => g.includes('value-scoped refusal'));
+  assert.match(bareGap, /inert against a dishonest one/, 'no binding composed — the honest limit is still named');
+});
 
 test('boot fails on a register entry citing an unknown clause (rogue enforcement, D-8)', () => {
   const ctx = fakeCtx({ services: ALL_SERVICES });

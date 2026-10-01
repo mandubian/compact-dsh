@@ -25,7 +25,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'n
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256Hex, generateEd25519, parseManifest, signAnnex, annexDigestOf, verifyAnnex, verifySeal, SealError,
-  memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, verifyRoll } from 'compact-dsh-seals';
+  memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, verifyRoll,
+  signPriorDeclaration, verifyPriorDeclaration } from 'compact-dsh-seals';
 import { sealArtifact, recordEnactment } from './rehearsal-amendment.mjs';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 
@@ -329,7 +330,32 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
   const rollPath = join(dir, 'roll.json');
   writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n', { mode: 0o600 });
 
-  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, accreditationPath, witnessKeyPath: witnessPemPath, witnessKeyDigest: witnessDigest, rollPath, roll };
+  // ── a seeded PRIOR DECLARATION (identity slice 4, #127): the operator
+  // principal declares a value ground with its OWN key — the authorship
+  // half of R-9's value-scoped limb, verifiable offline by any party
+  // through the roll, closing the "inert against a dishonest Enforcer"
+  // limit the constitution's gap line carried ──
+  const rollManifest = parseManifest(readFileSync(manifestPath, 'utf8'));
+  const rollVerdict = verifyRoll({ roll, manifest: rollManifest });
+  const founderRow = roll.entries.find((e) => e.kind === 'admission' && e.member === SEED_MEMBERS[0].id);
+  const founderDigest = founderRow.memberKeyDigest;
+  const founderPemPath = join(dir, 'private', `member-${SEED_MEMBERS[0].id}.pem`);
+  const declaration = signPriorDeclaration({
+    member: SEED_MEMBERS[0].id,
+    memberKeyDigest: founderDigest,
+    value: 'rehearsal ground: no exfiltration of customer data to third-party remotes',
+    grounds: 'the value-scoped refusal\'s rehearsal ground — authorship by the Member\'s own key (R-9, amendment 0002; identity slice 4)',
+    privateKey: readFileSync(founderPemPath, 'utf8'),
+    declaredAt: now,
+  });
+  const declarationVerdict = verifyPriorDeclaration(declaration, rollVerdict);
+  if (!declarationVerdict.valid) {
+    throw new SealError('declaration-broken', `the seeded prior declaration refuses: ${declarationVerdict.reason} — the rehearsal genesis does not seed artifacts it cannot itself verify`);
+  }
+  const declarationsPath = join(dir, 'declarations.jsonl');
+  writeFileSync(declarationsPath, `${JSON.stringify(declaration)}\n`, { mode: 0o600 });
+
+  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, accreditationPath, witnessKeyPath: witnessPemPath, witnessKeyDigest: witnessDigest, rollPath, roll, declarationsPath, declaration };
 }
 
 /**
@@ -388,6 +414,13 @@ if (process.argv[1] && process.argv[1].endsWith('rehearsal-keyring.mjs')) {
       console.log(`verify OK: annex self-signature valid; law digest joins the sealed body (${r.lawDigest.slice(0, 16)}…); ${r.manifest.threshold.k}-of-${r.manifest.threshold.n} authority keys on file`);
       if (r.roll) {
         console.log(`  member roll OK: ${r.roll.entries} entries, ${r.roll.members} member(s) (${r.roll.live} live, ${r.roll.witnesses} external Witness(es) accredited), anchored through seq ${r.roll.anchoredThrough} — ${r.roll.basis}, conveys no standing`);
+      }
+      const declPath = join(dir, 'declarations.jsonl');
+      if (existsSync(declPath)) {
+        const row = JSON.parse(readFileSync(declPath, 'utf8').trim().split('\n')[0]);
+        const dv = verifyPriorDeclaration(row, verifyRoll({ roll: JSON.parse(readFileSync(join(dir, 'roll.json'), 'utf8')), manifest: parseManifest(readFileSync(join(dir, 'keyring.json'), 'utf8')) }));
+        if (!dv.valid) throw new SealError('roll-broken', `the seeded prior declaration refuses: ${dv.reason}`);
+        console.log('  prior declaration OK: 1 value ground carries the Member\'s own signature, verified against the roll — the authorship half of R-9\'s value-scoped limb (R-9 rehearsal), conveys no standing');
       }
       console.log('  basis: dev-keyring — code-path correctness proven; ratification, standing, and I-1 identity NOT claimed');
     } catch (e) {
