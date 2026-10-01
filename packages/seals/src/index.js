@@ -20,3 +20,8 @@ export {
   REHEARSAL_DECLARATION, annexDigestOf, verifyAnnex, signAnnex,
   verifySubjectCert, signSubjectCert,
 } from './annex.js';
+export {
+  ROLL_ENTRY_KINDS, MEMBER_CLASSES, CHECKPOINT_SUBJECT, RollError,
+  memberKeyDigestOf, rollGenesisHash, rollEntryHash, rollHeadOf,
+  signRollEvent, appendRollEvent, closeEpoch, verifyRoll, resolveMember,
+} from './roll.js';
