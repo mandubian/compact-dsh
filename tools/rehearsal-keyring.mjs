@@ -24,12 +24,51 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sha256Hex, generateEd25519, parseManifest, signAnnex, annexDigestOf, verifyAnnex, SealError } from 'compact-dsh-seals';
+import { sha256Hex, generateEd25519, parseManifest, signAnnex, annexDigestOf, verifyAnnex, verifySeal, SealError,
+  memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, verifyRoll } from 'compact-dsh-seals';
+import { sealArtifact, recordEnactment } from './rehearsal-amendment.mjs';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const REGISTER_PATH = join(ROOT, 'packages', 'constitution', 'register.json');
 const AUTHORITY_KEY_IDS = ['dev-rehearsal-authority-1', 'dev-rehearsal-authority-2', 'dev-rehearsal-authority-3'];
+
+/** The rehearsal admission statute (SIMULATED — A-7's organic shape, exercised
+ *  not enacted). The roll's admissions cite this document's digest as their
+ *  grounds; the chain to statute is exercised, never narrated. */
+const ADMISSION_STATUTE = `# Rehearsal Admission Statute (SIMULATED)
+
+NOT an enacted statute. This document rehearses the organic-statute chain the
+member-identity page designs (A-7 -> F-8, docs/concept-member-identity.md):
+admission criteria, the admitting authority, and quorum — exercised under the
+development keyring, standing: none, admitting rehearsal keys into a rehearsal
+roll and nothing else.
+
+- WHO MAY BE ADMITTED: rehearsal entities only — the operator's principal
+  (class principal) and designated long-lived rehearsal Subjects (class
+  long-lived-subject). No real person or artificial Member is admitted here.
+- THE ADMITTING AUTHORITY: the rehearsal authority keys named in keyring.json,
+  k-of-n with DISTINCT-signer semantics (2-of-3 while the rehearsal keyring
+  holds three practice keys, one entity).
+- POSSESSION AT ADMISSION: the admitted key signs its own admission row —
+  capability to act is proven by signing, never asserted by a third party (I-1).
+- CLASSES: principal | long-lived-subject. The external-witness class arrives
+  with the accreditation statute (identity slice 3), never before.
+- REVOCATION GROUNDS: rehearsal compromise drills and rotation-cadence tests.
+  Revocation is a row, not a deletion: it stays, verifies, and says revoked.
+- ROTATION: the successor row is signed by the predecessor key; rotation
+  outside the roll (a fresh admission for the same actor) is a new Member.
+- STANDING: none. Every artifact this statute produces rehearses machinery;
+  ratification replaces the whole document set (genesis, roll, statutes) with
+  the same parsers and the same loops — swap documents, not code.
+`;
+
+/** The rehearsal Members the seed roll admits (slice 2 binds sessions to the
+ *  principal; the long-lived Subject exercises the other class honestly). */
+const SEED_MEMBERS = [
+  { id: 'rehearsal-founder', class: 'principal', holder: 'the operator\'s principal — the Member sessions bind to until an artificial Subject is admitted (identity slice 2)' },
+  { id: 'rehearsal-subject', class: 'long-lived-subject', holder: 'a designated long-lived rehearsal Subject, for binding and rotation tests' },
+];
 
 function fail(msg) {
   console.error(`✗ ${msg}`);
@@ -125,13 +164,93 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
     issuedAt: now,
   });
   writeFileSync(annexPath, JSON.stringify(annex, null, 2) + '\n', { mode: 0o600 });
-  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex };
+
+  // ── the member roll (identity slice 1, #124): the admission statute
+  // sealed and recorded through the amendment harness — the chain to
+  // statute exercised, not narrated — then the seed roll with its epoch-0
+  // checkpoint. Same formats, same labels, same keyring: the fourth
+  // rehearsal concern beside the three the keyring already exercises. ──
+  const statutePath = join(dir, 'statute-admission.md');
+  writeFileSync(statutePath, ADMISSION_STATUTE, { mode: 0o600 });
+  const statuteBytes = readFileSync(statutePath);
+  const statuteDigest = sha256Hex(statuteBytes);
+  const statuteSeal = sealArtifact(dir, statuteBytes, 'amendment', 'statute-admission.md');
+  const statuteVerified = verifySeal({ bytes: statuteBytes, subject: 'amendment', seal: statuteSeal, manifest });
+  writeFileSync(join(dir, 'statute-admission.sig.json'), JSON.stringify(statuteSeal, null, 2) + '\n', { mode: 0o600 });
+  recordEnactment(dir, {
+    id: `simulated-enactment-${now}`,
+    kind: 'SIMULATED ENACTMENT',
+    amendment: statutePath,
+    amendmentDigest: statuteDigest,
+    seal: { threshold: statuteVerified.threshold, distinctSigners: statuteVerified.distinctSigners, basis: 'dev-keyring' },
+    reason: 'rehearsal: the ADMISSION STATUTE for the member roll, enacted in simulation — admission criteria, the admitting authority, and quorum, under standing: none (identity slice 1, #124)',
+    decidedBy: 'rehearsal authority keys (practice keys, one entity — NOT the A-1 trust root)',
+    dissent: [],
+    standing: 'none',
+  });
+
+  const roll = {
+    kind: 'rehearsal-member-roll',
+    version: 1,
+    created: now.slice(0, 10),
+    declaration:
+      'NOT the community roll. Rehearsal identity events under the development keyring — admissions, rotations, ' +
+      'revocations, accreditations — hash-chained the way the session record is, checkpointed at epoch close. ' +
+      'Machinery exercised, nothing discharged: this ledger conveys no standing, and ratification replaces it with ' +
+      'the genesis roll under the A-1 root, same parsers, same loops.',
+    standing: 'none — roll events under this ledger prove code-path correctness only',
+    genesis: {
+      epochLength: { events: 64 },
+      admissionStatute: { digest: statuteDigest, subject: 'amendment', file: 'statute-admission.md' },
+      keyring: 'keyring.json (dev-keyring: practice keys)',
+    },
+    entries: [],
+    checkpoints: [],
+  };
+  // the admitting quorum the rehearsal statute names: 2-of-3 authority keys,
+  // and every admitted key signs its own admission (possession, I-1)
+  const authoritySigners = AUTHORITY_KEY_IDS.slice(0, 2).map((id) => ({ keyId: id, privateKey: privates.get(id) }));
+  for (const m of SEED_MEMBERS) {
+    const kp = generateEd25519();
+    const pemPath = join(dir, 'private', `member-${m.id}.pem`);
+    writeFileSync(pemPath, kp.privateKeyPem, { mode: 0o600 });
+    chmodSync(pemPath, 0o600);
+    const digest = memberKeyDigestOf(kp.publicKey);
+    const event = {
+      kind: 'admission', memberKeyDigest: digest, class: m.class, memberKey: kp.publicKey,
+      member: m.id, holder: m.holder,
+      grounds: `rehearsal admission statute ${statuteDigest.slice(0, 16)}… (SIMULATED)`,
+      recordedAt: now,
+    };
+    appendRollEvent(roll, {
+      ...event,
+      signedBy: signRollEvent(event, [...authoritySigners, { keyId: digest, privateKey: kp.privateKeyPem }]),
+    });
+  }
+  closeEpoch({ roll, epoch: 0, manifest, privateKeys: privates, now });
+  recordEnactment(dir, {
+    id: `simulated-checkpoint-${now}`,
+    kind: 'SIMULATED ENACTMENT',
+    amendment: 'member roll, epoch 0 checkpoint',
+    amendmentDigest: roll.checkpoints[0].rollHead,
+    seal: { threshold: statuteVerified.threshold, distinctSigners: statuteVerified.distinctSigners, basis: 'dev-keyring' },
+    reason: 'rehearsal: roll epoch 0 closed — the root\'s only verb over the roll is "the roll stood thus", a digest at checkpoint, never a Member',
+    decidedBy: 'rehearsal authority keys (practice keys, one entity — NOT the A-1 trust root)',
+    dissent: [],
+    standing: 'none',
+  });
+  const rollPath = join(dir, 'roll.json');
+  writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n', { mode: 0o600 });
+
+  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, rollPath, roll };
 }
 
 /**
  * Verify an installed rehearsal identity set: manifest shape, annex
- * self-signature, and the two anchor joins — annex lawDigest vs the bundled
- * body's pin, annex registerDigest vs the bundled register's bytes.
+ * self-signature, the two anchor joins — annex lawDigest vs the bundled
+ * body's pin, annex registerDigest vs the bundled register's bytes — and,
+ * when a member roll is installed, the roll itself: chain, per-kind
+ * signatures, semantics, and the checkpoint anchoring walk.
  */
 export function verifyRehearsalKeyring(dir) {
   const manifestPath = join(dir, 'keyring.json');
@@ -143,7 +262,23 @@ export function verifyRehearsalKeyring(dir) {
     throw new SealError('annex-register-mismatch',
       'the annex declares a register digest that does not match the bundled register — the annex and the enforcement register must describe the same law together (A-4)');
   }
-  return { ...joined, manifest, manifestDigest: sha256Hex(readFileSync(manifestPath)) };
+  const out = { ...joined, manifest, manifestDigest: sha256Hex(readFileSync(manifestPath)) };
+  const rollPath = join(dir, 'roll.json');
+  if (existsSync(rollPath)) {
+    let roll;
+    try {
+      roll = JSON.parse(readFileSync(rollPath, 'utf8'));
+    } catch (e) {
+      throw new SealError('roll-malformed', `the member roll at ${rollPath} is not JSON (${e.message}) — evidence that cannot be read is refused, not skipped`);
+    }
+    const verdict = verifyRoll({ roll, manifest });
+    if (!verdict.ok) {
+      const first = verdict.findings.find((f) => f.severity === 'error');
+      throw new SealError('roll-broken', `the member roll refuses: ${first?.reason}: ${first?.detail}`);
+    }
+    out.roll = { path: rollPath, ...verdict.summary };
+  }
+  return out;
 }
 
 if (process.argv[1] && process.argv[1].endsWith('rehearsal-keyring.mjs')) {
@@ -154,7 +289,8 @@ if (process.argv[1] && process.argv[1].endsWith('rehearsal-keyring.mjs')) {
       console.log(`rehearsal identity set installed under ${resolve(dir)}`);
       console.log(`  authority manifest: ${r.manifestPath}`);
       console.log(`  enforcer annex:     ${r.annexPath} (digest ${r.annexDigest.slice(0, 16)}…)`);
-      console.log('  reminder: practice keys — the annex proves code-path correctness and conveys no standing');
+      console.log(`  member roll:        ${r.rollPath} — ${r.roll.entries.length} admission(s) under the SIMULATED admission statute, epoch 0 checkpointed`);
+      console.log('  reminder: practice keys — the roll and the annex prove code-path correctness and convey no standing');
     } catch (e) {
       fail(e.message);
     }
@@ -162,6 +298,9 @@ if (process.argv[1] && process.argv[1].endsWith('rehearsal-keyring.mjs')) {
     try {
       const r = verifyRehearsalKeyring(resolve(dir));
       console.log(`verify OK: annex self-signature valid; law digest joins the sealed body (${r.lawDigest.slice(0, 16)}…); ${r.manifest.threshold.k}-of-${r.manifest.threshold.n} authority keys on file`);
+      if (r.roll) {
+        console.log(`  member roll OK: ${r.roll.entries} entries, ${r.roll.members} member(s) (${r.roll.live} live), anchored through seq ${r.roll.anchoredThrough} — ${r.roll.basis}, conveys no standing`);
+      }
       console.log('  basis: dev-keyring — code-path correctness proven; ratification, standing, and I-1 identity NOT claimed');
     } catch (e) {
       fail(e.message);

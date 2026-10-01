@@ -51,14 +51,19 @@ function loadAuthorityPrivateKeys(keyringDir) {
   return out;
 }
 
-/** Seal one artifact under the authority keys (k-of-n, distinct signers). */
-function sealArtifact(keyringDir, bytes, subject, source) {
+/** Seal one artifact under the authority keys (k-of-n, distinct signers).
+ *  Exported for the rehearsal identity set: the admission statute seals
+ *  through the same harness an amendment does — one channel, one discipline. */
+export function sealArtifact(keyringDir, bytes, subject, source) {
   const manifest = parseManifest(readFileSync(join(keyringDir, 'keyring.json'), 'utf8'));
   return signSeal({ bytes, subject, source, manifest, privateKeys: loadAuthorityPrivateKeys(keyringDir) });
 }
 
-/** The rehearsal ledger: append-only, A-5 shaped (reasons and dissent live here). */
-function recordEnactment(keyringDir, entry) {
+/** The rehearsal ledger: append-only, A-5 shaped (reasons and dissent live
+ *  here). Exported for the identity set's statute enactment and the roll's
+ *  epoch checkpoints — every SIMULATED act this domain records lands in ONE
+ *  ledger, or the ledger stops being the record of what was rehearsed. */
+export function recordEnactment(keyringDir, entry) {
   const ledgerPath = join(keyringDir, 'ledger.json');
   const ledger = existsSync(ledgerPath)
     ? JSON.parse(readFileSync(ledgerPath, 'utf8'))

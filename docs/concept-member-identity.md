@@ -441,6 +441,37 @@ development keyring already exercises:
   manifests alone. Zero code changes — the ratification dress rehearsal
   the whole identity stack is built to pass.
 
+Slice 1 is built and walked — real output:
+
+```
+$ node tools/rehearsal-keyring.mjs ensure .rehearsal
+rehearsal identity set installed under .rehearsal
+  authority manifest: .rehearsal/keyring.json
+  enforcer annex:     .rehearsal/enforcer.annex.json (digest 9715d96562a1d79f…)
+  member roll:        .rehearsal/roll.json — 2 admission(s) under the SIMULATED
+    admission statute, epoch 0 checkpointed
+  reminder: practice keys — the roll and the annex prove code-path correctness
+    and convey no standing
+
+$ node tools/rehearsal-keyring.mjs verify .rehearsal
+verify OK: annex self-signature valid; law digest joins the sealed body (27bb70…); 2-of-3 authority keys on file
+  member roll OK: 2 entries, 2 member(s) (2 live), anchored through seq 1 — dev-keyring, conveys no standing
+
+$ node auditor/audit.mjs <log> --roll .rehearsal/roll.json --keyring .rehearsal/keyring.json --quiet
+auditor: conforming (0 events, 0 approval asks)
+
+$ node auditor/audit.mjs <log> --roll .rehearsal/roll.json --keyring .rehearsal/keyring.json   # the attestation's roll verdict:
+  "memberRoll": {
+    "ok": true, "entries": 2, "members": 2, "live": 2, "checkpoints": 1,
+    "anchoredThrough": 1, "basis": "dev-keyring", "conveysStanding": false,
+    "phrase": "VALID under DEV keyring — conveys no standing"
+  }
+  "…the member roll .rehearsal/roll.json: 2 identity event(s), 2 member(s) (2 live, 0 revoked, 0 rotation(s)),
+  epoch checkpoints anchored through seq 1 — every event signature verified (admission by the statute quorum
+  AND the member's own key; rotation by the predecessor; revocation by the quorum): VALID under DEV keyring —
+  conveys no standing (I-1 rehearsal)"
+```
+
 ## Slices (the build track, under the umbrella)
 
 1. **The roll and the Member key (rehearsal).** Ledger format, the entry
