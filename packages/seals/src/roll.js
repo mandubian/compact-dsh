@@ -194,7 +194,8 @@ const unsignedBytes = (event) => canonicalBytes(withoutField(event, 'signedBy'))
  *      reach is a fork before the checkpoint — not the roll.
  *
  * @returns {{ok: boolean, findings: Array<{severity, rule, reason, detail}>,
- *   summary: object, members: Array, byKey: Map, anchoredThrough: number|null}}
+ *   summary: object (anchoredThrough: number|null lives here, beside the counts),
+ *   members: Array, byKey: Map}}
  */
 export function verifyRoll({ roll, manifest, now = Date.now() }) {
   const findings = [];

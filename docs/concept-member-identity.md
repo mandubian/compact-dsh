@@ -458,10 +458,18 @@ verify OK: annex self-signature valid; law digest joins the sealed body (27bb70�
   member roll OK: 2 entries, 2 member(s) (2 live), anchored through seq 1 — dev-keyring, conveys no standing
 
 $ node auditor/audit.mjs <log> --roll .rehearsal/roll.json --keyring .rehearsal/keyring.json --quiet
-auditor: conforming — the roll: 2 identity event(s), 2 member(s), checkpoints
-  anchored through seq 1, every event signature verified (admission by the
-  statute quorum AND the member's own key; rotation by the predecessor;
-  revocation by the quorum) — VALID under DEV keyring, conveys no standing
+auditor: conforming (0 events, 0 approval asks)
+
+$ node auditor/audit.mjs <log> --roll .rehearsal/roll.json --keyring .rehearsal/keyring.json   # the attestation's roll verdict:
+  "memberRoll": {
+    "ok": true, "entries": 2, "members": 2, "live": 2, "checkpoints": 1,
+    "anchoredThrough": 1, "basis": "dev-keyring", "conveysStanding": false,
+    "phrase": "VALID under DEV keyring — conveys no standing"
+  }
+  "…the member roll .rehearsal/roll.json: 2 identity event(s), 2 member(s) (2 live, 0 revoked, 0 rotation(s)),
+  epoch checkpoints anchored through seq 1 — every event signature verified (admission by the statute quorum
+  AND the member's own key; rotation by the predecessor; revocation by the quorum): VALID under DEV keyring —
+  conveys no standing (I-1 rehearsal)"
 ```
 
 ## Slices (the build track, under the umbrella)

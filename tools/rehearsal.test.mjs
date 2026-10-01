@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { parseManifest, parseSeal, verifySeal, verifyAnnex } from 'compact-dsh-seals';
+import { parseManifest, parseSeal, verifySeal, verifyAnnex, sha256Hex } from 'compact-dsh-seals';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const KEYRING = fileURLToPath(new URL('./rehearsal-keyring.mjs', import.meta.url));
@@ -159,7 +159,7 @@ test('rehearsal-keyring: the member roll — statute enacted in simulation, admi
     assert.equal(roll.kind, 'rehearsal-member-roll');
     assert.equal(roll.standing.startsWith('none'), true);
     assert.equal(roll.entries.length, 2);
-    assert.equal(roll.genesis.admissionStatute.digest, verdict2Digest(statuteBytes));
+    assert.equal(roll.genesis.admissionStatute.digest, sha256Hex(statuteBytes));
     assert.ok(roll.entries.every((e) => e.kind === 'admission' && e.grounds.includes('SIMULATED')));
     assert.equal(roll.checkpoints.length, 1);
     assert.equal(roll.checkpoints[0].epoch, 0);
@@ -172,10 +172,6 @@ test('rehearsal-keyring: the member roll — statute enacted in simulation, admi
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
-function verdict2Digest(bytes) {
-  return createHash('sha256').update(bytes).digest('hex');
-}
 
 test('auditor --roll: the walk verifies offline, and a tampered roll refuses by name', () => {
   const dir = mkdtempSync(join(tmpdir(), 'rehearsal-roll-'));
