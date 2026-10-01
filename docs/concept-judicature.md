@@ -811,6 +811,21 @@ composition itself), the appellate panel must include external Witnesses
 (`[JG/appeal-witnesses-pending]`), never the accused's own class
 pretending otherwise.
 
+Finality is a property of a landed judgment, never of a recorded row —
+so the recorded states that are not judgments refuse in their own name.
+An appeal recorded **unheard** (every disjoint set recused) or
+**witnesses-pending** holds the door: nothing is final, the first
+judgment stays operative, and a second filing is refused for what stands
+recorded — the refusal says *an appeal stands recorded unheard*, never a
+finality nothing earned. Unlike an unheard *case*, whose re-filing is a
+new row nothing blocks, the appeal is one per case: the recorded row is
+the one appeal, and within a runtime whose annex is fixed at boot no
+later-declared set can revive it. And while an appeal stands open before
+a resolved appellate bench, **remedies wait**: the judgment a remedy
+would ride is under contest until the disposition lands, and a row
+premised on a judgment the same bench might depart from is not a
+compensating entry but a guess.
+
 ### Scenario 5 — what refuses at creation: fail-closed, with the reason named
 
 A declaration that will not validate refuses at the boot (D-7: a broken

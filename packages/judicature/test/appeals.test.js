@@ -63,10 +63,36 @@ test('an appeal re-hears a judgment, as of right, once', () => {
   const a = fileAppeal(c, { filer: 'customer-51d0', grounds: 'the grant\'s scope was read too widely on this record', now: NOW + 2 });
   assert.equal(a.kind, 'appeal');
   c.appeal = a;
+  c.appeal.panel = resolveAppellatePanel(judiciary, c);
+  landAppellateJudgment(c, { seat: 'chair', disposition: 'affirm', findings: [{ session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }], rules: ['J-2'], reasons: 'r' });
   assert.throws(() => fileAppeal(c, { filer: 'specialist-7f3a', grounds: 'g2' }),
-    (e) => e.code === 'final', 'a second appeal is refused — the door closes');
+    (e) => e.code === 'final' && /second judgment is final/.test(e.message),
+    'after the appellate judgment is final, a second appeal is refused — the door closes');
   assert.throws(() => fileAppeal({ ...judged(), parties: [{ kind: 'process', id: 'stranger' }] }, { filer: 'customer-51d0', grounds: 'g' }),
     (e) => /not a party/.test(e.message), 'an appeal belongs to those who were before the court');
+});
+
+test('a recorded appeal holds the door, and the refusal names the recorded state — never a finality nothing earned', () => {
+  // UNHEARD: no appellate judgment has landed, none can — the second filing
+  // is refused for what stands recorded, not for a finality that does not exist
+  const c = judged();
+  c.appeal = fileAppeal(c, { filer: 'customer-51d0', grounds: 'g' });
+  c.appeal.panel = { status: 'unheard' };
+  assert.throws(() => fileAppeal(c, { filer: 'specialist-7f3a', grounds: 'g2' }),
+    (e) => e.code === 'unheard' && /stands recorded unheard/.test(e.message) && !/second judgment is final/.test(e.message),
+    'unheard names unheard — J-1: never dismissed, and never final');
+  assert.throws(() => landAppellateJudgment(c, { seat: 'chair', disposition: 'affirm', findings: [{ session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }], rules: ['J-2'], reasons: 'r' }),
+    (e) => /stands recorded unheard/.test(e.message), 'the judge door names the recorded state too');
+  // WITNESSES-PENDING: the D-8 route, heard never — same discipline
+  const d = judged();
+  d.parties = [...parties, { kind: 'key', id: 'enforcer-x' }];
+  d.appeal = fileAppeal(d, { filer: 'customer-51d0', grounds: 'g' });
+  d.appeal.panel = { status: 'witnesses-pending' };
+  assert.throws(() => fileAppeal(d, { filer: 'specialist-7f3a', grounds: 'g2' }),
+    (e) => /stands recorded witnesses-pending/.test(e.message) && !/second judgment is final/.test(e.message),
+    'witnesses-pending names witnesses-pending');
+  assert.throws(() => landAppellateJudgment(d, { seat: 'chair', disposition: 'affirm', findings: [{ session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }], rules: ['J-2'], reasons: 'r' }),
+    (e) => /stands recorded witnesses-pending/.test(e.message));
 });
 
 test('the appellate panel is the first DISJOINT set with a seat that remains', () => {
@@ -76,6 +102,27 @@ test('the appellate panel is the first DISJOINT set with a seat that remains', (
   assert.equal(p.status, 'panel');
   assert.equal(p.setId, 'review');
   assert.deepEqual(p.seats, ['chair', 'second']);
+  // a review set with a recusing role BESIDE a remaining one: the panel
+  // carries the chosen set's own refusals too, not only the skipped sets'
+  const mixed = validateAdjudicatorSets({
+    nodes: [{ kind: 'plugin', id: 'compact-dsh' }],
+    sets: [
+      { id: 'first', roles: [{ id: 'judge', standing: { kind: 'principal', id: 'founder' } }],
+        trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis'] } },
+      { id: 'review', roles: [
+          { id: 'chair', standing: { kind: 'key', id: 'member-key-7' } },
+          { id: 'party-seat', standing: { kind: 'process', id: 'specialist-7f3a' } }],
+        trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis'] } },
+    ],
+    edges: [{ type: 'directed-by', from: { kind: 'plugin', id: 'compact-dsh' }, to: { kind: 'principal', id: 'founder' } }],
+  }, { enforcerKey: 'enforcer-x' });
+  const mc = judged();
+  mc.appeal = fileAppeal(mc, { filer: 'customer-51d0', grounds: 'g' });
+  const mp = resolveAppellatePanel(mixed, mc);
+  assert.equal(mp.status, 'panel');
+  assert.deepEqual(mp.seats, ['chair']);
+  assert.equal(mp.refusals.length, 1, 'the chosen set\'s own recusal rides the resolution');
+  assert.equal(mp.refusals[0].roleId, 'party-seat');
 });
 
 test('no second set → unavailable; disjoint sets that all recuse → unheard', () => {
@@ -128,10 +175,19 @@ test('affirm or depart, argued; the same record only; final with dissent', () =>
   assert.match(lines.find((l) => l.includes('appellate panel')), /disjoint from first, by declared edges/);
 });
 
-test('departure names and argues; remedies ride the operative judgment', () => {
+test('departure names and argues; remedies wait out the open appeal, then ride the operative judgment', () => {
   const c = judged();
   c.appeal = fileAppeal(c, { filer: 'customer-51d0', grounds: 'the scope was read too widely' });
   c.appeal.panel = resolveAppellatePanel(judiciary, c);
+  // the open-appeal window: no remedy rides a judgment under contest — not
+  // from the appellate seats (which have verified nothing yet), not from the
+  // first panel's (whose judgment the appeal may depart from)
+  for (const seat of ['chair', 'judge']) {
+    assert.throws(() => landRemedy(c, {
+      kind: 'annotation', seat, proportionality: 'premature',
+      spec: { target: { session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }, note: 'n' },
+    }), (e) => /under contest/.test(e.message), `seat ${seat}: a remedy waits out the open appeal`);
+  }
   const departed = landAppellateJudgment(c, {
     seat: 'chair', disposition: 'depart',
     findings: [{ session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }], rules: ['D-3', 'J-2'],
@@ -148,6 +204,12 @@ test('departure names and argues; remedies ride the operative judgment', () => {
     spec: { target: { session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }, note: 'the push ran inside the path-scoped grant (appellate finding)' },
   });
   assert.equal(row.remedy, 'annotation');
+  // the operative panel keys off the LANDED judgment: the first panel's
+  // seats judged, but their judgment is no longer the operative one
+  assert.throws(() => landRemedy(c, {
+    kind: 'annotation', seat: 'judge', proportionality: 'the first bench kept its prerogative',
+    spec: { target: { session: 'specialist-7f3a', fromSeq: 2, toSeq: 3 }, note: 'n' },
+  }), (e) => /operative panel's resolved seats \(chair, second\)/.test(e.message));
 });
 
 test('the dispositions are closed', () => {

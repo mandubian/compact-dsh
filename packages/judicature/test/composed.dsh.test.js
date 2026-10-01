@@ -63,6 +63,26 @@ function fixtureAnnex(dir, section) {
   return path;
 }
 
+/** A signed annex WITH the private key on disk — the record provider's
+ *  enforcer signer: every session flush anchors under the annex key, so a
+ *  case citing those sessions derives the enforcer key as a party (D-8). */
+function fixtureAnnexWithKey(dir, section) {
+  const kp = generateEd25519();
+  const keyPath = join(dir, `key-${Math.random().toString(36).slice(2)}.pem`);
+  writeFileSync(keyPath, kp.privateKeyPem);
+  const annexPath = join(dir, `annex-${Math.random().toString(36).slice(2)}.json`);
+  writeFileSync(annexPath, JSON.stringify(signAnnex({
+    composition: 'compact-dsh',
+    host: 'test',
+    lawDigest: COMPACT_DIGEST,
+    keyId: 'test-enforcer',
+    publicKey: kp.publicKey,
+    privateKey: kp.privateKeyPem,
+    ...(section ? { adjudicatorSets: section } : {}),
+  })));
+  return { annexPath, keyPath };
+}
+
 const SECTION = {
   nodes: [{ kind: 'plugin', id: 'compact-dsh' }],
   sets: [{
@@ -79,8 +99,9 @@ const SECTION = {
   ],
 };
 
-/** Boot with the record provider and (optionally) the judicature annex. */
-async function boot(t, annexPath, { withRecord = true } = {}) {
+/** Boot with the record provider and (optionally) the judicature annex.
+ *  `signer` boots the provider's authorship anchors under the annex key. */
+async function boot(t, annexPath, { withRecord = true, signer = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const ctx = new Context();
@@ -88,7 +109,10 @@ async function boot(t, annexPath, { withRecord = true } = {}) {
   ctx.plugin(SystemPromptStub);
   ctx.plugin(ToolRuntime);
   if (withRecord) {
-    await ctx.plugin(provider, { root: join(dir, 'sessions'), chainDir: join(dir, 'chains'), compression: 'none' });
+    await ctx.plugin(provider, {
+      root: join(dir, 'sessions'), chainDir: join(dir, 'chains'), compression: 'none',
+      ...(signer ? { enforcerAnnexPath: signer.annexPath, enforcerKeyPath: signer.keyPath } : {}),
+    });
   }
   if (withRecord) {
     // the seams the remedies ride: the real approval service (grants) and
@@ -480,6 +504,15 @@ test('the appeal door (J-5): one as of right, a disjoint bench, final with disse
     case_id: id, seat: 'chair', findings: 'specialist:2-3', rules: 'J-2', reasons: 'r', disposition: 'depart',
   })), /departure names the first judgment and argues it/);
 
+  // the open-appeal window: the judgment a remedy would ride is under
+  // contest — from either bench's seats, the remedy waits
+  for (const seat of ['founder', 'chair']) {
+    assert.match(text(await call(tools, 'judicature_remedy', {
+      case_id: id, seat, kind: 'annotation', proportionality: 'premature',
+      spec: JSON.stringify({ target: { session: 'specialist', fromSeq: 2, toSeq: 3 }, note: 'n' }),
+    })), /under contest until the appellate disposition lands/);
+  }
+
   // the appellate judgment that departs, with a dissent — final
   const landed = text(await call(tools, 'judicature_judge', {
     case_id: id, seat: 'chair', findings: 'specialist:2-3', rules: 'D-3, J-2',
@@ -514,6 +547,11 @@ test('with one declared set there is no appellate authority: [JG/appeal-unavaila
   const { tools, service } = await boot(t, fixtureAnnex(dir, SECTION));
   await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer');
   const id = service.docket()[0].id;
+  // the appellate arguments are refused at a case with no open appeal,
+  // never silently dropped
+  assert.match(text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r', disposition: 'affirm',
+  })), /are the APPELLATE door's arguments — this case carries no open appeal/);
   await call(tools, 'judicature_judge', {
     case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
   });
@@ -521,4 +559,73 @@ test('with one declared set there is no appellate authority: [JG/appeal-unavaila
   assert.match(out, /^\[JG\/appeal-unavailable\]/);
   assert.match(out, /no appellate authority at all/);
   assert.equal(service.appeal(id), null, 'nothing records where no authority exists');
+});
+
+test('an UNHEARD appeal holds the door — and the refusals name the recorded state, never a finality nothing earned', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const twoSets = JSON.parse(JSON.stringify(SECTION));
+  // disjoint, but seated on the parties themselves — every seat recuses
+  twoSets.sets.push({
+    id: 'review',
+    roles: [
+      { id: 'chair', standing: { kind: 'process', id: 'specialist' } },
+      { id: 'second', standing: { kind: 'process', id: 'customer' } },
+    ],
+    trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
+  });
+  const { tools, service } = await boot(t, fixtureAnnex(dir, twoSets));
+  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer');
+  const id = service.docket()[0].id;
+  await call(tools, 'judicature_judge', { case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r' });
+  const appeal = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'misapplied' }, 'customer'));
+  assert.match(appeal, /UNHEARD, never dismissed/);
+  assert.match(appeal, /The recorded appeal holds the door/);
+  assert.equal(service.appeal(id).panel.status, 'unheard');
+  // the second filing is refused for what stands recorded — not for a
+  // finality that does not exist (no appellate judgment can ever land)
+  const second = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'once more' }, 'specialist'));
+  assert.match(second, /^\[JG\/appeal-refused\]/);
+  assert.match(second, /stands recorded unheard/);
+  assert.doesNotMatch(second, /second judgment is final/, 'nothing is final — the refusal must not claim it');
+  // the judge door names the recorded state too
+  assert.match(text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+  })), /stands recorded unheard/);
+  // and the first judgment stays operative: an unheard appeal contests
+  // nothing, so its bench's remedies still land from the FIRST panel
+  assert.match(text(await call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'founder', kind: 'annotation', proportionality: 'the first judgment stands operative',
+    spec: JSON.stringify({ target: { session: 'specialist', fromSeq: 2, toSeq: 3 }, note: 'uncontested' }),
+  })), /\[J-6\] remedy landed/);
+});
+
+test('the D-8 route through the door: witnesses-pending recorded, heard never, said cleanly', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // the provider anchors every flush under the annex key, so the cited
+  // sessions derive key:test-enforcer as a party — the Enforcer's own class
+  const signer = fixtureAnnexWithKey(dir, SECTION);
+  const { tools, service } = await boot(t, signer.annexPath, { signer });
+  const filed = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer'));
+  assert.match(filed, /key:test-enforcer/, 'the anchor key derives as a party');
+  const id = service.docket()[0].id;
+  // the founder seat recuses (its edge path reaches the enforcer key); peer remains
+  assert.match(filed, /panel: first \(peer\)/);
+  await call(tools, 'judicature_judge', { case_id: id, seat: 'peer', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r' });
+  // the D-8 wall precedes even authority-existence: with ONE declared set the
+  // route still records witnesses-pending rather than vanish unanswered
+  const appeal = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'misapplied' }, 'customer'));
+  assert.match(appeal, /\[JG\/appeal-witnesses-pending\]/);
+  assert.match(appeal, /heard NEVER/);
+  assert.equal(service.appeal(id).panel.status, 'witnesses-pending');
+  // the rendering is clean: one dash per move, no doubled dashes or padded prose
+  assert.doesNotMatch(appeal, /—\s+—/, 'no mangled double dashes');
+  assert.match(appeal, /^ {4}— the recorded appeal is the claim's place in line/m);
+  // the second filing names the recorded state; the judge door does too
+  assert.match(text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'again' }, 'specialist')),
+    /stands recorded witnesses-pending/);
+  assert.match(text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'peer', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+  })), /stands recorded witnesses-pending/);
 });

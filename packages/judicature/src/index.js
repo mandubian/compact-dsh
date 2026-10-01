@@ -82,6 +82,9 @@ export const DECLARED_GAPS = [
   'the D-8 appeal route (an accusation whose party is of the Enforcer\'s own class) requires external Witnesses on ' +
     'the appellate panel — pending I-1 identity keys (#116), that route is heard never, saying so, and it never ' +
     'pretends otherwise',
+  'an open appeal carries no term of its own: the case\'s liveness discipline (CASE_TERM_MS, overdue derived at ' +
+    'read) does not extend to the re-hearing, and the docket summary still reads judged while an appeal stands ' +
+    'open — the appeal shows in the case\'s full row only',
   'revocation orders record, they do not re-declare: the annex/register rotation that executes a revocation is ' +
     'the operator\'s recorded act (the keyring\'s rotation discipline) — the remedy row is the order, cited in it',
   'restitution is bounded by resources (J-6 clause text): the obligation row is the honest artifact; the reserve ' +
@@ -229,8 +232,8 @@ export function appealRefusedEnvelope(detail) {
     gate: GATE,
     ruleId: 'appeal-refused',
     reason: `the appeal refuses: ${detail}. Appeal asks WAS THE LAW APPLIED here, on the same record, and lies to an ` +
-      'authority not subordinate to the first panel (J-5) — one appeal as of right; a second judgment is final, the ' +
-      'door closes, and the petition door never does: an appeal can never fix the law, a petition can never reopen a case',
+      'authority not subordinate to the first panel (J-5) — one appeal as of right; once the appellate judgment has ' +
+      'landed it is FINAL, the door closes, and the petition door never does: an appeal can never fix the law, a petition can never reopen a case',
     lawfulNextMoves: [
       'the adverse party files once, as of right — judicature_appeal with the argued grounds',
       'after a final adverse judgment convinced the LAW is wrong: petition (R-11), not defiance',
@@ -264,7 +267,7 @@ export function appealWitnessesPendingEnvelope() {
       'the appellate panel for such an accusation MUST include external Witnesses (D-8) — which do not exist yet: ' +
       'pending I-1 identity keys, that route is heard NEVER, saying so, never the accused\'s own class pretending otherwise',
     lawfulNextMoves: [
-      'the appeal is recorded with this state — re-filed the moment external Witnesses are accredited (I-1)',
+      'the recorded appeal is the claim\'s place in line — when external Witnesses are accredited (I-1) the route hears it; no re-filing is needed, and none is possible while the appeal stands',
       'the offline verifier (I-7) cross-examines the annex-versus-conduct divergence without the runtime\'s cooperation',
       'petition (R-11) carries the law question now; the D-8 route carries the accusation later',
     ],
@@ -598,6 +601,15 @@ export function apply(ctx, config = {}) {
       const rules = String(args?.rules ?? '').split(',').map((s) => s.trim()).filter(Boolean);
       const dissent = args?.dissent_seat ? { seat: String(args.dissent_seat), reasons: String(args?.dissent_reasons ?? '') } : undefined;
 
+      // a first-instance judgment affirms nothing and departs from nothing:
+      // the appellate arguments are refused at a case carrying no open
+      // appeal, never silently dropped (the form-checker discipline)
+      if (c.appeal == null && (args?.disposition != null || args?.departure_grounds != null)) {
+        const envelope = judgmentRefusedEnvelope('disposition and departure_grounds are the APPELLATE door\'s arguments — this case carries no open appeal, and a first-instance judgment affirms nothing and departs from nothing (J-5)');
+        emitRefusal(envelope, 'judicature_judge');
+        return envelope.text;
+      }
+
       // the appellate branch (J-5): an open appeal re-hears from the
       // disjoint panel's seats, with the disposition the door's honesty is
       if (c.appeal != null && c.appeal.judgment == null) {
@@ -797,10 +809,14 @@ export function apply(ctx, config = {}) {
           'The appeal re-hears on the SAME record: judicature_judge from one of these seats, disposition affirm or depart.');
       } else if (panel.status === 'unheard') {
         lines.push('  appellate panel: none — every disjoint set recused; the appeal is UNHEARD, never dismissed.',
-          'It may be re-filed before any later-declared disjoint set.');
+          'The recorded appeal holds the door: no second appeal files while it stands, and no set is declared later within this runtime (the annex is fixed at boot). Nothing is final — the first judgment stays operative.');
       } else if (panel.status === 'witnesses-pending') {
         const envelope = appealWitnessesPendingEnvelope();
-        lines.push('  appellate panel: none —', envelope.text.replace(/\nLawful next moves:\n/, '\n  Lawful next moves:\n  — ').replace(/— /g, '  — '));
+        lines.push(
+          `  appellate panel: none — [${GATE}/appeal-witnesses-pending] ${envelope.reason}`,
+          '  Lawful next moves:',
+          ...envelope.lawfulNextMoves.map((move) => `    — ${move}`),
+        );
       }
       return lines.join('\n');
     },

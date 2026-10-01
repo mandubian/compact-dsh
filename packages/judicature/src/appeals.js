@@ -37,8 +37,10 @@ function normalizeStanding(p) {
   return { kind: 'process', id: String(p) };
 }
 
-/** Is any party of the Enforcer's own class (D-8)? The enforcer key the
- *  annex declares, or the composition itself — the class that must never
+/** Is any party of the Enforcer's own class (D-8)? Any plugin (the enforcer
+ *  runs as one — pre-I-1, party derivation can only reach this through a
+ *  future door, so the branch is defense) or the annex's own enforcer key
+ *  (what an anchored cited session carries) — the class that must never
  *  judge accusations against itself without external Witnesses. */
 export function isEnforcerClass(parties, judiciary) {
   return parties.some((p) =>
@@ -56,7 +58,16 @@ export function fileAppeal(c, { filer, grounds, now = Date.now() }) {
     throw new CaseError('malformed', 'nothing has been judged on this case — an appeal re-hears an application, and there is none to re-hear (J-5)');
   }
   if (c.appeal != null) {
-    throw new CaseError('final', 'an appeal already exists on this case — a second judgment is final and a second appeal is refused; the door closes, the petition door never does');
+    // The refusal names the recorded state exactly: finality is a property
+    // of a landed judgment, never of a recorded row (J-1's discipline —
+    // an unheard appeal is never a dismissed one, and never a final one).
+    if (c.appeal.judgment != null) {
+      throw new CaseError('final', 'an appeal already exists on this case — a second judgment is final and a second appeal is refused; the door closes, the petition door never does');
+    }
+    if (c.appeal.panel?.status === 'witnesses-pending') {
+      throw new CaseError('unheard', 'an appeal stands recorded witnesses-pending on this case — heard never until external Witnesses exist (I-1): no judgment has landed, nothing is final, and the recorded appeal holds the door (the accreditation revives the route; it needs no re-filing)');
+    }
+    throw new CaseError('unheard', 'an appeal stands recorded unheard on this case — every disjoint set recused, no appellate judgment has landed, and nothing is final (J-1: never dismissed); the recorded appeal holds the door, and no set is declared later within this runtime (the annex is fixed at boot)');
   }
   const f = normalizeStanding(filer);
   if (!isParty(c, f)) {
@@ -95,10 +106,10 @@ export function resolveAppellatePanel(judiciary, c) {
   const refusals = [];
   for (const s of disjoint) {
     const row = perSet.get(s.id);
+    if (row) refusals.push(...row.refusals);
     if (row && row.seats.length > 0) {
       return { status: 'panel', setId: s.id, seats: row.seats, refusals };
     }
-    if (row) refusals.push(...row.refusals);
   }
   return { status: 'unheard' };
 }
@@ -116,6 +127,12 @@ export function landAppellateJudgment(c, { seat, disposition, findings, rules, r
   }
   if (c.appeal.judgment != null) {
     throw new CaseError('final', 'the appellate judgment already landed — a second judgment is final, and no removal operation exists (A-5)');
+  }
+  if (c.appeal.panel?.status === 'unheard') {
+    throw new CaseError('unheard', 'the appeal stands recorded unheard — every disjoint set recused, nobody lawful remains to re-hear it; it is never dismissed, and no judgment lands without a lawful seat (J-1)');
+  }
+  if (c.appeal.panel?.status === 'witnesses-pending') {
+    throw new CaseError('unheard', 'the appeal stands recorded witnesses-pending — a party is of the Enforcer\'s own class (D-8), and that route is heard never until external Witnesses exist (I-1)');
   }
   if (c.appeal.panel?.status !== 'panel') {
     throw new CaseError('malformed', 'the appeal has no resolved panel — nobody lawful has been seated to re-hear it');
