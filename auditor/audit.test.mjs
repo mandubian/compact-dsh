@@ -8,7 +8,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateEd25519, signSeal, signAnnex, annexDigestOf, signSubjectCert, canonicalBytes, withoutField, sha256Hex } from '../packages/seals/src/index.js';
+import { generateEd25519, signSeal, signAnnex, annexDigestOf, signSubjectCert, canonicalBytes, withoutField, sha256Hex, memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, parseManifest } from '../packages/seals/src/index.js';
 import { extendChain, genesisHash, signAnchor, genesisAnchor, anchorHashOf } from '../packages/record/src/index.js';
 import { COMPACT_BODY, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { audit } from './audit.mjs';
@@ -303,6 +303,85 @@ test('an unreadable identity ledger is an ERROR, never a skipped check (#20)', a
     const finding = att.findings.find(x => x.type === 'identities');
     assert.match(finding.detail, /is not JSON/);
     assert.match(finding.detail, /refused, not skipped/);
+  } finally {
+    f.cleanup();
+  }
+});
+
+// ── the member-binding join (identity slice 2, #125): --identities × --roll ──
+
+/** A roll domain: one member ('test-member'), optionally rotated or revoked. */
+function rollDomain(dir, { rotate = false, revoke = false, name = 'roll' } = {}) {
+  const auth = [1, 2, 3].map((i) => { const kp = generateEd25519(); return { id: `auth-${i}`, publicKey: kp.publicKey, privateKeyPem: kp.privateKeyPem }; });
+  const manifestText = JSON.stringify({ kind: 'dev-keyring', declaration: 'test keyring', threshold: { k: 2, n: 3 }, keys: auth.map(({ id, publicKey }) => ({ id, publicKey })), rotations: [] }, null, 2);
+  const manifest = parseManifest(manifestText);
+  const keyringPath = join(dir, `${name}.keyring.json`);
+  writeFileSync(keyringPath, manifestText);
+  const privates = new Map(auth.map(({ id, privateKeyPem }) => [id, privateKeyPem]));
+  const quorum = (n = 2) => auth.slice(0, n).map(({ id, privateKeyPem }) => ({ keyId: id, privateKey: privateKeyPem }));
+  const k1 = generateEd25519();
+  const k1Digest = memberKeyDigestOf(k1.publicKey);
+  let current = { kp: k1, digest: k1Digest };
+  const roll = { kind: 'test-roll', version: 1, genesis: { epochLength: { events: 64 }, admissionStatute: { digest: 'a'.repeat(64) } }, entries: [], checkpoints: [] };
+  const NOW2 = '2026-10-01T00:00:00.000Z';
+  const adm = { kind: 'admission', memberKeyDigest: k1Digest, class: 'principal', memberKey: k1.publicKey, member: 'test-member', holder: 'the principal under test', grounds: 'test', recordedAt: NOW2 };
+  appendRollEvent(roll, { ...adm, signedBy: signRollEvent(adm, [...quorum(2), { keyId: k1Digest, privateKey: k1.privateKeyPem }]) });
+  if (rotate) {
+    const k2 = generateEd25519();
+    const k2Digest = memberKeyDigestOf(k2.publicKey);
+    const rot = { kind: 'rotation', memberKeyDigest: k2Digest, class: 'principal', predecessorKeyDigest: k1Digest, successorKey: k2.publicKey, grounds: 'drill', recordedAt: NOW2 };
+    appendRollEvent(roll, { ...rot, signedBy: signRollEvent(rot, [{ keyId: k1Digest, privateKey: k1.privateKeyPem }]) });
+    current = { kp: k2, digest: k2Digest };
+  }
+  if (revoke) {
+    const rev = { kind: 'revocation', memberKeyDigest: current.digest, grounds: 'compromise drill', recordedAt: NOW2 };
+    appendRollEvent(roll, { ...rev, signedBy: signRollEvent(rev, quorum(2)) });
+  }
+  closeEpoch({ roll, epoch: 0, manifest, privateKeys: privates, now: NOW2 });
+  const rollPath = join(dir, `${name}.roll.json`);
+  writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n');
+  return { rollPath, keyringPath, manifestText, k1, k1Digest, currentDigest: current.digest };
+}
+
+test('the binding join: --identities × --roll verifies the countersignature against the roll, and every refusal names itself (#125)', () => {
+  const f = rehearsalDir();
+  try {
+    const domain = rollDomain(f.dir);
+    const boundCert = subjectCert(f.enforcer, { subjectId: 'bound-1', memberKeyDigest: domain.currentDigest, memberPrivateKey: domain.k1.privateKeyPem });
+    const identitiesFile = writeIdentityLedger(f, [ledgerLine(boundCert)]);
+    const att = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile, rollFile: domain.rollPath, keyringFile: domain.keyringPath });
+    assert.equal(att.checked.identities, 'verified');
+    assert.equal(att.checked.roll, 'verified');
+    assert.equal(att.identityChain.bound, 1);
+    assert.equal(att.identityChain.unbound, 0);
+    assert.equal(att.findings.length, 0);
+
+    // a member key the roll never bound — the false answer D-3 names
+    const ghostCert = subjectCert(f.enforcer, { subjectId: 'ghost', memberKeyDigest: 'e'.repeat(64), memberPrivateKey: domain.k1.privateKeyPem });
+    const ghost = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile: writeIdentityLedger(f, [ledgerLine(ghostCert)]), rollFile: domain.rollPath, keyringFile: domain.keyringPath });
+    assert.equal(ghost.checked.identities, 'BROKEN');
+    assert.ok(ghost.findings.some((x) => x.severity === 'error' && /which the roll never bound/.test(x.detail)));
+
+    // a revoked member: the act that leans on the certificate refuses on the row
+    const revokedDomain = rollDomain(f.dir, { revoke: true, name: 'revoked' });
+    const revokedCert = subjectCert(f.enforcer, { subjectId: 'revoked-1', memberKeyDigest: revokedDomain.currentDigest, memberPrivateKey: revokedDomain.k1.privateKeyPem });
+    const revoked = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile: writeIdentityLedger(f, [ledgerLine(revokedCert)]), rollFile: revokedDomain.rollPath, keyringFile: revokedDomain.keyringPath });
+    assert.equal(revoked.checked.identities, 'BROKEN');
+    const revokedFinding = revoked.findings.find((x) => x.severity === 'error' && /REVOKED at roll entry/.test(x.detail));
+    assert.ok(revokedFinding, 'the refusal cites the roll row it acts on');
+    assert.match(revokedFinding.rule, /F-8/);
+
+    // a countersignature that does not verify against the roll's key
+    const forgedCert = subjectCert(f.enforcer, { subjectId: 'forged-1', memberKeyDigest: domain.currentDigest, memberPrivateKey: domain.k1.privateKeyPem });
+    forgedCert.memberCountersignature = subjectCert(f.enforcer, { memberKeyDigest: domain.currentDigest, memberPrivateKey: domain.k1.privateKeyPem }).memberCountersignature;
+    const forged = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile: writeIdentityLedger(f, [ledgerLine(forgedCert)]), rollFile: domain.rollPath, keyringFile: domain.keyringPath });
+    assert.equal(forged.checked.identities, 'BROKEN');
+    assert.ok(forged.findings.some((x) => x.severity === 'error' && /countersignature.*does not verify against the roll's key/.test(x.detail)));
+
+    // no --roll given: the countersignature is declared UNVERIFIABLE, never passed silently
+    const noRoll = audit(LOG, undefined, 0, { annexFile: f.annexPath, identitiesFile: writeIdentityLedger(f, [ledgerLine(boundCert)]) });
+    assert.equal(noRoll.checked.identities, 'verified', 'a warning is not an error');
+    assert.ok(noRoll.findings.some((x) => x.severity === 'warning' && /this run CANNOT verify/.test(x.detail) && /--roll/.test(x.detail)));
   } finally {
     f.cleanup();
   }

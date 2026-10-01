@@ -42,7 +42,7 @@ import { basename, dirname, join } from 'node:path';
 import { genesisHash, verifySlice, RecordIntegrityError, extendChain, readAnchors } from '../packages/record/src/index.js';
 import { verifyAnchorChain } from '../packages/record/src/anchors.js';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
-import { parseManifest, parseSeal, verifySeal, verifyAnnex, verifySubjectCert, verifyRoll, canonicalBytes, withoutField, sha256Hex, SealError } from '../packages/seals/src/index.js';
+import { parseManifest, parseSeal, verifySeal, verifyAnnex, verifySubjectCert, verifyRoll, certUnsignedBytes, canonicalBytes, withoutField, sha256Hex, SealError } from '../packages/seals/src/index.js';
 
 const DEV_BASIS_PHRASE = 'VALID under DEV keyring — conveys no standing';
 
@@ -187,7 +187,9 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
       ...(signatures.identities?.ok
         ? [`${signatures.identities.certificates} subject certificate(s) in ${signatures.identities.file} verify under enforcer key ${signatures.identities.keyId} — ` +
           `${signatures.identities.roots} root(s), ${signatures.identities.chained} chained to their parent's digest, ` +
-          `${signatures.identities.incomplete} declared-but-unverifiable link(s): ${DEV_BASIS_PHRASE} (I-1/MA-1 rehearsal)`]
+          `${signatures.identities.incomplete} declared-but-unverifiable link(s), ` +
+          `${signatures.identities.bound ?? 0} member-bound (countersignature verified against the roll${signatures.roll?.ok ? '' : ' — give --roll to verify the binding'}), ` +
+          `${signatures.identities.unbound ?? 0} unbound: ${DEV_BASIS_PHRASE} (I-1/MA-1 rehearsal)`]
         : []),
       ...(signatures.roll?.ok
         ? [`the member roll ${signatures.roll.file}: ${signatures.roll.entries} identity event(s), ${signatures.roll.members} member(s) (${signatures.roll.live} live, ${signatures.roll.revoked} revoked, ${signatures.roll.rotations} rotation(s)), ` +
@@ -220,7 +222,7 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
  * own line. An unreadable ledger is an ERROR — evidence that cannot be read
  * is refused, never skipped.
  */
-function checkIdentities(file, annex, now = Date.now()) {
+function checkIdentities(file, annex, roll = null, now = Date.now()) {
   const findings = [];
   let lines;
   try {
@@ -267,9 +269,48 @@ function checkIdentities(file, annex, now = Date.now()) {
     certs.push({ cert: entry.cert, digest, line: index + 1 });
   });
 
-  const summary = { certificates: certs.length, roots: 0, chained: 0, incomplete: 0 };
+  const summary = { certificates: certs.length, roots: 0, chained: 0, incomplete: 0, bound: 0, unbound: 0 };
   for (const { cert, line } of certs) {
     const at = `identity ledger line ${line}`;
+    // THE MEMBER BINDING JOIN (identity slice 2, #125): a certificate that
+    // names a member key is checked against the ROLL — the roll is the
+    // source of who holds which key, so the countersignature verifies
+    // against the roll's public half for that digest, and standing reads
+    // from rows, never from the issuing runtime's word
+    if (cert.memberKeyDigest) {
+      const bound = roll?.byKey?.get(cert.memberKeyDigest);
+      if (roll && !bound) {
+        findings.push({
+          seq: null, type: 'identities', severity: 'error', rule: 'I-1',
+          detail: `${at}: names member key ${cert.memberKeyDigest.slice(0, 12)}…, which the roll never bound — a binding to a member the roll does not show is the false answer D-3 names`,
+        });
+      } else if (bound && bound.member.state === 'revoked') {
+        findings.push({
+          seq: null, type: 'identities', severity: 'error', rule: 'F-8',
+          detail: `${at}: the bound Member was REVOKED at roll entry ${bound.member.revocationRow} — the act that leans on this certificate refuses on a row it can cite (revocation is a fact, not an absence)`,
+        });
+      } else if (bound) {
+        summary.bound += 1;
+        try {
+          verifySubjectCert({ cert, enforcerKey: annex.enforcerKey, memberPublicKey: bound.publicKey, now });
+        } catch (e) {
+          if (e instanceof SealError && e.reason === 'cert-countersignature-invalid') {
+            findings.push({ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: `${at}: ${e.message}` });
+          } else {
+            findings.push({ seq: null, type: 'identities', severity: 'warning', rule: 'I-1', detail: `${at}: ${e.message}` });
+          }
+        }
+      } else {
+        // a roll was not given: the countersignature is structurally present
+        // but cannot be verified offline — declared, never passed silently
+        findings.push({
+          seq: null, type: 'identities', severity: 'warning', rule: 'I-1',
+          detail: `${at}: names member key ${cert.memberKeyDigest.slice(0, 12)}… with a countersignature this run CANNOT verify — pass --roll to resolve the member's key from the roll (I-7)`,
+        });
+      }
+    } else if (roll) {
+      summary.unbound += 1;
+    }
     if (!cert.parentSubjectId && !cert.parentCertDigest) { summary.roots += 1; continue; }
     if (!cert.parentCertDigest) {
       summary.incomplete += 1;
@@ -362,17 +403,7 @@ function checkSignatures(events, { annexFile, anchorsFile, identitiesFile, rollF
     }
   }
 
-  if (identitiesFile) {
-    if (!annex) {
-      out.identities = { file: identitiesFile, ok: false };
-      findings.push({ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: 'identity verification requires a verified enforcer annex (--annex) — a subject certificate is checked against the key that signed it, never against nothing' });
-    } else {
-      const verdict = checkIdentities(identitiesFile, annex);
-      out.identities = { file: identitiesFile, ok: verdict.ok, ...verdict.summary };
-      findings.push(...verdict.findings);
-    }
-  }
-
+  let rollVerdict = null;
   if (rollFile) {
     if (!keyringFile) {
       out.roll = { file: rollFile, ok: false };
@@ -383,6 +414,7 @@ function checkSignatures(events, { annexFile, anchorsFile, identitiesFile, rollF
         const roll = JSON.parse(readFileSync(rollFile, 'utf8'));
         const verdict = verifyRoll({ roll, manifest });
         out.roll = { file: rollFile, ok: verdict.ok, ...verdict.summary, phrase: DEV_BASIS_PHRASE };
+        rollVerdict = verdict;
         findings.push(...verdict.findings.map((f) => ({
           seq: null, type: 'roll', severity: f.severity, rule: f.rule,
           detail: `[${f.reason}] ${f.detail}`,
@@ -391,6 +423,17 @@ function checkSignatures(events, { annexFile, anchorsFile, identitiesFile, rollF
         out.roll = { file: rollFile, ok: false };
         findings.push({ seq: null, type: 'roll', severity: 'error', rule: 'I-1', detail: `member roll refused: ${e.message}` });
       }
+    }
+  }
+
+  if (identitiesFile) {
+    if (!annex) {
+      out.identities = { file: identitiesFile, ok: false };
+      findings.push({ seq: null, type: 'identities', severity: 'error', rule: 'I-1', detail: 'identity verification requires a verified enforcer annex (--annex) — a subject certificate is checked against the key that signed it, never against nothing' });
+    } else {
+      const verdict = checkIdentities(identitiesFile, annex, rollVerdict?.byKey ? rollVerdict : null);
+      out.identities = { file: identitiesFile, ok: verdict.ok, ...verdict.summary };
+      findings.push(...verdict.findings);
     }
   }
 

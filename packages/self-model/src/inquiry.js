@@ -126,6 +126,11 @@ function certificateOf(id, identities) {
     keyId: verdict.keyId ?? identities.keyId?.() ?? null,
     valid: verdict.valid === true,
     ...(verdict.valid ? {} : { reason: verdict.reason ?? 'the certificate did not verify' }),
+    // the member binding (identity slice 2): countersigned on the cert,
+    // resolved through the roll when the composition declares one
+    member: found.cert.memberKeyDigest
+      ? { memberKeyDigest: found.cert.memberKeyDigest, countersigned: true, ...(verdict.member ?? {}) }
+      : null,
     conveysStanding: false,
   };
 }
@@ -227,7 +232,11 @@ function certificateLines(cert, indent = '  ') {
         : cert.parentSubjectId
           ? ` · names parent ${cert.parentSubjectId} but binds no parent digest — this link CANNOT be verified offline (the parent's certificate was not available at issuance)`
           : ' · no parent');
-  return [`${indent}certificate: ${digest} — ${verdict}`, `${indent}  ${lineage}`];
+  const member = cert.member
+    ? [`${indent}  member binding: key ${cert.member.memberKeyDigest.slice(0, 12)}… — countersigned by the member key` +
+       (cert.member.memberId ? `, member "${cert.member.memberId}" (class ${cert.member.class}, resolved through the roll)` : ', roll resolution not available to this answer')]
+    : [`${indent}  member binding: none — the honest pre-I-1 interim (identity slice 2)`];
+  return [`${indent}certificate: ${digest} — ${verdict}`, `${indent}  ${lineage}`, ...member];
 }
 
 /** Render an inquiry answer as the in-band prose the asking Subject reads. */

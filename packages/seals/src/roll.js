@@ -423,5 +423,8 @@ export function resolveMember(verified, keyOrDigest) {
   if (!bound) return null;
   const { member } = bound;
   const state = member.state === 'revoked' ? 'revoked' : (member.lineage.at(-1) === digest ? 'live' : 'superseded');
-  return { state, class: member.class, lineage: [...member.lineage], foundingDigest: member.foundingDigest };
+  return {
+    state, class: member.class, lineage: [...member.lineage], foundingDigest: member.foundingDigest,
+    ...(member.state === 'revoked' ? { revocationRow: member.revocationRow ?? null } : {}),
+  };
 }

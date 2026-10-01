@@ -18,7 +18,7 @@ export { generateEd25519, importPublicKey, signMessage, verifyMessage, sha256Hex
 export { messageFor, parseManifest, parseSeal, verifySeal, signSeal, SealError } from './seal.js';
 export {
   REHEARSAL_DECLARATION, annexDigestOf, verifyAnnex, signAnnex,
-  verifySubjectCert, signSubjectCert,
+  verifySubjectCert, signSubjectCert, certUnsignedBytes,
 } from './annex.js';
 export {
   ROLL_ENTRY_KINDS, MEMBER_CLASSES, CHECKPOINT_SUBJECT, RollError,

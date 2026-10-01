@@ -83,6 +83,11 @@ export function deriveParties(citations, resolve) {
     let resolved;
     try { resolved = resolve(id) ?? {}; } catch { resolved = {}; }
     if (resolved.anchorKey) add('key', resolved.anchorKey);
+    // the member binding (identity slice 2, #125): the session is the deed
+    // of a Member, so the MEMBER's current key joins the parties — recusal
+    // follows the member, not the session, and the same member re-keyed
+    // into a fresh session derives the same party
+    if (resolved.memberKeyDigest) add('key', resolved.memberKeyDigest);
     if (resolved.parent) walk(resolved.parent, depth + 1);
   };
   for (const c of citations) walk(c.session, 0);
