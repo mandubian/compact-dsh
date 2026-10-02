@@ -8,7 +8,7 @@
 // the listener is a waterfall — pass = return next(), deny = return the
 // PreToolDecision; tool identity is exec.name / exec.arguments.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { parseAllowlist, extractTarget, decide } from './allowlist.js';
 import { buildEnvelope,bandReason } from 'compact-envelope';

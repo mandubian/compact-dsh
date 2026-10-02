@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
-import { constants } from 'node:fs';
+import { constants, readFileSync } from 'node:fs';
 import { mkdir, open, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -154,7 +154,16 @@ async function main() {
       }
     }
   }
-  const bundle = name => loadOverlayPatches(binName, fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve(`${name}/package.json`))));
+  // a bundle may be a LIST of patch layers (dsh-web-app 0.2.0 ships its
+  // agent presets as separate files listed in dsh.bundle.patch); a real
+  // profile boot applies every layer in order, so the launcher does too
+  const bundle = name => {
+    const dir = dirname(fileURLToPath(import.meta.resolve(`${name}/package.json`)));
+    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    const declared = manifest.dsh?.bundle?.patch ?? ['./cordis.patch.yml'];
+    const layers = Array.isArray(declared) ? declared : [declared];
+    return layers.flatMap(rel => loadOverlayPatches(binName, join(dir, rel)));
+  };
   const patches = [
     ...bundle('@deepseek-ai/dsh-base'),
     ...values.smoke ? [] : values.web ? bundle('@deepseek-ai/dsh-web-app') : bundle('@deepseek-ai/dsh-headless'),
@@ -166,7 +175,7 @@ async function main() {
     ...values.web ? bundle('compact-dsh-card') : [],
     ...values.web ? webRows() : values.smoke ? [] : [
       { id: 'headless-startup', disabled: true },
-      { id: 'code-runtime', disabled: true },
+      { id: 'ptc-runtime', disabled: true },
       { id: 'headless-runner', inject: ['compact-ready'], config: { task } },
     ],
   ];

@@ -4,7 +4,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ALLOWED = /^~0\.1\.5-rc\.\d+$/; // audited line; upgrades are re-blessed events
+const ALLOWED = /^~0\.2\.0-rc\.\d+$/; // audited line; upgrades are re-blessed events
 const root = new URL('..', import.meta.url).pathname;
 const pkgs = readdirSync(join(root, 'packages')).map(p => join(root, 'packages', p, 'package.json'));
 let failures = 0, checked = 0;
@@ -15,7 +15,7 @@ for (const pkg of pkgs) {
   if (!range) continue;
   checked++;
   if (!ALLOWED.test(range)) {
-    console.error(`✗ ${manifest.name}: dsh range "${range}" is outside the audited line (~0.1.5-rc.*)`);
+    console.error(`✗ ${manifest.name}: dsh range "${range}" is outside the audited line (~0.2.0-rc.*)`);
     failures++;
   }
 }

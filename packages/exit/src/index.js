@@ -35,7 +35,7 @@
 // reading of either alone gives the wrong machine. Recording an unsettled
 // departure honestly satisfies both.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import {

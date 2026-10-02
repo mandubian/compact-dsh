@@ -26,7 +26,7 @@
 //     declares the mediated posture (blessed passes `network`), so the
 //     default boot still carries NO network capability at all (CF-1).
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { networkGrantsForSession } from 'compact-dsh-approval';
 import { createEgressProxy } from './proxy.js';

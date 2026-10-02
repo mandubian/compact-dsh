@@ -24,7 +24,7 @@
 //   reaches the parent through the delegation tool's own result, attributed to
 //   the child; it never becomes the Enforcer's picture by being reprinted here.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 

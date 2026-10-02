@@ -7,34 +7,46 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { composeEntries, loadOverlayPatches } from '@deepseek-ai/dsh-app-boot';
-import { PRESET_ID, ensureInstallAnchor, installAnchor, presetCompositionPath, presetRoot, webRows } from '../src/web.js';
+import { PRESET_ID, ensureInstallAnchor, installAnchor, presetDeclarationPath, presetRoot, webRows } from '../src/web.js';
 
 const overlayFile = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url));
 const baseFile = fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve('@deepseek-ai/dsh-base/package.json')));
 const webFile = fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve('@deepseek-ai/dsh-web-app/package.json')));
+const webPkgFile = fileURLToPath(new URL('./package.json', import.meta.resolve('@deepseek-ai/dsh-web-app/package.json')));
 
 test('web rows disable the A-4/DYN trigger and replace the preset roster', () => {
   const rows = webRows();
-  assert.deepEqual(rows.filter(row => row.config === undefined), [
+  const declared = rows.filter(row => row.insert !== undefined).flatMap(row => row.insert);
+  assert.deepEqual(rows.filter(row => row.config === undefined && row.insert === undefined), [
     { id: 'cordis-host-runner', disabled: true },
-    { id: 'code-runtime', disabled: true },
+    { id: 'ptc-runtime', disabled: true },
     { id: 'directory-picker', disabled: true },
+    // the shipped presets each re-arm refused tools per session — off at the row
+    { id: 'preset-standard', disabled: true },
+    { id: 'preset-ptc', disabled: true },
+    { id: 'preset-minimal', disabled: true },
+    { id: 'preset-cordis', disabled: true },
   ]);
-  const presets = rows.find(row => row.id === 'agent-presets').config;
-  assert.equal(presets.default, PRESET_ID);
-  assert.deepEqual(presets.roots, [{ path: presetRoot(), trust: 'system' }]);
-  assert.equal(presets.includeShippedRoot, false, 'the shipped `standard` preset re-arms refused tools per session');
-  assert.equal(presets.includeUserRoot, false, 'the roster is exactly the pilot preset');
+  const registry = rows.find(row => row.id === 'agent-preset-registry').config;
+  assert.deepEqual(registry, { default: PRESET_ID }, 'the registry keeps only its default');
+  assert.equal(declared.length, 1, 'exactly one declaring row: the pilot');
+  assert.equal(declared[0].name, '@deepseek-ai/dsh-agent-preset');
+  assert.equal(declared[0].config.id, PRESET_ID);
+  assert.ok(declared[0].config.plugins.length > 0, 'the pilot declaration carries its plugin rows');
 });
 
 test('web composition over the real bundles: runner disabled, transport live, overlay intact', () => {
   const warnings = [];
+  // the web bundle ships its agent presets as separate layers (dsh.bundle.patch);
+  // a real profile boot applies every layer in order, so this composition does too
+  const webLayers = JSON.parse(readFileSync(webPkgFile, 'utf8')).dsh.bundle.patch
+    .map(rel => loadOverlayPatches('compact-test', join(dirname(webFile), rel)));
   const rows = composeEntries([
     loadOverlayPatches('compact-test', baseFile),
-    loadOverlayPatches('compact-test', webFile),
+    ...webLayers,
     loadOverlayPatches('compact-test', overlayFile),
     [{ id: 'tools', config: { mode: 'native' } }],
     webRows(),
@@ -42,9 +54,9 @@ test('web composition over the real bundles: runner disabled, transport live, ov
   assert.deepEqual(warnings, [], 'a disable that misses its row must fail here, not warn at boot');
   assert.equal(rows.find(row => row.id === 'cordis-host-runner')?.disabled, true,
     'the web bundle mounts the dynamic-plugin runner; the pilot composition must refuse it at the row (A-4/DYN absent)');
-  assert.equal(rows.find(row => row.id === 'code-runtime')?.disabled, true,
+  assert.equal(rows.find(row => row.id === 'ptc-runtime')?.disabled, true,
     'host-side PTC execution stays off; the pilot code surface is confined bash only');
-  for (const id of ['webserver', 'web-runtime', 'web-startup', 'agent-presets']) {
+  for (const id of ['webserver', 'web-runtime', 'web-startup', 'agent-preset-registry']) {
     assert.notEqual(rows.find(row => row.id === id)?.disabled, true, id);
   }
   assert.equal(rows.some(row => row.id === 'tool-cordis'), false,
@@ -63,27 +75,26 @@ test('web composition over the real bundles: runner disabled, transport live, ov
 // re-mount refused tools per session, so the roster is part of the posture.
 const REFUSED_PRESET_ROWS = [
   'tool-subagent-control', 'tool-subagent-list-agents', 'tool-subagent-fork', 'tool-subagent',
-  'workflow-worker-thread', 'tool-workflow', 'tool-ralph',
+  'workflow-ptc', 'tool-workflow', 'tool-ralph',
   'tool-fs', 'tool-fs-search', 'tool-jobs', 'skill-filesystem', 'tool-skill',
   'command-goal', 'tool-goal', 'plan-mode', 'tool-web',
 ];
 
 test('compact-pilot preset mounts nothing the pilot refuses', () => {
-  const text = readFileSync(presetCompositionPath(), 'utf8');
+  const text = readFileSync(presetDeclarationPath(), 'utf8');
   const pattern = new RegExp(`^\\s*- id: (?:${[...REFUSED_PRESET_ROWS].sort((a, b) => b.length - a.length).join('|')})\\b`, 'm');
   assert.doesNotMatch(text, pattern, 'the roster would re-arm a refused tool per session');
   for (const required of ['tool-bash', 'tool-todo', 'tool-ask-user', 'present', 'compaction-basic']) {
     assert.match(text, new RegExp(`^\\s*- id: ${required}\\b`, 'm'), required);
   }
-  const metadata = readFileSync(join(presetRoot(), PRESET_ID, 'preset.yml'), 'utf8');
-  assert.match(metadata, /^name: Compact pilot$/m);
+  assert.match(text, /^        name: Compact pilot$/m);
 });
 
 test('the preset lives in the checkout, where node_modules anchors plugin resolution', () => {
-  const dir = join(presetRoot(), PRESET_ID);
+  const dir = presetRoot();
   assert.equal(statSync(dir).isDirectory(), true);
-  assert.equal(existsSync(presetCompositionPath()), true);
-  // the parent-walk from the preset directory must reach an installation
+  assert.equal(existsSync(presetDeclarationPath()), true);
+  // the parent-walk from the presets directory must reach an installation
   // anchor; the checkout root supplies it
   let cursor = dir;
   let anchored = false;

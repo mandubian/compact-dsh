@@ -14,7 +14,7 @@ message (R-9).
       - https://mirror.example.org/v1/
 ```
 
-Tests: `npm test` (node:test, no build step). dsh pin: `~0.1.5-rc.1`.
+Tests: `npm test` (node:test, no build step). dsh pin: `~0.2.0-rc.2`.
 
 **Contract, verified against the installed `@deepseek-ai/dsh-tools` types:**
 `tools/pre-execute` is a *waterfall* — pass = `return next()`, deny =

@@ -41,7 +41,7 @@
 //   an identifiable Member. An unknown id yields a recorded "not known to this
 //   runtime", which is an answer; silence is not.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 /** The root's authority: the party that composed and ran this runtime. */
 export const ULTIMATE_PRINCIPAL = {

@@ -10,7 +10,7 @@
     "./package.json": "./package.json"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+    "@deepseek-ai/dsh": "~0.2.0-rc.2"
   },
   "dependencies": {
     "compact-dsh-allowlist-gate": "0.1.0",

@@ -34,7 +34,7 @@
 // scheduling", and unlike a register line reading "ungated — debt declared" it
 // is a fact a verifier can check.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { buildEnvelope,bandReason } from 'compact-envelope';
 import { CAPABILITY_PARTS, assessParts, unboundMessage } from './parts.js';

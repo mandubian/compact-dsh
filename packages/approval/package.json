@@ -5,10 +5,10 @@
   "description": "The Compact on dsh \u2014 layered approval & grants: exec cache, plan/session grants, flood cap, ordered evaluation, the approval/request answerer materializing allowed-once, grants-* commands, budgets, JSON+fsync persistence (Phase 1).",
   "main": "src/index.js",
   "peerDependencies": {
-    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+    "@deepseek-ai/dsh": "~0.2.0-rc.2"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-llm": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.2.0-rc.2",
     "compact-envelope": "0.1.0"
   },
   "scripts": {

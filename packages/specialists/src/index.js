@@ -28,7 +28,7 @@
 // or drops a source exclusion undocumented refuses to load — drift is a
 // build failure, not a style note (#1329–#1331).
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { apply as applySubagentTool } from '@deepseek-ai/dsh-tool-subagent';

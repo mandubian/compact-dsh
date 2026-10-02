@@ -27,7 +27,7 @@
 //      the literal reading of "any excess is a new gate, not an inheritance",
 //      and `checkSupplyChain` never consults `buildApprovals` to permit.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { spawnSync } from 'node:child_process';
 import { buildEnvelope } from 'compact-envelope';

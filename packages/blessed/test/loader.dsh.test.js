@@ -17,7 +17,7 @@ const overlayFile = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url
 const disabled = [
   'sandbox', 'session-persistence-jsonl', 'subagent-fork-in-process',
   'tool-subagent', 'tool-subagent-fork', 'tool-subagent-control',
-  'tool-subagent-list-agents', 'workflow-worker-thread', 'tool-workflow',
+  'tool-subagent-list-agents', 'workflow-ptc', 'tool-workflow',
   'tool-ralph', 'web', 'web-search-deepseek', 'web-fetch-http', 'tool-web',
   'session-title-llm', 'session-telemetry-otel',
   'tool-fs', 'tool-fs-search', 'tool-jobs', 'tool-skill', 'skill-filesystem',
@@ -199,7 +199,7 @@ test('loader: base and blessed patches boot real host services, deny tools and p
   assert.deepEqual(await record.verify(session.id), { ok: true, events: events.length });
   assert.ok(verifySlice({ sessionId: session.id, firstSeq: 0, events, links: record.store.load(session.id).links }));
   assert.equal(record.head(session.id), extendChain(genesisHash(session.id), 0, events).at(-1).h);
-  assert.match(readFileSync(join(f.env.COMPACT_RECORD_ROOT, '_no-cwd', session.id, 'session.v3.jsonl'), 'utf8'), /turn\/end/);
+  assert.match(readFileSync(join(f.env.COMPACT_RECORD_ROOT, '_no-cwd', session.id, 'session.v4.jsonl'), 'utf8'), /turn\/end/);
   assert.equal(readFileSync(join(f.env.COMPACT_CHAIN_DIR, `${session.id}.chain`), 'utf8').trim().split('\n').length, events.length);
 });
 
@@ -230,7 +230,7 @@ test('loader: benign bash pwd runs through Docker offline; workdir remains the p
     assert.equal(spec.workdir, process.cwd());
     assert.equal(spec.timeoutMs, 10_000);
     assert.ok(spec.stdoutMaxBytes > 0);
-    const result = await ctx.shell.run(spec);
+    const result = await (await ctx.shell.execute(spec)).result();
     assert.equal(result.exitCode, 0, result.stderr.text);
     assert.equal(result.timedOut, false);
     assert.equal(result.aborted, false);

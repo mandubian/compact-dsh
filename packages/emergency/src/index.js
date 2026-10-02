@@ -33,7 +33,7 @@
 // queued for a review that has no forum, and the queue is surfaced rather than
 // silently drained — an unreviewed emergency must look unreviewed.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import {

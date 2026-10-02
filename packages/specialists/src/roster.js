@@ -16,7 +16,7 @@
 // sections under their applicability marks. The delivered prompt is
 // self-contained; the sources are shared. See docs/concept-specialist-personas.md.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

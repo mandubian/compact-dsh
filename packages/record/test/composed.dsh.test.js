@@ -12,7 +12,10 @@ import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import * as record from '../src/index.js';
 import { ChainStore, RecordIntegrityError, genesisHash, verifySlice } from '../src/index.js';
 
+// v4 turn discipline: starts and ends alternate, numbered sequentially —
+// consecutive turn/starts read back as a corrupt log
 const EV = (seq, data) => ({ type: 'turn/start', seq, time: 1_700_000_000_000 + seq, data });
+const EV_END = (seq, turn) => ({ type: 'turn/end', seq, time: 1_700_000_000_000 + seq, data: { turn } });
 const header = (id) => ({ version: SESSION_FORMAT_VERSION, id, createdAt: Date.now(), isSeeded: false });
 
 async function boot() {
@@ -41,8 +44,8 @@ test('composed: a session written through the chain reads back and verifies', as
   const { service, store } = await boot();
   const handle = await service.chained.create(header('sess-clean'));
   try {
-    await handle.append([EV(0, { turn: 1 }), EV(1, { turn: 2 })]);
-    await handle.append([EV(2, { turn: 3 })]);
+    await handle.append([EV(0, { turn: 1 }), EV_END(1, 1)]);
+    await handle.append([EV(2, { turn: 2 })]);
     await handle.flush();
     const { events } = await handle.read(0);
     assert.equal(events.length, 3);
@@ -71,7 +74,7 @@ test('composed: an act altered in the stored artifact is caught on the next read
   const { ctx, service, root } = await boot();
   const handle = await service.chained.create(header('sess-tampered'));
   try {
-    await handle.append([EV(0, { turn: 1, act: 'approve' }), EV(1, { turn: 2 })]);
+    await handle.append([EV(0, { turn: 1, act: 'approve' }), EV_END(1, 1)]);
     await handle.flush();
   } finally {
     await handle.close();
@@ -80,7 +83,7 @@ test('composed: an act altered in the stored artifact is caught on the next read
   // Rewrite history the way someone with disk access would: the same event
   // shape, the same seq, the same line count — only the content changes. This
   // is the state the host's own validation cannot distinguish from the truth.
-  const artifact = join(root, '_no-cwd', 'sess-tampered', 'session.v3.jsonl');
+  const artifact = join(root, '_no-cwd', 'sess-tampered', 'session.v4.jsonl');
   const lines = readFileSync(artifact, 'utf8').split('\n');
   const i = lines.findIndex(l => l.includes('"act":"approve"'));
   assert.ok(i >= 0, 'the approval is on disk in the clear');
@@ -98,7 +101,7 @@ test('composed: a history presented under another identity is refused (R-7)', as
   const handle = await service.chained.create(header('sess-mine'));
   let events;
   try {
-    await handle.append([EV(0, { act: 'approve' })]);
+    await handle.append([EV(0, { turn: 1, act: 'approve' })]);
     await handle.flush();
     ({ events } = await handle.read(0));
   } finally {
