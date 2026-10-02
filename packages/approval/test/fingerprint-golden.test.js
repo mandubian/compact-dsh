@@ -6,7 +6,7 @@
 // security-relevant change, not a refactor.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fingerprint, canonicalTarget } from '../src/index.js';
+import { fingerprint, canonicalTarget, queryShape } from '../src/index.js';
 import { parseAllowlistLikePattern } from '../src/pattern.js';
 import { patternMatches } from '../src/grants.js';
 
@@ -182,4 +182,16 @@ test('bash: the effect axis (option B on top of A, tightened) — every target-l
   assert.equal(bf(READ('ls /')), bf({ command: 'ls /' }), 'declared or undeclared, the identical command is one identity');
   assert.notEqual(bf(READ('ls /')), bf(READ('ls /b')));
   assert.notEqual(bf(READ('ls /')), bf({ command: 'rm -rf /', effectClass: null }), 'the read class never covers the unprovable act');
+});
+
+// -- the display-facing query SHAPE (#8 G5 display): names only, never values --
+test('queryShape: sorted, deduplicated parameter names — values never leave', () => {
+  assert.deepEqual(queryShape('https://x.example/v1/search?name=Paris&count=5&language=en'), ['count', 'language', 'name']);
+  assert.deepEqual(queryShape('https://x.example/v1/search?b=2&a=1&b=3'), ['a', 'b'], 'repeats collapse by name');
+  assert.deepEqual(queryShape('https://x.example/v1/search'), null, 'no query, no shape — like canonicalQuery');
+  assert.deepEqual(queryShape('https://x.example/v1/search?'), null, 'an empty query contributes nothing');
+  assert.deepEqual(queryShape('not a url'), null, 'unparsable: no shape, like canonicalTarget');
+  const s = queryShape('https://x.example/v1/search?api_key=SECRET_VALUE');
+  assert.deepEqual(s, ['api_key'], 'the name is displayed');
+  assert.ok(!JSON.stringify(s).includes('SECRET_VALUE'), 'the value never rides the shape');
 });

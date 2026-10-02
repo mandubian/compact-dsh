@@ -107,10 +107,12 @@ export class GrantStore {
 
   // -- exec cache -----------------------------------------------------------
   // Entries carry the canonical target so a revocation can find and kill the
-  // fingerprints a grant covered (the fingerprint itself is one-way).
-  cacheSet(fp, now, ttlMs, target) {
+  // fingerprints a grant covered (the fingerprint itself is one-way), plus
+  // the query PARAMETER NAMES (never values) so a same-target re-ask can say
+  // precisely what changed about its query.
+  cacheSet(fp, now, ttlMs, target, queryNames = null) {
     if (ttlMs === 0) return; // 0 disables
-    this.cache.set(fp, { grantedAt: now, expiresAt: ttlMs ? now + ttlMs : null, target: target ?? null });
+    this.cache.set(fp, { grantedAt: now, expiresAt: ttlMs ? now + ttlMs : null, target: target ?? null, queryNames: queryNames ?? null });
   }
   cacheHit(fp, now) {
     const e = this.cache.get(fp);
@@ -278,7 +280,10 @@ export function classifyAskCause(store, { target, session, now, egress, hasMetho
   if (route != null) {
     for (const e of store.cache.values()) {
       if (targetKey(e.target) === route) {
-        return { kind: 'rephrase', lapsed: !!(e.expiresAt != null && e.expiresAt <= now) };
+        // the prior entry's query SHAPE rides the cause: the ask can then say
+        // precisely what differs — names added/dropped, or the same names
+        // twice, which means the values differ (#8 G5)
+        return { kind: 'rephrase', lapsed: !!(e.expiresAt != null && e.expiresAt <= now), priorQuery: e.queryNames ?? null };
       }
     }
   }

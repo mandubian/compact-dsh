@@ -44,6 +44,22 @@ export function canonicalQuery(url) {
   } catch { return null; }   // unparsable: no query component, like canonicalTarget
 }
 
+/**
+ * The query SHAPE for the operator-facing display: the sorted, deduplicated
+ * PARAMETER NAMES, never the values (#8 G5 — a query can carry credentials,
+ * so values stay inside the one-way fingerprint payload). Names alone answer
+ * the question the second ask raises: the operator can see that one ask
+ * carried `query(count, name)` and the next `query(count, language, name)` —
+ * or the same names twice, which means the values differ. Null when the act
+ * carries no query, matching canonicalQuery.
+ */
+export function queryShape(url) {
+  if (canonicalQuery(url) == null) return null;
+  try {
+    return [...new Set([...new URL(url).searchParams.keys()])].sort();
+  } catch { return null; }
+}
+
 export function fingerprint(tool, args) {
   const t = canonicalTarget(args);
   // Consent identity is risk identity (#26, folded into #38): when the caller

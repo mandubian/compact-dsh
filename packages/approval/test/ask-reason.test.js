@@ -108,6 +108,42 @@ test('a cached approval on the same route, different fingerprint, leads with the
   assertDemoted(reason, 'was approved before', 'rephrase');
 });
 
+test('a same-target re-ask with a changed query says what changed — the VALUES differ (#8 G5)', async () => {
+  // the operator's case: two geocoding calls, same route, same parameter
+  // names, different values — the display that showed two identical-looking
+  // `url=…` rows now says exactly why both asked
+  const booted = boot({});
+  const approved = { url: 'https://geo.example/v1/search?name=Paris&count=1' };
+  booted.approval.store.cacheSet(fingerprint('bash', approved), Date.now(), 60 * 60 * 1000,
+    canonicalTarget(approved), ['count', 'name']);
+  const reason = await ask(booted, { name: 'bash', arguments: { url: 'https://geo.example/v1/search?name=Paris&count=5' }, agent: AGENT });
+  assert.match(reason, /url=https:\/\/geo\.example\/v1\/search\/ query\(count, name\) was approved before/);
+  assert.match(reason, /The query carries the same parameters \('count', 'name'\) — the VALUES differ\./);
+  assert.match(reason, /approving one never covers another \(#8 G5\)/);
+  assert.ok(!reason.includes('Paris') || !/query.*Paris/.test(reason.match(/query\([^)]*\)/)[0]),
+    'the shape bit carries names only — no values ride the display');
+});
+
+test('a same-target re-ask with different parameter NAMES names them', async () => {
+  const booted = boot({});
+  const approved = { url: 'https://geo.example/v1/search?name=Paris' };
+  booted.approval.store.cacheSet(fingerprint('bash', approved), Date.now(), 60 * 60 * 1000,
+    canonicalTarget(approved), ['name']);
+  const reason = await ask(booted, { name: 'bash', arguments: { url: 'https://geo.example/v1/search?name=Lyon&count=5&language=en' }, agent: AGENT });
+  assert.match(reason, /url=https:\/\/geo\.example\/v1\/search\/ query\(count, language, name\) was approved before/);
+  assert.match(reason, /The query parameters differ from the approved phrasing: this act adds 'count', 'language'\./);
+  assert.doesNotMatch(reason, /VALUES differ/);
+});
+
+test('a re-ask that drops the query the approval carried says so', async () => {
+  const booted = boot({});
+  const approved = { url: 'https://geo.example/v1/search?name=Paris' };
+  booted.approval.store.cacheSet(fingerprint('bash', approved), Date.now(), 60 * 60 * 1000,
+    canonicalTarget(approved), ['name']);
+  const reason = await ask(booted, { name: 'bash', arguments: { url: 'https://geo.example/v1/search' }, agent: AGENT });
+  assert.match(reason, /The approval it rephrases carried a query \('name'\); this act drops it\./);
+});
+
 // -- the call-shaped causes the store cannot see ------------------------------
 
 test('an underivable method class under the mediated posture leads with D-7 (the issue wording)', async () => {
