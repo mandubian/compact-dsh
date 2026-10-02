@@ -56,7 +56,7 @@ function makeAgent(id = 'sess-compact-1') {
   return {
     id, session,
     // #25: the transcript-note channel — the recorded answerer queues a
-    // plugin-sourced user message for the agent's next model step
+    // producer-sourced user message for the agent's next model step
     injected: [],
     inject(message) { this.injected.push(message); },
   };
@@ -138,7 +138,7 @@ test('composed: every decided ask leaves a transcript note (#25), every replay a
   await run(tools, agent, 'noted.example');                 // ask → allow → decision note
   assert.equal(agent.injected.length, 1);
   const note = agent.injected[0];
-  assert.equal(note.source?.kind, 'plugin');
+  assert.equal(note.source?.kind, 'compact-approval');
   assert.equal(note.source?.plugin, 'compact-approval');
   // the notice presentation: the web transcript shows the summary on the
   // collapsed context row — "an approval happened" is visible at a glance

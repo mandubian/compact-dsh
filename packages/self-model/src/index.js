@@ -61,7 +61,7 @@ export {
 };
 
 export const name = 'compact-self-model';
-export const SOURCE = { kind: 'plugin', plugin: name };
+export const SOURCE = { kind: name, plugin: name };
 
 export function apply(ctx, config = {}) {
   const staleAfterMs = config.staleAfterMs ?? DEFAULT_STALE_AFTER_MS;

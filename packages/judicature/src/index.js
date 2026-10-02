@@ -78,7 +78,7 @@ export {
 };
 
 export const name = 'compact-judicature';
-export const SOURCE = { kind: 'plugin', plugin: name };
+export const SOURCE = { kind: name, plugin: name };
 export const GATE = 'JG';
 
 /** The refusal seam already on the bus (the collision counter rides it). */
