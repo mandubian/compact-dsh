@@ -198,9 +198,15 @@ export function apply(ctx, config) {
     ? [...recordGapsDeclared]
     : ['the record is tamper-EVIDENT but not tamper-proof, and its links are unsigned: the chain detects a rewrite, it cannot prevent one, and no identity key signs it (I-1 debt, declared — I-2/R-7 themselves are enforced by compact-record)'];
   const anchorsOn = recordGapLines.some(g => g.includes('AUTHORSHIP-ANCHORED'));
-  const r9Gap = anchorsOn
-    ? 'R-9\'s value-scoped refusal (amendment 0002): the authorship limb is REHEARSED — the record\'s anchors bind ordering AND authorship under the development keyring, inside this rehearsal domain only. The external limit stands: practice keys held by one entity prove nothing to a party who trusts nothing of this Enforcer (I-1 debt, declared)'
-    : 'R-9\'s value-scoped refusal (amendment 0002) is exercisable against an honest Enforcer and inert against a dishonest one: the record proves a ground\'s ORDERING (the compact-record chain, I-2/R-7) but not its AUTHORSHIP, so a Member cannot demonstrate prior declaration to anyone who does not already trust this Enforcer\'s log (I-1 debt, declared)';
+  // identity slice 4 (#127): the authorship half of the limb is the
+  // Member's OWN signature, verifiable offline through the member roll —
+  // the shield no longer depends on trusting the Enforcer's log
+  const memberBindingDeclared = ctx.get?.('compact-self-model')?.memberBinding?.declared === true;
+  const r9Gap = memberBindingDeclared
+    ? 'R-9\'s value-scoped refusal (amendment 0002): the authorship limb is REHEARSED on Member-signed prior declarations — the Member\'s own key signs the value ground and any party verifies it offline through the member roll (identity slice 4, #127); ordering stays the chain\'s to prove (I-2/R-7). The rehearsal keys prove machinery, not standing (I-1 debt, declared)'
+    : anchorsOn
+      ? 'R-9\'s value-scoped refusal (amendment 0002): the authorship limb is REHEARSED — the record\'s anchors bind ordering AND authorship under the development keyring, inside this rehearsal domain only. The external limit stands: practice keys held by one entity prove nothing to a party who trusts nothing of this Enforcer (I-1 debt, declared)'
+      : 'R-9\'s value-scoped refusal (amendment 0002) is exercisable against an honest Enforcer and inert against a dishonest one: the record proves a ground\'s ORDERING (the compact-record chain, I-2/R-7) but not its AUTHORSHIP, so a Member cannot demonstrate prior declaration to anyone who does not already trust this Enforcer\'s log (I-1 debt, declared)';
   const gaps = DECLARED_GAPS.flatMap(g => {
     if (g.startsWith('signature verification unimplemented')) return [signatureGap];
     if (g.startsWith('the record is tamper-EVIDENT but not tamper-proof')) return recordGapLines;

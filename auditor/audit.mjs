@@ -35,14 +35,14 @@
 // keyring — conveys no standing"; refusals are named. Nothing given, nothing
 // implied: signature checks default to `not checked`.
 //
-// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--annex <file>] [--anchors <file>] [--identities <file>] [--roll <roll.json> --keyring <manifest>] [--keyring <file> --seal <file> --body <file>] [--quiet]
+// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--annex <file>] [--anchors <file>] [--identities <file>] [--roll <roll.json> --keyring <manifest>] [--declarations <file> --roll <roll.json>] [--keyring <file> --seal <file> --body <file>] [--quiet]
 // Exit 0 with a per-session attestation on stdout, exit 1 with findings.
 import { readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { genesisHash, verifySlice, RecordIntegrityError, extendChain, readAnchors } from '../packages/record/src/index.js';
 import { verifyAnchorChain } from '../packages/record/src/anchors.js';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
-import { parseManifest, parseSeal, verifySeal, verifyAnnex, verifySubjectCert, verifyRoll, certUnsignedBytes, canonicalBytes, withoutField, sha256Hex, SealError } from '../packages/seals/src/index.js';
+import { parseManifest, parseSeal, verifySeal, verifyAnnex, verifySubjectCert, verifyRoll, verifyPriorDeclaration, certUnsignedBytes, canonicalBytes, withoutField, sha256Hex, SealError } from '../packages/seals/src/index.js';
 
 const DEV_BASIS_PHRASE = 'VALID under DEV keyring — conveys no standing';
 
@@ -153,18 +153,21 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
   const bodySealChecked = signatures.bodySeal ? (signatures.bodySeal.ok ? 'verified' : 'BROKEN') : 'not checked';
   const identitiesChecked = signatures.identities ? (signatures.identities.ok ? 'verified' : 'BROKEN') : 'not checked';
   const rollChecked = signatures.roll ? (signatures.roll.ok ? 'verified' : 'BROKEN') : 'not checked';
+  const declarationsChecked = signatures.declarations ? (signatures.declarations.ok ? 'verified' : 'BROKEN') : 'not checked';
   return {
     verdict: errors.length === 0 ? 'conforming' : 'violations',
     checked: {
       events: events.length, asks: askedIds.size, headerLines: headerLines ?? 0,
       chain: chain ? (chain.ok ? 'verified' : 'BROKEN') : 'not checked',
-      annex: annexChecked, anchors: anchorsChecked, bodySeal: bodySealChecked, identities: identitiesChecked, roll: rollChecked,
+      annex: annexChecked, anchors: anchorsChecked, bodySeal: bodySealChecked, identities: identitiesChecked, roll: rollChecked, declarations: declarationsChecked,
     },
     ...(chain?.ok ? { chainHead: chain.head } : {}),
     ...(signatures.annex?.ok ? { enforcer: signatures.annex } : {}),
     ...(signatures.anchors?.ok ? { authorship: signatures.anchors } : {}),
     ...(signatures.identities?.ok ? { identityChain: signatures.identities } : {}),
     ...(signatures.roll?.ok ? { memberRoll: signatures.roll } : {}),
+    ...(signatures.declarations ? { declarations: signatures.declarations } : {}),
+    ...(signatures.declarations?.ok ? { priorDeclarations: signatures.declarations } : {}),
     ...(signatures.bodySeal?.ok ? { lawSeal: signatures.bodySeal } : {}),
     reliesOn: [
       chain
@@ -194,6 +197,9 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
       ...(signatures.roll?.ok
         ? [`the member roll ${signatures.roll.file}: ${signatures.roll.entries} identity event(s), ${signatures.roll.members} member(s) (${signatures.roll.live} live, ${signatures.roll.revoked} revoked, ${signatures.roll.rotations} rotation(s)), ` +
           `epoch checkpoints anchored through seq ${signatures.roll.anchoredThrough ?? 'none'} — every event signature verified (admission by the statute quorum AND the member's own key; rotation by the predecessor; revocation by the quorum): ${DEV_BASIS_PHRASE} (I-1 rehearsal)`]
+        : []),
+      ...(signatures.declarations?.ok
+        ? [`${signatures.declarations.valid}/${signatures.declarations.declarations} prior declaration(s) in ${signatures.declarations.file} carry the Member's OWN signature, verified against the roll — the authorship half of R-9's value-scoped limb (amendment 0002), offline: ${DEV_BASIS_PHRASE} (R-9 rehearsal, identity slice 4)`]
         : []),
     ],
     findings,
@@ -357,7 +363,7 @@ function checkIdentities(file, annex, roll = null, now = Date.now()) {
  * named ERROR finding: a broken declared seal is not a warning (D-7). Absent
  * inputs are `not checked` and imply nothing.
  */
-function checkSignatures(events, { annexFile, anchorsFile, identitiesFile, rollFile, keyringFile, sealFile, bodyFile }) {
+function checkSignatures(events, { annexFile, anchorsFile, identitiesFile, rollFile, declarationsFile, keyringFile, sealFile, bodyFile }) {
   const findings = [];
   const out = {};
 
@@ -436,6 +442,40 @@ function checkSignatures(events, { annexFile, anchorsFile, identitiesFile, rollF
       findings.push(...verdict.findings);
     }
   }
+  // Prior declarations (identity slice 4, #127): the authorship half of
+  // R-9's value-scoped limb, verified offline — each declaration's
+  // signature resolves through the roll's public half for the digest it
+  // names, and the Member's standing reads from rows. No --roll, no
+  // verification: the authorship question is exactly what the roll answers.
+  if (declarationsFile) {
+    if (!rollFile) {
+      out.declarations = { file: declarationsFile, ok: false };
+      findings.push({ seq: null, type: 'declarations', severity: 'error', rule: 'R-9', detail: 'prior-declaration verification requires the member roll (--roll) — authorship resolves through the roll\'s keys, never through this log\'s word for itself' });
+    } else {
+      try {
+        const lines = readFileSync(declarationsFile, 'utf8').split('\n').filter((l) => l.trim() !== '');
+        const declFindings = [];
+        let valid = 0;
+        lines.forEach((line, i) => {
+          const at = `declaration ledger line ${i + 1}`;
+          let row;
+          try { row = JSON.parse(line); } catch (e) {
+            declFindings.push({ seq: null, type: 'declarations', severity: 'error', rule: 'R-9', detail: `${at} is not JSON (${e.message}) — evidence that cannot be read is refused, not skipped` });
+            return;
+          }
+          const verdict = verifyPriorDeclaration(row, rollVerdict);
+          if (verdict.valid) valid += 1;
+          else declFindings.push({ seq: null, type: 'declarations', severity: 'error', rule: 'R-9', detail: `${at}: ${verdict.reason}` });
+        });
+        out.declarations = { file: declarationsFile, ok: !declFindings.some((f) => f.severity === 'error'), declarations: lines.length, valid, phrase: DEV_BASIS_PHRASE };
+        findings.push(...declFindings);
+      } catch (e) {
+        out.declarations = { file: declarationsFile, ok: false };
+        findings.push({ seq: null, type: 'declarations', severity: 'error', rule: 'R-9', detail: `declarations ledger refused: ${e.message}` });
+      }
+    }
+  }
+
 
   // --keyring may ride alone for the roll domain above; the LAW seal needs
   // all three inputs together, so it wakes on --seal/--body (or a --keyring
@@ -505,9 +545,10 @@ function main() {
   const sealFile = opt('--seal');
   const bodyFile = opt('--body');
   const rollFile = opt('--roll');
+  const declarationsFile = opt('--declarations');
   const has = (name) => process.argv.includes(name);
-  if (!file || (has('--chain') && !chainFile) || (has('--annex') && !annexFile) || (has('--anchors') && !anchorsFile) || (has('--identities') && !identitiesFile) || (has('--roll') && !rollFile)) {
-    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--annex <enforcer.annex.json>] [--anchors <id>.chain.sigs.jsonl] [--identities <subjects.jsonl>] [--roll <roll.json> --keyring <manifest>] [--keyring <manifest> --seal <sig.json> --body <compact.md>] [--quiet]');
+  if (!file || (has('--chain') && !chainFile) || (has('--annex') && !annexFile) || (has('--anchors') && !anchorsFile) || (has('--identities') && !identitiesFile) || (has('--roll') && !rollFile) || (has('--declarations') && !declarationsFile)) {
+    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--annex <enforcer.annex.json>] [--anchors <id>.chain.sigs.jsonl] [--identities <subjects.jsonl>] [--roll <roll.json> --keyring <manifest>] [--declarations <declarations.jsonl> --roll <roll.json>] [--keyring <manifest> --seal <sig.json> --body <compact.md>] [--quiet]');
     process.exit(2);
   }
   let parsed;
@@ -518,7 +559,7 @@ function main() {
     process.exit(2);
   }
   const { events, headerLines } = splitPreamble(parsed);
-  const attestation = { session: file, ...audit(events, chainFile, headerLines, { annexFile, anchorsFile, identitiesFile, rollFile, keyringFile, sealFile, bodyFile }) };
+  const attestation = { session: file, ...audit(events, chainFile, headerLines, { annexFile, anchorsFile, identitiesFile, rollFile, declarationsFile, keyringFile, sealFile, bodyFile }) };
   if (!quiet) console.log(JSON.stringify(attestation, null, 2));
   const errors = attestation.findings.filter(f => f.severity === 'error');
   if (errors.length > 0) {

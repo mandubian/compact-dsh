@@ -45,6 +45,7 @@ import {
   canonicalBytes, withoutField, verifyAnnex, signMessage, verifyMessage,
   generateEd25519, sha256Hex, signSubjectCert, verifySubjectCert,
   parseManifest, verifyRoll, resolveMember,
+  signPriorDeclaration, verifyPriorDeclaration,
 } from 'compact-dsh-seals';
 import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 import {
@@ -115,6 +116,7 @@ export function apply(ctx, config = {}) {
       throw new Error(`compact-self-model: the member key at ${memberKeyPath} is not the current key of "${memberId}" per the roll (whose current key digest is ${resolved.lineage.at(-1).slice(0, 12)}…) — rotate through the roll, or point the binding at the right key (J-4: the lineage is data)`);
     }
     memberRollVerdict = verdict;
+    const declarationsPath = config.memberBinding.declarationsPath ?? null;
     memberBinding = {
       memberId,
       class: resolved.class,
@@ -124,6 +126,7 @@ export function apply(ctx, config = {}) {
       revocationRow: resolved.revocationRow ?? null,
       privateKey: memberPrivateKey,
       roll: { path: rollPath, anchoredThrough: verdict.summary.anchoredThrough, entries: verdict.summary.entries },
+      declarationsPath,
     };
   }
   // The last attestation handed to each Subject, so `self_describe` can tell a
@@ -342,6 +345,43 @@ export function apply(ctx, config = {}) {
     }),
   };
 
+  // Prior declarations (identity slice 4, #127): the authorship half of
+  // R-9's value-scoped limb. The Member's OWN key signs the value ground —
+  // verifiable offline by any party through the roll — so a shield no
+  // longer depends on trusting the Enforcer's log. Ordering was always the
+  // chain's to prove (I-2/R-7); authorship is what the signature adds.
+  // Absent a declared binding, declaring refuses: a ground without a
+  // member to attribute it to is the false answer D-3 names.
+  const priorDeclarations = {
+    declare: ({ value, grounds = null, by = null, now = new Date().toISOString() } = {}) => {
+      if (!memberBinding || !memberRollVerdict) {
+        throw new Error('compact-self-model: no member binding is declared — a prior declaration without a member key to sign it proves nothing, and the shield must not pretend otherwise (R-9/D-3)');
+      }
+      const row = signPriorDeclaration({
+        member: memberBinding.memberId,
+        memberKeyDigest: memberBinding.currentKeyDigest,
+        value, grounds,
+        privateKey: memberBinding.privateKey,
+        declaredAt: now,
+        ...(by ? {} : {}),
+      });
+      if (memberBinding.declarationsPath) {
+        try {
+          mkdirSync(dirname(memberBinding.declarationsPath), { recursive: true, mode: 0o700 });
+          appendFileSync(memberBinding.declarationsPath, `${JSON.stringify(row)}\n`, { mode: 0o600 });
+        } catch (error) {
+          ctx.logger?.warn?.(`compact-self-model: could not append the declarations ledger at ${memberBinding.declarationsPath}: ${error.message} — the declaration is returned but not ledgered`);
+        }
+      }
+      return row;
+    },
+    verify: (row) => (memberRollVerdict
+      ? verifyPriorDeclaration(row, memberRollVerdict)
+      : { valid: false, reason: 'no member roll is composed — authorship cannot be resolved, and the answer says so' }),
+    declared: memberBinding != null,
+    path: () => memberBinding?.declarationsPath ?? null,
+  };
+
   // 1. at the boundary of the Subject's own operation
   ctx.on?.('session/event', (session, event) => {
     if (event?.type !== 'turn/start') return;
@@ -475,6 +515,10 @@ export function apply(ctx, config = {}) {
      * the identity function.
      */
     memberBinding: memberBindingSurface,
+    /** Prior declarations (identity slice 4): the authorship half of
+     *  R-9's value-scoped limb — declare() signs with the Member's own key,
+     *  verify() resolves authorship through the roll, offline. */
+    priorDeclarations,
   };
   ctx.provide?.('compact-self-model', service);
   return service;

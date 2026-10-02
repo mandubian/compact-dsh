@@ -25,3 +25,6 @@ export {
   memberKeyDigestOf, rollGenesisHash, rollEntryHash, rollHeadOf,
   signRollEvent, appendRollEvent, closeEpoch, verifyRoll, resolveMember,
 } from './roll.js';
+export {
+  declarationUnsignedBytes, signPriorDeclaration, verifyPriorDeclaration,
+} from './declarations.js';

@@ -456,7 +456,7 @@ change at that swap is a defect in this page.
 | J-5's D-8 appellate panel | externals outright — "heard never, saying so" ends where externals begin |
 | J-4/F-6 Member-not-session binding | recusal and appellate disjointness resolved over Member identity; rotation lineage so re-keying launders nothing |
 | J-8's trajectory exit | a first external-Member adjudicator — presumes a Member identity to sit on, and a term to hold it to |
-| R-9's value-scoped refusal (amendment 0002) | authorship proof — a prior declaration signed under the Member key, verifiable by any party, closing the "inert against a dishonest Enforcer" limit the annex declares |
+| R-9's value-scoped refusal (amendment 0002) | authorship proof — a prior declaration signed under the Member key, verifiable by any party, closing the "inert against a dishonest Enforcer" limit the annex declares. **Built and rehearsed** (identity slice 4, #127): the Member's own key signs the value ground, any party verifies it offline through the roll (`--declarations × --roll`), and the planted-ground drill refuses by name |
 | I-3's attestation signature | a key verifiers can check — the signature exists in rehearsal; the *verifiable-by-others* half is identity |
 | R-11's statutory counting | distinct *Members*, not distinct sessions — one Member's fifty sessions becomes one voice for amendment-invitation counts, while the flood cap (I-5) stays session-scoped: load is load, standing is standing |
 | R-13 inquiry | "who that Member is" answered cryptographically, for accuser and accused alike |
@@ -537,7 +537,23 @@ $ node auditor/audit.mjs <log> --roll .rehearsal/roll.json --keyring .rehearsal/
    harness; an accredited external seated in an adjudicator-set
    declaration; J-1's last rung hears its first rehearsal case.
 4. **Authorship proofs for R-9.** Amendment 0002's value-scoped limb on
-   Member-signed prior declarations — the annex's named debt, closed.
+   Member-signed prior declarations — the annex's named debt, closed in
+   rehearsal. Walked:
+
+```
+$ # the honest ground: the Member's own key signs it, any party verifies offline
+$ node auditor/audit.mjs <log> --declarations declarations.jsonl --roll roll.json --keyring keyring.json
+  "1/1 prior declaration(s) in declarations.jsonl carry the Member's OWN signature,
+  verified against the roll — the authorship half of R-9's value-scoped limb
+  (amendment 0002), offline: VALID under DEV keyring — conveys no standing (R-9
+  rehearsal, identity slice 4)"
+
+$ # the drill: a dishonest Enforcer plants a "prior declaration" in its own log
+  after the directive —
+  "declaration ledger line 2: malformed prior declaration: parsed but missing
+  required fields (…signature) " — authorship is the Member's own act, and a
+  ground that does not carry it refuses instead of being accepted.
+```
 5. **Travel (presentation bundles).** FED-gated: designed above, built only
    with federation, if federation is ever adopted.
 
