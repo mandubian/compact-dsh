@@ -152,7 +152,17 @@ export function rootManifest({ closure, externals, peer, version, description })
     peerDependencies: { '@deepseek-ai/dsh': peer },
     engines: { node: '>=22.19' },
     dsh: {
-      bundle: { patch: ['./patches/blessed.patch.yml', './patches/card.patch.yml'] },
+      bundle: {
+        patch: [
+          './patches/blessed.patch.yml',
+          './patches/card.patch.yml',
+          // the plain-profile posture layer (#141) and the pilot preset it
+          // selects: the refusals and state defaults a profile boot needs
+          // because it has no launcher (see tools/dist.posture.patch.yml)
+          './patches/posture.patch.yml',
+          './patches/compact-pilot.patch.yml',
+        ],
+      },
       client: closure.get('compact-dsh-card').manifest.dsh.client,
     },
   };
@@ -230,6 +240,8 @@ export function packComposition({ outDir = join(ROOT, 'dist'), packagesDir = PAC
   writeFileSync(join(staged, 'patches', 'card.patch.yml'), rewritePatch(join(card.dir, 'cordis.patch.yml'), [
     ['name: compact-dsh-card', `name: ${DIST_NAME}/card`],
   ]));
+  copyFileSync(join(ROOT, 'tools', 'dist.posture.patch.yml'), join(staged, 'patches', 'posture.patch.yml'));
+  copyFileSync(join(blessed.dir, 'presets', 'compact-pilot.patch.yml'), join(staged, 'patches', 'compact-pilot.patch.yml'));
 
   writeFileSync(join(staged, 'package.json'), JSON.stringify(rootManifest({
     closure, externals, peer,
