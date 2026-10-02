@@ -154,7 +154,13 @@ npm run compact -- --web     # chat at 127.0.0.1:3080, loopback-only by design
 live).** The multi-provider adapter mounts dormant until your settings
 document supplies a route. Put this in `~/.compact-dsh/settings.yaml` — the
 key resolves **by name** from your shell (or from
-`~/.compact-dsh/.credentials.yaml`), never stored in the settings file:
+`~/.compact-dsh/.credentials.yaml`), never stored in the settings file
+(the launcher re-reads the document every boot; a document that does not
+parse refuses the boot). Note the browser's **Settings page is absent by
+posture**: the interactive settings stack is dsh 0.2.0 profile machinery the
+pilot does not boot (the settings service requires a profile context), so the
+section is disabled rather than served erroring pages — this document and the
+per-session model picker are the configuration surfaces:
 
 ```yaml
 llm-pi-ai:
