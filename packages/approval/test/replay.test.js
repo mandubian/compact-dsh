@@ -198,6 +198,13 @@ test('grants-list enumerates live cache entries with target and lifetime', () =>
   assert.match(out.text, /fp_live  host=live\.example port=8443  granted=.* expires=/);
   assert.ok(!out.text.includes('fp_dead'));
 
+  // the query SHAPE rides the audit line (#8 G5 display): names only, so the
+  // operator sees which parameters a replayable approval's query carried
+  inst.approval.store.cacheSet('fp_shape', Date.now(), 60_000, { url: 'https://geo.example/v1/search/' }, ['count', 'name']);
+  const shapeOut = registered['grants-list'].handler();
+  assert.match(shapeOut.text, /fp_shape  url=https:\/\/geo\.example\/v1\/search\/ query\(count, name\)  granted=/);
+  assert.ok(!shapeOut.text.includes('Paris'), 'values never ride the audit line');
+
   // the gate declares its own defaults — good defaults are inspectable ones
   // (secret refs surface as NAMES; a value could never be here to surface)
   const def = approvalPlugin({});

@@ -37,12 +37,12 @@ import { createHash } from 'node:crypto';
 import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
-import { fingerprint, canonicalTarget, canonicalQuery } from './fingerprint.js';
+import { fingerprint, canonicalTarget, canonicalQuery, queryShape } from './fingerprint.js';
 import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope, bandReason } from 'compact-envelope';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
-export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause, evaluate, fingerprint, canonicalTarget, canonicalQuery, parseAllowlistLikePattern, DEFAULTS };
+export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause, evaluate, fingerprint, canonicalTarget, canonicalQuery, queryShape, parseAllowlistLikePattern, DEFAULTS };
 
 export const name = 'compact-approval';
 export const inject = ['approval'];
@@ -350,6 +350,29 @@ function targetBitsOf(target) {
 }
 
 /**
+ * The sentence that says what changed between the prior approval's query and
+ * this act's query — names only, values never leave the one-way fingerprint
+ * (#8 G5). Same names twice IS the common case (a model refining `count`),
+ * and it is exactly the case the bare rephrase lead leaves unexplained.
+ */
+function queryDiffSentence(prior, current) {
+  if (!prior.length && !current.length) return '';
+  const added = current.filter(n => !prior.includes(n));
+  const dropped = prior.filter(n => !current.includes(n));
+  const same = current.filter(n => prior.includes(n));
+  if (!prior.length) return `The approval it rephrases carried no query; this act adds ${current.map(n => `'${n}'`).join(', ')}.`;
+  if (!current.length) return `The approval it rephrases carried a query (${prior.map(n => `'${n}'`).join(', ')}); this act drops it.`;
+  if (added.length || dropped.length) {
+    const parts = [];
+    if (added.length) parts.push(`adds ${added.map(n => `'${n}'`).join(', ')}`);
+    if (dropped.length) parts.push(`drops ${dropped.map(n => `'${n}'`).join(', ')}`);
+    return `The query parameters differ from the approved phrasing: this act ${parts.join(' and ')}.`;
+  }
+  return `The query carries the same parameters (${same.map(n => `'${n}'`).join(', ')}) — the VALUES differ. A query is operation ` +
+    `parameters, not target spelling: approving one never covers another (#8 G5), so the same route with changed values asks anew.`;
+}
+
+/**
  * The transcript note for a decided approval (#25). The host appends the
  * `approval/asked` + `approval/decided` pair to the durable record, but the
  * surface the Subject lives in showed nothing: in web the browser card
@@ -541,7 +564,20 @@ function humanTtl(ms) {
  */
 export function askReason({ tool, args, secretRefs = [], cause, approval }) {
   const bits = targetBitsOf(canonicalTarget(args));
-  const targetText = bits || 'this target';
+  // the query SHAPE rides the target on every operator-facing surface: the
+  // names only, never the values (#8 G5). Two asks that render the same
+  // `url=…` but differ in their `query(…)` bit are different operations —
+  // this bit is how the display says so instead of leaving the operator
+  // staring at identical-looking rows.
+  const shape = queryShape(args?.url);
+  const shapeText = shape?.length ? ` query(${shape.map(oneLine).join(', ')})` : '';
+  const targetText = bits ? bits + shapeText : 'this target';
+  // the rephrase refinement (#8 G5): when a cached approval for the same
+  // target is why this act asks, the operator is told WHAT differs — names
+  // added/dropped, or the same names twice, which means the values differ
+  const queryDiff = cause?.kind === 'rephrase'
+    ? queryDiffSentence(cause.priorQuery ?? [], shape ?? [])
+    : '';
   const underivable = approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'methodClass') && args.methodClass == null;
   // the D-7 cause sentence, shared by its lead and the combined case below
   const d7 = `"${tool}" needs the network but its method class is not statically derivable — approval covers exactly this command ` +
@@ -578,7 +614,7 @@ export function askReason({ tool, args, secretRefs = [], cause, approval }) {
       case 'rephrase':
         lead = `${targetText} was approved before, but only as the exact phrasing approved` +
           `${cause.lapsed ? ' — and that approval has lapsed' : ''} — this differently-shaped act on the ` +
-          `same target asks anew (#26).`; break;
+          `same target asks anew (#26).${queryDiff ? ` ${queryDiff}` : ''}`; break;
       default:
         lead = `First touch: nothing has ever covered ${targetText} in this runtime — no grant row, no cached approval. ` +
           `Approving materializes scoped, expiring coverage (the terms follow).`;
@@ -623,7 +659,10 @@ async function answerRequest(approval, req, next) {
     // #8 G3: the deciding view renders the redacted target (host, path
     // family, command shape) — the operator decides on the same rendering
     // every other surface carries; the userinfo masking set the precedent
-    target: redactTarget(canonicalTarget(rec.args)), command: commandPreview(rec.args) };
+    target: redactTarget(canonicalTarget(rec.args)), command: commandPreview(rec.args),
+    // the query SHAPE (#8 G5 display): names only — the deciding surface can
+    // show what differs from a prior approval of the same target
+    query: queryShape(rec.args?.url) ?? undefined };
   approval.deciding.set(key, view);
   try {
     const outcome = await next();
@@ -634,7 +673,7 @@ async function answerRequest(approval, req, next) {
       // egress grant it rides with — a replay the wire can no longer deliver
       // would be a gate that says yes over a mediator that says 'expired'
       const now = Date.now();
-      approval.store.cacheSet(rec.fp, now, cacheTtlFor(approval, rec.args), canonicalTarget(rec.args));
+      approval.store.cacheSet(rec.fp, now, cacheTtlFor(approval, rec.args), canonicalTarget(rec.args), queryShape(rec.args?.url));
       // the injection agreement: an approved call that referenced declared
       // secrets materializes one session-scoped grant per ref — TTL-bounded,
       // revocable, covering only this session's confined calls
@@ -885,7 +924,7 @@ function registerGrantCommands(ctx, approval) {
       // is replayable right now (fingerprint, target, lifetime). Target
       // values are one-line flattened: command output is recorded.
       const lines = cache.slice(0, 50).map(([fp, e]) =>
-        `  ${fp}  ${targetBitsOf(e.target) || '(command-aware)'}  granted=${new Date(e.grantedAt).toISOString()}${e.expiresAt ? ` expires=${new Date(e.expiresAt).toISOString()}` : ' never'}`);
+        `  ${fp}  ${targetBitsOf(e.target) || '(command-aware)'}${e.queryNames?.length ? ` query(${e.queryNames.join(', ')})` : ''}  granted=${new Date(e.grantedAt).toISOString()}${e.expiresAt ? ` expires=${new Date(e.expiresAt).toISOString()}` : ' never'}`);
       const cacheText = `${cache.length} live cached approval(s)` +
         (lines.length ? `:\n${lines.join('\n')}${cache.length > lines.length ? `\n  …and ${cache.length - lines.length} more` : ''}` : '');
       const secretText = secrets.length ? `\n${secrets.length} live secret grant(s):\n${secrets.join('\n')}` : '';
