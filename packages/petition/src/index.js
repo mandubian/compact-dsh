@@ -49,7 +49,7 @@ export {
 };
 
 export const name = 'compact-petition';
-export const SOURCE = { kind: 'plugin', plugin: name };
+export const SOURCE = { kind: name, plugin: name };
 
 /** The declared gaps this layer carries into the boot record (I-8). */
 export const DECLARED_GAPS = [

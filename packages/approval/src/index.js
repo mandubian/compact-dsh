@@ -281,7 +281,7 @@ export function createApproval(opts = {}) {
             tool, fingerprint: fp, target: entry.target ?? {},
             grantedAt: entry.grantedAt, expiresAt: entry.expiresAt,
           }) }],
-          source: { kind: 'plugin', plugin: 'compact-approval', form: 'notice',
+          source: { kind: 'compact-approval', plugin: 'compact-approval', form: 'notice',
             summary: `Replay: "${oneLine(tool) || 'unknown-tool'}" running under a prior operator approval` },
         }));
         approval.replayNotes.set(key, now);
@@ -684,7 +684,7 @@ async function answerRequest(approval, req, next) {
             ? ` The approved injection grant${rec.secretRefs.length > 1 ? 's are' : ' is'} live for this session ` +
               `(${rec.secretRefs.map(r => '$' + r).join(', ')}), TTL-bounded.`
             : '') }],
-          source: { kind: 'plugin', plugin: 'compact-approval', form: 'notice',
+          source: { kind: 'compact-approval', plugin: 'compact-approval', form: 'notice',
             summary: approvalNoticeSummary(view, outcome) },
         }));
       } catch { /* the note is a trace, never a gate */ }

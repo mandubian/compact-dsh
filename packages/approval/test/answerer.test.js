@@ -2,6 +2,7 @@
 // that kills covered cache entries (port plan Phase 1 items 4 & 6).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { assertV4RowAdmission } from '@deepseek-ai/dsh-session-format-v3-to-v4';
 import { createApproval, approvalPlugin, canonicalTarget } from '../src/index.js';
 
 const NOW = 1_700_000_000_000;
@@ -249,7 +250,12 @@ test('a decided ask injects a plugin-sourced note through the agent', async () =
   );
   assert.equal(outcome, 'allowed-once');
   assert.equal(injected.length, 1, 'one note per decision');
-  assert.equal(injected[0].source?.kind, 'plugin');
+  // v4 session format: the retired `kind: 'plugin'` wrapper is refused on
+  // append — the kind names the producer, and the row must be admissible
+  assert.equal(injected[0].source?.kind, 'compact-approval');
+  assertV4RowAdmission({ type: 'user/message', data: injected[0] });
+  assert.throws(() => assertV4RowAdmission({ type: 'user/message', data: { ...injected[0], source: { kind: 'plugin', plugin: 'compact-approval' } } }),
+    /producer-owned source kind/, 'the retired wrapper must stay refused — this is the regression this test pins');
   assert.equal(injected[0].source?.plugin, 'compact-approval');
   assert.equal(injected[0].source?.form, 'notice');
   assert.equal(injected[0].source?.summary, 'Approval: "bash" allowed once by the operator');

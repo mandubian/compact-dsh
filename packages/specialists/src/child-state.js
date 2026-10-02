@@ -155,7 +155,7 @@ export function bindChildState(ctx, { registry = new ChildStateRegistry(), now =
         // form:'notice' + summary: the delegation transition is visible on
         // the web transcript's collapsed context row — MA-3's honesty about
         // children reaches the page, not only the parent's context
-        source: { kind: 'plugin', plugin: CHILD_STATE_PLUGIN, form: 'notice',
+        source: { kind: CHILD_STATE_PLUGIN, plugin: CHILD_STATE_PLUGIN, form: 'notice',
           summary: record.state === 'settled'
             ? `Delegation settled — ${record.stopReason ?? 'no stop reason recorded'}`
             : 'Delegation started' },
