@@ -15,7 +15,7 @@
 // a third posture: an Enforcer that holds a capability it has not bound has
 // defrauded the law whether or not it reached for it.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 /**
  * Detection is deliberately narrow. Over-declaring a trigger is its own D-8

@@ -5,7 +5,7 @@
   "description": "The Compact on dsh — the constitution meta-layer (port plan Phase 4): boot verification against the bundled body's pinned digest, the rule registry materialized from the enforcement register, composition coupling (missing enforcement refuses to start, F-5), and the boot attestation.",
   "main": "src/index.js",
   "peerDependencies": {
-    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+    "@deepseek-ai/dsh": "~0.2.0-rc.2"
   },
   "dependencies": {
     "compact-dsh-seals": "0.1.0",

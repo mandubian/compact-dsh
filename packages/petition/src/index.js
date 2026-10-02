@@ -30,7 +30,7 @@
 // does not exist in this composition, so I-6's last sentence ("contested
 // application of the law is heard under Part V") is unbuilt and declared.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';

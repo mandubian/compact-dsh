@@ -385,7 +385,7 @@ claims **no Compact standing** (F-5 honesty).
 
 ## dsh version policy — following the release rhythm
 
-All packages pin `@deepseek-ai/dsh` to `~0.1.5-rc.1` (npm `latest` at
+All packages pin `@deepseek-ai/dsh` to `~0.2.0-rc.2` (npm `latest` at
 adoption; the audited line). `tools/verify-pin.mjs` refuses any other range;
 an upgrade is a reviewed, re-blessed event — never silent drift. The pin is
 not a wish to stand still, though: upstream is pre-1.0, breaks

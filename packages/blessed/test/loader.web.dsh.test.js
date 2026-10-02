@@ -17,11 +17,12 @@ import { provideCmdline } from '@deepseek-ai/dsh-cmdline';
 import { extendChain, genesisHash, verifySlice } from 'compact-dsh-record';
 import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 import { defineTool } from '@deepseek-ai/dsh-tools';
-import { PRESET_ID, ensureInstallAnchor, presetCompositionPath, webRows } from '../src/web.js';
+import { PRESET_ID, ensureInstallAnchor, presetDeclarationPath, webRows } from '../src/web.js';
 
 const rootUrl = new URL('../../../package.json', import.meta.url).href;
 const baseFile = fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve('@deepseek-ai/dsh-base/package.json')));
 const webFile = fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve('@deepseek-ai/dsh-web-app/package.json')));
+const webPkgFile = fileURLToPath(new URL('./package.json', import.meta.resolve('@deepseek-ai/dsh-web-app/package.json')));
 const overlayFile = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url));
 
 function fixture(t) {
@@ -72,7 +73,10 @@ function fixture(t) {
   // the launcher's exact web stack, exercised through the same rows it mounts
   const patches = [
     ...loadOverlayPatches('compact-test', baseFile),
-    ...loadOverlayPatches('compact-test', webFile),
+    // the web bundle ships its presets as separate layers (dsh.bundle.patch);
+    // a real profile boot applies every layer in order, so this stack does too
+    ...JSON.parse(readFileSync(webPkgFile, 'utf8')).dsh.bundle.patch
+      .flatMap(rel => loadOverlayPatches('compact-test', join(dirname(webFile), rel))),
     ...loadOverlayPatches('compact-test', overlayFile),
     { id: 'tools', config: { mode: 'native' } },
     ...webRows(),
@@ -104,8 +108,8 @@ test('loader web: the browser surface boots governed — runner absent, loop gat
   const rows = composeEntries([f.patches], message => warnings.push(message));
   assert.deepEqual(warnings, []);
   assert.equal(rows.find(row => row.id === 'cordis-host-runner')?.disabled, true);
-  assert.equal(rows.find(row => row.id === 'code-runtime')?.disabled, true);
-  assert.equal(rows.find(row => row.id === 'agent-presets')?.config?.default, PRESET_ID);
+  assert.equal(rows.find(row => row.id === 'ptc-runtime')?.disabled, true);
+  assert.equal(rows.find(row => row.id === 'agent-preset-registry')?.config?.default, PRESET_ID);
   assert.equal(rows.some(row => row.id === 'headless-runner'), false);
   assert.equal(rows.some(row => row.id === 'tool-cordis'), false);
   const ctx = await launch(f);
@@ -133,7 +137,8 @@ test('loader web: the browser surface boots governed — runner absent, loop gat
   assert.deepEqual(listed.map(preset => preset.id), [PRESET_ID], 'the roster carries exactly the pilot preset');
   const mine = listed[0];
   assert.equal(mine.broken, undefined, `${PRESET_ID} composition healthy: ${mine?.broken}`);
-  assert.equal(mine.path, presetCompositionPath());
+  assert.equal(mine.name, 'Compact pilot');
+  assert.equal(presetDeclarationPath().endsWith('compact-pilot.patch.yml'), true, 'the declaration is the checkout file');
 
   // the loop binds to readiness exactly as headless does
   const entries = [...ctx.loader.entries()];
@@ -187,7 +192,7 @@ test('loader web: the browser surface boots governed — runner absent, loop gat
   assert.deepEqual(await record.verify(session.id), { ok: true, events: events.length });
   assert.ok(verifySlice({ sessionId: session.id, firstSeq: 0, events, links: record.store.load(session.id).links }));
   assert.equal(record.head(session.id), extendChain(genesisHash(session.id), 0, events).at(-1).h);
-  assert.match(readFileSync(join(f.env.COMPACT_RECORD_ROOT, '_no-cwd', session.id, 'session.v3.jsonl'), 'utf8'), /turn\/end/);
+  assert.match(readFileSync(join(f.env.COMPACT_RECORD_ROOT, '_no-cwd', session.id, 'session.v4.jsonl'), 'utf8'), /turn\/end/);
   assert.equal(readFileSync(join(f.env.COMPACT_CHAIN_DIR, `${session.id}.chain`), 'utf8').trim().split('\n').length, events.length);
 });
 

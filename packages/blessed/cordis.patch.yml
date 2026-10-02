@@ -34,7 +34,7 @@
 - id: tool-subagent-list-agents
   disabled: true
 
-- id: workflow-worker-thread
+- id: workflow-ptc
   disabled: true
 
 - id: tool-workflow

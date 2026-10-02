@@ -31,7 +31,7 @@
 // Content-blind: the evaluator sees targets, never messages (R-9).
 // Denials and asks are Compact envelopes (R-3/I-4).
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { createHash } from 'node:crypto';
 import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause } from './grants.js';

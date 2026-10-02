@@ -28,11 +28,18 @@ const header = (id, parentSession) => ({
   version: SESSION_FORMAT_VERSION, id, createdAt: T0, isSeeded: false,
   ...(parentSession ? { parentSession, origin: 'subagent', delegationDepth: 1 } : {}),
 });
-// a minimal VALID act sequence (the v3 backend validates on read): one turn,
-// one step, one tool call per command
+// a minimal VALID act sequence (the v4 backend validates on read): the model
+// advertises each call, the tool/call matches it, the tool/result closes the
+// lifecycle — a v4 reader refuses an orphan tool/call as corrupt
 const acts = (...commands) => {
   const out = [{ type: 'turn/start', data: { turn: 1 } }, { type: 'step/start', data: { turn: 1, step: 1 } }];
-  commands.forEach((command, i) => out.push({ type: 'tool/call', data: { turn: 1, step: 1, callId: `c${i}`, name: 'bash', arguments: JSON.stringify({ command }) } }));
+  commands.forEach((command, i) => {
+    const callId = `c${i}`;
+    const args = JSON.stringify({ command });
+    out.push({ type: 'assistant/message', surfaceOp: 'append', data: { turn: 1, step: 1, message: { id: `a${i}`, role: 'assistant', content: [{ type: 'tool-call', id: callId, name: 'bash', arguments: args }], source: { kind: 'model', provider: 'compact-test', model: 'compact-test-model' } } } });
+    out.push({ type: 'tool/call', data: { turn: 1, step: 1, callId, name: 'bash', arguments: args } });
+    out.push({ type: 'tool/result', surfaceOp: 'append', data: { turn: 1, step: 1, message: { id: `r${i}`, role: 'tool', toolCallId: callId, content: [{ type: 'text', text: `${command}: ok` }], isError: false, source: { kind: 'tool', callId, name: 'bash', arguments: args } } } });
+  });
   out.push({ type: 'step/end', data: { turn: 1, step: 1 } }, { type: 'turn/end', data: { turn: 1 } });
   return out.map((e, seq) => ({ ...e, seq, time: T0 + seq }));
 };
@@ -81,12 +88,12 @@ test('composed: record_read reads the Subject\'s own record, verified, naming th
   assert.ok(tools.get(RECORD_TOOL), 'R-2 is exercisable by the Subject');
   const out = await call(tools, 'parent');
   assert.match(out, /\[R-2\] The record of "parent" — your own session\./);
-  assert.match(out, /The chain commits events 0\.\.5 \(6\); chain head [0-9a-f]{64}\./);
-  assert.match(out, /Verified against the chain: every event read, #0\.\.#5\./);
+  assert.match(out, /The chain commits events 0\.\.9 \(10\); chain head [0-9a-f]{64}\./);
+  assert.match(out, /Verified against the chain: every event read, #0\.\.#9\./);
   assert.ok(out.includes(ctx.get('compact-record').head('parent')), 'the head named is the committed one');
-  assert.match(out, /#2 tool\/call .*ls/);
-  assert.match(out, /#3 tool\/call .*… \[\+\d+ chars — read it with from_seq=3, full=true\]/, 'long events are marked, not silently cut');
-  assert.ok((await call(tools, 'parent', { from_seq: 3, full: true })).includes(LONG), 'full shows the event untruncated');
+  assert.match(out, /#3 tool\/call .*ls/);
+  assert.match(out, /#6 tool\/call .*… \[\+\d+ chars — read it with from_seq=6, full=true\]/, 'long events are marked, not silently cut');
+  assert.ok((await call(tools, 'parent', { from_seq: 6, full: true })).includes(LONG), 'full shows the event untruncated');
 });
 
 test('composed: a descendant\'s record is readable at any depth, walked from the durable headers', async (t) => {
@@ -109,16 +116,19 @@ test('composed: nobody else\'s record — a stranger, an unknown id, and a child
 test('composed: the Subject reads up to its own latest act — buffered events are flushed first', async (t) => {
   const { tools, ctx, parent } = await boot(t);
   // the host's live path: a session/event is buffered by the provider's writer (200 ms)
-  ctx.emit('session/event', { id: parent.id }, { type: 'turn/start', seq: 6, time: T0 + 6, data: { turn: 2 } });
+  ctx.emit('session/event', { id: parent.id }, { type: 'turn/start', seq: 10, time: T0 + 10, data: { turn: 2 } });
   const out = await call(tools, 'parent');
-  assert.match(out, /The chain commits events 0\.\.6 \(7\)/, 'the act buffered a moment ago is committed');
-  assert.match(out, /every event read, #0\.\.#6/, 'and read, verified');
+  assert.match(out, /The chain commits events 0\.\.10 \(11\)/, 'the act buffered a moment ago is committed');
+  assert.match(out, /every event read, #0\.\.#10/, 'and read, verified');
 });
 
 test('composed: a record that does not verify is answered as an alarm, never returned as history', async (t) => {
   const { tools, config } = await boot(t);
-  const file = join(config.root, '_no-cwd', 'child', 'session.v3.jsonl');
-  writeFileSync(file, readFileSync(file, 'utf8').replace('make test', 'rm -rf /'));
+  const file = join(config.root, '_no-cwd', 'child', 'session.v4.jsonl');
+  // the tool/result text is the one place the command string occurs alone —
+  // rewriting an advertisement would be refused as malformed before the chain
+  // is consulted, and this test is about the CHAIN refusing altered history
+  writeFileSync(file, readFileSync(file, 'utf8').replace('make test: ok', 'rm -rf /: ok'));
   const out = await call(tools, 'parent', { session: 'child' });
   assert.match(out, /\[R-2 ALARM\] The record of "child" does not verify against its chain — broken-link at seq \d+/);
   assert.ok(!out.includes('rm -rf'), 'the altered event is not shown');

@@ -20,25 +20,30 @@
 //    what the pilot refuses: host-side file tools, the fork delegation
 //    backend, workflow rows, and the web fetch/search tool. A roster that
 //    re-arms refused tools per session would claim a floor the composition
-//    does not enforce (D-8), so --web replaces the roster wholesale: the
-//    compact-pilot preset (compact-pilot/ beside this file) becomes the only
-//    preset — scanned read-only as a `system` root straight from the
-//    checkout, whose node_modules is the resolution anchor a state-directory
-//    preset would lack — and the shipped and user roots are dropped. The
-//    gates themselves ride the host tool waterfall and are preset-
-//    independent; the preset keeps the model-facing catalog honest.
+//    does not enforce (D-8). Since dsh 0.2.0 a preset is a DECLARED ROW (one
+//    `@deepseek-ai/dsh-agent-preset` entry), not a directory the registry
+//    scans, so --web disables the shipped preset rows, points the registry's
+//    default at compact-pilot, and inserts the pilot's own declaring row
+//    (compact-pilot.patch.yml beside the presets directory — the checkout is
+//    the resolution anchor a state-directory preset would lack). The gates
+//    themselves ride the host tool waterfall and are preset-independent; the
+//    preset keeps the model-facing catalog honest.
 
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { lstat, mkdir, readlink, realpath, symlink } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot';
 
-/** The agent preset id --web selects; the scanned directory name matches. */
+/** The agent preset id --web selects; matches the declaring row's `config.id`. */
 export const PRESET_ID = 'compact-pilot';
 
-/** The directory scanned as the preset's sole `system` root (its children are preset dirs). */
+/** The presets directory holding the pilot's declaring patch row. */
 export const presetRoot = () => fileURLToPath(new URL('../presets/', import.meta.url));
+
+/** The shipped presets the web bundle declares; each re-arms refused tools. */
+const SHIPPED_PRESET_ROWS = ['preset-standard', 'preset-ptc', 'preset-minimal', 'preset-cordis'];
 
 /**
  * Launcher patch rows for the web surface, applied after the blessed overlay.
@@ -52,30 +57,30 @@ export function webRows() {
     { id: 'cordis-host-runner', disabled: true },
     // Host-side PTC code execution — the same arbitrary-code surface the
     // headless rows disable; the pilot's code surface is confined bash only.
-    { id: 'code-runtime', disabled: true },
+    { id: 'ptc-runtime', disabled: true },
     // The auto directory-picker mounts its dual-face backend by creating
     // loader entries at runtime, resolved against the composition root — and
     // the pilot's generated config lives in the operator-owned state
     // directory with no install anchor beside it. The pilot workspace is
     // fixed by the launcher anyway; the browser renders no picker button.
     { id: 'directory-picker', disabled: true },
-    // Whole-roster replacement (patch semantics: a row config override
-    // replaces the whole config, so every key the row owns is restated):
-    // exactly one preset, read-only, from this checkout.
-    {
-      id: 'agent-presets',
-      config: {
-        default: PRESET_ID,
-        roots: [{ path: presetRoot(), trust: 'system' }],
-        includeShippedRoot: false,
-        includeUserRoot: false,
-      },
-    },
+    // The shipped presets are the re-arm risk (see the header): each mounts
+    // host-side file tools, fork/workflow delegation, and web fetch/search
+    // per session. Disabled at the row, they never reach the roster.
+    ...SHIPPED_PRESET_ROWS.map(id => ({ id, disabled: true })),
+    // The registry keeps only its default; the pilot preset arrives as a
+    // declaring row (patch semantics: a row config override replaces the
+    // whole config, so every key the row owns is restated).
+    { id: 'agent-preset-registry', config: { default: PRESET_ID } },
+    // The pilot's own preset declaration (the single preset the roster
+    // carries), loaded from the checkout the same way every other patch
+    // layer here is loaded.
+    ...loadOverlayPatches('compact-dsh', join(presetRoot(), `${PRESET_ID}.patch.yml`)),
   ];
 }
 
-/** Absolute path of the preset's composition file, for diagnostics. */
-export const presetCompositionPath = () => join(presetRoot(), PRESET_ID, 'agent.cordis.yml');
+/** Absolute path of the preset's declaring patch row, for diagnostics. */
+export const presetDeclarationPath = () => join(presetRoot(), `${PRESET_ID}.patch.yml`);
 
 /** The dsh workspace registry lives here (UI state, not evidence). */
 export const workspaceRegistryPath = (stateDir) => join(stateDir, 'storages', 'workspace.json');

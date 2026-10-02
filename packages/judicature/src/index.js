@@ -32,7 +32,7 @@
 //      can be verified, no parties derived)
 //   5. malformed filing / broken slice / over cap → the named JG refusal
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';

@@ -32,7 +32,7 @@
 // wider scope could lawfully enable, and a knob with no lawful use is surface
 // waiting to be misused.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { buildEnvelope,bandReason } from 'compact-envelope';
 

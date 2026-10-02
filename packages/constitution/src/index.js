@@ -20,7 +20,7 @@
 // declared gaps (draft-not-ratified, the rehearsal signature basis, unsigned
 // chain links) are degradation honesty (I-8): loud, never silent.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

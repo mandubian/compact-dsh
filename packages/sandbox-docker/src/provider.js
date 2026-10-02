@@ -27,7 +27,7 @@
 // so a Phase 1 network grant is necessary but never sufficient on this
 // backend; `config.network: 'host'` is the composition-level escape hatch.
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { spawnSync } from 'node:child_process';
 import SandboxProvider, { SANDBOX_UNAVAILABLE, SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox';

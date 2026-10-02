@@ -5,14 +5,14 @@
   "description": "The Compact on dsh — Specialist bundles: the autonoetic specialist roster as dsh subagent personas with per-persona tool surfaces (deny filters), bounded delegation, the Enforcer-sourced child-state projection (MA-3), and consent-scoped address (MA-4).",
   "main": "src/index.js",
   "peerDependencies": {
-    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+    "@deepseek-ai/dsh": "~0.2.0-rc.2"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-tool-subagent": "^0.1.5-rc.1",
+    "@deepseek-ai/dsh-tool-subagent": "^0.2.0-rc.2",
     "compact-envelope": "0.1.0"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-subagent": "~0.1.5-rc.1"
+    "@deepseek-ai/dsh-subagent": "~0.2.0-rc.2"
   },
   "scripts": {
     "test": "node --test \"test/*.test.js\""

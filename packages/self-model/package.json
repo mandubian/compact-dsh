@@ -5,7 +5,7 @@
   "description": "The Compact on dsh — the Subject's own knowledge: the per-turn attestation composed from the Enforcer's services (R-1) and the inquiry answer assembled from recorded state (R-13).",
   "main": "src/index.js",
   "peerDependencies": {
-    "@deepseek-ai/dsh": "~0.1.5-rc.1"
+    "@deepseek-ai/dsh": "~0.2.0-rc.2"
   },
   "scripts": {
     "test": "node --test \"test/*.test.js\""

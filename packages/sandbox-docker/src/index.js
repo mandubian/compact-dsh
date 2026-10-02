@@ -19,7 +19,7 @@
 // declares the services it needs — 'tools' (tool registration), 'approval'
 // (the human gate), and 'compact-approval' (this runtime's grant store).
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { DockerSandboxProvider } from './provider.js';
 import { mountRequestTool } from './mount-tool.js';

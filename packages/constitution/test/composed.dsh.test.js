@@ -82,6 +82,9 @@ class SubagentsStub extends Service {
   }
   getProvider(name) { return this.providers.get(name); }
   list() { return [...this.providers.keys()]; }
+  // the 0.2.0 delegation-tool contract resolves the depth budget against the
+  // provider at mount; the stub owns no setting, so it mirrors the pure part
+  resolveMaxDepth(configured) { return configured === 'provider-managed' ? undefined : configured; }
 }
 
 function mountSpecialists(ctx) {

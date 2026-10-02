@@ -44,7 +44,7 @@
 // the composition declares nothing (D-7 — an unknown posture is not a
 // posture to guess).
 //
-// Pinned: @deepseek-ai/dsh ~0.1.5-rc.1 (see tools/verify-pin.mjs).
+// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 /** How long an attestation may be relied on before it is an alarm. */
 import { redactEmbeddedSecrets } from 'compact-dsh-approval';

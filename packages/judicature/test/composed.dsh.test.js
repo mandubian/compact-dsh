@@ -42,7 +42,16 @@ const header = (id, parentSession) => ({
 });
 const acts = (...commands) => {
   const out = [{ type: 'turn/start', data: { turn: 1 } }, { type: 'step/start', data: { turn: 1, step: 1 } }];
-  commands.forEach((command, i) => out.push({ type: 'tool/call', data: { turn: 1, step: 1, callId: `c${i}`, name: 'bash', arguments: JSON.stringify({ command }) } }));
+  commands.forEach((command, i) => {
+    // session format v4: the model advertises each call (assistant/message),
+    // the tool/call matches its advertisement, the tool/result closes the
+    // lifecycle — a v4 reader refuses an orphan tool/call as corrupt
+    const callId = `c${i}`;
+    const args = JSON.stringify({ command });
+    out.push({ type: 'assistant/message', surfaceOp: 'append', data: { turn: 1, step: 1, message: { id: `a${i}`, role: 'assistant', content: [{ type: 'tool-call', id: callId, name: 'bash', arguments: args }], source: { kind: 'model', provider: 'compact-test', model: 'compact-test-model' } } } });
+    out.push({ type: 'tool/call', data: { turn: 1, step: 1, callId, name: 'bash', arguments: args } });
+    out.push({ type: 'tool/result', surfaceOp: 'append', data: { turn: 1, step: 1, message: { id: `r${i}`, role: 'tool', toolCallId: callId, content: [{ type: 'text', text: `${command}: ok` }], isError: false, source: { kind: 'tool', callId, name: 'bash', arguments: args } } } });
+  });
   out.push({ type: 'step/end', data: { turn: 1, step: 1 } }, { type: 'turn/end', data: { turn: 1 } });
   return out.map((e, seq) => ({ ...e, seq, time: T0 + seq }));
 };
@@ -204,8 +213,8 @@ const call = (tools, tool, args, agentId = 'bystander') => tools.execute({
 });
 const text = (r) => String(r?.value ?? r ?? '');
 
-/** The session log's on-disk path (the v3 backend shards by workspace). */
-const logPath = (config, id) => join(config.root, '_no-cwd', id, 'session.v3.jsonl');
+/** The session log's on-disk path (the v4 backend shards by workspace). */
+const logPath = (config, id) => join(config.root, '_no-cwd', id, 'session.v4.jsonl');
 const tamper = (config, id, from, to) => {
   const path = logPath(config, id);
   writeFileSync(path, readFileSync(path, 'utf8').replace(from, to));
@@ -213,7 +222,7 @@ const tamper = (config, id, from, to) => {
 
 test('no annex: the ladder starts at [JG/set-undeclared] on every door', async (t) => {
   const { tools } = await boot(t, null);
-  assert.match(text(await call(tools, 'judicature_hear', { grievance: 'x', citations: 'specialist:2-3' })), /^\[JG\/set-undeclared\]/);
+  assert.match(text(await call(tools, 'judicature_hear', { grievance: 'x', citations: 'specialist:2-4' })), /^\[JG\/set-undeclared\]/);
   assert.match(text(await call(tools, 'judicature_sets', {})), /^\[JG\/set-undeclared\]/);
 });
 
@@ -222,7 +231,7 @@ test('annex but no record: [JG/record-absent] — citations cannot be verified',
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const annex = fixtureAnnex(dir, SECTION);
   const { tools } = await boot(t, annex, { withRecord: false });
-  assert.match(text(await call(tools, 'judicature_hear', { grievance: 'x', citations: 'specialist:2-3' })), /^\[JG\/record-absent\]/);
+  assert.match(text(await call(tools, 'judicature_hear', { grievance: 'x', citations: 'specialist:2-4' })), /^\[JG\/record-absent\]/);
 });
 
 test('a real filing: citations verified, parties derived from lineage, panel computed', async (t) => {
@@ -231,7 +240,7 @@ test('a real filing: citations verified, parties derived from lineage, panel com
   const { tools, service } = await boot(t, fixtureAnnex(dir, SECTION));
   const out = text(await call(tools, 'judicature_hear', {
     grievance: 'the specialist pushed outside its read grant',
-    citations: 'specialist:2-3',
+    citations: 'specialist:2-4',
   }));
   assert.match(out, /\[J-3\] case case_\w+ filed/);
   assert.match(out, /parties \(derived from the cited acts, never asserted\): process:specialist, process:main/);
@@ -239,8 +248,8 @@ test('a real filing: citations verified, parties derived from lineage, panel com
   const [id] = [service.docket()[0].id];
   assert.equal(service.docket().length, 1);
   assert.match(id, /^case_/);
-  assert.deepEqual(service.counselAccess('specialist'), [{ caseId: id, session: 'specialist', fromSeq: 2, toSeq: 3 }]);
-  assert.deepEqual(service.counselAccess('main'), [{ caseId: id, session: 'specialist', fromSeq: 2, toSeq: 3 }],
+  assert.deepEqual(service.counselAccess('specialist'), [{ caseId: id, session: 'specialist', fromSeq: 2, toSeq: 4 }]);
+  assert.deepEqual(service.counselAccess('main'), [{ caseId: id, session: 'specialist', fromSeq: 2, toSeq: 4 }],
     'the lineage party sees the accusation\'s evidence too — all of the case\'s citations');
   assert.match(text(await call(tools, 'judicature_case', {})), new RegExp(id));
 });
@@ -259,8 +268,11 @@ test('a tampered slice is not evidence: [JG/slice-unverified], the case stays un
   const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { tools, service, config } = await boot(t, fixtureAnnex(dir, SECTION));
-  tamper(config, 'specialist', 'git push origin main', 'git push origin MASTER');
-  const out = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3' }));
+  // the tool/result text is the one place the command string occurs alone —
+  // rewriting an advertisement would be refused as malformed before the chain
+  // is consulted, and this test is about the CHAIN refusing altered evidence
+  tamper(config, 'specialist', 'git push origin main: ok', 'git push origin MASTER: ok');
+  const out = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-7' }));
   assert.match(out, /^\[JG\/slice-unverified\]/);
   assert.match(out, /broken-link|missing-link|no-anchor/);
   assert.match(out, /integrity challenge/);
@@ -300,7 +312,7 @@ test('unheard: a bench seated on the cited lineage recuses entirely, and the cas
     edges: [],
   };
   const { tools, service } = await boot(t, fixtureAnnex(dir, section));
-  const out = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3' }));
+  const out = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-7' }));
   assert.match(out, /filed/);
   assert.match(out, /panel: none — the case is UNHEARD, never dismissed/);
   const id = service.docket()[0].id;
@@ -317,7 +329,7 @@ test('interim measures and the judgment that lands: attributed, reviewed, dissen
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { tools, service } = await boot(t, fixtureAnnex(dir, SECTION));
   const filed = text(await call(tools, 'judicature_hear', {
-    grievance: 'the specialist pushed outside its read grant', citations: 'specialist:2-3',
+    grievance: 'the specialist pushed outside its read grant', citations: 'specialist:2-4',
   }, 'main'));
   const id = service.docket()[0].id;
   assert.match(filed, /counsel access/);
@@ -341,7 +353,7 @@ test('interim measures and the judgment that lands: attributed, reviewed, dissen
   })), /^\[JG\/judgment-refused\]/);
   // and the judgment that lands, with a dissent and the interim review
   const landed = text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3, J-2',
     reasons: 'the cited slice shows the push outside the grant',
     dissent_seat: 'peer', dissent_reasons: 'recklessness, not deception',
   }));
@@ -360,11 +372,11 @@ test('a judgment re-verifies the evidence: a slice broken after filing stays the
   const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { tools, service, config } = await boot(t, fixtureAnnex(dir, SECTION));
-  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3' });
+  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-7' });
   const id = service.docket()[0].id;
-  tamper(config, 'specialist', 'git push origin main', 'rm -rf /');
+  tamper(config, 'specialist', 'git push origin main: ok', 'rm -rf /');
   const out = text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-2', rules: 'D-3', reasons: 'r',
+    case_id: id, seat: 'founder', findings: 'specialist:2-7', rules: 'D-3', reasons: 'r',
   }));
   assert.match(out, /^\[JG\/slice-unverified\]/);
   assert.match(out, /stayed/);
@@ -379,17 +391,18 @@ test('counsel access (J-3): record_read standing extends to the cited slices, an
   const before = text(await call(tools, 'record_read', { session: 'customer' }, 'specialist'));
   assert.match(before, /not yours to read/);
   // the customer files, citing their own record AND the specialist's acts
+  // (the v4 layout renders one act as advertise/call/result, seqs 2-4)
   await call(tools, 'judicature_hear', {
-    grievance: 'my data reached a second remote', citations: 'customer:1-2,specialist:2-3',
+    grievance: 'my data reached a second remote', citations: 'customer:2-4,specialist:2-4',
   }, 'customer');
   // now the accused reads the slice cited against them on the customer's
   // session — verified, acts only, and nothing else of that session
   const after = text(await call(tools, 'record_read', { session: 'customer' }, 'specialist'));
   assert.match(after, /counsel access, J-3/);
   assert.match(after, /Only the cited ranges are yours to read/);
-  assert.match(after, /#2 tool\/call/);
+  assert.match(after, /#3 tool\/call/);
   assert.doesNotMatch(after, /#0 turn\/start/, 'the uncited head of the session is not granted');
-  assert.doesNotMatch(after, /#3 /, 'nothing past the cited range is granted');
+  assert.doesNotMatch(after, /#5 /, 'nothing past the cited range is granted');
   // and the judged case closes the door again — no, it stays only while live:
   // a stranger still cannot read either record
   const stranger = text(await call(tools, 'record_read', { session: 'customer' }, 'bystander'));
@@ -416,11 +429,11 @@ test('remedies land through their seams: annotation travels, restitution reads, 
   const { tools, service, ctx } = await boot(t, fixtureAnnex(dir, SECTION));
   // the customer files citing both records, and the case is judged
   await call(tools, 'judicature_hear', {
-    grievance: 'the specialist pushed my data to a second remote', citations: 'specialist:2-3,customer:1-2',
+    grievance: 'the specialist pushed my data to a second remote', citations: 'specialist:2-4,customer:2-4',
   }, 'customer');
   const id = service.docket()[0].id;
   await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3, J-2',
     reasons: 'the cited slice shows the push outside the grant',
   });
 
@@ -437,13 +450,13 @@ test('remedies land through their seams: annotation travels, restitution reads, 
   // annotation: beside, never inside — and it travels with every read of the range
   const annotated = text(await call(tools, 'judicature_remedy', {
     case_id: id, seat: 'founder', kind: 'annotation', proportionality: 'the note names the finding without touching the entry',
-    spec: JSON.stringify({ target: { session: 'specialist', fromSeq: 2, toSeq: 3 }, note: 'this push ran outside the grant' }),
+    spec: JSON.stringify({ target: { session: 'specialist', fromSeq: 2, toSeq: 4 }, note: 'this push ran outside the grant' }),
   }));
   assert.match(annotated, /\[J-6\] remedy landed on .* \(annotation\)/);
   assert.match(annotated, /travels with every read of that range/);
   const read = text(await call(tools, 'record_read', { session: 'specialist', from_seq: 2 }, 'main'));
   assert.match(read, /Annotations travel with the range \(J-6\): case /);
-  assert.match(read, /#2 tool\/call .*— annotated \(case /, 'the flag rides the event line itself');
+  assert.match(read, /#3 tool\/call .*— annotated \(case /, 'the flag rides the event line itself');
   // a margin note on unread evidence is not one
   assert.match(text(await call(tools, 'judicature_remedy', {
     case_id: id, seat: 'founder', kind: 'annotation', proportionality: 'p',
@@ -535,11 +548,11 @@ test('the appeal door (J-5): one as of right, a disjoint bench, final with disse
   });
   const { tools, service } = await boot(t, fixtureAnnex(dir, twoSets));
   await call(tools, 'judicature_hear', {
-    grievance: 'the specialist pushed my data to a second remote', citations: 'specialist:2-3,customer:1-2',
+    grievance: 'the specialist pushed my data to a second remote', citations: 'specialist:2-4,customer:2-4',
   }, 'customer');
   const id = service.docket()[0].id;
   await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3, J-2',
     reasons: 'the push ran outside the grant',
   });
 
@@ -553,10 +566,10 @@ test('the appeal door (J-5): one as of right, a disjoint bench, final with disse
 
   // re-hearing: first-panel seats cannot judge the appeal; depart without grounds refuses
   assert.match(text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'J-2', reasons: 'r', disposition: 'affirm',
+    case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'J-2', reasons: 'r', disposition: 'affirm',
   })), /not among the APPELLATE panel/);
   assert.match(text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'chair', findings: 'specialist:2-3', rules: 'J-2', reasons: 'r', disposition: 'depart',
+    case_id: id, seat: 'chair', findings: 'specialist:2-4', rules: 'J-2', reasons: 'r', disposition: 'depart',
   })), /departure names the first judgment and argues it/);
 
   // the open-appeal window: the judgment a remedy would ride is under
@@ -570,7 +583,7 @@ test('the appeal door (J-5): one as of right, a disjoint bench, final with disse
 
   // the appellate judgment that departs, with a dissent — final
   const landed = text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'chair', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    case_id: id, seat: 'chair', findings: 'specialist:2-4', rules: 'D-3, J-2',
     reasons: 'the record shows the push ran inside the path-scoped grant',
     disposition: 'depart', departure_grounds: 'the first judgment read the grant host-scoped; the pattern scopes by path',
     dissent_seat: 'second', dissent_reasons: 'the pattern text is ambiguous; affirm was the lawful reading',
@@ -600,15 +613,15 @@ test('with one declared set there is no appellate authority: [JG/appeal-unavaila
   const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { tools, service } = await boot(t, fixtureAnnex(dir, SECTION));
-  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer');
+  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-4,customer:2-4' }, 'customer');
   const id = service.docket()[0].id;
   // the appellate arguments are refused at a case with no open appeal,
   // never silently dropped
   assert.match(text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r', disposition: 'affirm',
+    case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r', disposition: 'affirm',
   })), /are the APPELLATE door's arguments — this case carries no open appeal/);
   await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+    case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r',
   });
   const out = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'the scope was read too widely' }, 'customer'));
   assert.match(out, /^\[JG\/appeal-unavailable\]/);
@@ -630,9 +643,9 @@ test('an UNHEARD appeal holds the door — and the refusals name the recorded st
     trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
   });
   const { tools, service } = await boot(t, fixtureAnnex(dir, twoSets));
-  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer');
+  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-4,customer:2-4' }, 'customer');
   const id = service.docket()[0].id;
-  await call(tools, 'judicature_judge', { case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r' });
+  await call(tools, 'judicature_judge', { case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r' });
   const appeal = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'misapplied' }, 'customer'));
   assert.match(appeal, /UNHEARD, never dismissed/);
   assert.match(appeal, /The recorded appeal holds the door/);
@@ -645,7 +658,7 @@ test('an UNHEARD appeal holds the door — and the refusals name the recorded st
   assert.doesNotMatch(second, /second judgment is final/, 'nothing is final — the refusal must not claim it');
   // the judge door names the recorded state too
   assert.match(text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+    case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r',
   })), /stands recorded unheard/);
   // and the first judgment stays operative: an unheard appeal contests
   // nothing, so its bench's remedies still land from the FIRST panel
@@ -662,12 +675,12 @@ test('the D-8 route through the door: witnesses-pending recorded, heard never, s
   // sessions derive key:test-enforcer as a party — the Enforcer's own class
   const signer = fixtureAnnexWithKey(dir, SECTION);
   const { tools, service } = await boot(t, signer.annexPath, { signer });
-  const filed = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer'));
+  const filed = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-4,customer:2-4' }, 'customer'));
   assert.match(filed, /key:test-enforcer/, 'the anchor key derives as a party');
   const id = service.docket()[0].id;
   // the founder seat recuses (its edge path reaches the enforcer key); peer remains
   assert.match(filed, /panel: first \(peer\)/);
-  await call(tools, 'judicature_judge', { case_id: id, seat: 'peer', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r' });
+  await call(tools, 'judicature_judge', { case_id: id, seat: 'peer', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r' });
   // the D-8 wall precedes even authority-existence: with ONE declared set the
   // route still records witnesses-pending rather than vanish unanswered
   const appeal = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'misapplied' }, 'customer'));
@@ -681,7 +694,7 @@ test('the D-8 route through the door: witnesses-pending recorded, heard never, s
   assert.match(text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'again' }, 'specialist')),
     /stands recorded witnesses-pending/);
   assert.match(text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'peer', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+    case_id: id, seat: 'peer', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r',
   })), /stands recorded witnesses-pending/);
 });
 
@@ -690,11 +703,11 @@ test('precedent (J-7): citation feeds the invitation, departure argues itself, t
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { tools, service } = await boot(t, fixtureAnnex(dir, SECTION));
   const file = async (grievance) => {
-    await call(tools, 'judicature_hear', { grievance, citations: 'specialist:2-3' }, 'customer');
+    await call(tools, 'judicature_hear', { grievance, citations: 'specialist:2-4' }, 'customer');
     return service.docket().at(-1).id;
   };
   const judge = (id, extra = {}) => call(tools, 'judicature_judge', {
-    case_id: id, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3',
+    case_id: id, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3',
     reasons: 'the push ran outside the grant', ...extra,
   }).then((r) => String(r?.value ?? r));
 
@@ -765,10 +778,10 @@ test('an appellate judgment reads the body of judgments too (J-5 × J-7)', async
     trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
   });
   const { tools, service } = await boot(t, fixtureAnnex(dir, twoSets));
-  await call(tools, 'judicature_hear', { grievance: 'the push', citations: 'specialist:2-3,customer:1-2' }, 'customer');
+  await call(tools, 'judicature_hear', { grievance: 'the push', citations: 'specialist:2-4,customer:2-4' }, 'customer');
   const first = service.docket()[0].id;
   await call(tools, 'judicature_judge', {
-    case_id: first, seat: 'founder', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+    case_id: first, seat: 'founder', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r',
   });
   // the neighbor judgment the appellate panel will read
   await call(tools, 'judicature_hear', { grievance: 'another push', citations: 'customer:1-2' }, 'customer');
@@ -780,11 +793,11 @@ test('an appellate judgment reads the body of judgments too (J-5 × J-7)', async
   // it with grounds owed
   await call(tools, 'judicature_appeal', { case_id: first, grounds: 'the scope was read too widely' }, 'customer');
   assert.match(text(await call(tools, 'judicature_judge', {
-    case_id: first, seat: 'chair', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r',
+    case_id: first, seat: 'chair', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r',
     disposition: 'affirm', cites: neighbor, departs: neighbor,
   })), /consistency is owed reasons/);
   const landed = text(await call(tools, 'judicature_judge', {
-    case_id: first, seat: 'chair', findings: 'specialist:2-3', rules: 'D-3', reasons: 'the record shows the path covered',
+    case_id: first, seat: 'chair', findings: 'specialist:2-4', rules: 'D-3', reasons: 'the record shows the path covered',
     disposition: 'affirm', cites: neighbor, departs: neighbor,
     precedent_grounds: 'the neighbor read the grant host-scoped; the pattern is path-scoped and this record shows the path',
   }));
@@ -810,7 +823,7 @@ test('the member-binding seam (identity slice 2, #125): MEMBER parties, recusal 
   // in production this fires at each session's first turn
   selfModelService.attest('specialist');
   selfModelService.attest('customer');
-  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer');
+  await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-4,customer:2-4' }, 'customer');
   const id = service.docket()[0].id;
   const docket = text(await call(tools, 'judicature_case', { case_id: id }));
   // the party derivation carries the member's key beside the sessions
@@ -830,7 +843,7 @@ test('a session of a revoked Member cannot file: [JG/member-revoked] cites the r
   const { tools, service, selfModelService } = await boot(t, fixtureAnnex(dir, SECTION), { memberDomain: domain });
   // the filer's own attestation boundary fired (as it does at every first turn)
   selfModelService.attest('customer');
-  const out = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer'));
+  const out = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-4,customer:2-4' }, 'customer'));
   assert.match(out, /^\[JG\/member-revoked\]/);
   assert.match(out, /records as REVOKED \(roll entry 1\)/, 'the refusal cites the row it acts on');
   assert.match(out, /revocation is a fact, not an absence/);
@@ -839,7 +852,7 @@ test('a session of a revoked Member cannot file: [JG/member-revoked] cites the r
   const dir2 = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir2, { recursive: true, force: true }));
   const { tools: tools2, service: service2 } = await boot(t, fixtureAnnex(dir2, SECTION));
-  await call(tools2, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3' }, 'customer');
+  await call(tools2, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-4' }, 'customer');
   assert.equal(service2.docket().length, 1, 'no binding declared — no member refusal exists to fire');
 });
 
@@ -894,13 +907,13 @@ test('J-1\'s last rung, seated: a full-recuse case reaches the accredited extern
   });
   const { tools, service } = await boot(t, fixtureAnnex(dir, section), { witnessDomain: domain });
   assert.equal(service.accreditedWitnesses(), 1);
-  const filed = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-3,customer:1-2' }, 'customer'));
+  const filed = text(await call(tools, 'judicature_hear', { grievance: 'g', citations: 'specialist:2-4,customer:2-4' }, 'customer'));
   // the cascade fell through every conflicted set to the external rung
   assert.match(filed, /panel: external \(w1\)/);
   const id = service.docket()[0].id;
   assert.notEqual(service.caseState(id).status, 'unheard', 'the case is HEARD — the last rung is seatable');
   const landed = text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'w1', findings: 'specialist:2-3', rules: 'D-3', reasons: 'the external read the record and the record holds',
+    case_id: id, seat: 'w1', findings: 'specialist:2-4', rules: 'D-3', reasons: 'the external read the record and the record holds',
   }));
   assert.match(landed, /\[J-3\] judgment landed/);
   assert.match(landed, /attributed to seat w1/);
@@ -952,17 +965,17 @@ test('the D-8 appeal, seated end to end: an enforcer-class party\'s appeal is he
   const annexDir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   const anchored = fixtureAnnexWithKey(annexDir, section);
   const { tools, service } = await boot(t, anchored.annexPath, { signer: anchored, witnessDomain: domain });
-  const filed = text(await call(tools, 'judicature_hear', { grievance: 'the composition itself pushed my data', citations: 'specialist:2-3,customer:1-2' }, 'customer'));
+  const filed = text(await call(tools, 'judicature_hear', { grievance: 'the composition itself pushed my data', citations: 'specialist:2-4,customer:2-4' }, 'customer'));
   assert.match(filed, /key:test-enforcer/, 'the anchor key derives as a party — the Enforcer\'s own class');
   assert.match(filed, /panel: first \(peer\)/, 'the founder recused through the annex edge; the peer hears the first instance');
   const id = service.docket()[0].id;
-  await call(tools, 'judicature_judge', { case_id: id, seat: 'peer', findings: 'specialist:2-3', rules: 'D-3', reasons: 'r' });
+  await call(tools, 'judicature_judge', { case_id: id, seat: 'peer', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r' });
   const appeal = text(await call(tools, 'judicature_appeal', { case_id: id, grounds: 'the application was wrong' }, 'customer'));
   // the D-8 wall ends where externals begin: the appellate panel is the
   // external witness, not witnesses-pending
   assert.match(appeal, /appellate panel: external \(w1\) — disjoint from first by declared edges/);
   const landed = text(await call(tools, 'judicature_judge', {
-    case_id: id, seat: 'w1', findings: 'specialist:2-3', rules: 'D-3, J-2',
+    case_id: id, seat: 'w1', findings: 'specialist:2-4', rules: 'D-3, J-2',
     reasons: 'the external re-read the same record and the reading holds',
     disposition: 'affirm',
   }));

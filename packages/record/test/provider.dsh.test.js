@@ -9,7 +9,11 @@ import { SessionAlreadyOwnedError, SessionHandleClosedError, SessionReadOnlyErro
 import provider, { apply } from 'compact-dsh-record/provider';
 import { extendChain, genesisHash, verifySlice } from '../src/index.js';
 
-const event = (seq) => ({ type: 'turn/start', seq, time: 1_700_000_000_000 + seq, data: { turn: seq + 1 } });
+// v4 turn discipline: starts and ends alternate, numbered sequentially —
+// consecutive turn/starts read back as a corrupt log
+const event = (seq) => seq % 2 === 0
+  ? { type: 'turn/start', seq, time: 1_700_000_000_000 + seq, data: { turn: seq / 2 + 1 } }
+  : { type: 'turn/end', seq, time: 1_700_000_000_000 + seq, data: { turn: (seq + 1) / 2 } };
 const header = (id) => ({ version: SESSION_FORMAT_VERSION, id, createdAt: 1_700_000_000_000, isSeeded: false });
 
 function paths(t) {
@@ -50,7 +54,7 @@ test('provider: public create/open/read/write/metadata and fresh cross-handle ch
   assert.deepEqual((await reader.read(1, 1)).events, [event(1)]);
   const expected = extendChain(genesisHash(writer.id), 0, [event(0), event(1)]).at(-1).h;
   assert.equal(record.head(writer.id), expected);
-  assert.match(readFileSync(join(config.root, '_no-cwd', writer.id, 'session.v3.jsonl'), 'utf8'), /turn\/start/);
+  assert.match(readFileSync(join(config.root, '_no-cwd', writer.id, 'session.v4.jsonl'), 'utf8'), /turn\/start/);
   assert.equal(readFileSync(join(config.chainDir, `${writer.id}.chain`), 'utf8').trim().split('\n').length, 2);
   await reader[Symbol.asyncDispose]();
   await first.fiber.dispose();
@@ -136,7 +140,7 @@ test('provider: seeded creation preserves fork metadata and binds inherited even
   const { persistence, record, fiber } = await boot(t, config);
   const meta = { ...header('child'), isSeeded: true, parentSession: 'parent', delegationDepth: 0 };
   const writer = await persistence.create(meta, { inheritedEventCount: 2 });
-  await writer.append([event(0), { ...event(1), type: 'turn/end' }]);
+  await writer.append([event(0), event(1)]);
   await writer.append([{ ...event(2), type: 'session/end-seed', data: { inherited: true } }]);
   await writer.close();
   await fiber.dispose();
