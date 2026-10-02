@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import { operatorSettingsRows } from './operator-settings.mjs';
+import { installResilientFailLoud } from './resilient-fail-loud.mjs';
 
 const binName = 'compact-dsh';
 const rootUrl = new URL('../package.json', import.meta.url).href;
@@ -137,7 +138,7 @@ async function main() {
   await emptyRoot(configFile);
   process.chdir(workspace);
 
-  const { boot, loadOverlayPatches, installFailLoud } = await import('@deepseek-ai/dsh-app-boot');
+  const { boot, loadOverlayPatches } = await import('@deepseek-ai/dsh-app-boot');
   const { provideCmdline } = await import('@deepseek-ai/dsh-cmdline');
   const { webRows, PRESET_ID, ASIDE_RETENTION, ensureInstallAnchor, alignWorkspaceRegistry, ensureProfileSurface, profilePatchRows } = await import('compact-dsh-blessed/web');
   // the profile surface (#134): web mode emulates the profile the settings
@@ -241,7 +242,12 @@ async function main() {
   const onTerminate = () => interrupt(143);
   process.on('SIGINT', onInterrupt);
   process.on('SIGTERM', onTerminate);
-  const uninstallFailLoud = installFailLoud(binName, process, dispose);
+  // The uncaught-failure classifier (tools/resilient-fail-loud.mjs) replaces
+  // the stock fail-loud handler: transient peer resets (ECONNRESET/EPIPE — a
+  // browser tab closed mid-stream, a flaky remote) are logged and contained
+  // instead of killing the governed runtime mid-session; everything the
+  // runtime OWNS stays exactly as fatal as before (report, dispose, exit 1).
+  const uninstallFailLoud = installResilientFailLoud({ binName, proc: process, dispose });
   const keepAlive = setInterval(() => {}, 60_000);
   let modelRequests = 0;
   try {
