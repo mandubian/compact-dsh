@@ -31,7 +31,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
-import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { lstat, mkdir, readlink, realpath, symlink } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { loadOverlayPatches } from '@deepseek-ai/dsh-app-boot';
@@ -44,6 +44,76 @@ export const presetRoot = () => fileURLToPath(new URL('../presets/', import.meta
 
 /** The shipped presets the web bundle declares; each re-arms refused tools. */
 const SHIPPED_PRESET_ROWS = ['preset-standard', 'preset-ptc', 'preset-minimal', 'preset-cordis'];
+
+/**
+ * The profile surface (#134): the interactive Settings stack is 0.2.0
+ * profile machinery — `@deepseek-ai/dsh-settings` declares
+ * `inject = ["configEditor", "profileContext"]` and both rows are disabled
+ * outside a profile boot. The launcher EMULATES the profile for the web
+ * surface: a persistent operator-owned directory holding the manifest the
+ * config editor locks and inherits from, and a patch file its edits persist
+ * through, which the launcher loads back every boot. The bundle list mirrors
+ * what the launcher composes, so the settings forms inherit the pilot's real
+ * values rather than empty defaults.
+ */
+export const PROFILE_BUNDLES = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'compact-dsh-blessed', 'compact-dsh-card'];
+
+export const profileDir = (stateDir) => join(stateDir, 'compact-profile');
+export const profilePatchPath = (stateDir) => join(stateDir, 'compact.profile.patch.yml');
+
+/**
+ * Create the on-disk profile state if missing and return the profileContext
+ * the launcher provides to the boot. The manifest is a real package.json —
+ * the config editor takes its lock there and reads `dsh.profile.bundles` as
+ * the inherited layers; the patch file starts as an empty sequence.
+ *
+ * `overlays` carries every launcher-specific layer that is NOT a manifest
+ * bundle (pilot rows, the tools row, the operator settings bridge): on a
+ * settings edit the config editor RELOADS the whole composition from
+ * readProfilePatches — manifest bundles, then the patch file, then these
+ * overlays — so the reload must compose the same stack the boot did, pilot
+ * posture rows included. Missing layers here would resurrect refused rows
+ * mid-flight.
+ * @param {string} stateDir - the operator-owned state directory ($DSH_HOME).
+ * @param {Array<object>} overlays - launcher patch rows applied after the
+ *   profile patch file, in the boot's own order.
+ */
+export function ensureProfileSurface(stateDir, overlays = []) {
+  const dir = profileDir(stateDir);
+  const patchPath = profilePatchPath(stateDir);
+  mkdirSync(dir, { recursive: true });
+  const manifestPath = join(dir, 'package.json');
+  if (!existsSync(manifestPath)) {
+    writeFileSync(manifestPath, JSON.stringify({
+      name: 'compact-profile',
+      private: true,
+      dsh: { profile: { bundles: PROFILE_BUNDLES } },
+    }, null, 2) + '\n');
+  }
+  if (!existsSync(patchPath)) writeFileSync(patchPath, '[]\n');
+  return {
+    name: 'compact-profile',
+    dir,
+    patchPath,
+    installAnchor: installAnchor(),
+    startedBundles: PROFILE_BUNDLES,
+    cwd: process.cwd(),
+    home: stateDir,
+    overlays,
+    telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
+  };
+}
+
+/**
+ * The rows the profile patch file carries (settings UI edits persist there).
+ * An absent or empty file contributes nothing; the file is operator-owned,
+ * so a document that does not parse refuses the boot via loadOverlayPatches.
+ */
+export function profilePatchRows(stateDir) {
+  const path = profilePatchPath(stateDir);
+  if (!existsSync(path)) return [];
+  return loadOverlayPatches('compact-dsh', path);
+}
 
 /**
  * Launcher patch rows for the web surface, applied after the blessed overlay.
@@ -64,19 +134,19 @@ export function webRows() {
     // directory with no install anchor beside it. The pilot workspace is
     // fixed by the launcher anyway; the browser renders no picker button.
     { id: 'directory-picker', disabled: true },
-    // The interactive Settings surface is 0.2.0 profile machinery: the
-    // settings service declares inject = ["configEditor", "profileContext"]
-    // and its row is disabled outside a profile boot — which the compact
-    // launcher never boots. Left mounted, every settings page errors at
-    // runtime ("settings service is absent: mount @deepseek-ai/dsh-settings
-    // with @deepseek-ai/dsh-config-editor in the profile composition").
-    // Honest absence instead: the section is off at the row, model config
-    // lives in $DSH_HOME/settings.yaml (the launcher's operator-settings
-    // bridge), and per-session model selection stays in the composer.
-    // Bringing the surface up for real means emulating a profile (persistent
-    // patch file, config editor) while keeping plugin-manager and HMR
-    // refused — tracked as its own work, not a silent mount.
-    { id: 'ui-settings', disabled: true },
+    // The profile emulation (#134) flips every `disabled: !profileContext`
+    // row in the base bundle to ACTIVE — including two the pilot refuses.
+    // The plugin-manager is the dynamic plugin install system (a
+    // self-modification surface: it mounts new plugins at runtime), and the
+    // HMR reloader tears down and re-mounts the composition when the profile
+    // patch changes on disk — under the pilot, the operator restarts
+    // instead, and every boot passes through the gates. Both stay refused
+    // EXPLICITLY, said here rather than silently inherited.
+    { id: 'plugin-manager', disabled: true },
+    { id: 'hmr', disabled: true },
+    // Settings pages whose backends stay refused with the plugin-manager.
+    { id: 'ui-settings-plugins', disabled: true },
+    { id: 'ui-settings-plugin-inventory', disabled: true },
     // The shipped presets are the re-arm risk (see the header): each mounts
     // host-side file tools, fork/workflow delegation, and web fetch/search
     // per session. Disabled at the row, they never reach the roster.

@@ -154,13 +154,15 @@ npm run compact -- --web     # chat at 127.0.0.1:3080, loopback-only by design
 live).** The multi-provider adapter mounts dormant until your settings
 document supplies a route. Put this in `~/.compact-dsh/settings.yaml` — the
 key resolves **by name** from your shell (or from
-`~/.compact-dsh/.credentials.yaml`), never stored in the settings file
-(the launcher re-reads the document every boot; a document that does not
-parse refuses the boot). Note the browser's **Settings page is absent by
-posture**: the interactive settings stack is dsh 0.2.0 profile machinery the
-pilot does not boot (the settings service requires a profile context), so the
-section is disabled rather than served erroring pages — this document and the
-per-session model picker are the configuration surfaces:
+`~/.compact-dsh/.credentials.yaml`), never stored in the settings file (a
+document that does not parse refuses the boot). On the **web surface** the
+first boot imports the document once into the interactive Settings page
+(dsh 0.2.0 moved that stack behind profile machinery, which the launcher now
+emulates: your edits persist in `~/.compact-dsh/compact.profile.patch.yml`
+and survive restarts); afterwards the browser edits the values, and a
+re-introduced `settings.yaml` is re-imported on its next boot, overriding
+the browser's values on conflict. On **headless** boots the document stays
+the live config, re-read every boot by the launcher:
 
 ```yaml
 llm-pi-ai:
@@ -541,7 +543,20 @@ must stay **outside the agent workspace**. Contents, verified layout:
 │                                  SYMLINK to this checkout's node_modules; any
 │                                  other node_modules here is refused
 ├── settings.yaml                  model-route settings (provider names reference env
-│                                  vars by NAME — API keys stay in your shell)
+│                                  vars by NAME — API keys stay in your shell);
+│                                  on the web surface imported once into the
+│                                  interactive Settings page (the file is
+│                                  renamed settings.yaml.imported), on headless
+│                                  re-read every boot by the launcher
+├── compact-profile/               the emulated profile the settings stack
+│   └── package.json               requires (#134): its dsh.profile.bundles
+│                                  declare the inherited layers the settings
+│                                  forms show; the config editor takes its
+│                                  lock here
+├── compact.profile.patch.yml      where the browser's Settings edits persist
+│                                  (operator-owned; loaded every web boot, and
+│                                  re-applied verbatim when a settings edit
+│                                  reloads the composition)
 ├── .credentials.yaml              provider credentials written by dsh-credentials-local
 │                                  (0600; operator-owned, never in the record)
 ├── storages/                      dsh storage-json deployment state — a corrupt

@@ -139,9 +139,15 @@ async function main() {
 
   const { boot, loadOverlayPatches, installFailLoud } = await import('@deepseek-ai/dsh-app-boot');
   const { provideCmdline } = await import('@deepseek-ai/dsh-cmdline');
-  const { webRows, PRESET_ID, ASIDE_RETENTION, ensureInstallAnchor, alignWorkspaceRegistry } = await import('compact-dsh-blessed/web');
+  const { webRows, PRESET_ID, ASIDE_RETENTION, ensureInstallAnchor, alignWorkspaceRegistry, ensureProfileSurface, profilePatchRows } = await import('compact-dsh-blessed/web');
+  // the profile surface (#134): web mode emulates the profile the settings
+  // stack requires — a persistent operator-owned patch file the config editor
+  // writes through, loaded back every boot BELOW the operator settings bridge
+  // (a hand-edited settings.yaml keeps precedence over UI edits on conflict)
+  let profileContext;
   if (values.web) {
     ensureInstallAnchor(stateDir);
+
     // one boot, one exposed workspace: a registry naming another directory
     // would attach browser sessions to files this boot never exposed
     const aligned = alignWorkspaceRegistry(stateDir, workspace);
@@ -165,30 +171,43 @@ async function main() {
     const layers = Array.isArray(declared) ? declared : [declared];
     return layers.flatMap(rel => loadOverlayPatches(binName, join(dir, rel)));
   };
-  const patches = [
-    ...bundle('@deepseek-ai/dsh-base'),
-    ...values.smoke ? [] : values.web ? bundle('@deepseek-ai/dsh-web-app') : bundle('@deepseek-ai/dsh-headless'),
-    ...bundle('compact-dsh-blessed'),
+  // The layer order is the config editor's reload order (readProfilePatches):
+  // manifest bundles, then the profile patch file (the settings UI's persisted
+  // edits), then the launcher's overlay rows. A settings edit reloads the
+  // whole composition from exactly this shape, so boot and reload compose the
+  // same stack — pilot posture rows included.
+  const overlays = [
     { id: 'tools', config: { mode: 'native' } },
-    // the web ask card (#90): a static client plugin the browser loads to
-    // render the ask as the structured card. Web-only — the browser is the
-    // only surface it renders on; headless/attended compose nothing here.
-    ...values.web ? bundle('compact-dsh-card') : [],
     ...values.web ? webRows() : values.smoke ? [] : [
       { id: 'headless-startup', disabled: true },
       { id: 'ptc-runtime', disabled: true },
       { id: 'headless-runner', inject: ['compact-ready'], config: { task } },
     ],
     // the operator's $DSH_HOME/settings.yaml (model providers, default model,
-    // ...), LAST so the operator's values win over every bundle default. dsh
-    // 0.2.0 removed the document and its reader (the settings service only
-    // mounts in a profile boot); the bridge in operator-settings.mjs keeps
-    // the operator's file live in this composition.
+    // ...), LAST so the operator's values win over every bundle default AND
+    // over the browser's settings edits. dsh 0.2.0 removed the document and
+    // its reader; the bridge in operator-settings.mjs keeps it live — and on
+    // the web surface the settings service's one-time legacy import moves it
+    // into the profile patch, after which the browser edits it.
     ...operatorSettingsRows({
       settingsPath: join(stateDir, 'settings.yaml'),
       web: values.web === true,
       notice: message => console.error(`${binName}: ${message}`),
     }),
+  ];
+  if (values.web && !values.smoke) profileContext = ensureProfileSurface(stateDir, overlays);
+  const patches = [
+    ...bundle('@deepseek-ai/dsh-base'),
+    ...values.smoke ? [] : values.web ? bundle('@deepseek-ai/dsh-web-app') : bundle('@deepseek-ai/dsh-headless'),
+    ...bundle('compact-dsh-blessed'),
+    // the web ask card (#90): a static client plugin the browser loads to
+    // render the ask as the structured card. Web-only — the browser is the
+    // only surface it renders on; headless/attended compose nothing here.
+    ...values.web ? bundle('compact-dsh-card') : [],
+    // the settings UI's own edits (#134): persisted by the config editor into
+    // the profile patch file, reloaded verbatim on every settings write
+    ...values.web && !values.smoke ? profilePatchRows(stateDir) : [],
+    ...overlays,
   ];
   let ctx;
   let disposal;
@@ -229,6 +248,11 @@ async function main() {
     ctx = await boot(binName, configFile, patches, host => {
       ctx = host;
       if (exitCode !== undefined) throw new Error('startup interrupted');
+      // the profile emulation (#134): provided before the tree mounts so the
+      // base bundle's `disabled: !profileContext` rows (settings, config
+      // editor) activate, and plugin-manager/HMR stay refused at the pilot's
+      // own rows
+      if (profileContext) host.provide('profileContext', profileContext);
       provideCmdline(host, { args: values.web ? webArgs : [], exit: requestExit });
       if (values.smoke) host.on('llm/stream', () => {
         modelRequests++;
