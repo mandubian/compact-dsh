@@ -43,7 +43,12 @@ test('the artifact carries the whole closure — every workspace package, bundle
     if (!manifest.bundleDependencies.includes(name)) assert.match(name, /^@deepseek-ai\//, `external dep ${name} is unexpected — the artifact's registry surface is dsh packages only`);
   }
   assert.deepEqual(manifest.peerDependencies, { '@deepseek-ai/dsh': '~0.2.0-rc.2' });
-  assert.deepEqual(manifest.dsh.bundle.patch, ['./patches/blessed.patch.yml', './patches/card.patch.yml']);
+  assert.deepEqual(manifest.dsh.bundle.patch, [
+    './patches/blessed.patch.yml',
+    './patches/card.patch.yml',
+    './patches/posture.patch.yml',
+    './patches/compact-pilot.patch.yml',
+  ]);
   assert.ok(manifest.dsh.client, 'the bundle root must carry the ask card client manifest');
 
   for (const name of workspaceNames()) {
@@ -111,11 +116,56 @@ test('the tarball ships the payload: patches, vendored sources, client bundle, r
     'package/package.json',
     'package/patches/blessed.patch.yml',
     'package/patches/card.patch.yml',
+    'package/patches/posture.patch.yml',
+    'package/patches/compact-pilot.patch.yml',
     'package/node_modules/compact-dsh-blessed/src/index.js',
     'package/node_modules/compact-dsh-record/src/provider.js',
     'package/node_modules/compact-dsh-card/lib/client.js',
     'package/node_modules/compact-dsh-blessed/presets/',
   ]) assert.ok(listing.includes(member), `tarball lacks ${member}`);
+});
+
+test('the posture layer refuses the profile-gated re-arm surfaces and defaults state under the profile — while declaring, not hiding, the plugin-manager gap', async (t) => {
+  const { loadOverlayPatches } = await import('file://' + join(ROOT, 'node_modules', '@deepseek-ai', 'dsh-app-boot', 'lib', 'index.js'));
+  const dir = mkdtempSync(join(tmpdir(), 'compact-dist-posture-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  pack(dir);
+  const posturePath = join(dir, 'package', 'patches', 'posture.patch.yml');
+
+  const rows = loadOverlayPatches('compact-dist-test', posturePath);
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  for (const id of ['cordis-host-runner', 'ptc-runtime', 'directory-picker', 'preset-standard', 'preset-ptc', 'preset-minimal', 'preset-cordis']) {
+    assert.equal(byId.get(id)?.disabled, true, `${id} must be disabled by the posture layer`);
+  }
+  assert.equal(byId.get('agent-preset-registry')?.config?.default, 'compact-pilot', 'the roster must select the pilot preset only');
+
+  const exprs = [];
+  const dig = (value) => {
+    if (value === null || typeof value !== 'object') return;
+    if ('__jsExpr' in value) { exprs.push(String(value.__jsExpr)); return; }
+    for (const child of Object.values(value)) dig(child);
+  };
+  for (const id of ['compact-record-provider', 'compact-blessed']) {
+    const row = byId.get(id);
+    assert.ok(row, `${id} must carry a posture config override`);
+    dig(row.config);
+  }
+  const joined = exprs.join('\n');
+  for (const state of ['COMPACT_RECORD_ROOT', 'COMPACT_CHAIN_DIR', 'COMPACT_APPROVAL_PERSIST_PATH', 'compact-data/records', 'compact-data/chains', 'compact-data/approvals.json']) {
+    assert.ok(joined.includes(state), `the state defaults must derive ${state} (env first, then the profile dir)`);
+  }
+  for (const expr of exprs) {
+    if (expr.includes('subjects.jsonl')) assert.ok(expr.includes('profileContext'), 'the subjects ledger must follow the derived chain dir, never a bare concat onto undefined');
+  }
+
+  // the declared gap, asserted as absence: the host's own management surface
+  // stays alive on the trial path — enforcement rides the gate (a mounted
+  // dynamicCordisRunner refuses the boot; a late-mounted one latches a breach)
+  const text = readFileSync(posturePath, 'utf8');
+  for (const id of ['plugin-manager', 'hmr', 'ui-settings-plugins', 'ui-settings-plugin-inventory']) {
+    assert.ok(!text.includes(`id: ${id}`), `${id} must stay absent from the posture layer — the gap is declared in prose, not enforced by this file`);
+  }
+  assert.match(text, /DECLARED GAP/);
 });
 
 test('live: pnpm adds the tarball into a scratch profile and every compact-* import loads', { skip: process.env.COMPACT_DIST_LIVE_TEST !== '1' ? 'set COMPACT_DIST_LIVE_TEST=1 (runs npx pnpm; the install path the plugin manager uses)' : false }, async (t) => {
