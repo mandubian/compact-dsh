@@ -24,9 +24,13 @@ test('web rows disable the A-4/DYN trigger and replace the preset roster', () =>
     { id: 'cordis-host-runner', disabled: true },
     { id: 'ptc-runtime', disabled: true },
     { id: 'directory-picker', disabled: true },
-    // the interactive Settings surface is profile machinery the pilot does
-    // not boot — honest absence instead of pages that error at runtime
-    { id: 'ui-settings', disabled: true },
+    // the profile emulation (#134) activates the base bundle's gated rows —
+    // these two stay refused EXPLICITLY (dynamic plugin install, live reload)
+    { id: 'plugin-manager', disabled: true },
+    { id: 'hmr', disabled: true },
+    // settings pages whose backends stay refused with the plugin-manager
+    { id: 'ui-settings-plugins', disabled: true },
+    { id: 'ui-settings-plugin-inventory', disabled: true },
     // the shipped presets each re-arm refused tools per session — off at the row
     { id: 'preset-standard', disabled: true },
     { id: 'preset-ptc', disabled: true },
@@ -59,8 +63,13 @@ test('web composition over the real bundles: runner disabled, transport live, ov
     'the web bundle mounts the dynamic-plugin runner; the pilot composition must refuse it at the row (A-4/DYN absent)');
   assert.equal(rows.find(row => row.id === 'ptc-runtime')?.disabled, true,
     'host-side PTC execution stays off; the pilot code surface is confined bash only');
-  assert.equal(rows.find(row => row.id === 'ui-settings')?.disabled, true,
-    'the Settings surface is profile machinery (settings service injects configEditor + profileContext) — absent, not erroring');
+  assert.equal(rows.find(row => row.id === 'plugin-manager')?.disabled, true,
+    'the profile emulation activates the gated plugin-manager row — the dynamic plugin install system stays refused, explicitly');
+  assert.equal(rows.find(row => row.id === 'hmr')?.disabled, true,
+    'live profile reload re-mounts the composition mid-flight — the operator restarts through the gates instead');
+  for (const id of ['ui-settings', 'config-editor', 'settings']) {
+    assert.notEqual(rows.find(row => row.id === id)?.disabled, true, id);
+  }
   for (const id of ['webserver', 'web-runtime', 'web-startup', 'agent-preset-registry']) {
     assert.notEqual(rows.find(row => row.id === id)?.disabled, true, id);
   }

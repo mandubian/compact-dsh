@@ -17,7 +17,7 @@ import { provideCmdline } from '@deepseek-ai/dsh-cmdline';
 import { extendChain, genesisHash, verifySlice } from 'compact-dsh-record';
 import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 import { defineTool } from '@deepseek-ai/dsh-tools';
-import { PRESET_ID, ensureInstallAnchor, presetDeclarationPath, webRows } from '../src/web.js';
+import { PRESET_ID, ensureInstallAnchor, ensureProfileSurface, presetDeclarationPath, profilePatchRows, webRows } from '../src/web.js';
 
 const rootUrl = new URL('../../../package.json', import.meta.url).href;
 const baseFile = fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve('@deepseek-ai/dsh-base/package.json')));
@@ -38,6 +38,17 @@ function fixture(t) {
   const configFile = join(dir, 'home', 'cordis.yml');
   mkdirSync(dirname(configFile), { recursive: true });
   writeFileSync(configFile, '[]\n');
+  // the profile surface (#134), exactly as the launcher prepares it: the
+  // persistent profile state under $DSH_HOME and its context provided to the
+  // boot before the tree mounts — with the launcher's overlay rows riding in
+  // context.overlays, because a settings edit reloads the composition from
+  // readProfilePatches and the reload must include the pilot's posture rows
+  const stateDir = join(dir, 'home');
+  const overlays = [
+    { id: 'tools', config: { mode: 'native' } },
+    ...webRows(),
+  ];
+  const profileContext = ensureProfileSurface(stateDir, overlays);
   const digest = execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', 'ubuntu:24.04'], {
     encoding: 'utf8', timeout: 10_000,
   }).trim();
@@ -70,19 +81,26 @@ function fixture(t) {
   };
   setEnv(env);
   cleanup.push(() => setEnv(previous));
-  // the launcher's exact web stack, exercised through the same rows it mounts
-  const patches = [
+  // the launcher's exact web stack, exercised through the same rows it mounts,
+  // in the launcher's exact order (bundles → profile patch → overlays) — the
+  // order the config editor's reload reproduces. The profile patch rows are
+  // read FRESH per boot (a getter, like the launcher's own per-boot call):
+  // edits written by boot N must compose in boot N+1.
+  const cardFile = fileURLToPath(new URL('./cordis.patch.yml', import.meta.resolve('compact-dsh-card/package.json')));
+  const bundleRows = [
     ...loadOverlayPatches('compact-test', baseFile),
     // the web bundle ships its presets as separate layers (dsh.bundle.patch);
     // a real profile boot applies every layer in order, so this stack does too
     ...JSON.parse(readFileSync(webPkgFile, 'utf8')).dsh.bundle.patch
       .flatMap(rel => loadOverlayPatches('compact-test', join(dirname(webFile), rel))),
     ...loadOverlayPatches('compact-test', overlayFile),
-    { id: 'tools', config: { mode: 'native' } },
-    ...webRows(),
+    ...loadOverlayPatches('compact-test', cardFile),
   ];
   let modelRequests = 0;
   const prepare = ctx => {
+    // the launcher provides the profile context before the tree mounts, so
+    // the base bundle's `disabled: !profileContext` rows activate
+    ctx.provide('profileContext', profileContext);
     // the launcher provides the cmdline before the tree settles; --port 0 lets
     // the OS pick the test's listen port and --no-open skips the browser
     provideCmdline(ctx, { args: ['--no-open', '--port', '0'], exit: () => {} });
@@ -92,7 +110,12 @@ function fixture(t) {
     }, { prepend: true });
   };
   cleanup.push(() => assert.equal(modelRequests, 0));
-  return { env, dir, configFile, patches, cleanup, prepare };
+  return {
+    env, dir, stateDir, configFile, cleanup, prepare, profileContext,
+    get patches() {
+      return [...bundleRows, ...profilePatchRows(stateDir), ...overlays];
+    },
+  };
 }
 
 async function launch(fixture, patches = fixture.patches) {
@@ -194,6 +217,47 @@ test('loader web: the browser surface boots governed — runner absent, loop gat
   assert.equal(record.head(session.id), extendChain(genesisHash(session.id), 0, events).at(-1).h);
   assert.match(readFileSync(join(f.env.COMPACT_RECORD_ROOT, '_no-cwd', session.id, 'session.v4.jsonl'), 'utf8'), /turn\/end/);
   assert.equal(readFileSync(join(f.env.COMPACT_CHAIN_DIR, `${session.id}.chain`), 'utf8').trim().split('\n').length, events.length);
+});
+
+test('loader web: the settings surface mounts under the emulated profile and persists edits across boots', { timeout: 90_000 }, async (t) => {
+  // #134: the interactive settings stack requires profile machinery; the
+  // launcher emulates it. The proof: the service mounts, the provider
+  // directory namespaces compose from the rows, an edit lands in the
+  // operator-owned patch file, and a SECOND boot reads it back.
+  const f = fixture(t);
+  await ensureInstallAnchor(f.env.DSH_HOME);
+  const dispose1 = [];
+  const ctx1 = await boot('compact-test', f.configFile, f.patches, f.prepare, rootUrl);
+  dispose1.push(ctx1);
+
+  // the gated rows the profile activates, and the two that must stay refused
+  assert.ok(ctx1.get('settings'), 'the settings service mounts under the emulated profile');
+  assert.ok(ctx1.get('configEditor'), 'the config editor mounts with it');
+  assert.equal(ctx1.get('pluginManager'), undefined, 'the dynamic plugin install system stays refused');
+  assert.equal(ctx1.get('hmr'), undefined, 'live reload stays refused — the operator restarts through the gates');
+
+  // the provider directory namespaces compose from the rows
+  const settings = ctx1.get('settings');
+  const namespaces = settings.describe().map(descriptor => descriptor.ns);
+  assert.ok(namespaces.includes('llm-pi-ai'), `llm-pi-ai in the directory (${namespaces.join(', ')})`);
+  assert.ok(namespaces.includes('agent-default-model'), `agent-default-model in the directory (${namespaces.join(', ')})`);
+
+  // an edit persists into the operator-owned patch file
+  const model = settings.describe().find(descriptor => descriptor.ns === 'agent-default-model');
+  await settings.update('agent-default-model', { provider: 'zai', model: 'glm-5.3-flash' }, model.revision);
+  const patchText = readFileSync(f.profileContext.patchPath, 'utf8');
+  assert.match(patchText, /agent-default-model/);
+  assert.match(patchText, /glm-5\.3-flash/);
+
+  // a SECOND boot reads the edit back — the launcher loads the patch file
+  await ctx1.fiber.dispose();
+  dispose1.pop();
+  const ctx2 = await boot('compact-test', f.configFile, f.patches, f.prepare, rootUrl);
+  f.cleanup.push(() => ctx2.fiber.dispose());
+  const after = ctx2.get('settings').describe().find(descriptor => descriptor.ns === 'agent-default-model');
+  assert.equal(after?.value?.provider, 'zai', `the edit survives the restart: ${JSON.stringify(after?.value)}`);
+  assert.equal(after?.value?.model, 'glm-5.3-flash', `the edit survives the restart: ${JSON.stringify(after?.value)}`);
+  assert.ok(dispose1.length === 0);
 });
 
 test('loader web: a mounted dynamicCordisRunner after boot latches a breach that denies every tool call', { timeout: 90_000 }, async (t) => {
