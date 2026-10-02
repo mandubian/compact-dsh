@@ -64,6 +64,19 @@ export function webRows() {
     // directory with no install anchor beside it. The pilot workspace is
     // fixed by the launcher anyway; the browser renders no picker button.
     { id: 'directory-picker', disabled: true },
+    // The interactive Settings surface is 0.2.0 profile machinery: the
+    // settings service declares inject = ["configEditor", "profileContext"]
+    // and its row is disabled outside a profile boot — which the compact
+    // launcher never boots. Left mounted, every settings page errors at
+    // runtime ("settings service is absent: mount @deepseek-ai/dsh-settings
+    // with @deepseek-ai/dsh-config-editor in the profile composition").
+    // Honest absence instead: the section is off at the row, model config
+    // lives in $DSH_HOME/settings.yaml (the launcher's operator-settings
+    // bridge), and per-session model selection stays in the composer.
+    // Bringing the surface up for real means emulating a profile (persistent
+    // patch file, config editor) while keeping plugin-manager and HMR
+    // refused — tracked as its own work, not a silent mount.
+    { id: 'ui-settings', disabled: true },
     // The shipped presets are the re-arm risk (see the header): each mounts
     // host-side file tools, fork/workflow delegation, and web fetch/search
     // per session. Disabled at the row, they never reach the roster.
