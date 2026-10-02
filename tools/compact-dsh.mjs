@@ -6,6 +6,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
+import { operatorSettingsRows } from './operator-settings.mjs';
 
 const binName = 'compact-dsh';
 const rootUrl = new URL('../package.json', import.meta.url).href;
@@ -178,6 +179,16 @@ async function main() {
       { id: 'ptc-runtime', disabled: true },
       { id: 'headless-runner', inject: ['compact-ready'], config: { task } },
     ],
+    // the operator's $DSH_HOME/settings.yaml (model providers, default model,
+    // ...), LAST so the operator's values win over every bundle default. dsh
+    // 0.2.0 removed the document and its reader (the settings service only
+    // mounts in a profile boot); the bridge in operator-settings.mjs keeps
+    // the operator's file live in this composition.
+    ...operatorSettingsRows({
+      settingsPath: join(stateDir, 'settings.yaml'),
+      web: values.web === true,
+      notice: message => console.error(`${binName}: ${message}`),
+    }),
   ];
   let ctx;
   let disposal;
