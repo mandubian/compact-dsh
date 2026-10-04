@@ -65,7 +65,7 @@ export function splitPreamble(lines) {
   const events = [];
   let headerLines = 0;
   for (const e of lines) {
-    if (e?.seq === undefined && e?.type === 'session' && e?.version === 3) headerLines += 1;
+    if (e?.seq === undefined && e?.type === 'session' && (e?.version === 3 || e?.version === 4)) headerLines += 1;
     else events.push(e);
   }
   return { events, headerLines };

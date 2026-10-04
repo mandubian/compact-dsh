@@ -7,8 +7,10 @@
     "compact": "node tools/compact-dsh.mjs",
     "compact:smoke": "node tools/compact-dsh.mjs --smoke",
     "dist": "node tools/dist.mjs",
+    "dist:probe": "node tools/dist-probe.mjs",
     "test": "node --test \"packages/*/test/*.test.js\" \"tools/*.test.mjs\"",
     "test:live": "COMPACT_LIVE_TEST=1 node --test \"packages/blessed/test/live/*.test.mjs\"",
+    "test:dist-probe": "COMPACT_DIST_PROBE=1 node --test tools/dist-probe.test.mjs",
     "verify-pin": "node tools/verify-pin.mjs",
     "verify-register": "node tools/verify-register.mjs"
   },

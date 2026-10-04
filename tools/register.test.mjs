@@ -130,14 +130,15 @@ test('the auditor rejects outcomes outside the closed vocabulary and unbalanced 
   assert.ok(att.findings.some(f => f.detail.includes('without an open turn')));
 });
 
-test('a dsh v3 session header line is metadata, not an unevidenced act', async () => {
+test('a dsh v3/v4 session header line is metadata, not an unevidenced act', async () => {
   const { mkdtempSync, writeFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { extendChain, genesisHash } = await import('../packages/record/src/chain.js');
   const { splitPreamble } = await import('../auditor/audit.mjs');
 
-  const header = { type: 'session', version: 3, id: 'sess-v3-header', createdAt: 1 };
+  // the 0.2.0 upgrade moved the log format to v4; the header stays metadata
+  const header = { type: 'session', version: 4, id: 'sess-v3-header', createdAt: 1 };
   const events = [
     { seq: 0, type: 'turn/start', time: 1, data: { turn: 1 } },
     { seq: 1, type: 'turn/end', time: 2, data: { turn: 1 } },
