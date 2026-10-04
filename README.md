@@ -271,6 +271,54 @@ true: against a cooperative-but-fallible agent — the daily case — every row
 changes behavior structurally, and the demos show each difference with the
 plain-dsh contrast captured alongside.
 
+## The trial path — the Compact as one plugin in plain dsh
+
+Everything above is the **attested path**: the launcher pins the composition,
+isolates state, and refuses to boot on tampered inputs. The same machinery
+now also travels as **one bundle inside a plain dsh profile** — installed the
+way dsh's plugin manager installs anything, dynamically, the same surface
+the web UI's Plugins page rides. That is the trial path, proven end to end
+in [docs/dist-probe.md](docs/dist-probe.md) (governed calls, the approval
+envelope, the offline auditor passing — all `(verified)`).
+
+```bash
+npm run dist        # → dist/compact-dsh-<version>.tgz — the whole composition as one package
+```
+
+A scratch profile for the trial (isolated `DSH_HOME`, so nothing touches a
+real one):
+
+```bash
+export DSH_HOME=/tmp/compact-trial
+mkdir -p "$DSH_HOME/profiles/compact" && cd "$DSH_HOME/profiles/compact"
+cat > package.json <<'EOF'
+{ "name": "dsh-profile-compact", "private": true,
+  "dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "compact-dsh"] } } }
+EOF
+echo '[]' > cordis.patch.yml
+pnpm add /path/to/compact-dsh/dist/compact-dsh-0.1.0.tgz
+export COMPACT_SANDBOX_IMAGE=ubuntu:24.04
+export COMPACT_SANDBOX_IMAGE_DIGEST="$(docker image inspect ubuntu:24.04 --format '{{index .RepoDigests 0}}' | cut -d@ -f2)"
+dsh --profile compact
+```
+
+What to expect: without the sandbox image the boot **refuses**, naming the
+move — the image and its digest are the operator's act, never defaulted; the
+record, chains, and grants land under the profile's own `compact-data/`
+(the launcher's env names override when set); and the web surface carries
+the ask card. `npm run dist:probe` replays the whole story from a clean
+tree.
+
+What it is **not** — the declared gaps, written down in
+[the decision record](docs/decision-plain-dsh-distribution.md): no attested
+boot (the profile is editable YAML, not the launcher's generated empty
+root), no state isolation, no pre-boot digest verification, and the host
+keeps its `plugin-manager`/`hmr` dynamism. On a foreign host that is the
+host's call, not the composition's — what stays enforced is the gate: a boot
+that mounts a `dynamicCordisRunner` refuses to start, and one mounted late
+latches a breach that denies every tool call. The pilot remains the path
+whose boot attests what it enforces.
+
 ## Q&A
 
 <details>
