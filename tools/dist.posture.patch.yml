@@ -1,0 +1,118 @@
+# The plain-profile posture layer (#141): the refusals and state defaults a
+# plain `dsh --profile` boot needs that the pilot gets from its launcher.
+#
+# Why this layer must exist: a profile boot provides `profileContext`, which
+# flips the base bundle's `disabled: !ctx.get('profileContext')` rows active —
+# including `cordis-host-runner` (the dynamicCordisRunner service the
+# capability gate forbids — a mounted one refuses the boot, A-4) and
+# `ptc-runtime` (host-side arbitrary code execution). The pilot disables these
+# in the launcher's webRows(); a plain profile has no launcher, so the
+# posture rides the bundle. Bundle order puts this composition last, so these
+# rows land after the dsh-web-app rows they refuse — the same ordering rule
+# the launcher's web rows follow.
+#
+# DELIBERATELY ABSENT: `plugin-manager`, `hmr`, and the settings pages whose
+# backends ride them. The pilot refuses them outright; the dynamically loaded
+# composition does not — the trial path's premise is riding the host's own
+# dynamism (it was installed through it). This is a DECLARED GAP, not an
+# oversight: what stays enforced is the gate — a boot whose composition
+# mounts a dynamicCordisRunner refuses (the row disables below are posture;
+# if a plugin-manager toggle re-arms the runner, the next boot refuses), and
+# a runner late-mounted in-process latches a breach denying every tool call.
+# The gap is named in the README and docs/decision-plain-dsh-distribution.md.
+#
+# The state defaults follow the same honesty: env wins when the operator
+# exports it (same names the launcher uses), else state lands under the
+# profile's own directory; if neither exists the record provider refuses —
+# an explicit operator path is the law, and no default invents one.
+#
+# YAML note: expressions carrying ternaries are single-quoted scalars, so
+# their inner strings are double-quoted (the launcher's rows do the same).
+
+- id: cordis-host-runner
+  disabled: true
+
+- id: ptc-runtime
+  disabled: true
+
+- id: directory-picker
+  disabled: true
+
+# The shipped presets are the re-arm risk (see packages/blessed/presets/
+# compact-pilot.patch.yml): each mounts host-side file tools, fork/workflow
+# delegation, and web fetch/search PER SESSION — row disables do not cover
+# the session tool plane. Disabled at the row; the roster carries the pilot
+# preset only (declared by the copied preset patch, selected by the registry
+# replacement below).
+- id: preset-standard
+  disabled: true
+
+- id: preset-ptc
+  disabled: true
+
+- id: preset-minimal
+  disabled: true
+
+- id: preset-cordis
+  disabled: true
+
+# Patch semantics: a config override replaces the whole config, so every key
+# the row owns is restated.
+- id: agent-preset-registry
+  config:
+    default: compact-pilot
+
+# State defaults for the record provider: env first (launcher-compatible
+# names), else the profile directory, else undefined — the provider's
+# explicit-path refusal. compression and the enforcer annex keys are
+# restated unchanged; the annex is a declared rehearsal identity, never a
+# default.
+- id: compact-record-provider
+  config:
+    root: !!js 'process.env.COMPACT_RECORD_ROOT || (ctx.get("profileContext") ? ctx.get("profileContext").dir + "/compact-data/records" : undefined)'
+    chainDir: !!js 'process.env.COMPACT_CHAIN_DIR || (ctx.get("profileContext") ? ctx.get("profileContext").dir + "/compact-data/chains" : undefined)'
+    compression: none
+    enforcerAnnexPath: !!js process.env.COMPACT_ENFORCER_ANNEX || undefined
+    enforcerKeyPath: !!js process.env.COMPACT_ENFORCER_KEY || undefined
+
+# State defaults for the composition root: the grants store and the
+# protected-state set follow the same derivation as the record above; the
+# allowlist, secrets, trust root, enforcer annex, and sandbox posture rest
+# env-declared exactly as the pilot declares them. The sandbox image is NOT
+# defaulted on purpose: blessed validates it at mount, so an operator who
+# exports nothing is refused at boot with the error that names the lawful
+# move (`blessed: sandbox.image must be an explicit non-empty string`) — the
+# declared image and its digest stay the operator's act, verified at confine
+# time against the local daemon.
+- id: compact-blessed
+  config:
+    allowlist: !!js JSON.parse(process.env.COMPACT_ALLOWLIST || '[]')
+    secrets: !!js JSON.parse(process.env.COMPACT_SECRETS || '[]')
+    approval:
+      persistPath: !!js 'process.env.COMPACT_APPROVAL_PERSIST_PATH || (ctx.get("profileContext") ? ctx.get("profileContext").dir + "/compact-data/approvals.json" : undefined)'
+    protectedState:
+      - !!js 'process.env.COMPACT_RECORD_ROOT || (ctx.get("profileContext") ? ctx.get("profileContext").dir + "/compact-data/records" : undefined)'
+      - !!js 'process.env.COMPACT_CHAIN_DIR || (ctx.get("profileContext") ? ctx.get("profileContext").dir + "/compact-data/chains" : undefined)'
+      - !!js 'process.env.COMPACT_APPROVAL_PERSIST_PATH || (ctx.get("profileContext") ? ctx.get("profileContext").dir + "/compact-data/approvals.json" : undefined)'
+    trustRoot:
+      kind: dev-keyring
+      manifest: !!js process.env.COMPACT_KEYRING_MANIFEST || undefined
+      seal: !!js process.env.COMPACT_KEYRING_SEAL || undefined
+      trustedKeyringDigest: !!js process.env.COMPACT_TRUSTED_KEYRING_DIGEST || undefined
+    enforcer:
+      annexPath: !!js process.env.COMPACT_ENFORCER_ANNEX || undefined
+      privateKeyPath: !!js process.env.COMPACT_ENFORCER_KEY || undefined
+      ledgerPath: !!js 'process.env.COMPACT_CHAIN_DIR ? process.env.COMPACT_CHAIN_DIR + "/subjects.jsonl" : (ctx.get("profileContext") ? ctx.get("profileContext").dir + "/compact-data/chains/subjects.jsonl" : undefined)'
+    sandbox:
+      image: !!js process.env.COMPACT_SANDBOX_IMAGE
+      # the mediated posture, opt-in exactly as the pilot opts in: the
+      # container gets no route of its own, only its session's listener on an
+      # internal network, and every connection is delivered per live grant
+      egress: !!js 'process.env.COMPACT_EGRESS === "proxy" ? "proxy" : undefined'
+      network: !!js 'process.env.COMPACT_EGRESS === "proxy" ? (process.env.COMPACT_EGRESS_NETWORK || "compact-egress") : "none"'
+      imageProvenance:
+        - ref: !!js process.env.COMPACT_SANDBOX_IMAGE
+          digest: !!js process.env.COMPACT_SANDBOX_IMAGE_DIGEST
+          attestation: operator-declared
+          recordedBy: !!js process.env.COMPACT_SANDBOX_RECORDED_BY
+          note: !!js process.env.COMPACT_SANDBOX_PROVENANCE_NOTE
