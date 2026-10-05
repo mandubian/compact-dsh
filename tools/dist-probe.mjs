@@ -154,7 +154,9 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
     overlays,
     telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
   };
-  const webArgs = ['--no-open'];
+  // the webserver row binds a port like any boot; the probe must never
+  // contend with a live dsh the operator is running — ephemeral port
+  const webArgs = ['--no-open', '--port', String(20000 + Math.floor(Math.random() * 40000))];
 
   let llmRequests = 0;
   const ctx = await boot(BIN, rootConfig, readProfilePatches(BIN, profileContext, profile), async (host) => {

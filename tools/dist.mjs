@@ -251,8 +251,15 @@ export function packComposition({ outDir = join(ROOT, 'dist'), packagesDir = PAC
   for (const { file, text } of rootShims()) writeFileSync(join(staged, file), text);
   // the client half is served by file path from the bundle root (the same
   // mechanism card's lib/client.js rides) — a pack-time copy, never a shim,
-  // so the browser receives the real bundle bytes
-  copyFileSync(join(card.dir, 'lib', 'client.js'), join(staged, 'client.js'));
+  // so the browser receives the real bundle bytes. The copy's registration
+  // id must follow the served name: the bundle self-registers via
+  // __ModuleLoader__.load({ id }) and the client-modules host serves it as
+  // this package — a misregistered id is a module that "loads without
+  // registering" (caught by the first live web install).
+  const clientBytes = readFileSync(join(card.dir, 'lib', 'client.js'), 'utf8');
+  const from = "id: 'compact-dsh-card'";
+  if (clientBytes.split(from).length !== 2) throw new Error(`${BIN} expected exactly one registration id in the card client bundle`);
+  writeFileSync(join(staged, 'client.js'), clientBytes.replace(from, `id: '${DIST_NAME}'`));
   copyFileSync(join(ROOT, 'LICENSE'), join(staged, 'LICENSE'));
 
   const tarball = join(outDir, `${DIST_NAME}-${blessed.manifest.version}.tgz`);
