@@ -125,11 +125,18 @@ publish needs.
   host tools behind presets); the read-only `cordis-inspect-providers` row
   pends on its disabled host-runner backend (ungated per the register —
   `cordis_inspect_*` is not mutation). Named in [dist-probe.md](dist-probe.md).
-- **The CLI pnpm wrinkle.** `dsh plugin --profile X add` initializes the
-  profile with a workspace file, then its raw pnpm forward trips
-  `ERR_PNPM_ADDING_TO_ROOT` until `-w` is passed; the plugin-manager
-  service path (the web UI) constructs its own arguments and does not. A
-  one-liner install story waits on either an upstream fix or publishing.
+- **The pnpm workspace-root wrinkle (both paths).** dsh initializes every
+  profile directory with a `pnpm-workspace.yaml`, so pnpm treats any `add`
+  there as a workspace-root operation and refuses without `-w`
+  (`ERR_PNPM_ADDING_TO_ROOT`). The CLI's raw pnpm forward trips this, and —
+  correcting an earlier claim here — so does the plugin-manager service
+  path: a live install from the web UI's Plugins page failed the same way
+  (dsh 0.2.0-rc.2). The operator unblock is the error's own suggestion
+  applied where pnpm reads it: `ignore-workspace-root-check=true` in the
+  profile's `.npmrc` (or `~/.npmrc`). A one-liner install story waits on
+  either an upstream fix (the manager passing `-w`, or setting the check
+  for its spawns) or publishing to a registry, where `pnpm add <name>` in
+  a workspace root hits the same check regardless.
 
 ## Register impact
 
