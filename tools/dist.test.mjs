@@ -123,6 +123,14 @@ test('the tarball ships the payload: patches, vendored sources, client bundle, r
     'package/node_modules/compact-dsh-card/lib/client.js',
     'package/node_modules/compact-dsh-blessed/presets/',
   ]) assert.ok(listing.includes(member), `tarball lacks ${member}`);
+
+  // the served client copy must self-register under the SERVED name: the
+  // bundle's __ModuleLoader__.load({ id }) is embedded at build time, and a
+  // copy that still registers as compact-dsh-card loads without registering
+  // compact-dsh — the browser then reports the module as failed
+  const servedClient = readFileSync(join(dir, 'package', 'client.js'), 'utf8');
+  assert.equal(servedClient.split("id: 'compact-dsh'").length, 2, 'the served client must register exactly once, as compact-dsh');
+  assert.ok(!servedClient.includes("id: 'compact-dsh-card'"), 'the served client must not carry the source package registration id');
 });
 
 test('the posture layer refuses the profile-gated re-arm surfaces and defaults state under the profile — while declaring, not hiding, the plugin-manager gap', async (t) => {
