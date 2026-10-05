@@ -289,6 +289,10 @@ A scratch profile for the trial (isolated `DSH_HOME`, so nothing touches a
 real one):
 
 ```bash
+# one-time per machine: dsh profiles are pnpm workspaces, so pnpm refuses
+# adds-to-root until told otherwise (the web UI's install hits the same check)
+echo 'ignore-workspace-root-check=true' >> ~/.npmrc
+
 export DSH_HOME=/tmp/compact-trial
 mkdir -p "$DSH_HOME/profiles/compact" && cd "$DSH_HOME/profiles/compact"
 cat > package.json <<'EOF'
@@ -297,13 +301,26 @@ cat > package.json <<'EOF'
 EOF
 echo '[]' > cordis.patch.yml
 pnpm add /path/to/compact-dsh/dist/compact-dsh-0.1.0.tgz
+# declare the ONE workspace this boot governs (sessions naming another
+# directory are refused — the boundary is declared at boot, not by the governed)
+export COMPACT_WORKSPACE=/absolute/path/to/the/project/to/govern
 export COMPACT_SANDBOX_IMAGE=ubuntu:24.04
 export COMPACT_SANDBOX_IMAGE_DIGEST="$(docker image inspect ubuntu:24.04 --format '{{index .RepoDigests 0}}' | cut -d@ -f2)"
 dsh --profile compact
 ```
 
+Installing into an **existing** profile instead: the same tarball path in the
+web UI's **Plugins** page installs the bundle the same way (pnpm underneath,
+so the `~/.npmrc` line above applies there too) — enable the `compact-dsh`
+bundle if the page does not, restart the profile, and open the **new** boot
+URL it prints (every boot issues a fresh token; a tab from an earlier boot
+half-authenticates and reports host services as unavailable).
+
 What to expect: without the sandbox image the boot **refuses**, naming the
-move — the image and its digest are the operator's act, never defaulted; the
+move — the image and its digest are the operator's act, never defaulted; a
+session naming a directory outside the declared workspace is **refused** at
+its first act (`#18` — the boundary follows `COMPACT_WORKSPACE` or the
+invoking directory, and one boot governs exactly one workspace); the
 record, chains, and grants land under the profile's own `compact-data/`
 (the launcher's env names override when set); and the web surface carries
 the ask card. `npm run dist:probe` replays the whole story from a clean
