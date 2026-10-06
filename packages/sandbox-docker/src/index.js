@@ -14,6 +14,13 @@
 //     REFUSES TO START — an Enforcer that confines execution binds CF-2, and a
 //     composition that cannot state its supply chain does not claim the clause
 //     (D-8, F-5). Run-time demands are answered by run-time grants only.
+//   - the immutable-toolchain recognition (src/toolchain.js, #152): the
+//     rootfs is --read-only in every mode, so a system-package-manager write
+//     is refused pre-execute — before any approval ask can fire — with the
+//     [SC/CF-1/immutable-toolchain] envelope, and a package-manager-shaped
+//     result carrying the backend's denial dialect is wrapped into the same
+//     envelope post-execute. An approval that cannot change anything is a
+//     survey; the refusal teaches the lawful routes instead.
 //
 // Composition coupling (fail loudly, never degrade silently): the plugin
 // declares the services it needs — 'tools' (tool registration), 'approval'
@@ -21,19 +28,28 @@
 //
 // Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
-import { DockerSandboxProvider } from './provider.js';
+import { DockerSandboxProvider, DENIAL_SIGNATURES } from './provider.js';
 import { mountRequestTool } from './mount-tool.js';
 import { mountGrantsFor, DEFAULT_SENSITIVE_PATHS, canonicalizeBestEffort } from './mounts.js';
 import {
   normalizeProvenanceRecords, networkGrantsFor, declaredGapsFor,
   checkSupplyChain, defaultDigestResolver, SupplyChainRefusal,
 } from './provenance.js';
+import {
+  systemPackageWriteOf, packageManagerCommandOf,
+  immutableToolchainDenial, immutableToolchainBlock, immutableToolchainRefusalEvent,
+} from './toolchain.js';
+import { REFUSAL_EVENT } from 'compact-dsh-approval';
 
 export { DockerSandboxProvider, mountRequestTool, mountGrantsFor, DEFAULT_SENSITIVE_PATHS, canonicalizeBestEffort };
 export {
   normalizeProvenanceRecords, networkGrantsFor, declaredGapsFor,
   checkSupplyChain, defaultDigestResolver, SupplyChainRefusal,
 };
+export {
+  systemPackageWriteOf, packageManagerCommandOf,
+  immutableToolchainDenial, immutableToolchainBlock, immutableToolchainRefusalEvent,
+} from './toolchain.js';
 
 export const name = 'compact-sandbox-docker';
 export const inject = ['tools', 'approval', 'compact-approval'];
@@ -57,6 +73,41 @@ export function apply(ctx, config) {
   }
   const declaredGaps = declaredGapsFor(record, image);
   for (const gap of declaredGaps) ctx.logger?.warn?.(`sandbox-docker: ${gap}`);
+  // #152 — the immutable-toolchain recognition, PRE-EXECUTE. The docker
+  // rootfs is --read-only in every sandbox mode (provider.js), so a
+  // system-package-manager write cannot succeed no matter what the operator
+  // approves — and an approval that cannot change anything is a survey. The
+  // act is refused HERE, before any approval ask can fire, with the teaching
+  // envelope. Workspace-scoped installs are lawful and pass untouched; the
+  // analyzer's ask never sees the doomed family. Registered on the ROOT
+  // context at apply time — like the approval gate and the LoopGuard — so
+  // registration order is composition order, and the blessed composition
+  // mounts compact-sandbox BEFORE compact-remote-access so this listener is
+  // ahead of the analyzer's ask in the waterfall.
+  ctx.on?.('tools/pre-execute', async (exec, next) => {
+    const write = systemPackageWriteOf(exec?.arguments ?? {});
+    if (!write) return next();
+    try { ctx.emit?.(REFUSAL_EVENT, immutableToolchainRefusalEvent(exec)); } catch { /* accounting must not break enforcement */ }
+    return immutableToolchainDenial(write);
+  });
+  // #152 — the belt, POST-EXECUTE: a confined result carrying the backend's
+  // own denial dialect from a package-manager-shaped command wraps into the
+  // same envelope. The pre-execute recognition is deliberately precise
+  // (workspace-scoped installs pass); the belt is where the shapes precision
+  // spares — `pip install --user` against a read-only HOME — get taught,
+  // because there the signature is the fact: the container itself reported
+  // that the write hit the immutable filesystem. The container's own words
+  // stay on the record below the envelope.
+  ctx.on?.('tools/post-execute', async (exec, result, next) => {
+    if (!result?.isError) return next();
+    const text = typeof result?.error?.message === 'string' && result.error.message
+      ? result.error.message
+      : (result?.content ?? []).map(b => (b?.type === 'text' ? b.text : '')).join('\n');
+    if (!DENIAL_SIGNATURES.some(s => text.toLowerCase().includes(s))) return next();
+    const shape = packageManagerCommandOf(exec?.arguments ?? {});
+    if (!shape) return next();
+    return immutableToolchainBlock(shape, text);
+  });
   // Defer until the composition's services exist (Cordis inject ordering):
   // the provider needs the grant store, the tool needs the human gate and
   // the tool registry. A composition missing any of them never applies the
@@ -86,6 +137,9 @@ export function apply(ctx, config) {
     scope.provide?.('compact-sandbox', {
       name: 'compact-sandbox-docker',
       image,
+      // #152: the fact the immutable-toolchain recognition stands on — this
+      // backend's rootfs is immutable in every sandbox mode
+      immutableRootfs: true,
       // CF-2: the acquisition history travels with the service, so the boot
       // record and the offline auditor can both read what is being trusted
       // and on what basis.
