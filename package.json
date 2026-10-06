@@ -7,6 +7,7 @@
     "compact": "node tools/compact-dsh.mjs",
     "compact:smoke": "node tools/compact-dsh.mjs --smoke",
     "compact:bake": "node tools/bake.mjs",
+    "compact:community": "node tools/community-demo.mjs",
     "dist": "node tools/dist.mjs",
     "dist:probe": "node tools/dist-probe.mjs",
     "test": "node --test \"packages/*/test/*.test.js\" \"tools/*.test.mjs\"",
