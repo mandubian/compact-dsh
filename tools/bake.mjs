@@ -29,6 +29,14 @@
 // The baked toolchain lands in /opt/compact-venv (on PATH) and /usr/local/bin
 // — never at the workspace path, which the runtime bind-mounts over every act.
 //
+// PROXY (the corporate-host case): a build's RUN steps do not read the
+// invoking shell's proxy environment, so on a proxied host `apt-get update`
+// times out while DNS still resolves. bake forwards the proxy variables it
+// finds in ITS OWN environment (http_proxy/https_proxy/no_proxy/all_proxy,
+// either case) into the build as predeclared build-args — they populate the
+// RUN steps' environment and never persist in the final image's config. The
+// summary line says when it did; unset them before invoking to build direct.
+//
 // Usage:
 //   npm run compact:bake -- --base <image> [--workspace DIR] [--tag NAME]
 //                           [--packages "a, b"] [--dry-run]
@@ -42,6 +50,23 @@ import { join, resolve } from 'node:path';
 const REF_RE = /^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$/;          // the launcher's image-reference charset
 const PKG_RE = /^[A-Za-z0-9][A-Za-z0-9+.=_-]*$/;           // a debian package name (plus =version pins)
 const BUILT_VENV = '/opt/compact-venv';
+// the proxy variables a build's RUN steps may need, forwarded as predeclared
+// build-args (docker predeclares both cases; they never persist in the image)
+const PROXY_KEYS = ['http_proxy', 'https_proxy', 'no_proxy', 'all_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'ALL_PROXY'];
+
+/**
+ * The proxy build-args for one invocation environment — PURE. Only variables
+ * actually set (non-empty) are forwarded, in a deterministic order, so the
+ * same shell always derives the same build.
+ */
+export function proxyBuildArgs(env = process.env) {
+  const out = [];
+  for (const key of PROXY_KEYS) {
+    const value = env[key];
+    if (typeof value === 'string' && value.trim() !== '') out.push('--build-arg', `${key}=${value}`);
+  }
+  return out;
+}
 
 /** Usage text — printed on a missing --base, the one required fact. */
 export const USAGE =
@@ -50,7 +75,10 @@ export const USAGE =
   '  --workspace DIR    the workspace whose toolchain is promoted (default: the working directory)\n' +
   '  --tag NAME         the derived image tag (default: compact-baked:<base>-<timestamp>)\n' +
   '  --packages "a, b"  system packages to install in the derived image (comma/space separated)\n' +
-  '  --dry-run          print what would be built and the exact Dockerfile, build nothing';
+  '  --dry-run          print what would be built and the exact Dockerfile, build nothing\n' +
+  '\n' +
+  'Your shell\'s proxy variables (http_proxy/https_proxy/no_proxy/all_proxy, either case)\n' +
+  'are forwarded into the build when set — unset them to build direct.';
 
 /**
  * The workspace's toolchain artifacts, by convention: `.venv` (the name the
@@ -140,17 +168,18 @@ function defaultInspect({ ref }) {
   return /^sha256:[0-9a-f]{64}$/.test(digest) ? { ok: true, digest } : { ok: false, detail: `docker returned ${JSON.stringify(digest)}, not a sha256 digest` };
 }
 
-function defaultBuild({ dir, tag }) {
-  const out = spawnSync('docker', ['build', '-t', tag, '-f', join(dir, 'Dockerfile'), dir], { encoding: 'utf8', timeout: 600_000 });
+function defaultBuild({ dir, tag, buildArgs = [] }) {
+  const out = spawnSync('docker', ['build', ...buildArgs, '-t', tag, '-f', join(dir, 'Dockerfile'), dir], { encoding: 'utf8', timeout: 600_000 });
   return { status: out.status ?? 1, stderr: String(out.stderr ?? out.stdout ?? '') };
 }
 
 /**
  * The whole operator act. Injected `io` keeps the unit tests daemon-free;
- * the defaults shell out to the operator's docker.
+ * the defaults shell out to the operator's docker. `env` (default: the
+ * process environment) is where the proxy variables are read from.
  */
 export async function bake({
-  base, workspace, tag, packages = [], dryRun = false,
+  base, workspace, tag, packages = [], dryRun = false, env = process.env,
   io = {},
 } = {}) {
   const inspect = io.inspect ?? defaultInspect;
@@ -163,6 +192,7 @@ export async function bake({
   const write = io.write ?? writeFileSync;
   const copy = io.copy ?? cpSync;
   const stat = io.stat ?? statSync;
+  const buildArgs = proxyBuildArgs(env);
 
   if (!base) throw new Error(USAGE);
   if (!REF_RE.test(base)) throw new Error(`base ${JSON.stringify(base)} is not a Docker image reference`);
@@ -196,8 +226,10 @@ export async function bake({
   });
 
   // 4. build with a MINIMAL context — the Dockerfile and bin/ only; the
-  //    workspace itself never rides to the daemon
-  if (dryRun) return { tag: derivedTag, digest: null, baseDigest: resolved.digest, dockerfile, artifacts, requirements, context: null };
+  //    workspace itself never rides to the daemon. Proxy variables from the
+  //    invoking environment ride as build-args (RUN steps only; they never
+  //    persist in the final image).
+  if (dryRun) return { tag: derivedTag, digest: null, baseDigest: resolved.digest, dockerfile, artifacts, requirements, context: null, buildArgs };
   const ctxDir = mkctx('compact-bake-');
   write(join(ctxDir, 'Dockerfile'), dockerfile);
   if (artifacts.venv) {
@@ -209,14 +241,14 @@ export async function bake({
       if (stat(join(artifacts.bin, f)).isFile()) copy(join(artifacts.bin, f), join(ctxDir, 'bin', f));
     }
   }
-  const result = build({ dir: ctxDir, tag: derivedTag });
+  const result = build({ dir: ctxDir, tag: derivedTag, buildArgs });
   if (result.status !== 0) {
     throw new Error(`docker build failed for ${derivedTag} (context kept at ${ctxDir} for inspection):\n` +
       String(result.stderr).trim().split('\n').slice(-6).join('\n'));
   }
   const digest = inspect({ ref: derivedTag });
   if (!digest.ok) throw new Error(`the built image ${derivedTag} could not be re-inspected: ${digest.detail}`);
-  return { tag: derivedTag, digest: digest.digest, baseDigest: resolved.digest, dockerfile, artifacts, requirements, context: ctxDir };
+  return { tag: derivedTag, digest: digest.digest, baseDigest: resolved.digest, dockerfile, artifacts, requirements, context: ctxDir, buildArgs };
 }
 
 async function main() {
@@ -246,6 +278,8 @@ async function main() {
   if (out.artifacts.bin) bits.push('./bin/');
   if (packageList.length > 0) bits.push(`packages: ${packageList.join(', ')}`);
   console.log(`  artifacts: ${bits.join(' · ') || '(none)'}`);
+  const proxyKeys = out.buildArgs.filter((_, i) => i % 2 === 1).map(a => a.split('=')[0]);
+  if (proxyKeys.length > 0) console.log(`  proxy:     forwarded into the build (${proxyKeys.join(', ')})`);
   if (out.context) console.log(`  context:   ${out.context} (kept for inspection — the workspace itself never rode to the daemon)`);
   if (out.digest == null) {
     console.log('\n--dry-run: nothing built. The Dockerfile:\n');
