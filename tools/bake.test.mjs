@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { detectArtifacts, deriveBakefile, freezeRequirements, bake, USAGE } from './bake.mjs';
+import { detectArtifacts, deriveBakefile, freezeRequirements, bake, proxyBuildArgs, USAGE } from './bake.mjs';
 
 const DIGEST = 'sha256:' + 'ab'.repeat(32);
 const CREATED = '2026-10-06T09:00:00.000Z';
@@ -173,6 +173,36 @@ test('bake: a failed build keeps the context and names it (the operator inspects
     base: 'ubuntu:24.04', workspace: ws,
     io: IO({ build: () => ({ status: 1, stderr: 'ERROR: base image python3 not found\nDONE\n' }) }),
   }), /docker build failed.*context kept at .*python3 not found/s);
+});
+
+// -- the proxy forward (the corporate-host case) --------------------------------
+
+test('proxyBuildArgs: forwards exactly the set proxy variables, either case, deterministically', () => {
+  const args = proxyBuildArgs({
+    http_proxy: 'http://proxy.corp:3128/',
+    HTTPS_PROXY: 'http://proxy.corp:3128/',
+    no_proxy: 'localhost,127.0.0.1',
+    PATH: '/usr/bin',                       // never forwarded
+    empty_proxy: '',                        // not a proxy key
+  });
+  assert.deepEqual(args, [
+    '--build-arg', 'http_proxy=http://proxy.corp:3128/',
+    '--build-arg', 'no_proxy=localhost,127.0.0.1',
+    '--build-arg', 'HTTPS_PROXY=http://proxy.corp:3128/',
+  ], 'the PROXY_KEYS order, only non-empty proxy variables');
+  assert.deepEqual(proxyBuildArgs({}), [], 'a direct-connected shell forwards nothing');
+});
+
+test('bake: the invoking shell\'s proxy rides the build as build-args (RUN steps only, never the image)', async () => {
+  const ws = makeWorkspace({ venv: '.venv' });
+  let seen = null;
+  const out = await bake({
+    base: 'ubuntu:24.04', workspace: ws, tag: 'compact-baked:test',
+    env: { http_proxy: 'http://proxy.corp:3128/', NO_PROXY: 'localhost' },
+    io: IO({ build: ({ buildArgs }) => { seen = buildArgs; return { status: 0, stderr: '' }; } }),
+  });
+  assert.deepEqual(seen, ['--build-arg', 'http_proxy=http://proxy.corp:3128/', '--build-arg', 'NO_PROXY=localhost']);
+  assert.equal(out.buildArgs, seen, 'the forwarded args travel with the result for the summary line');
 });
 
 // -- the whole act, for real: build, digest, labels, and the smoke boot --------

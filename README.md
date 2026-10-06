@@ -347,12 +347,14 @@ workspace's toolchain artifacts (a `.venv` freeze, `./bin/`, or an explicit
 package list), stamps the provenance chain (base digest, workspace,
 timestamp) as labels, builds on your daemon, and prints the ready-to-export
 `COMPACT_SANDBOX_IMAGE` / `COMPACT_SANDBOX_IMAGE_DIGEST` pair — derived the
-way the runtime itself derives digests, so the re-declare is copy-paste. It
-records nothing on the governed record; CF-2 at confine time is the notary —
-a rebuilt image that drifted off the declared digest is refused by name until
-re-declared. The Subject-facing version of all four moves is the guide's
-toolchain page, and the per-turn attestation states the posture before any of
-this comes up.
+way the runtime itself derives digests, so the re-declare is copy-paste.
+Behind a corporate proxy, your shell's proxy variables are forwarded into
+the build automatically (`apt-get` inside the build needs them; they never
+persist in the image). It records nothing on the governed record; CF-2 at
+confine time is the notary — a rebuilt image that drifted off the declared
+digest is refused by name until re-declared. The Subject-facing version of
+all four moves is the guide's toolchain page, and the per-turn attestation
+states the posture before any of this comes up.
 
 What it is **not** — the declared gaps, written down in
 [the decision record](docs/decision-plain-dsh-distribution.md): no attested
