@@ -326,6 +326,34 @@ record, chains, and grants land under the profile's own `compact-data/`
 the ask card. `npm run dist:probe` replays the whole story from a clean
 tree.
 
+### Missing a tool?
+
+The sandbox image (`ubuntu:24.04` is a bare shell) ships almost nothing, and
+its root filesystem is read-only: **the image is the operator's digest-pinned
+supply-chain act, the governed cannot mutate its own toolchain, and approval
+cannot buy what the read-only rootfs forbids** — a system-package install is
+refused *before* any approval fires, with the lawful moves on the refusal.
+The four lawful moves:
+
+| Need | Lawful move |
+|---|---|
+| a python/node/… library | install into the workspace (`python3 -m venv .venv`) — it persists across every act |
+| a self-contained CLI (jq, yq) | static binary into `./bin/`, invoke by path |
+| operator-provisioned host tools | a read-only PathPrefix mount grant over the tools directory |
+| system packages | the operator's act: bake a derived image and re-declare its digest (`npm run compact:bake`) |
+
+`compact:bake` derives the Dockerfile from your base image plus the
+workspace's toolchain artifacts (a `.venv` freeze, `./bin/`, or an explicit
+package list), stamps the provenance chain (base digest, workspace,
+timestamp) as labels, builds on your daemon, and prints the ready-to-export
+`COMPACT_SANDBOX_IMAGE` / `COMPACT_SANDBOX_IMAGE_DIGEST` pair — derived the
+way the runtime itself derives digests, so the re-declare is copy-paste. It
+records nothing on the governed record; CF-2 at confine time is the notary —
+a rebuilt image that drifted off the declared digest is refused by name until
+re-declared. The Subject-facing version of all four moves is the guide's
+toolchain page, and the per-turn attestation states the posture before any of
+this comes up.
+
 What it is **not** — the declared gaps, written down in
 [the decision record](docs/decision-plain-dsh-distribution.md): no attested
 boot (the profile is editable YAML, not the launcher's generated empty
