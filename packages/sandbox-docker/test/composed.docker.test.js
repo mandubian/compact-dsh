@@ -263,11 +263,15 @@ test('composed #152: the apt-get act is refused pre-execute — zero approval as
 
   // the precision requirement, live: a workspace-scoped pip install is spared
   // by the recognition — it still asks for its egress honestly (pypi), runs,
-  // and fails on its own merits (no python3/pip in the bare image — the act
-  // was lawful; the image just cannot do it)
+  // and fails on its own merits. The outcome belongs to the container, not
+  // this gate: a bare image answers 127 (no pip3), a pip-bearing image fails
+  // on the unreachable index (the sandbox keeps the network off) — so the
+  // pin reads the confined result structurally, image-agnostic (#160)
   const lawful = await run(tools, agent, 'bash_probe', { command: 'pip3 install --user requests' });
   const sl = JSON.stringify(lawful);
   assert.ok(!sl.includes('SC/CF-1'), 'a workspace-scoped install is never refused by this gate');
   assert.equal(asked.count, 1, 'its egress ask fired honestly instead');
-  assert.ok(sl.includes('command not found') || sl.includes('not found'), 'the act ran and failed on its own merits — ' + sl.slice(0, 200));
+  const confined = JSON.parse(String(lawful.value));
+  assert.equal(typeof confined.status, 'number', 'the act reached the container — ' + sl.slice(0, 200));
+  assert.notEqual(confined.status, 0, 'the act fails on its own merits, not by this gate\'s word — ' + sl.slice(0, 200));
 });
