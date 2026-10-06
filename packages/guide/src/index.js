@@ -88,11 +88,11 @@ export function apply(ctx, config = {}) {
   const guide = defineTool({
     name: GUIDE_TOOL,
     description:
-      'The guide to this runtime: how it is run and configured, how approvals, grants, confinement, network egress, ' +
-      'secrets, delegation, the record and your remedies work, with the exact commands, flags and env vars. Use it when ' +
-      'your operator asks how to use or configure the system, or before you use a mechanism you have not used. With no ' +
-      'arguments, the index; with `page`, one page; with `query`, a search. It explains mechanisms — for what YOU may ' +
-      'do now, self_describe is authoritative, and for the law, law_read.',
+      'The guide to this runtime: how it is run and configured, how approvals, grants, confinement, the immutable ' +
+      'toolchain, network egress, secrets, delegation, the record and your remedies work, with the exact commands, ' +
+      'flags and env vars. Use it when your operator asks how to use or configure the system, or before you use a ' +
+      'mechanism you have not used. With no arguments, the index; with `page`, one page; with `query`, a search. It ' +
+      'explains mechanisms — for what YOU may do now, self_describe is authoritative, and for the law, law_read.',
     parameters: {
       page: { type: 'string', description: 'a page id from the index, e.g. "approvals"' },
       query: { type: 'string', description: 'words to search the pages for, e.g. "mount a directory"' },

@@ -128,6 +128,41 @@
       ]
     },
     {
+      "id": "toolchain",
+      "title": "The toolchain: immutable by design, and where dependencies go",
+      "audience": [
+        "operator",
+        "subject"
+      ],
+      "tags": [
+        "toolchain",
+        "install",
+        "apt",
+        "apt-get",
+        "pip",
+        "venv",
+        "package",
+        "packages",
+        "missing",
+        "static",
+        "binary",
+        "image",
+        "bake",
+        "immutable",
+        "persist",
+        "workspace"
+      ],
+      "sources": [
+        "packages/sandbox-docker/src/toolchain.js",
+        "packages/sandbox-docker/src/provider.js",
+        "packages/sandbox-docker/src/provenance.js",
+        "packages/sandbox-docker/src/index.js",
+        "packages/self-model/src/attestation.js",
+        "docs/concept-supply-chain.md",
+        "README.md"
+      ]
+    },
+    {
       "id": "network",
       "title": "Network: detection, postures and the egress mediator",
       "audience": [

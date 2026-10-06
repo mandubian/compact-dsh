@@ -44,6 +44,15 @@
 // the composition declares nothing (D-7 — an unknown posture is not a
 // posture to guess).
 //
+// THE TOOLCHAIN IS POSTURE TOO (#153). The same session that taught the wire
+// gap taught this one: the Subject ran `apt-get install python3` because
+// nothing said the rootfs is read-only and the image digest-pinned — it
+// learned the container's physics from a confounded failure. The sandbox
+// service's own declaration (#152: `immutableRootfs`, image, CF-2 digest)
+// becomes the second declarative line, and where dependencies DO go (the
+// workspace, where they persist across acts). Same discipline: from the
+// service, never the Subject; silent when undeclared.
+//
 // Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 /** How long an attestation may be relied on before it is an alarm. */
@@ -80,6 +89,7 @@ export function capabilitiesOf(ctx) {
   const gate = svc(ctx, 'compact-capability-gate');
   const parts = gate?.assess?.() ?? [];
   const approval = svc(ctx, 'compact-approval');
+  const sandbox = svc(ctx, 'compact-sandbox');
   const enforcement = [
     'compact-approval', 'compact-loopguard', 'compact-promotion', 'compact-sandbox',
     'compact-specialists', 'compact-capability-gate', 'compact-record', 'compact-remote-access',
@@ -96,6 +106,21 @@ export function capabilitiesOf(ctx) {
     // line exists to replace). null when undeclared: a standalone gate knows no
     // physics, and the attestation says nothing rather than guess (D-7).
     egress: EGRESS_POSTURES.includes(approval?.egress) ? approval.egress : null,
+    // #153 — the toolchain posture, read from the sandbox service's own
+    // declaration (#152: `immutableRootfs` travels with the service, beside the
+    // CF-2 acquisition history). The live session ran `apt-get install` because
+    // nothing said the toolchain was immutable — it learned the container's
+    // physics from a confounded failure, the anti-pattern #106 fixed for the
+    // wire. Read from the declaration, never from anything the Subject said.
+    // null when the composition declares no sandbox or no immutable rootfs
+    // (another backend may differ): the same silence the egress line keeps —
+    // an unknown physics is not a posture to guess (D-7).
+    toolchain: sandbox?.immutableRootfs === true
+      ? {
+          image: sandbox.image,
+          digest: typeof sandbox.provenance?.digest === 'string' ? sandbox.provenance.digest : null,
+        }
+      : null,
   };
 }
 
@@ -277,6 +302,17 @@ const EGRESS_LINES = {
   open: '  - Egress: open — the declared open posture (CF-2); connectivity follows the sandbox\'s declaration, not approval',
 };
 
+// #153 — the toolchain, declared where the governed party reads it, the same
+// move #106 made for the wire. Declarative only (I-8): the line changes no
+// gate, grants nothing, and refuses nothing — it states the physics (the
+// read-only rootfs, the per-call container) and the destination that works
+// (the workspace), so a competent Subject never learns them from a confounded
+// failure. Where the sandbox declares no immutable rootfs, no line: silence is
+// the honest unknown (D-7), never a guessed posture.
+const TOOLCHAIN_LINE = (t) =>
+  `  - Toolchain: ${t.image} at ${t.digest ? t.digest.slice(0, 19) + '…' : 'digest not resolvable'} — immutable: ` +
+  'read-only rootfs, a fresh container per call; installs belong in the workspace, where they persist across acts';
+
 export function renderAttestation(att) {
   const cap = att.capabilities;
   const basisLine = att.basis === 'dev-keyring'
@@ -321,6 +357,9 @@ export function renderAttestation(att) {
     // #106: the wire, declared. Absent when the composition declares no
     // posture — silence is the honest "unknown" (D-7), never a guessed line.
     ...(EGRESS_LINES[cap.egress] ? [EGRESS_LINES[cap.egress]] : []),
+    // #153: the toolchain, declared. Same discipline — absent when the
+    // sandbox declares no immutable rootfs, never a guessed physics.
+    ...(cap.toolchain ? [TOOLCHAIN_LINE(cap.toolchain)] : []),
     ...(att.exception?.declared
       ? ['',
          '[A-8/R-5] A STATE OF EXCEPTION IS IN FORCE over this runtime — your capabilities are narrowed, and you are',

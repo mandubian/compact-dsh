@@ -49,6 +49,7 @@ You can't see any of them. When they ask "how do I…?":
 | `page:running` | operator | launching: modes, flags, env vars, the state directory |
 | `page:approvals` | both | the ask, grants, budgets and `command:/grants-grant` |
 | `page:sandbox` | both | Docker confinement, mounts, the workspace, image provenance |
+| `page:toolchain` | both | the immutable toolchain: why installs go to the workspace, the four lawful moves |
 | `page:network` | both | the remote-access analyzer and egress postures |
 | `page:secrets` | both | declared secret refs and secret grants |
 | `page:delegation` | both | specialists, child Members, consent, inquiry |

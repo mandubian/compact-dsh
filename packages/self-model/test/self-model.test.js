@@ -256,6 +256,84 @@ test('the posture line sits inside the capabilities block, below the Part VI enu
   assert.ok(lines[egressAt].startsWith('  - '), 'the line carries the block\'s bullet form');
 });
 
+// -- #153 — the toolchain posture, the wire's twin ----------------------------
+// The live session ran `apt-get install python3` because nothing said the
+// toolchain was immutable; it learned the container's physics from a
+// confounded failure. The attestation names the posture (image, digest,
+// immutability, the workspace destination) from the sandbox service's own
+// declaration — and stays silent where nothing is declared.
+
+const SANDBOX_STUB = {
+  name: 'compact-sandbox-docker',
+  image: 'ubuntu:24.04',
+  immutableRootfs: true,
+  provenance: { digest: 'sha256:' + 'abcd'.repeat(16), attestation: 'operator-declared' },
+  declaredGaps: ['OPERATOR-DECLARED'],
+};
+
+test('a declared immutable toolchain tells the Subject the physics and the destination (#153)', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  ctx.plugin(stubService('compact-sandbox', { ...SANDBOX_STUB }));
+  for (let i = 0; i < 300 && ctx.get('compact-sandbox') === undefined; i++) await new Promise(r => setImmediate(r));
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.deepEqual(att.capabilities.toolchain,
+    { image: 'ubuntu:24.04', digest: 'sha256:' + 'abcd'.repeat(16) },
+    'the posture is composed data, read from the sandbox declaration');
+  const text = renderAttestation(att);
+  assert.match(text,
+    /Toolchain: ubuntu:24\.04 at sha256:abcdabcdabcd… — immutable: read-only rootfs, a fresh container per call; installs belong in the workspace, where they persist across acts/,
+    'the line names image, digest-short, immutability, and where dependencies DO go');
+  assert.ok(!text.includes('abcd'.repeat(16)), 'the digest renders SHORT — the full value stays in the record');
+});
+
+test('an undeclared toolchain renders nothing — silence is the honest unknown (D-7) (#153)', async () => {
+  // no sandbox service at all
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  const att = composeAttestation(ctx, { sessionId: 's1' });
+  assert.equal(att.capabilities.toolchain, null, 'no declaration is null, never a plausible posture');
+  assert.ok(!renderAttestation(att).includes('Toolchain:'), 'nothing is claimed where nothing was declared');
+
+  // a sandbox whose declaration does not say immutableRootfs — another
+  // backend's physics are its own; the attestation does not guess them
+  const other = await boot();
+  other.agents.add('s1');
+  other.ctx.plugin(stubService('compact-sandbox', { name: 'compact-sandbox-other', image: 'alpine:3.21' }));
+  for (let i = 0; i < 300 && other.ctx.get('compact-sandbox') === undefined; i++) await new Promise(r => setImmediate(r));
+  const attOther = composeAttestation(other.ctx, { sessionId: 's1' });
+  assert.equal(attOther.capabilities.toolchain, null);
+  assert.ok(!renderAttestation(attOther).includes('Toolchain:'), 'the service\'s presence is not the posture');
+
+  // immutable but with no resolvable digest: the line renders and says so,
+  // rather than inventing a digest
+  const bare = await boot();
+  bare.agents.add('s1');
+  bare.ctx.plugin(stubService('compact-sandbox', { image: 'ubuntu:24.04', immutableRootfs: true }));
+  for (let i = 0; i < 300 && bare.ctx.get('compact-sandbox') === undefined; i++) await new Promise(r => setImmediate(r));
+  const attBare = composeAttestation(bare.ctx, { sessionId: 's1' });
+  assert.deepEqual(attBare.capabilities.toolchain, { image: 'ubuntu:24.04', digest: null });
+  assert.match(renderAttestation(attBare), /Toolchain: ubuntu:24\.04 at digest not resolvable — immutable/);
+});
+
+test('the toolchain line sits with the egress line inside the capabilities block (#153)', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('s1');
+  ctx.plugin(stubService('compact-approval', { egress: 'none' }));
+  ctx.plugin(stubService('compact-sandbox', { ...SANDBOX_STUB }));
+  for (let i = 0; i < 300 && (ctx.get('compact-sandbox') === undefined || ctx.get('compact-approval') === undefined); i++) {
+    await new Promise(r => setImmediate(r));
+  }
+  const lines = renderAttestation(composeAttestation(ctx, { sessionId: 's1' })).split('\n');
+  const toolchainAt = lines.findIndex(l => l.startsWith('  - Toolchain:'));
+  const egressAt = lines.findIndex(l => l.startsWith('  - Egress:'));
+  const partsAt = lines.findIndex(l => l.startsWith('Capabilities in force:'));
+  const budgetsAt = lines.findIndex(l => l.startsWith('Budgets remaining:'));
+  assert.ok(partsAt < egressAt && egressAt < toolchainAt && toolchainAt < budgetsAt,
+    'both posture lines are capabilities-in-force, the toolchain beside the wire');
+  assert.ok(lines[toolchainAt].startsWith('  - '), 'the line carries the block\'s bullet form');
+});
+
 test('the declared gaps include the unsigned basis — the limit travels with the claim', async () => {
   const { ctx } = await boot();
   const gaps = gapsOf(ctx);
