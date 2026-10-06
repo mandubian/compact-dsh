@@ -323,6 +323,20 @@ export const GLOSS = {
     instruction: 'Do not expect the image’s build settings to grant anything. Network access runs through the egress gate.',
     cites: ['CF-2', 'I-5', 'R-3'],
   },
+  'SC/CF-1/immutable-toolchain': {
+    title: 'The system toolchain is immutable — this install cannot succeed',
+    why: 'The confined act runs against a read-only, digest-pinned rootfs: the system package stores inside the container are immutable by design. Installing system packages there cannot succeed no matter what the operator approves — an approval that cannot change anything is a survey — so the act is refused before any approval fires, and the refusal names the routes that work.',
+    example: {
+      blocked: ['apt-get install -y python3 under the docker sandbox'],
+      lawful: ['python3 -m venv .venv && .venv/bin/pip install … — a workspace install persists across every act', 'a static binary fetched into ./bin/ and invoked by path'],
+    },
+    instruction: 'Do not retry the system install. Install language dependencies into the workspace (a venv or --target), fetch a self-contained binary by path, request a read-only mount grant over an operator-provisioned tools directory, or escalate to your Principal to bake a derived image.',
+    operatorMoves: {
+      'bake a derived image': 'the operator’s act: build the image, declare its acquisition history (CF-2 re-declared), and boot the composition on it',
+      'provision a tools directory': 'an operator-provisioned directory the session may then request a read-only mount grant over',
+    },
+    cites: ['CF-1', 'CF-2', 'I-5', 'R-3'],
+  },
 
   // ── CF — the launcher's workspace anchor (blessed) ──
 

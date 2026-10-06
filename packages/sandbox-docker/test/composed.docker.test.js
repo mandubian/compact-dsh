@@ -17,6 +17,7 @@ import ApprovalService from '@deepseek-ai/dsh-user-approval';
 import { CommandRuntime } from '@deepseek-ai/dsh-commands';
 import { Session } from '@deepseek-ai/dsh-session';
 import { approvalPlugin } from 'compact-dsh-approval';
+import * as remoteAccess from 'compact-dsh-remote-access';
 import * as sandbox from '../src/index.js';
 import { DockerSandboxProvider } from '../src/provider.js';
 import { defaultDigestResolver, SupplyChainRefusal } from '../src/provenance.js';
@@ -59,7 +60,10 @@ async function boot({ operator = 'allowed-once', workspaceRoot } = {}) {
   ctx.plugin(ToolRuntime);
   ctx.plugin(CommandRuntime);
   approvalPlugin({})(ctx, {});
+  // the blessed order (#152): the sandbox mounts BEFORE the remote-access
+  // analyzer, so the immutable-toolchain refusal registers ahead of the ask
   sandbox.apply(ctx, { ...PROV });
+  remoteAccess.apply(ctx, {});
   const asked = { count: 0 };
   ctx.on('approval/request', async (req, next) => {
     asked.count += 1;
@@ -238,4 +242,32 @@ test('composed CF-2: the service carries the acquisition history and its declare
   assert.equal(svc.provenance.attestation, 'operator-declared');
   assert.equal(svc.declaredGaps.length, 1, 'an asserted-but-unverified history is a declared gap (I-8)');
   assert.match(svc.declaredGaps[0], /OPERATOR-DECLARED/);
+});
+
+// -- #152: the immutable-toolchain recognition against the real waterfall -----
+
+test('composed #152: the apt-get act is refused pre-execute — zero approval ask fires (the dishonest ask is the bug)', async () => {
+  const workspace = mkdtempSync(join(tmpdir(), 'compact-sbx-it-'));
+  const { ctx, tools, asked } = await boot({ operator: 'allowed-once' });
+  tools.register(makeBashTool(ctx, workspace));
+  const agent = makeAgent('sess-imm-1');
+
+  // the trial path's exact act: the waterfall once asked for an egress grant
+  // for archive.ubuntu.com — an approval that cannot change anything is a survey
+  const r = await run(tools, agent, 'bash_probe', { command: 'apt-get install -y python3' });
+  const s = JSON.stringify(r);
+  assert.equal(asked.count, 0, 'the egress ask for archive.ubuntu.com never fires');
+  assert.ok(s.includes('[SC/CF-1/immutable-toolchain]'), 'the refusal teaches — ' + s.slice(0, 300));
+  assert.ok(s.includes('Lawful next moves'), 'the moves ride the refusal');
+  assert.ok(!s.includes('"status"'), 'no confined execution happened');
+
+  // the precision requirement, live: a workspace-scoped pip install is spared
+  // by the recognition — it still asks for its egress honestly (pypi), runs,
+  // and fails on its own merits (no python3/pip in the bare image — the act
+  // was lawful; the image just cannot do it)
+  const lawful = await run(tools, agent, 'bash_probe', { command: 'pip3 install --user requests' });
+  const sl = JSON.stringify(lawful);
+  assert.ok(!sl.includes('SC/CF-1'), 'a workspace-scoped install is never refused by this gate');
+  assert.equal(asked.count, 1, 'its egress ask fired honestly instead');
+  assert.ok(sl.includes('command not found') || sl.includes('not found'), 'the act ran and failed on its own merits — ' + sl.slice(0, 200));
 });

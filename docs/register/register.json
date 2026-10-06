@@ -121,13 +121,18 @@
       "kind": "enforced",
       "plugin": "compact-sandbox-docker",
       "service": "compact-sandbox",
-      "evidence": "fail-closed confinement: SANDBOX_UNAVAILABLE on daemon loss, never passthrough; per-call container, no-network default; enforcement reported honestly",
+      "evidence": "fail-closed confinement: SANDBOX_UNAVAILABLE on daemon loss, never passthrough; per-call container, no-network default; enforcement reported honestly. The immutable-toolchain recognition (#152): the rootfs is --read-only in every sandbox mode and the image is digest-pinned (CF-2), so a system-package-manager write (apt/apt-get/dnf/yum/apk write subcommands; pip/pip3 installs aimed at the system site-packages — a venv in the line, --target/--user/--prefix scoping or a path-qualified venv interpreter spares the pip family, because precision is the requirement: a refusal must never teach a lie) is refused PRE-EXECUTE with the [SC/CF-1/immutable-toolchain] envelope and its four lawful moves, BEFORE any approval ask can fire — an approval that cannot change anything is a survey, and the trial path's ask for archive.ubuntu.com was exactly that. The post-execute belt wraps any package-manager-shaped result carrying the backend's denial dialect (read-only fs, permission denial) into the same envelope, keeping the container's own words on the record — the shapes precision spares (pip install --user against a read-only HOME) are taught here. The blessed composition mounts the sandbox BEFORE the remote-access analyzer so the refusal registers ahead of the ask (waterfall order is registration order)",
       "enforcedBy": [
-        "packages/sandbox-docker/src/provider.js"
+        "packages/sandbox-docker/src/provider.js",
+        "packages/sandbox-docker/src/toolchain.js",
+        "packages/sandbox-docker/src/index.js",
+        "packages/blessed/src/index.js"
       ],
       "verifiers": [
         "packages/sandbox-docker/test/provider.test.js",
-        "packages/sandbox-docker/test/composed.docker.test.js"
+        "packages/sandbox-docker/test/composed.docker.test.js",
+        "packages/sandbox-docker/test/toolchain.test.js",
+        "packages/sandbox-docker/test/immutable-toolchain.test.js"
       ]
     },
     {

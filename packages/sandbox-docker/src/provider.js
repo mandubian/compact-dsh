@@ -141,6 +141,11 @@ export class DockerSandboxProvider extends SandboxProvider {
     this.ensureAvailable(policy.mode);
     this.ensureSupplyChain(policy);
     const root = canonicalizeBestEffort(policy.workspaceRoot);
+    // --read-only is UNCONDITIONAL (both modes): the system toolchain inside
+    // the act is immutable and digest-pinned (CF-2). This fact is what the
+    // immutable-toolchain recognition (src/toolchain.js, #152) stands on — a
+    // system-package-manager write can never succeed here, so it is refused
+    // at the waterfall before any approval ask can fire.
     const run = [this.dockerCommand, 'run', '--rm',
       '--network', this.network, '--read-only',
       '--user', `${this.uid}:${this.gid}`];

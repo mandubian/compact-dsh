@@ -458,7 +458,6 @@ export async function apply(ctx, config = {}) {
     secretRefs: options.secrets,
     egress,
   }), { ...options.approval, egress }, ['approval', 'commands']);
-  await mount('compact-remote-access', applyRemoteAccess, {}, ['compact-approval']);
   // #38 phase 3: the mediator composes ALWAYS (its enforced register row must
   // resolve at boot — F-5), while the CAPABILITY it carries wakes only under
   // the declared posture: without a network name it provides an inert service
@@ -475,10 +474,18 @@ export async function apply(ctx, config = {}) {
       `blessed: egress posture is BOUND (mediated, #38) — the container carries no route of its own; every connection ` +
       `is delivered per live grant by compact-egress-proxy on the internal network "${options.sandbox.network}"`);
   }
+  // #152: the sandbox mounts BEFORE the remote-access analyzer, on purpose.
+  // The waterfall honors registration order, and the sandbox's
+  // immutable-toolchain refusal must register its listener ahead of the
+  // analyzer's ask: the rootfs is --read-only in every mode, so a
+  // system-package-manager write can never succeed — an approval ask for its
+  // egress would be a survey, not a decision. The analyzer still owns every
+  // act that CAN succeed.
   await mount('compact-sandbox', applySandbox, {
     ...options.sandbox,
     ...(mediated ? { proxyEnvFor: (sessionId) => egressProxy.envFor(sessionId) } : {}),
   }, ['tools', 'approval', 'compact-approval']);
+  await mount('compact-remote-access', applyRemoteAccess, {}, ['compact-approval']);
   requireServices(ctx, ['sandbox']);
   // D-8 declaration: the secret-injection posture is on the record at boot —
   // BOUND (refs declared, injection only ever under a live SecretGrant) or
