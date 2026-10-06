@@ -32,7 +32,7 @@ test('deriveBakefile: the provenance chain is stamped as labels (base digest, wo
 test('deriveBakefile: system packages ride apt, venvs are translated to a fresh /opt/compact-venv on PATH', () => {
   const df = deriveBakefile({
     base: 'ubuntu:24.04', baseDigest: DIGEST, workspace: '/srv/proj', created: CREATED,
-    packages: ['jq', 'python3-venv'], requirements: ['requests==2.31.0'], withVenv: true,
+    packages: ['jq', 'python3-venv'], withVenv: true,
   });
   assert.match(df, /RUN apt-get update && apt-get install -y --no-install-recommends jq python3-venv && rm -rf \/var\/lib\/apt\/lists\//);
   assert.match(df, /COPY compact-requirements\.txt \/tmp\/compact-requirements\.txt/);

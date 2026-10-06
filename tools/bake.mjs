@@ -32,8 +32,6 @@
 // Usage:
 //   npm run compact:bake -- --base <image> [--workspace DIR] [--tag NAME]
 //                           [--packages "a, b"] [--dry-run]
-//
-// Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { parseArgs } from 'node:util';
 import { spawnSync } from 'node:child_process';
@@ -89,7 +87,7 @@ export function freezeRequirements({ venvDir, exists = existsSync, run = (args) 
  * over every act, and a baked file there would be shadowed — a promise the
  * container could not keep.
  */
-export function deriveBakefile({ base, baseDigest, workspace, created, requirements = [], packages = [], includeBin = false, withVenv = false }) {
+export function deriveBakefile({ base, baseDigest, workspace, created, packages = [], includeBin = false, withVenv = false }) {
   if (!REF_RE.test(base)) throw new Error(`base ${JSON.stringify(base)} is not a Docker image reference`);
   if (!/^sha256:[0-9a-f]{64}$/.test(baseDigest)) throw new Error('the base digest must be a sha256 image digest (docker image inspect .Id form)');
   for (const p of packages) {
@@ -187,11 +185,13 @@ export async function bake({
       'bake refuses to produce an image identical to its base');
   }
 
-  // 3. the Dockerfile, stamped with the provenance chain
+  // 3. the Dockerfile, stamped with the provenance chain. The requirements
+  //    themselves ride the build context as compact-requirements.txt (written
+  //    below) — the Dockerfile only ever COPYs that file.
   const created = now().toISOString();
   const dockerfile = deriveBakefile({
     base, baseDigest: resolved.digest, workspace, created,
-    requirements, packages: packageList, includeBin: artifacts.bin != null,
+    packages: packageList, includeBin: artifacts.bin != null,
     withVenv: artifacts.venv != null,
   });
 
