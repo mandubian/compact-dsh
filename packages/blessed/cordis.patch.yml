@@ -138,6 +138,11 @@
           # Default: absent (COMPACT_EGRESS unset → 'none', as before).
           egress: !!js 'process.env.COMPACT_EGRESS === "proxy" ? "proxy" : undefined'
           network: !!js 'process.env.COMPACT_EGRESS === "proxy" ? (process.env.COMPACT_EGRESS_NETWORK || "compact-egress") : "none"'
+          # #55's composition seam: mediated delivery is PUBLIC-unicast only by
+          # default; a deployment that needs delivery into local space declares
+          # the address classes here (loopback, private, ula) — validated at
+          # resolveConfig, warned at boot, never a dial-policy edit
+          egressAddressClasses: !!js 'process.env.COMPACT_EGRESS_ADDRESS_CLASSES ? process.env.COMPACT_EGRESS_ADDRESS_CLASSES.split(",").map((s) => s.trim()).filter(Boolean) : undefined'
           imageProvenance:
             - ref: !!js process.env.COMPACT_SANDBOX_IMAGE
               digest: !!js process.env.COMPACT_SANDBOX_IMAGE_DIGEST

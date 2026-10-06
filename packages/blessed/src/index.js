@@ -75,6 +75,23 @@ export function resolveConfig(config) {
       throw new TypeError('blessed: sandbox.egress "proxy" requires sandbox.network to name the INTERNAL mediation network (never "none") — the mediator lives there (D-7)');
     }
   }
+  // #55's sanctioned extension door: the mediator dials PUBLIC unicast only,
+  // and a deployment that genuinely needs mediated delivery INTO local space
+  // (a rehearsal releases host on the mediation gateway, an on-prem target)
+  // declares the exception HERE, at the composition seam that owns the wire —
+  // never by editing the dial policy. Loopback/private/ULA only: link-local
+  // carries the metadata address, and multicast/reserved stay undialable.
+  let egressAddressClasses = [];
+  if (config.sandbox.egressAddressClasses !== undefined) {
+    if (config.sandbox.egress !== 'proxy') {
+      throw new TypeError('blessed: sandbox.egressAddressClasses extends the MEDIATED posture — declare it with sandbox.egress "proxy" or not at all');
+    }
+    if (!Array.isArray(config.sandbox.egressAddressClasses) || config.sandbox.egressAddressClasses.length === 0
+      || config.sandbox.egressAddressClasses.some((c) => !['loopback', 'private', 'ula'].includes(c))) {
+      throw new TypeError(`blessed: sandbox.egressAddressClasses must be a non-empty list from (loopback, private, ula), got ${JSON.stringify(config.sandbox.egressAddressClasses)}`);
+    }
+    egressAddressClasses = [...new Set(config.sandbox.egressAddressClasses)];
+  }
   text(config.sandbox.image, 'sandbox.image');
   if (!Array.isArray(config.sandbox.imageProvenance) || !normalizeProvenanceRecords(config.sandbox.imageProvenance).has(config.sandbox.image)) {
     throw new TypeError('blessed: sandbox.imageProvenance must declare the configured image');
@@ -466,13 +483,18 @@ export async function apply(ctx, config = {}) {
   // declared, so a default boot still runs `--network none` exactly as before
   // (CF-1 absent by composition).
   const mediated = options.sandbox.egress === 'proxy';
+  // #55's declared exception, live: public unicast plus the classes the
+  // composition NAMED (validated at resolveConfig) — warned at boot so the
+  // operator's log carries the widened dial policy with the posture itself
+  const dialable = new Set(['public', ...(options.sandbox.egressAddressClasses ?? [])]);
   await mount('compact-egress-proxy', applyEgressProxy,
-    { network: mediated ? options.sandbox.network : undefined }, ['compact-approval']);
+    { network: mediated ? options.sandbox.network : undefined, ...(dialable.size > 1 ? { addressAllowed: (_address, cls) => dialable.has(cls) } : {}) }, ['compact-approval']);
   const egressProxy = ctx.get('compact-egress-proxy');
   if (mediated) {
     ctx.logger?.warn?.(
       `blessed: egress posture is BOUND (mediated, #38) — the container carries no route of its own; every connection ` +
-      `is delivered per live grant by compact-egress-proxy on the internal network "${options.sandbox.network}"`);
+      `is delivered per live grant by compact-egress-proxy on the internal network "${options.sandbox.network}"` +
+      (dialable.size > 1 ? ` — dial policy DECLAREDLY widened beyond public unicast to: ${[...dialable].join(', ')} (#55's composition seam)` : ''));
   }
   // #152: the sandbox mounts BEFORE the remote-access analyzer, on purpose.
   // The waterfall honors registration order, and the sandbox's
