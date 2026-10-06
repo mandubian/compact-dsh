@@ -18,10 +18,14 @@ docker pull ubuntu:24.04
 ```
 
 The launcher resolves the sandbox image digest from the **local** Docker
-daemon (`.Id` via `docker image inspect`) and never pulls implicitly. Live
-model demos additionally need `DEEPSEEK_API_KEY` **or** an OpenCode Zen /
-OpenRouter route configured in `~/.compact-dsh/settings.yaml` (see the README
-section "Try Compact inside dsh").
+daemon (`.Id` via `docker image inspect`) and never pulls implicitly. A tool
+missing inside the container has four lawful moves — workspace venv, static
+binary by path, mount grant, or the operator's baked image
+(`npm run compact:bake`) — tabulated in the README's trial-path section
+("Missing a tool?"). Live model demos additionally need `DEEPSEEK_API_KEY`
+**or** an OpenCode Zen / OpenRouter route configured in
+`~/.compact-dsh/settings.yaml` (see the README section "Try Compact inside
+dsh").
 
 Sanity check — boots the real dsh loader, the full enforcement composition,
 and the constitution coupling, with **no model request**:
