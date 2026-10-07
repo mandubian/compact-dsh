@@ -1164,3 +1164,110 @@ conveys no standing. The demo's one operator egress act: it binds the
 `private`-class delivery exception at the composition seam
 (`COMPACT_EGRESS_ADDRESS_CLASSES`, #55's sanctioned door — warned at
 boot), so delivery is real, mediated, and never leaves this machine.
+---
+
+## Demo 12 — The swap test: a fresh genesis, the same community (I-1 / A-1 / F-5 · no key, no model · needs docker)
+
+```bash
+npm run compact:community
+```
+
+`compact:community` now tells two acts. Act one is Demo 11, unchanged —
+with one new fact made explicit: the boot **re-seats the trust root**
+into the rehearsal set it generated (`tools/trust-root-seat.mjs` — the
+same law bytes, re-sealed `subject: 'compact-body'` under that set's own
+2-of-3 authority keys, through the same harness the amendment tool uses)
+and **pins it**: `COMPACT_TRUSTED_KEYRING_DIGEST` names that manifest's
+raw-text digest, so the boot verifies the manifest it sees against the
+manifest the operator named, every start.
+
+Act two performs the identity page's **swap test** on the same
+composition: *"ratification replaces the keyring manifest; runtimes swap
+keyring configuration, never code … re-seal the law, swap in a fresh
+rehearsal genesis (new roll, new statutes), and the runtime follows on
+manifests alone. Zero code changes."* The law body does not change —
+draft v0.5 stays draft v0.5, digest untouched. What changes is the
+**authority that seals it**: a completely fresh rehearsal identity set —
+new authority keys, new enforcer key, fresh roll (two Members
+re-admitted, the external Witness re-accredited, epochs checkpointed),
+statutes re-sealed under the new authority — and the community annex
+re-signed by the new enforcer. Then, in order: the boot with the OLD pin
+refuses; the operator re-pins; the boot follows.
+
+The captured output **(verified 2026-10-07)**:
+
+```
+ACT TWO · THE SWAP TEST — a fresh genesis under a fresh rehearsal authority; the composition must follow on manifests alone
+the design test (docs/decision-rehearsal-identity.md): ratification replaces the keyring manifest — runtimes swap documents, never code.
+the law body does not change (draft v0.5, digest 27bb7078fe9a…): the authority that seals it changes. That is the re-seat, rehearsed.
+set B installed: authority keys fresh (/tmp/community-demo12c/state/keyring-b), roll re-admitted (two Members + the seated external, epoch checkpointed), statutes re-sealed, enforcer re-keyed, benches re-signed.
+trust root seated under B: law digest 27bb7078fe9a… UNCHANGED, seal re-made (threshold 2-of-3, 3 distinct signer(s)).
+
+the operator's pin still names set A (d49b494b44534b2a…). Booting on B must refuse — on the record:
+✗ refused at boot: community-demo:: startup failed: 1 required plugin did not activate
+  the refusal, named: SealError: the installed keyring manifest does not match trustedKeyringDigest — a swapped manifest is a swapped trust basis, and the runtime refuses it exactly as it refuses a swapped body
+the door held: a swapped manifest is a swapped trust basis, and the runtime refuses it exactly as it refuses a swapped body.
+
+the operator re-pins: trustedKeyringDigest ← 296190450b6a9f25… (set B's own manifest). An act over configuration — zero code changed — and the swap enacts:
+member binding, over roll B: sessions are the deeds of member "rehearsal-founder" (class principal, roll anchored through seq 2) — resolved through the FRESH roll, no replumbing.
+annex B declares 3 set(s): acme-first-instance, member-review, external — the same benches, seated by the new authority's declaration.
+
+$ bash (packer, genesis B) — one governed act under the fresh set:
+e330d0045e488e92fe256970
+
+offline auditor, over the FRESH roll (I-7):
+  conforming, chain verified, roll 3 live member(s) — VALID under DEV keyring — conveys no standing
+
+
+DONE (act two) — the swap test passed: a fresh genesis, the same composition, manifests alone, zero code changed
+and every honesty label crossed the swap intact: dev keyring, standing none. Ratification remains the real A-1 root
+held by real keyholders in the world — "internal agreement, however large, that does not hold the keys enacts nothing."
+```
+
+Three things the transcript shows, precisely:
+
+**The refusal is the swap test's first result, not a failure.** With the
+pin still naming set A, the constitution plugin refuses to activate and
+the boot dies — and the refusal is *named*, on the record, from the
+error the boot carries: *"the installed keyring manifest does not match
+trustedKeyringDigest — a swapped manifest is a swapped trust basis, and
+the runtime refuses it exactly as it refuses a swapped body."* A genesis
+that could slide in under a pin naming something else would make the pin
+decoration; this is the beat that proves it is a guard.
+
+**The re-pin is a governance act over configuration, and only that.** No
+source file changes, no plugin is rebuilt, no tool is edited — the
+operator names set B's manifest digest and the SAME composition boots on
+the fresh genesis: the member binding resolves over the fresh roll (the
+sessions are the deeds of the Member roll B shows, anchored through its
+own checkpoints), the same three benches come back declared by the new
+authority's annex, one governed act rides the gates onto a fresh chain,
+and the offline auditor walks that chain against roll B and keyring B —
+`VALID under DEV keyring — conveys no standing`, the label that
+crossed the swap unchanged.
+
+**Every honesty label survives the swap — that is the point, not a
+limitation of it.** Act two rehearses the *document* swap; it does not
+and cannot rehearse ratification itself, because standing does not come
+from any signature this machine can make: it bottoms out in the real
+A-1 root held by real, dispersed keyholders ("internal agreement,
+however large, that does not hold the keys enacts nothing"). A demo
+whose labels vanished after a self-administered swap would have
+presented a dev-keyring signature as standing — the fraud D-8 names.
+What the swap test establishes is exactly what the identity page
+promised: at ratification, the runtime side is a manifest swap. The
+governance act that remains is outside this machine, by design.
+
+**In plain words.** The club rehearsed its whole hearing on photocopied
+rulebook A — practice stamps, practice ledger. One day the founders hand
+the clubhouse a completely fresh paper set: new stamps, a new ledger,
+the bylaws annex freshly signed. The clubhouse must notice, or it lies.
+First the door proves it notices: booting on the new papers while the
+door frame still names the old founding document — refused, out loud,
+with the reason stated. Then the operator — the one person allowed to do
+this — signs the new founding document into the door frame. The same
+club, the same procedures, the same verdicts, now riding the new papers,
+and not one tool changed. And the honest ending is unchanged: the stamps
+are still practice stamps. Incorporation day needs the real founders in
+the room — and no rehearsal can fake that, which is precisely why the
+rehearsal is worth running.

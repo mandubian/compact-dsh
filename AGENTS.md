@@ -20,6 +20,20 @@ can be technically perfect and still not caught. The example without the
 precise version is a vibe — and this project exists because trust is not
 a vibe.
 
+## Both tellings take points, not walls
+
+Structure each telling for skimming before reading:
+
+- a one-breath headline first — what happened, in one sentence;
+- then bullets with several levels of detail — each point's headline
+  bolded, its detail nested beneath;
+- tables for anything enumerable (files, checks, results);
+- the plain telling stays plain: short sentences, no clause numbers, no
+  function names — the machinery's names live in the precise telling.
+
+Two dense paragraphs are as indigestible as jargon, however plain the
+words. The law reader and the coffee reader both read points.
+
 ## How to write the plain version
 
 - **One analogy, carried through.** Pick a single everyday frame and keep

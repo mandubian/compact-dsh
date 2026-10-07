@@ -34,11 +34,24 @@
 //   6. the annotation travels with a later read of the range; the docket
 //      carries the whole case.
 //
+// Then ACT TWO — the swap test (issue #168; the identity page's "ratification
+// dress rehearsal"): a FRESH rehearsal identity set (new authority 2-of-3,
+// new enforcer, fresh roll and statutes) takes over the same composition on
+// manifests alone. The law body does not change — the authority that seals
+// it does (the re-seat). The boot first refuses the swap while the operator's
+// pin still names the old manifest ("a swapped manifest is a swapped trust
+// basis"), and boots only after the operator re-pins — the governance act,
+// the demo's second scripted operator decision. Every honesty label survives
+// the swap intact: dev keyring, standing none; ratification still needs the
+// real A-1 root held in the world, which no demo can sign (D-8).
+//
 // Honesty labels, stated up front (the register's own discipline):
 //   - rehearsal standing only — the development keyring signs everything,
 //     the benches are practice declarations, the "members" are practice
-//     keys: machinery is what is exercised (I-8; ratification is the
-//     document swap the identity page rehearses, not this demo's to enact);
+//     keys: machinery is what is exercised (I-8). Act two rehearses the
+//     document swap itself — and every label rides through the swap
+//     unchanged. Ratification stays what it always was: the real A-1 root
+//     held in the world, a governance act no demo performs (D-8);
 //   - the member binding IS composed (identity slice 2): sessions are the
 //     deeds of the rehearsal founder per the roll, the filing and the
 //     recusal resolve over member identity, and the D-8 appellate route
@@ -49,9 +62,10 @@
 //     denies the rest — the demo's one scripted operator decision.
 //
 // Usage: node tools/community-demo.mjs [--out DIR]
-//   requires docker with the baked toolchain image (dsh-tools:basic — curl
-//   for the push; `npm run compact:bake` builds it) and nothing else: no
-//   model, no network beyond this host's own name.
+//   act one tells the community story; act two swaps the genesis underneath
+//   the same composition. Requires docker with the baked toolchain image
+//   (dsh-tools:basic — curl for the push; `npm run compact:bake` builds it)
+//   and nothing else: no model, no network beyond this host's own name.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -62,7 +76,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { sha256Hex, signAnnex, annexDigestOf, verifyAnnex } from 'compact-dsh-seals';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
+import { verifyTrustRoot } from '../packages/constitution/src/index.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
+import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
 
 const BIN = 'community-demo:';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -217,7 +233,7 @@ async function releasesHost(bindAddress) {
 
 // ── the runtime: the composed boot, the operator's one decision ──
 
-async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace }) {
+async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace, trustedKeyringDigest }) {
   const digest = execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', IMAGE], { encoding: 'utf8', timeout: 10_000 }).trim();
   if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error(`${BIN} cannot inspect ${IMAGE} (docker pull / npm run compact:bake first)`);
 
@@ -226,6 +242,8 @@ async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace 
     if (key.startsWith('COMPACT_') || key.startsWith('DSH_')) delete process.env[key];
   }
   const state = join(scratch, 'state');
+  const manifestPath = join(keyringDir, 'keyring.json');
+  const sealPath = join(keyringDir, 'compact-body.sig.json');
   const env = {
     DSH_HOME: state,
     DSH_TELEMETRY_DISABLED: '1',
@@ -234,6 +252,14 @@ async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace 
     COMPACT_CHAIN_DIR: join(state, 'chains'),
     COMPACT_APPROVAL_PERSIST_PATH: join(state, 'approvals.json'),
     COMPACT_ALLOWLIST: '[]',
+    // the trust root, re-seated into THIS keyring set (same law bytes, that
+    // authority's own seal) — and the operator's pin: the manifest digest the
+    // boot must see or refuse ("a swapped manifest is a swapped trust basis").
+    // trustedKeyringDigest is act two's lever: pass the OLD pin to prove the
+    // refusal, the new pin to enact the swap.
+    COMPACT_KEYRING_MANIFEST: manifestPath,
+    COMPACT_KEYRING_SEAL: sealPath,
+    COMPACT_TRUSTED_KEYRING_DIGEST: trustedKeyringDigest ?? manifestDigestOf(manifestPath),
     COMPACT_ENFORCER_ANNEX: annexPath,
     COMPACT_ENFORCER_KEY: join(keyringDir, 'enforcer.pem'),
     COMPACT_EGRESS: 'proxy',
@@ -392,6 +418,13 @@ async function main() {
   const keyringDir = join(scratch, 'state', 'keyring');
   mkdirSync(keyringDir, { recursive: true });
   const keyring = ensureRehearsalKeyring(keyringDir, { force: true });
+  // the trust root, seated in THIS set: the same law bytes, re-sealed under
+  // set A's own authority keys — the re-seat the amendment harness performs
+  // after a body change, done here so the operator's pin is a real pin (the
+  // boot verifies THIS manifest against THIS digest, and would refuse any
+  // other)
+  const seatA = seatTrustRoot(keyringDir);
+  SAY(`trust root seated: law digest ${seatA.lawDigest.slice(0, 16)}… unchanged, re-sealed (threshold ${seatA.verified.threshold}, ${seatA.verified.distinctSigners} distinct signer(s), ${seatA.verified.basis}) — the pin names manifest ${seatA.manifestDigest.slice(0, 16)}…`);
   const { annexPath } = communityAnnex(keyringDir, keyring);
   const { ctx, env, operator } = await bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
@@ -637,7 +670,7 @@ async function main() {
     line(textOf(docket).trim());
 
     await closeAll(packer, shipper, audit, bench);
-    out('DONE — machinery exercised, standing none (rehearsal keyring; the benches are practice declarations, the member binding and the seated external included — ratification is the document swap this rehearsal dresses for)');
+    out('DONE (act one) — machinery exercised, standing none (rehearsal keyring; the benches are practice declarations, the member binding and the seated external included — the document swap this rehearsal dresses for is act two, next)');
     line(`scratch kept at ${scratch} (records, chains, approvals, annex)`);
   } catch (error) {
     process.stdout.write(`\n${BIN} FAILED — ${error?.stack ?? error}\n`);
@@ -646,7 +679,129 @@ async function main() {
     await releases.close().catch(() => {});
     await ctx.fiber.dispose().catch(() => {});
   }
+  if (exitCode === 0) exitCode = await actTwo({ scratch, keyringDir });
   process.exitCode = exitCode;
+}
+
+/** ACT TWO — the swap test (issue #168). A fresh rehearsal identity set —
+ *  new authority 2-of-3, new enforcer, fresh roll and freshly sealed
+ *  statutes — takes over the SAME composition on manifests alone. The boot
+ *  first refuses the swap while the operator's pin still names set A, and
+ *  boots only after the re-pin: the governance act, shown. Every honesty
+ *  label survives the swap; nothing here presents a dev-keyring signature
+ *  as standing (D-8). */
+async function actTwo({ scratch, keyringDir }) {
+  let exitCode = 0;
+  let ctxB = null;
+  try {
+    // act two's own world: fresh state (chains, approvals), fresh workspace
+    const scratchB = join(scratch, 'act-two');
+    const workspaceB = join(scratchB, 'workspace');
+    mkdirSync(join(workspaceB, 'staging'), { recursive: true });
+
+    out('ACT TWO · THE SWAP TEST — a fresh genesis under a fresh rehearsal authority; the composition must follow on manifests alone');
+    line('the design test (docs/decision-rehearsal-identity.md): ratification replaces the keyring manifest — runtimes swap documents, never code.');
+    line(`the law body does not change (draft v0.5, digest ${COMPACT_DIGEST.slice(0, 12)}…): the authority that seals it changes. That is the re-seat, rehearsed.`);
+
+    // the fresh set: new authority k-of-n, new enforcer, fresh roll — the
+    // statutes re-enacted under the new authority (same words, new seals)
+    const keyringDirB = join(scratch, 'state', 'keyring-b');
+    const keyringB = ensureRehearsalKeyring(keyringDirB, { force: true });
+    const seatB = seatTrustRoot(keyringDirB);
+    const { annexPath: annexPathB } = communityAnnex(keyringDirB, keyringB);
+    line(`set B installed: authority keys fresh (${keyringDirB}), roll re-admitted (two Members + the seated external, epoch checkpointed), statutes re-sealed, enforcer re-keyed, benches re-signed.`);
+    line(`trust root seated under B: law digest ${seatB.lawDigest.slice(0, 12)}… UNCHANGED, seal re-made (threshold ${seatB.verified.threshold}, ${seatB.verified.distinctSigners} distinct signer(s)).`);
+
+    // ── the refusal: the pin still names set A ──
+    const pinA = manifestDigestOf(join(keyringDir, 'keyring.json'));
+    line('');
+    line(`the operator's pin still names set A (${pinA.slice(0, 16)}…). Booting on B must refuse — on the record:`);
+    let refused = null;
+    try {
+      ctxB = (await bootRuntime({
+        scratch: scratchB, annexPath: annexPathB, keyring: keyringB, keyringDir: keyringDirB,
+        workspace: workspaceB, trustedKeyringDigest: pinA,
+      })).ctx;
+      throw new Error(`${BIN} GUARD VOID — the swapped genesis BOOTED under set A's pin; the swap test proves nothing and is aborted`);
+    } catch (e) {
+      if (String(e?.message ?? '').includes('GUARD VOID')) throw e;
+      // the plugin framework reports a refused constitution as a dead
+      // plugin ("required plugin did not activate"); anything else is not
+      // the guard and must not be shown as if it were
+      if (!/activate|manifest|swapped|trust basis/i.test(String(e?.message ?? e))) {
+        throw new Error(`${BIN} the pinned boot failed, but NOT with the swap refusal — the guard cannot be demonstrated: ${e?.stack ?? e}`);
+      }
+      refused = e;
+      ctxB = null;
+    }
+    line(`✗ refused at boot: ${String(refused?.message ?? refused).split('\n')[0].trim()}`);
+    // name the reason: from the error's cause chain when the framework
+    // carries it, otherwise from the constitution's own reader on the same
+    // inputs — labeled as the reader's verdict, never put in the boot's mouth
+    const chain = [];
+    for (let c = refused, hops = 0; c && hops < 4; c = c.cause ?? (Array.isArray(c.errors) ? c.errors[0] : null), hops++) chain.push(String(c?.message ?? ''));
+    const named = chain.find((m) => /swapped trust basis|does not match trustedKeyringDigest/i.test(m));
+    if (named) {
+      const namedLine = named.split('\n').map((l) => l.trim()).find((l) => /swapped trust basis|does not match trustedKeyringDigest/i.test(l));
+      line(`  the refusal, named: ${namedLine}`);
+    } else {
+      try {
+        verifyTrustRoot({ kind: 'dev-keyring', manifest: join(keyringDirB, 'keyring.json'), seal: join(keyringDirB, 'compact-body.sig.json'), trustedKeyringDigest: pinA }, COMPACT_BODY);
+      } catch (reader) {
+        line(`  the constitution's reader, on the same inputs: ${String(reader?.message ?? reader).split('\n')[0].trim()}`);
+      }
+    }
+    line('the door held: a swapped manifest is a swapped trust basis, and the runtime refuses it exactly as it refuses a swapped body.');
+
+    // ── the re-pin: the governance act ──
+    line('');
+    line(`the operator re-pins: trustedKeyringDigest ← ${seatB.manifestDigest.slice(0, 16)}… (set B's own manifest). An act over configuration — zero code changed — and the swap enacts:`);
+    ctxB = (await bootRuntime({
+      scratch: scratchB, annexPath: annexPathB, keyring: keyringB, keyringDir: keyringDirB,
+      workspace: workspaceB, trustedKeyringDigest: seatB.manifestDigest,
+    })).ctx;
+    const bindingB = ctxB.get('compact-self-model')?.memberBinding;
+    if (bindingB?.declared) {
+      const rollB = bindingB.roll();
+      line(`member binding, over roll B: sessions are the deeds of member "${bindingB.memberId}" (class ${bindingB.class}, roll anchored through seq ${rollB.anchoredThrough}) — resolved through the FRESH roll, no replumbing.`);
+    }
+    const judicatureB = ctxB.get('compact-judicature');
+    line(`annex B declares ${judicatureB.sets().length} set(s): ${judicatureB.sets().map((s) => s.id).join(', ')} — the same benches, seated by the new authority's declaration.`);
+
+    // one governed act on B, so a fresh chain exists for the offline walk
+    const newAgentB = agentOf(ctxB);
+    const packerB = await newAgentB('packer');
+    const packResult = await packerB.turn(() => packerB.call('pack-b-1', 'bash', {
+      command: 'printf "the same composition, a fresh genesis\\n" > staging/act-two.txt && sha256sum staging/act-two.txt | cut -c1-24',
+      description: 'one governed act under genesis B',
+    }));
+    line('');
+    line('$ bash (packer, genesis B) — one governed act under the fresh set:');
+    line(textOf(packResult).trim());
+
+    // the offline walk over B's roll: the label that survives the swap
+    const packerLogB = findSessionLog(join(scratchB, 'state', 'sessions'), packerB.id);
+    if (!packerLogB) throw new Error(`${BIN} genesis B's session log is missing`);
+    const runB = spawnSync(process.execPath, [join(ROOT, 'auditor', 'audit.mjs'), packerLogB, '--chain',
+      join(scratchB, 'state', 'chains', `${packerB.id}.chain`), '--roll', keyringB.rollPath, '--keyring', keyringB.manifestPath], { encoding: 'utf8' });
+    let verdictB; try { verdictB = runB.stdout.trim() ? JSON.parse(runB.stdout) : null; } catch { verdictB = null; }
+    if (verdictB == null) throw new Error(`${BIN} the auditor refused genesis B's chain: ${(runB.stderr || 'no output').split('\n')[0]}`);
+    line('');
+    line('offline auditor, over the FRESH roll (I-7):');
+    line(`  ${verdictB.verdict}${verdictB.checked?.chain ? `, chain ${verdictB.checked.chain}` : ''}${verdictB.memberRoll?.ok ? `, roll ${verdictB.memberRoll.live} live member(s) — ${verdictB.memberRoll.phrase}` : ''}`);
+
+    await packerB.close();
+    line('');
+    out('DONE (act two) — the swap test passed: a fresh genesis, the same composition, manifests alone, zero code changed');
+    line('and every honesty label crossed the swap intact: dev keyring, standing none. Ratification remains the real A-1 root');
+    line('held by real keyholders in the world — "internal agreement, however large, that does not hold the keys enacts nothing."');
+  } catch (error) {
+    process.stdout.write(`\n${BIN} ACT TWO FAILED — ${error?.stack ?? error}\n`);
+    exitCode = 1;
+  } finally {
+    await ctxB?.fiber.dispose().catch(() => {});
+  }
+  return exitCode;
 }
 
 main();
