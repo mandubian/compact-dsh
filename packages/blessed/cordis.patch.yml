@@ -103,6 +103,12 @@
         secrets: !!js JSON.parse(process.env.COMPACT_SECRETS || '[]')
         approval:
           persistPath: !!js process.env.COMPACT_APPROVAL_PERSIST_PATH
+          # the pin offer (#55 follow-up): opt into the ask resolving the
+          # target host-side and showing the addresses in the deciding view —
+          # an allowed-once materializes the egress grant PINNED to them.
+          # Default: absent (COMPACT_EGRESS_PIN_OFFERS unset → no offer, as
+          # before). Mediated posture only, validated at resolveConfig.
+          egressPinOffers: !!js '["1", "true"].includes(process.env.COMPACT_EGRESS_PIN_OFFERS) ? true : undefined'
         protectedState:
           - !!js process.env.COMPACT_RECORD_ROOT
           - !!js process.env.COMPACT_CHAIN_DIR

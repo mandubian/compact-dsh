@@ -79,7 +79,7 @@ test('egress patterns are connection-shaped: host+port, scheme defaults kept', (
 
 // -- the mediated posture: an allowed decision DELIVERS ----------------------
 
-async function boot(posture, downstream = () => 'allowed-once') {
+async function boot(posture, downstream = () => 'allowed-once', pluginOpts = {}) {
   const { Context } = await import('@deepseek-ai/cordis');
   const decider = {
     name: 'test-decider',
@@ -90,7 +90,7 @@ async function boot(posture, downstream = () => 'allowed-once') {
   const ctx = new Context();
   ctx.plugin(decider);
   await new Promise(r => setImmediate(r));
-  const inst = approvalPlugin({ egress: posture });
+  const inst = approvalPlugin({ egress: posture, ...pluginOpts });
   inst(ctx, { egress: posture });
   return { ctx, inst };
 }
@@ -125,6 +125,73 @@ test('proxy posture: allowed-once materializes the egress grant — host, port, 
   // the mediator's own read of the store sees exactly this grant for this session
   assert.deepEqual(egressGrantsFor(inst.approval.store, 'sess-a').map(x => x.id), [g.id]);
   assert.deepEqual(egressGrantsFor(inst.approval.store, 'sess-other'), [], 'another session holds nothing');
+});
+
+// -- the pin offer (#55 follow-up, slice 2): the ask resolves host-side, the --
+// deciding view shows the addresses, the allowed-once grant materializes pinned
+
+const PINNED_TARGET = { url: 'https://api.example.com/v1/data', host: 'api.example.com', methodClass: 'read', delivery: 'mediator' };
+
+async function decidePin(pluginOpts, target = PINNED_TARGET) {
+  let inst, seenView = null;
+  const harness = await boot('proxy', () => {
+    seenView = [...inst.approval.deciding.values()][0];
+    return 'allowed-once';
+  }, pluginOpts);
+  inst = harness.inst;
+  const ag = agent('sess-a');
+  const gated = inst.approval.gate({ name: 'bash', arguments: { ...target }, agent: ag, callId: 'call-pin' });
+  assert.equal(gated?.kind, 'ask', 'the mediated act still asks');
+  assert.equal(await decide(harness.ctx, { toolName: 'bash', agent: ag, callId: 'call-pin', reason: gated.reason }), 'allowed-once');
+  return { inst, seenView, grants: inst.approval.store.sessionGrants };
+}
+
+test('the pin offer: the ask resolves host-side, the view shows the addresses, the grant materializes PINNED', async () => {
+  let resolveCalls = 0;
+  const { seenView, grants } = await decidePin({
+    egressPinOffers: true,
+    resolveHost: async () => { resolveCalls += 1; return ['203.0.113.7', '203.0.113.7', '2606:2800:220:1:248:1893:25c8:1946']; },
+  });
+
+  // the deciding view showed the RESOLVED addresses — de-duplicated, exactly
+  // what the operator was shown when they answered
+  assert.deepEqual(seenView.addresses, ['203.0.113.7', '2606:2800:220:1:248:1893:25c8:1946']);
+  assert.equal(resolveCalls, 1, 'one resolution, at ask time');
+
+  // the materialized grant is pinned to exactly what was shown — consent over
+  // the address, not just the name
+  assert.equal(grants.length, 1);
+  assert.deepEqual(grants[0].addresses, ['203.0.113.7', '2606:2800:220:1:248:1893:25c8:1946']);
+});
+
+test('pin offer off by default: no resolution at ask time, unpinned grant — byte-identical', async () => {
+  let resolveCalls = 0;
+  const { seenView, grants } = await decidePin({
+    resolveHost: async () => { resolveCalls += 1; return ['203.0.113.7']; },
+  });
+  assert.equal(resolveCalls, 0, 'the offer is absent by composition — no DNS on the ask path');
+  assert.equal(seenView.addresses, undefined, 'the deciding view names no addresses');
+  assert.equal(grants[0].addresses, null, 'the grant materializes unpinned, exactly as before');
+});
+
+test('pin offer: an IP-literal target offers nothing — the dial goes to the literal, nothing to rebind', async () => {
+  let resolveCalls = 0;
+  const { grants } = await decidePin(
+    { egressPinOffers: true, resolveHost: async () => { resolveCalls += 1; return ['203.0.113.7']; } },
+    { url: 'http://127.0.0.1:8080/x', host: '127.0.0.1', methodClass: 'read', delivery: 'mediator' },
+  );
+  assert.equal(resolveCalls, 0, 'no name, no offer');
+  assert.equal(grants[0].addresses, null);
+});
+
+test('pin offer: a failed resolution is an absence, never a refusal — the ask still lands, the grant is unpinned', async () => {
+  const { seenView, grants } = await decidePin({
+    egressPinOffers: true,
+    resolveHost: async () => null,   // resolver answered nothing usable
+  });
+  assert.equal(seenView.addresses, undefined, 'no resolution, no offer on the view');
+  assert.equal(grants.length, 1, 'the allowed-once still materializes its grant');
+  assert.equal(grants[0].addresses, null, 'unpinned — the mediator resolves anew at the wire');
 });
 
 test('no derivable class → no grant, and the ask said so before the decision (D-7)', async () => {

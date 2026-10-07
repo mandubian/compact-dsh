@@ -51,6 +51,9 @@ export function createOperatorPrompter({ input = process.stdin, output = process
         `\n[compact-dsh] approval requested\n  tool: ${req.toolName ?? 'unknown'}` +
         (view?.command ? `\n  command: ${view.command}` : '') +
         (targetBits ? `\n  target: ${targetBits}` : '') +
+        // the pin offer (#55 follow-up): the addresses the name resolved to at
+        // ask time — approving pins the grant to exactly these
+        (view?.addresses?.length ? `\n  pin: ${view.addresses.join(', ')} — allow once pins the grant to these addresses` : '') +
         (view?.fingerprint ? `\n  fingerprint: ${view.fingerprint}` : (req.callId != null ? `\n  call: ${req.callId}` : '')) +
         `\n${reason.split('\n').map(line => `  ${line}`).join('\n')}` +
         `\n  1) deny (default)\n  2) allow once\n`);

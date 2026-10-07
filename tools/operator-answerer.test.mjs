@@ -62,6 +62,23 @@ test('prompter: explicit choice 2 answers allowed-once and shows tool + envelope
   assert.ok(shown.includes('1) deny (default)') && shown.includes('2) allow once'), 'the prompt shows the numbered choices');
 });
 
+test('prompter: the pin offer renders as its own line — the operator sees WHERE the name pointed (#55 follow-up)', async () => {
+  const transcript = [];
+  const prompt = createOperatorPrompter(fakeReadline('2', transcript));
+  const outcome = await prompt(REQ, { target: { host: 'api.example.com', port: '443' }, addresses: ['203.0.113.7', '2606:2800:220:1:248:1893:25c8:1946'] });
+  assert.equal(outcome, 'allowed-once');
+  const shown = transcript.join('');
+  assert.ok(shown.includes('pin: 203.0.113.7, 2606:2800:220:1:248:1893:25c8:1946'), shown, 'the prompt names the resolved addresses');
+  assert.ok(shown.includes('pins the grant to these addresses'), 'the prompt says what approving does with them');
+});
+
+test('prompter: no offer, no pin line — the prompt is unchanged for unpinned asks', async () => {
+  const transcript = [];
+  const prompt = createOperatorPrompter(fakeReadline('2', transcript));
+  await prompt(REQ, { target: { host: 'api.example.com', port: '443' } });
+  assert.doesNotMatch(transcript.join(''), /pin:/, 'no addresses in the view, no pin line');
+});
+
 test('prompter: allow aliases answer allowed-once', async () => {
   for (const answer of ['allow', ' allow once ', 'ALLOW']) {
     const prompt = createOperatorPrompter(fakeReadline(answer));
