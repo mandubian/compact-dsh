@@ -570,6 +570,97 @@ test('55-d: a name that does not resolve is an upstream fact, named as one (#55)
   assert.match(res.body, /could not resolve origin\.test/);
 });
 
+// -- the grant-pinned addresses (#55 follow-up): consent names the ADDRESS, --
+// not just the host. The pin is the fine-grained half of resolve-then-pin:
+// under a widened dial policy a rebinding answer can be class-legal, and
+// only the grant's `addresses` refuses it (`unpinned-address`).
+
+test('pin-a: a pinned grant delivers when the resolver answers the pinned address', async (t) => {
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_pin_ok', addresses: ['127.0.0.1'] })],
+    lookup: rebindingLookup('127.0.0.1'),
+    addressAllowed: (_addr, cls) => cls === 'public' || cls === 'loopback',
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/pinned-ok`);
+  assert.equal(res.status, 200, res.body);
+  assert.deepEqual(f.seen.map((s) => s.url), ['/pinned-ok'], 'the pinned answer was dialed');
+});
+
+test('pin-b: a class-legal rebinding answer still refuses when the grant pins elsewhere — the case only the pin catches', async (t) => {
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_pin', addresses: ['127.0.0.1'] })],
+    lookup: rebindingLookup('10.0.0.5'),          // the rebinding answer — PRIVATE, and the class is declared
+    addressAllowed: (_addr, cls) => cls !== 'link-local',   // the widened policy: private is dialable
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/exfil`);
+  assert.equal(res.status, 403);
+  assert.ok(res.body.includes(`[${GATE}/unpinned-address]`), res.body);
+  assert.match(res.body, /the grant pins 127\.0\.0\.1/);
+  assert.match(res.body, /answered: 10\.0\.0\.5/);
+  assert.match(res.body, /consent identity is risk identity for the address too/);
+  assert.deepEqual(f.seen, [], 'nothing was dialed');
+});
+
+test('pin-c: among several class-legal answers, the mediator dials the one the grant pins', async (t) => {
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_pin_multi', addresses: ['127.0.0.1'] })],
+    lookup: rebindingLookup(['10.0.0.5', '127.0.0.1']),
+    addressAllowed: () => true,                   // both class-legal — the pin alone selects
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/pin-selects`);
+  assert.equal(res.status, 200, res.body);
+  assert.deepEqual(f.seen.map((s) => s.url), ['/pin-selects'], 'the pinned address was dialed, its neighbor skipped');
+});
+
+test('pin-d: the same pin refuses the CONNECT — the tunnel never opens', async (t) => {
+  const f = await fixture({
+    rows: ({ echoPort }) => [hostPort('origin.test', echoPort, { id: 'sg_pin_tls', addresses: ['127.0.0.1'] })],
+    lookup: rebindingLookup('192.168.8.20'),      // private — class-legal under the widened policy
+    addressAllowed: (_addr, cls) => cls !== 'link-local',
+  });
+  t.after(f.cleanup);
+
+  const res = await connectVia(f.proxyPort, `origin.test:${f.echoPort}`);
+  assert.equal(res.status, 403, res.raw);
+  assert.ok(res.raw.includes(`[${GATE}/unpinned-address]`), res.raw);
+  assert.match(res.raw, /the grant pins 127\.0\.0\.1/);
+  res.socket.destroy();
+});
+
+test('pin-e: the class floor still outranks the pin in the refusal naming', async (t) => {
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_pin_cls', addresses: ['127.0.0.1'] })],
+    lookup: rebindingLookup('169.254.169.254'),   // link-local — refused by CLASS, not by the pin
+    addressAllowed: publicUnicastOnly,
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/x`);
+  assert.equal(res.status, 403);
+  assert.ok(res.body.includes(`[${GATE}/forbidden-address]`), res.body);
+  assert.doesNotMatch(res.body, /unpinned-address/, 'the older, class-shaped cause is the one named');
+  assert.deepEqual(f.seen, [], 'nothing was dialed');
+});
+
+test('pin-f: a grant without addresses is unchanged — the dial policy alone answers (#55 as landed)', async (t) => {
+  const f = await fixture({
+    rows: ({ originPort }) => [hostPort('origin.test', originPort, { id: 'sg_nopin' })],
+    lookup: rebindingLookup('127.0.0.1'),
+    addressAllowed: (_addr, cls) => cls === 'public' || cls === 'loopback',
+  });
+  t.after(f.cleanup);
+
+  const res = await viaProxy(f.proxyPort, `http://origin.test:${f.originPort}/nopin`);
+  assert.equal(res.status, 200, res.body);
+  assert.deepEqual(f.seen.map((s) => s.url), ['/nopin']);
+});
+
 test('the address vocabulary: every space the policy can refuse has a name (#55)', () => {
   // IPv4
   assert.equal(addressClassOf('8.8.8.8'), 'public');

@@ -214,8 +214,8 @@ export function createApproval(opts = {}) {
     // the records live exactly as long as the asking agent does.
     asks: new WeakMap(),
     fingerprint: (tool, args) => fingerprint(tool, args),
-    grantSession: ({ pattern, root, session, ttlMs = 60 * 60 * 1000, maxUses = null, methodClass = null, now = Date.now() }) =>
-      approval.store.addSessionGrant({ pattern: parseAllowlistLikePattern(pattern), root, session, ttlMs, maxUses, methodClass, now }),
+    grantSession: ({ pattern, root, session, ttlMs = 60 * 60 * 1000, maxUses = null, methodClass = null, addresses = null, now = Date.now() }) =>
+      approval.store.addSessionGrant({ pattern: parseAllowlistLikePattern(pattern), root, session, ttlMs, maxUses, methodClass, addresses, now }),
     grantPlan: ({ pattern, planRef, ttlMs, maxUses = null, now = Date.now() }) =>
       approval.store.addPlanGrant({ pattern: parseAllowlistLikePattern(pattern), planRef, ttlMs, maxUses, now }),
     // one id space for the operator (#64): sg_… session/egress grants and
