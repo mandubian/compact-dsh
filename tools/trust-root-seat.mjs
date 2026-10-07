@@ -13,7 +13,7 @@
 // every surface that shows one says so.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sha256Hex, parseManifest, parseSeal, verifySeal } from 'compact-dsh-seals';
+import { sha256Hex, parseManifest, verifySeal } from 'compact-dsh-seals';
 import { sealArtifact } from './rehearsal-amendment.mjs';
 import { COMPACT_BODY, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 
