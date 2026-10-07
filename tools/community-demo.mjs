@@ -126,10 +126,12 @@ function seqsOfCall(logPath, callId) {
 
 // ── the world: scratch dirs, rehearsal keyring, the community annex ──
 
-/** Sign the community's two-bench annex with the rehearsal enforcer key:
+/** Sign the community's three-set annex with the rehearsal enforcer key:
  *  a first instance held by the operator (which will REFUSE through the
- *  declared chain — the case's parties hang from that chain), and a
- *  member-review bench of two practice member keys that hears it. */
+ *  declared chain — the case's parties hang from that chain), a
+ *  member-review bench of two practice member keys that hears it, and
+ *  `external` — the accredited Witness the roll accredits, seat of the
+ *  D-8 appellate route (verified against the composed roll at boot). */
 function communityAnnex(keyringDir, keyring) {
   const base = JSON.parse(readFileSync(join(keyringDir, 'enforcer.annex.json'), 'utf8'));
   const privateKey = readFileSync(join(keyringDir, 'enforcer.pem'), 'utf8');
