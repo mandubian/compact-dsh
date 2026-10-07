@@ -61,7 +61,7 @@ The proxy is an HTTP/HTTPS forwarder (no other protocol has a route):
 |---|---|
 | plain HTTP | client sends the absolute URI; the proxy checks `host:port` + method class against **this session's** live grants, then resolves the name **itself** and forwards |
 | HTTPS | client sends `CONNECT host:port`; the authority is checked against this session's live grants, and the grant must NAME the port (`HostAndPort` — a bare-host grant carries plain HTTP and the CONNECT is refused by name, #56 option A; a tunnel's *class* cannot be observed without interception, see residuals), then a byte tunnel: TLS end-to-end, never terminated |
-| DNS | the container never resolves: the hostname travels to the proxy in the request line / `CONNECT` (verified below: on the internal bridge, `getent` fails); the proxy resolves, classifies the answer and dials the validated address — public unicast only by default, a rebinding answer refused by name (`#55`'s resolve-then-pin) |
+| DNS | the container never resolves: the hostname travels to the proxy in the request line / `CONNECT` (verified below: on the internal bridge, `getent` fails); the proxy resolves, classifies the answer and dials the validated address — public unicast only by default, a rebinding answer refused by name (`#55`'s resolve-then-pin); when the matched grant pins `addresses`, only a pinned answer dials and a class-legal answer elsewhere is refused by name too (`unpinned-address`) |
 | redirect | the proxy **never follows one** — the client's next request or `CONNECT` re-enters the check, so a cross-host redirect is refused with a named reason: *a new host is a new grant* |
 | method class | **observed, never guessed**: read = `GET`/`HEAD`/`OPTIONS`/`TRACE`, write = `POST`/`PUT`/`PATCH`/`DELETE`/…, an unknown method refused (D-7). Enforced per plain-HTTP request; a `CONNECT` is admitted only under a live, classed grant that names its port (#56 option A) — what rides inside an opaque tunnel is unobservable **by the decision not to intercept**, declared as residual 2 rather than pretended checked. Coverage is a lattice: a write grant covers the read to the same target, never the reverse |
 | TTL, revocation | the store is the single authority, checked per connection; an established tunnel **and every in-flight plain-HTTP exchange** are tracked against their grant, so **revocation — or a lapsed TTL — cuts what is already open** (#79): the streaming response and the streaming upload alike, not just the next attempt |
@@ -304,6 +304,21 @@ ran).
    deployment that genuinely needs mediated access INTO private space must
    extend the policy explicitly at composition (`addressAllowed`) — an
    exception declared at the seam that owns it, never a silent default.
+
+   **The pin, the fine-grained half (2026-10-07):** the class check answers
+   "is the address in a family of space the composition opened?"; it cannot
+   answer "is this the address the operator consented to?" — under a widened
+   policy a rebinding answer can be class-legal. A grant may therefore carry
+   `addresses` (operator-declared IP literals, validated at the grant
+   boundary, de-duplicated): the mediator then dials only a resolver answer
+   the grant PINS, and a class-legal answer elsewhere is refused with its own
+   name (`[EG/unpinned-address]`), tunnels included. The pin is consent over
+   the address, scoped to one grant — the composer speaks in classes, the
+   operator speaks in addresses, and both must pass. A grant without a pin is
+   unchanged: the dial policy alone answers. The pin enters a grant through
+   the operator's own declaration (`grantSession`), never derived from the
+   act — the act's evidence names a host, and #56's rule holds: what the
+   evidence cannot derive, the wire will not guess.
 
 ## The wire teaches the gate (#102) — ADOPTED (Option B)
 

@@ -223,6 +223,13 @@ export const GLOSS = {
     instruction: 'Do not retry this host. The refusal is about where the name points; pick a target that resolves lawfully.',
     cites: ['I-5', 'CF-1', 'D-7', 'R-3'],
   },
+  'EG/unpinned-address': {
+    title: 'The name resolves outside the addresses the grant pins',
+    why: 'The grant covered the name and the dial policy admitted the address class, but the grant pins the addresses its operator consented to — and the resolver answered elsewhere. A class-legal rebinding answer is still a rebinding answer: consent identity is risk identity for the address too.',
+    example: { blocked: ['a pinned name whose DNS was flipped to a different, class-legal address'], lawful: ['the pinned address itself, or a newly granted pin if the target lawfully moved'] },
+    instruction: 'Do not retry this host. The operator pinned where this grant may land; a new address needs a new consent.',
+    cites: ['I-5', 'CF-1', 'D-7', 'R-3'],
+  },
   'EG/upstream': {
     title: 'The mediator could not reach the target',
     why: 'The mediator holds a live grant and a validated address, but the connection to the target failed. This is connectivity, not consent — the grant was honored; the far end was not there.',

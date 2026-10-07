@@ -2,6 +2,25 @@
 // revocation), plan grants, exec-cache entries, and pending-approval
 // bookkeeping. The in-memory class is the contract; persistence
 // (JSON+fsync, src/persist.js) decorates it without changing semantics.
+import { isIP } from 'node:net';
+
+/**
+ * The grant-pinned addresses (#55 follow-up): consent over the ADDRESS, the
+ * one fact a name-based grant cannot carry. When a grant declares them, the
+ * mediator dials only a resolver answer in this set — even one the dial
+ * policy would admit (a class-legal rebinding answer is still a rebinding
+ * answer, refused as `unpinned-address`). Absent/null = no pin: the dial
+ * policy alone answers, exactly as before. Validated at this boundary —
+ * non-empty array of IP literals, de-duplicated: a pin of nothing pins
+ * nothing, and a pin of non-addresses pins nothing dialable.
+ */
+function normalizeAddressPin(addresses) {
+  if (addresses == null) return null;
+  if (!Array.isArray(addresses) || addresses.length === 0 || addresses.some((a) => !isIP(String(a)))) {
+    throw new TypeError('compact-dsh-approval: grant addresses (the pin) must be a non-empty array of IP literals when present');
+  }
+  return [...new Set(addresses.map((a) => String(a)))];
+}
 
 export class GrantStore {
   constructor() {
@@ -83,7 +102,7 @@ export class GrantStore {
   // (docs/concept-approval-layers.md — no blanket grants) — a falsy ttlMs is
   // replaced by the default hour, never by a permanent grant. Plan grants
   // below are the exception: their bound is the session itself.
-  addSessionGrant({ pattern, root, session, ttlMs, maxUses = null, methodClass = null, now }) {
+  addSessionGrant({ pattern, root, session, ttlMs, maxUses = null, methodClass = null, addresses = null, now }) {
     const grant = {
       id: 'sg_' + Math.random().toString(16).slice(2, 10),
       pattern, root: root ?? null, session: session ?? null,
@@ -92,6 +111,10 @@ export class GrantStore {
       // made without a derivable class — it still counts for CF-2's posture
       // check but covers no connection at the proxy.
       methodClass,
+      // the address pin (#55 follow-up): consent over the ADDRESS. null =
+      // no pin — the dial policy alone answers, exactly as before. See
+      // normalizeAddressPin for the enforcement story.
+      addresses: normalizeAddressPin(addresses),
       createdAt: now, expiresAt: now + (ttlMs || 60 * 60 * 1000),
       maxUses, uses: 0, revokedAt: null,
     };

@@ -375,37 +375,61 @@ export function createEgressProxy({
     classifyConnection(rowsFor(), { host, port: targetPort, methodClass, url, tunnel, now: now() });
 
   /**
-   * Resolve-then-pin (#55): resolve the NAME host-side (the container never
-   * does), classify EVERY address the resolver answers with, and settle on
-   * the first the policy allows. Rejection carries `code` so the refusal
+   * Resolve-then-pin (#55), the grant's own address pin included: resolve the
+   * NAME host-side (the container never does), classify EVERY address the
+   * resolver answers with, and settle on the first the dial policy allows
+   * AND — when the matched grant declares `addresses` — consent named. The
+   * pin is consent over the ADDRESS, the one fact a name-based grant cannot
+   * carry: under a widened dial policy a rebinding answer can be class-legal,
+   * and only the pin refuses it. Rejection carries `code` so the refusal
    * names its cause: `upstream-dns` (the name did not resolve — an upstream
-   * fact) or `forbidden-address` (it resolved somewhere the policy will not
-   * dial — a policy fact, named with the classes).
+   * fact), `forbidden-address` (everything answered is outside the dial
+   * policy — a policy fact, named with the classes), or `unpinned-address`
+   * (the class was open and the pin held — named whenever at least one
+   * answer passed the class floor, since that is the newer, more specific
+   * fact).
    */
-  const resolvePinned = (host) => new Promise((resolve, reject) => {
+  const resolvePinned = (host, grant = null) => new Promise((resolve, reject) => {
+    const pins = Array.isArray(grant?.addresses) && grant.addresses.length > 0
+      ? grant.addresses.map((a) => String(a))
+      : null;
     lookup(host, { all: true }, (error, addresses) => {
       if (error) {
         return reject(Object.assign(new Error(`${error.code ?? error.message}`), { code: 'upstream-dns' }));
       }
       const answers = (Array.isArray(addresses) ? addresses : [{ address: addresses }])
         .map((entry) => String(entry?.address ?? entry));
-      const refused = [];
+      const classRefused = [];
+      const pinRefused = [];
       for (const address of answers) {
         const cls = addressClassOf(address);
-        if (addressAllowed(address, cls)) return resolve({ address, cls });
-        refused.push(`${address} [${cls}]`);
+        if (!addressAllowed(address, cls)) classRefused.push(`${address} [${cls}]`);
+        else if (pins && !pins.includes(address)) pinRefused.push(address);
+        else return resolve({ address, cls });
+      }
+      if (pinRefused.length > 0) {
+        const detail = `the grant pins ${pins.join(', ')} — answered: ${[...pinRefused, ...classRefused].join(', ')}`;
+        return reject(Object.assign(
+          new Error(`every address ${host} resolves to is outside the grant's pinned addresses: ${detail}`),
+          { code: 'unpinned-address', detail }));
       }
       reject(Object.assign(
-        new Error(`every address ${host} resolves to is outside the dial policy: ${refused.join(', ')}`),
-        { code: 'forbidden-address', detail: refused.join(', ') }));
+        new Error(`every address ${host} resolves to is outside the dial policy: ${classRefused.join(', ')}`),
+        { code: 'forbidden-address', detail: classRefused.join(', ') }));
     });
   });
 
-  /** The named refusal for a resolution the policy refused or that failed. */
+  /** The named refusal for a resolution the policy refused, the pin refused, or that failed. */
   const resolveRefusal = (host, port, error) => buildEnvelope({
     gate: GATE,
-    ruleId: error.code === 'forbidden-address' ? 'forbidden-address' : 'upstream',
-    reason: error.code === 'forbidden-address'
+    // one line so the gloss lint's per-line ruleId scan sees every literal
+    ruleId: error.code === 'unpinned-address' ? 'unpinned-address' : error.code === 'forbidden-address' ? 'forbidden-address' : 'upstream',
+    reason: error.code === 'unpinned-address'
+      ? `${host}:${port} resolves only to addresses the matched grant does not pin (${error.detail}) — the grant covered ` +
+        `the name, the dial policy admitted the class, and the pin held: consent named the addresses this grant may ` +
+        `land on, and the resolver answered elsewhere. A class-legal rebinding answer is still a rebinding answer (#55); ` +
+        `consent identity is risk identity for the address too`
+      : error.code === 'forbidden-address'
       ? `${host}:${port} resolves only to addresses the mediator refuses to dial (${error.detail}) — the grant covered ` +
         `the name, and the wire will not quietly follow it into loopback, link-local or host-internal space (#55); ` +
         `consent identity is risk identity for the address too`
@@ -447,10 +471,10 @@ export function createEgressProxy({
       // the grant covered the NAME; the dial goes to the PINNED address (#55)
       let pinned;
       try {
-        pinned = await resolvePinned(authority.host);
+        pinned = await resolvePinned(authority.host, verdict.grant);
       } catch (error) {
         return refuse(res, resolveRefusal(authority.host, authority.port, error),
-          error.code === 'forbidden-address' ? 403 : 502);
+          error.code === 'upstream-dns' ? 502 : 403);
       }
 
       const headers = Object.fromEntries(Object.entries(req.headers).filter(([k]) => !HOP_BY_HOP.has(k.toLowerCase())));
@@ -506,10 +530,10 @@ export function createEgressProxy({
     // the grant covered the NAME; the tunnel goes to the PINNED address (#55)
     let pinned;
     try {
-      pinned = await resolvePinned(host);
+      pinned = await resolvePinned(host, verdict.grant);
     } catch (error) {
       return rawRefuse(clientSocket, resolveRefusal(host, targetPort, error),
-        error.code === 'forbidden-address' ? 'HTTP/1.1 403 Forbidden' : 'HTTP/1.1 502 Bad Gateway');
+        error.code === 'upstream-dns' ? 'HTTP/1.1 502 Bad Gateway' : 'HTTP/1.1 403 Forbidden');
     }
 
     const upstream = dial({ host: pinned.address, port: Number(targetPort) }, () => {

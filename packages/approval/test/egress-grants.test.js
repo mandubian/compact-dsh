@@ -15,6 +15,32 @@ const agent = (id = 'sess-a') => ({ id, session: { id, header: {} } });
 
 // -- consent identity is risk identity: the class joins the fingerprint -----
 
+test('the address pin is validated at the grant boundary — IP literals, non-empty, de-duplicated (#55 follow-up)', () => {
+  const store = new GrantStore();
+  const pinned = store.addSessionGrant({
+    pattern: { kind: 'HostAndPort', value: { host: 'releases.internal', port: '443' } },
+    methodClass: 'write', ttlMs: 60_000, now: Date.now(),
+    addresses: ['127.0.0.1', '127.0.0.1', '10.0.0.5'],
+  });
+  assert.deepEqual(pinned.addresses, ['127.0.0.1', '10.0.0.5'], 'de-duplicated, first-seen order kept');
+
+  // absent = no pin: the row carries null and the dial policy alone answers,
+  // exactly as before the pin existed
+  const unpinned = store.addSessionGrant({
+    pattern: { kind: 'ExactHost', value: 'api.example.com' },
+    methodClass: 'read', ttlMs: 60_000, now: Date.now(),
+  });
+  assert.equal(unpinned.addresses, null);
+
+  // a pin of nothing pins nothing; a pin of non-addresses pins nothing dialable
+  for (const bad of [[], ['not-an-ip'], ['10.0.0.5', 'releases.internal'], '10.0.0.5']) {
+    assert.throws(() => store.addSessionGrant({
+      pattern: { kind: 'ExactHost', value: 'api.example.com' },
+      methodClass: 'read', ttlMs: 60_000, now: Date.now(), addresses: bad,
+    }), /must be a non-empty array of IP literals/, JSON.stringify(bad));
+  }
+});
+
 test('same target, different method class → different identity (#26/#38)', () => {
   const get = fingerprint('bash', { url: 'https://api.example.com/v1', methodClass: 'read' });
   const post = fingerprint('bash', { url: 'https://api.example.com/v1', methodClass: 'write' });
