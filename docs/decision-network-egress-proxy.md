@@ -320,8 +320,12 @@ ran).
    **offer** (`approval.egressPinOffers`, mediated posture only): the ask
    resolves the target host-side — the same resolver the mediator dials
    from — the deciding view shows the addresses (a `pin:` line in the
-   attended prompt), and an allowed-once materializes the grant pinned to
-   exactly what was shown. An IP-literal target offers nothing (the dial
+   attended prompt), and an allowed-once pins the grant **only on a surface
+   that rendered the offer**: rendering acknowledges it
+   (`view.addressesShown`), and a surface that cannot show the offer (the
+   web card, until the interaction wire carries the view) never pins —
+   fail-safe, because consent over the address requires the address was
+   shown. An IP-literal target offers nothing (the dial
    goes to the literal; nothing to rebind); a failed resolution offers
    nothing — fail-open on the offer, never on the check, and the wire still
    answers at dial time: DNS that moved between the offer and the delivery

@@ -132,10 +132,15 @@ test('proxy posture: allowed-once materializes the egress grant — host, port, 
 
 const PINNED_TARGET = { url: 'https://api.example.com/v1/data', host: 'api.example.com', methodClass: 'read', delivery: 'mediator' };
 
-async function decidePin(pluginOpts, target = PINNED_TARGET) {
+// `ack` mirrors the attended prompter's contract: a deciding surface that
+// RENDERS the addresses sets view.addressesShown — only then does the grant
+// pin. ack:false is the web-bridge shape: the surface decides without ever
+// showing the offer.
+async function decidePin(pluginOpts, target = PINNED_TARGET, { ack = true } = {}) {
   let inst, seenView = null;
   const harness = await boot('proxy', () => {
     seenView = [...inst.approval.deciding.values()][0];
+    if (ack && Array.isArray(seenView?.addresses) && seenView.addresses.length > 0) seenView.addressesShown = true;
     return 'allowed-once';
   }, pluginOpts);
   inst = harness.inst;
@@ -192,6 +197,21 @@ test('pin offer: a failed resolution is an absence, never a refusal — the ask 
   assert.equal(seenView.addresses, undefined, 'no resolution, no offer on the view');
   assert.equal(grants.length, 1, 'the allowed-once still materializes its grant');
   assert.equal(grants[0].addresses, null, 'unpinned — the mediator resolves anew at the wire');
+});
+
+test('pin offer: a surface that never shows the offer never pins — the web-bridge shape (#165 review)', async () => {
+  // the page decides (allowed-once) WITHOUT rendering the addresses: the
+  // interaction wire carries no view, so the card cannot show the offer —
+  // and consent over the address requires the address was SHOWN
+  const { seenView, grants } = await decidePin(
+    { egressPinOffers: true, resolveHost: async () => ['203.0.113.7'] },
+    PINNED_TARGET,
+    { ack: false },
+  );
+  assert.deepEqual(seenView.addresses, ['203.0.113.7'], 'the offer WAS resolved and published on the view');
+  assert.equal(seenView.addressesShown, undefined, 'the surface never acknowledged showing it');
+  assert.equal(grants.length, 1, 'the allowed-once still materializes its grant');
+  assert.equal(grants[0].addresses, null, 'UNPINNED — a pin the operator never saw is a pin that never was');
 });
 
 test('no derivable class → no grant, and the ask said so before the decision (D-7)', async () => {

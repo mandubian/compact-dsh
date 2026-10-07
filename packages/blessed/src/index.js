@@ -498,7 +498,7 @@ export async function apply(ctx, config = {}) {
     egressPinOffers: options.approval.egressPinOffers === true,
   }), { ...options.approval, egress }, ['approval', 'commands']);
   if (options.approval.egressPinOffers === true) {
-    ctx.logger?.warn?.('blessed: approval.egressPinOffers is ON — mediated asks resolve the target host-side and show the addresses in the deciding view; an allowed-once materializes the egress grant PINNED to what was shown (#55 follow-up)');
+    ctx.logger?.warn?.('blessed: approval.egressPinOffers is ON — mediated asks resolve the target host-side and show the addresses in the deciding view; an allowed-once pins the egress grant ONLY on a surface that rendered the offer (the attended prompt acknowledges it) — the web card cannot show the offer today, so a web decision never pins (#55 follow-up)');
   }
   // #38 phase 3: the mediator composes ALWAYS (its enforced register row must
   // resolve at boot — F-5), while the CAPABILITY it carries wakes only under

@@ -714,7 +714,12 @@ async function answerRequest(approval, req, next) {
     // show what differs from a prior approval of the same target
     query: queryShape(rec.args?.url) ?? undefined,
     // the resolved addresses, when the offer applied — the deciding surface
-    // can show WHERE the name pointed when the operator decided
+    // can show WHERE the name pointed when the operator decided. A surface
+    // that RENDERS them acknowledges it by setting `addressesShown = true`
+    // (the attended prompter does); only then does the materialized grant
+    // pin. Consent over the address requires the address was SHOWN — a
+    // surface that cannot render the offer (the web card, until the
+    // interaction wire carries the view) never pins, fail-safe.
     ...(pinAddresses ? { addresses: pinAddresses } : {}) };
   approval.deciding.set(key, view);
   try {
@@ -753,9 +758,11 @@ async function answerRequest(approval, req, next) {
           approval.store.addSessionGrant({
             pattern, session: rec.session, methodClass: rec.methodClass,
             ttlMs: approval.egressGrantTtlMs, now,
-            // the offer the deciding view showed — the operator consented to
-            // these ADDRESSES, so the grant dials nothing else (#55 follow-up)
-            addresses: pinAddresses,
+            // the offer the deciding view showed — and only a surface that
+            // ACKNOWLEDGED rendering it (addressesShown) pins; the web card
+            // never shows the offer today, so a web decision never pins
+            // (fail-safe: no shown offer, no pin, pre-#165 behavior)
+            addresses: pinAddresses != null && view.addressesShown === true ? pinAddresses : null,
           });
         }
       }
