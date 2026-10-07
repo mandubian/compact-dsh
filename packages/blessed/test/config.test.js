@@ -190,3 +190,30 @@ test('#55 follow-up: approval.egressPinOffers is declared, boolean, and MEDIATED
   malformed.sandbox = { ...malformed.sandbox, egress: 'proxy', network: 'compact-egress' };
   assert.throws(() => resolveConfig(malformed), /egressPinOffers must be a boolean/);
 });
+
+test('I-1 slice 2: memberBinding is declared ALL of itself or not at all, and rides the resolved config', () => {
+  // default absent: sessions bind to nobody, exactly as before
+  const plain = resolveConfig(BASE());
+  assert.equal(plain.memberBinding, undefined);
+
+  // a binding that names a roll but no member is the false answer D-3 names
+  for (const partial of [
+    { rollPath: '/state/roll.json' },
+    { rollPath: '/state/roll.json', keyringPath: '/state/keyring.json' },
+    { rollPath: '/state/roll.json', keyringPath: '/state/keyring.json', memberKeyPath: '/state/founder.pem' },
+    { memberId: 'rehearsal-founder' },
+  ]) {
+    const p = BASE();
+    p.memberBinding = partial;
+    assert.throws(() => resolveConfig(p), /memberBinding\.\w+ must be an explicit non-empty string/, JSON.stringify(Object.keys(partial)));
+  }
+
+  // declared whole: rides the resolved config for the self-model (the
+  // binding) and the judicature (the roll a witness seat verifies against)
+  const declared = BASE();
+  declared.memberBinding = {
+    rollPath: '/state/roll.json', keyringPath: '/state/keyring.json',
+    memberKeyPath: '/state/founder.pem', memberId: 'rehearsal-founder',
+  };
+  assert.deepEqual(resolveConfig(declared).memberBinding, declared.memberBinding);
+});

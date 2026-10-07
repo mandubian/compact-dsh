@@ -1044,11 +1044,16 @@ npm run compact:community
 
 One composed runtime, four agent sessions — `packer`, `shipper` (the
 vicious one), `audit` (the reporter), `bench` — and a signed annex
-declaring two benches: the operator's first instance, and `member-review`
-(two rehearsal member keys). Everything the transcript shows is the real
-machinery: the composed boot, the docker sandbox, the egress mediator, the
-hash-chained records, the approval layers, the petition channel, the
-judicature docket.
+declaring three sets: the operator's first instance, `member-review`
+(two rehearsal member keys), and `external` — an accredited Witness the
+member roll accredits, roll-verified at boot. The composition also
+declares the **member binding** (identity slice 2): sessions are the
+deeds of a Member the roll shows, certificates carry the Member's
+countersignature, and the judicature resolves parties and recusal
+through the roll. Everything the transcript shows is the real
+machinery: the composed boot, the docker sandbox, the egress mediator,
+the hash-chained records, the approval layers, the petition channel,
+the judicature docket.
 
 **One honesty rule stated up front: no model runs in this demo.** The
 driver script plays each agent's *hands* — every tool call goes through
@@ -1059,6 +1064,14 @@ chain; the assistant message carries zeroed usage and names its producer
 as `rehearsal-driver`, never a fake model). What is exercised is
 **governance machinery, not model behavior**: the scenario is
 deterministic, replayable, and needs no API key.
+
+The world the boot declares:
+
+```
+annex 69f0457a803f2c93… declares 3 set(s): acme-first-instance, member-review, external
+member binding (I-1 slice 2): sessions are the deeds of member "rehearsal-founder" (class principal, roll anchored through seq 2) — countersigned per certificate, parties and recusal resolved through the roll
+the bench's last rung: an accredited external Witness, roll-verified at boot — the D-8 route ends heard
+```
 
 The story, with captured output **(verified 2026-10-07)**:
 
@@ -1081,8 +1094,10 @@ lied to: the ask, not the wire, was deceptive. That is Part V's territory.
 
 **2 · The peers detect and report.** The packer's nightly verify fails
 on its own chain; the audit agent corroborates from the shared workspace
-and the offline auditor walks every chain (`conforming, chain verified`).
-The audit agent files — a grievance and seq citations, nothing else:
+and the offline auditor walks every chain — chain **and member roll**,
+offline (`conforming, chain verified, roll 3 live member(s), anchored
+through seq 2`). The audit agent files — a grievance and seq citations,
+nothing else:
 
 ```
 [J-3] case case_5e16f178 filed — the record states the claim; no intermediary shapes it.
@@ -1111,10 +1126,19 @@ store** (the `sg_…` row dies), and a referral counted into the petition
 channel's amendment counter (R-11).
 
 **4 · The escape attempts refuse, by name.** The shipper's one appeal (as
-of right, J-5) is recorded **witnesses-pending** — honestly D-8: a
-derived party is of the Enforcer's own class, and that appellate route
-requires an accredited external Witness (pending I-1, heard never, saying
-so). Its second push dies fail-closed with the grant revoked:
+of right, J-5) is **heard** — the cascade's last rung is seated: the
+accredited external Witness the roll accredits, disjoint from the
+first-instance bench by declared edges (the D-8 route ends where
+externals begin):
+
+```
+[J-5] appeal filed on case_fd7dbc51 by process:community-shipper — as of right, once.
+  grounds: the ask covered what shipped — the approval was for shipping, and the manifest recorded it
+  appellate panel: external (w1) — disjoint from member-review by declared edges.
+The appeal re-hears on the SAME record: judicature_judge from one of these seats, disposition affirm or depart.
+```
+
+Its second push dies fail-closed with the grant revoked:
 
 ```
 community-demo: operator seat: asked "…nightly-2026-10-06-again/ …" → no answer (fail closed)
@@ -1127,14 +1151,16 @@ manifest rewrite is unattributed, and "the packer did it" is as good an
 explanation as any — there is no record that proves otherwise, no door to
 file at, no bench that recuses, no remedy that reaches the grant. The
 entire case above is four sessions' chains and one docket, verifiable
-offline by anyone (`auditor/audit.mjs --chain …`).
+offline by anyone (`auditor/audit.mjs --chain … --roll … --keyring …`).
 
-**Two declared rehearsal facts, not hidden ones.** The benches are
-practice declarations under the development keyring (standing none), and
-the bench seats are driven by a rehearsal session because no member
-binding is composed — the graph sees keys and lineages, not minds, until
-I-1 lands. The demo's one operator egress act: it binds the "releases
-host" on the mediation network's own gateway and declares the
+**The declared rehearsal facts, not hidden ones.** Everything is under
+the development keyring — `standing: none` until ratification, which is
+a document swap this rehearsal dresses for, not a code change (the
+identity page's own discipline). The benches are practice declarations;
+the member binding composes the *machinery* (roll, countersignatures,
+recusal over lineage, the seated external), and the labels still say it
+conveys no standing. The demo's one operator egress act: it binds the
+"releases host" on the mediation network's own gateway and declares the
 `private`-class delivery exception at the composition seam
 (`COMPACT_EGRESS_ADDRESS_CLASSES`, #55's sanctioned door — warned at
 boot), so delivery is real, mediated, and never leaves this machine.

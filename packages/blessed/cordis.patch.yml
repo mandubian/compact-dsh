@@ -109,6 +109,13 @@
           # Default: absent (COMPACT_EGRESS_PIN_OFFERS unset → no offer, as
           # before). Mediated posture only, validated at resolveConfig.
           egressPinOffers: !!js '["1", "true"].includes(process.env.COMPACT_EGRESS_PIN_OFFERS) ? true : undefined'
+        # the member binding (I-1 slice 2): sessions become the DEEDS of a
+        # Member — certificates carry memberKeyDigest + the Member's
+        # countersignature, and the judicature resolves parties and recusal
+        # through the roll. All four paths/names or none (all-or-none is
+        # re-refused at resolveConfig); the self-model verifies the roll and
+        # the key's lineage at boot.
+        memberBinding: !!js '(process.env.COMPACT_MEMBER_ROLL && process.env.COMPACT_MEMBER_KEYRING && process.env.COMPACT_MEMBER_KEY && process.env.COMPACT_MEMBER_ID) ? { rollPath: process.env.COMPACT_MEMBER_ROLL, keyringPath: process.env.COMPACT_MEMBER_KEYRING, memberKeyPath: process.env.COMPACT_MEMBER_KEY, memberId: process.env.COMPACT_MEMBER_ID } : undefined'
         protectedState:
           - !!js process.env.COMPACT_RECORD_ROOT
           - !!js process.env.COMPACT_CHAIN_DIR
