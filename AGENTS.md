@@ -22,13 +22,20 @@ a vibe.
 
 ## Both tellings take points, not walls
 
-Structure each telling for skimming before reading:
+The failure case, named: two dense paragraphs — one precise, one plain —
+is the jargon problem with the jargon removed. The reader bounces off
+both walls equally, and trust that is not read protects no one. **Never
+ship that shape.** This holds everywhere the operator reads you — chat
+replies, PR and issue descriptions, review answers, commit narratives,
+and the docs.
 
-- a one-breath headline first — what happened, in one sentence;
-- then bullets with several levels of detail — each point's headline
-  bolded, its detail nested beneath;
-- tables for anything enumerable (files, checks, results);
-- the plain telling stays plain: short sentences, no clause numbers, no
+Each telling instead:
+
+- opens with a one-breath headline — what happened, in one sentence;
+- continues as bullets with several levels of detail — each point's
+  headline bolded, its detail nested beneath;
+- uses tables for anything enumerable (files, checks, results);
+- keeps the plain telling plain: short sentences, no clause numbers, no
   function names — the machinery's names live in the precise telling.
 
 Two dense paragraphs are as indigestible as jargon, however plain the
