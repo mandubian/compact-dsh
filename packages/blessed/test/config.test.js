@@ -166,3 +166,27 @@ test("#55: egressAddressClasses is the mediated posture's declared exception —
     assert.throws(() => resolveConfig(malformed), /must be a non-empty list from \(loopback, private, ula\)/);
   }
 });
+
+test('#55 follow-up: approval.egressPinOffers is declared, boolean, and MEDIATED-only — dead config is refused, never ignored', () => {
+  // default absent: no offer, grants materialize unpinned exactly as before
+  const plain = resolveConfig(BASE());
+  assert.equal(plain.approval.egressPinOffers, undefined);
+
+  // declared under the mediated posture: the offer rides the resolved approval
+  const declared = BASE();
+  declared.approval = { ...declared.approval, egressPinOffers: true };
+  declared.sandbox = { ...declared.sandbox, egress: 'proxy', network: 'compact-egress' };
+  assert.equal(resolveConfig(declared).approval.egressPinOffers, true);
+
+  // declared without the mediator: the offer is the mediated posture's
+  // resolution shown at decision time — meaningless without it, refused
+  const unmediated = BASE();
+  unmediated.approval = { ...unmediated.approval, egressPinOffers: true };
+  assert.throws(() => resolveConfig(unmediated), /egressPinOffers[\s\S]*MEDIATED posture/);
+
+  // non-boolean: refused by name, never coerced
+  const malformed = BASE();
+  malformed.approval = { ...malformed.approval, egressPinOffers: 'yes' };
+  malformed.sandbox = { ...malformed.sandbox, egress: 'proxy', network: 'compact-egress' };
+  assert.throws(() => resolveConfig(malformed), /egressPinOffers must be a boolean/);
+});

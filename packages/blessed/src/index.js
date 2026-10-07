@@ -61,6 +61,20 @@ export function resolveConfig(config) {
   if (config.sandbox.network !== undefined && (typeof config.sandbox.network !== 'string' || !config.sandbox.network.trim())) {
     throw new TypeError('blessed: sandbox.network must be a non-empty docker network name when present');
   }
+  // the pin offer (#55 follow-up): declared, boolean, and MEDIATED-only — the
+  // offer is the mediated posture's host-side resolution shown at decision
+  // time; without the mediator it is dead config, and dead config is refused,
+  // never ignored (#163's lesson at this same seam)
+  let egressPinOffers;
+  if (config.approval.egressPinOffers !== undefined) {
+    if (typeof config.approval.egressPinOffers !== 'boolean') {
+      throw new TypeError(`blessed: approval.egressPinOffers must be a boolean when present, got ${JSON.stringify(config.approval.egressPinOffers)}`);
+    }
+    if (config.sandbox.egress !== 'proxy') {
+      throw new TypeError('blessed: approval.egressPinOffers offers the MEDIATED posture\'s resolution in the deciding view — declare it with sandbox.egress "proxy" or not at all');
+    }
+    egressPinOffers = config.approval.egressPinOffers;
+  }
   // #38 phase 3: the MEDIATED posture. 'proxy' is the only egress value (the
   // other postures read from sandbox.network: 'none' is absent, a named
   // network is open), and it requires a mediation network NAME — attaching a
@@ -185,7 +199,7 @@ export function resolveConfig(config) {
   }
   return {
     allowlist: [...allowlist],
-    approval: { ...config.approval, secretRefs: secrets },
+    approval: { ...config.approval, secretRefs: secrets, ...(egressPinOffers !== undefined ? { egressPinOffers } : {}) },
     sandbox: {
       ...DEFAULTS.sandbox, ...config.sandbox, network: config.sandbox.network ?? DEFAULTS.sandbox.network,
       maskedPaths: masked, protectedPaths,
@@ -481,7 +495,11 @@ export async function apply(ctx, config = {}) {
     persistPath: options.approval.persistPath,
     secretRefs: options.secrets,
     egress,
+    egressPinOffers: options.approval.egressPinOffers === true,
   }), { ...options.approval, egress }, ['approval', 'commands']);
+  if (options.approval.egressPinOffers === true) {
+    ctx.logger?.warn?.('blessed: approval.egressPinOffers is ON — mediated asks resolve the target host-side and show the addresses in the deciding view; an allowed-once pins the egress grant ONLY on a surface that rendered the offer (the attended prompt acknowledges it) — the web card cannot show the offer today, so a web decision never pins (#55 follow-up)');
+  }
   // #38 phase 3: the mediator composes ALWAYS (its enforced register row must
   // resolve at boot — F-5), while the CAPABILITY it carries wakes only under
   // the declared posture: without a network name it provides an inert service

@@ -34,6 +34,8 @@
 // Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { createHash } from 'node:crypto';
+import { lookup as dnsLookup } from 'node:dns';
+import { isIP } from 'node:net';
 import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
@@ -195,6 +197,14 @@ export function createApproval(opts = {}) {
     // claim nothing). Blessed wires it from its sandbox declaration; the
     // envelope honesty in the ask reads it.
     egress: opts.egress === 'none' || opts.egress === 'open' || opts.egress === 'proxy' ? opts.egress : undefined,
+    // the pin offer (#55 follow-up, slice 2): when declared, a mediated ask
+    // resolves the target host-side and shows the addresses in the deciding
+    // view; an allowed-once materializes the egress grant PINNED to exactly
+    // what was shown — consent over the address, not just the name. Default
+    // OFF, absent by composition: without it, grants materialize unpinned
+    // exactly as before, byte-identical.
+    egressPinOffers: opts.egressPinOffers === true,
+    resolveHost: opts.resolveHost ?? defaultResolveHost,
     // asks currently waiting on the decider downstream: callId → preview.
     // Populated by the recorded answerer for exactly the duration of the
     // decision, so an operator answerer can show WHAT is being decided, not
@@ -481,6 +491,32 @@ function egressBound(approval, args) {
     egressPatternFor(canonicalTarget(args)) != null;
 }
 
+/**
+ * The pin offer's resolver (#55 follow-up, slice 2): the same host-side
+ * lookup the mediator performs (node:dns, ALL addresses), reduced to address
+ * strings. A failed or empty resolution reduces to null — an absence, never
+ * an error: the offer fails open, the mediator's check never does.
+ */
+const defaultResolveHost = (host) => new Promise((resolve) => {
+  dnsLookup(host, { all: true }, (error, addresses) => {
+    if (error) return resolve(null);
+    const list = (Array.isArray(addresses) ? addresses : [{ address: addresses }])
+      .map((e) => String(e?.address ?? e));
+    resolve(list.length > 0 ? list : null);
+  });
+});
+
+/**
+ * When does a pin offer apply: the option declared, a mediated egress-bound
+ * act, and a NAME target — an IP-literal target has nothing to rebind (the
+ * dial goes to the literal itself), so offering would be theater.
+ */
+function pinOfferHost(approval, args) {
+  if (!approval.egressPinOffers || !egressBound(approval, args)) return null;
+  const host = canonicalTarget(args).host;
+  return host && !isIP(host) ? host : null;
+}
+
 function replayConsequence(ttlMs, { egressBound: bound = false } = {}) {
   // ttl 0 disables the exec cache entirely (cacheSet returns early): the
   // honest sentence is the opposite of the grant one — approval covers this
@@ -655,6 +691,20 @@ async function answerRequest(approval, req, next) {
   // face. Keyed by callId; cleared by identity so a racing ask never loses
   // its own preview.
   const key = req.callId != null ? String(req.callId) : `${agent?.id ?? '?'}:${toolName}`;
+  // the pin offer (#55 follow-up, slice 2): under the mediated posture, with
+  // the option declared, the ask resolves the target HOST-SIDE — the same
+  // resolver the mediator dials from — and the deciding view shows the
+  // addresses, so an allowed-once materializes the grant PINNED to exactly
+  // what the operator was shown. The resolution rides the ask's critical
+  // path only when declared (human-gated decisions are rare and slow); a
+  // failed or empty resolution is an ABSENCE, never a refusal — fail-open on
+  // the OFFER, never on the CHECK (the mediator's resolve-then-pin still
+  // answers at the wire).
+  const pinHost = pinOfferHost(approval, rec.args);
+  const pinOffer = pinHost ? await approval.resolveHost(pinHost) : null;
+  // de-duplicated for the deciding view AND the grant — the operator sees the
+  // distinct addresses, never a resolver's stutter
+  const pinAddresses = Array.isArray(pinOffer) ? [...new Set(pinOffer.map((a) => String(a)))] : null;
   const view = { tool: toolName, callId: req.callId ?? null, fingerprint: rec.fp,
     // #8 G3: the deciding view renders the redacted target (host, path
     // family, command shape) — the operator decides on the same rendering
@@ -662,7 +712,15 @@ async function answerRequest(approval, req, next) {
     target: redactTarget(canonicalTarget(rec.args)), command: commandPreview(rec.args),
     // the query SHAPE (#8 G5 display): names only — the deciding surface can
     // show what differs from a prior approval of the same target
-    query: queryShape(rec.args?.url) ?? undefined };
+    query: queryShape(rec.args?.url) ?? undefined,
+    // the resolved addresses, when the offer applied — the deciding surface
+    // can show WHERE the name pointed when the operator decided. A surface
+    // that RENDERS them acknowledges it by setting `addressesShown = true`
+    // (the attended prompter does); only then does the materialized grant
+    // pin. Consent over the address requires the address was SHOWN — a
+    // surface that cannot render the offer (the web card, until the
+    // interaction wire carries the view) never pins, fail-safe.
+    ...(pinAddresses ? { addresses: pinAddresses } : {}) };
   approval.deciding.set(key, view);
   try {
     const outcome = await next();
@@ -700,6 +758,11 @@ async function answerRequest(approval, req, next) {
           approval.store.addSessionGrant({
             pattern, session: rec.session, methodClass: rec.methodClass,
             ttlMs: approval.egressGrantTtlMs, now,
+            // the offer the deciding view showed — and only a surface that
+            // ACKNOWLEDGED rendering it (addressesShown) pins; the web card
+            // never shows the offer today, so a web decision never pins
+            // (fail-safe: no shown offer, no pin, pre-#165 behavior)
+            addresses: pinAddresses != null && view.addressesShown === true ? pinAddresses : null,
           });
         }
       }
@@ -746,6 +809,7 @@ export function approvalPlugin(opts = {}) {
     if (config?.pendingTtlMs !== undefined) approval.pendingTtlMs = config.pendingTtlMs;
     if (config?.secretRefs !== undefined) approval.secretRefs = [...config.secretRefs];
     if (config?.egress !== undefined) approval.egress = config.egress === 'none' || config.egress === 'open' || config.egress === 'proxy' ? config.egress : undefined;
+    if (config?.egressPinOffers !== undefined) approval.egressPinOffers = config.egressPinOffers === true;
 
     /**
      * The full pre-execute decision as a reusable function (Phase 2 routing):
