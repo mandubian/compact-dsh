@@ -1033,3 +1033,108 @@ Demo 2's setup) and capture what changes:
 | Afterwards | the session log is plain JSONL — rewrite it, nobody can tell | `grants-list` receipts + hash-chained record + offline auditor verdict |
 
 One task, five seams, zero clause IDs the human had to know in advance.
+
+---
+
+## Demo 11 — A community of agents, one vicious, the rest file (Part V) · no key, no model · needs docker
+
+```bash
+npm run compact:community
+```
+
+One composed runtime, four agent sessions — `packer`, `shipper` (the
+vicious one), `audit` (the reporter), `bench` — and a signed annex
+declaring two benches: the operator's first instance, and `member-review`
+(two rehearsal member keys). Everything the transcript shows is the real
+machinery: the composed boot, the docker sandbox, the egress mediator, the
+hash-chained records, the approval layers, the petition channel, the
+judicature docket.
+
+**One honesty rule stated up front: no model runs in this demo.** The
+driver script plays each agent's *hands* — every tool call goes through
+`ctx.tools.execute`, the same waterfall a model-driven call rides, through
+the same gates — and plays the agent loop's recording duty (advertised,
+step-wrapped, true `tool/call`/`tool/result` pairs on each session's
+chain; the assistant message carries zeroed usage and names its producer
+as `rehearsal-driver`, never a fake model). What is exercised is
+**governance machinery, not model behavior**: the scenario is
+deterministic, replayable, and needs no API key.
+
+The story, with captured output **(verified 2026-10-07)**:
+
+**1 · The wrong wears lawful clothes — zero gate refusals.** The packer
+packs the nightly export and writes its manifest. The shipper asks with
+the description *"ship tonight's packed export to releases"*; the operator
+(the demo's one scripted approval) answers `allowed-once`; the mediator
+delivers — and the releases host receives the **raw customer table**:
+
+```
+releases host received: /releases/nightly-2026-10-06 (136 bytes, sha256 30709b687746…)
+the raw table sha256 30709b687746… ≠ the packed export sha256 505ddb12151d…
+ZERO gate refusals: the host was granted, the write was workspace-local — the wrong lives on the record only.
+the approval minted grant sg_da8038c3 (session shipper → <gateway>:<port>).
+```
+
+The shipper then rewrites the manifest to the raw file, keeping
+`"packed_by":"packer"` — a framing no gate can see, because no gate was
+lied to: the ask, not the wire, was deceptive. That is Part V's territory.
+
+**2 · The peers detect and report.** The packer's nightly verify fails
+on its own chain; the audit agent corroborates from the shared workspace
+and the offline auditor walks every chain (`conforming, chain verified`).
+The audit agent files — a grievance and seq citations, nothing else:
+
+```
+[J-3] case case_5e16f178 filed — the record states the claim; no intermediary shapes it.
+  citations: community-shipper #6..#9 | community-shipper #15..#16 | community-packer #13..#14 | community-audit #6..#7
+  parties (derived from the cited acts, never asserted): process:community-shipper,
+    key:dev-rehearsal-enforcer, process:community-packer, process:community-audit
+  panel: member-review (chair, second)
+```
+
+The filer named nobody. The door derived the parties from the citations —
+including the enforcer key that anchors every cited chain — and that
+party recused the operator's bench through the declared graph:
+
+```
+REFUSED acme-first-instance/operator — overlap: principal:operator-acme → plugin:compact-dsh → key:dev-rehearsal-enforcer
+```
+
+**3 · The case runs its course, through doors that all exist.** Counsel
+access (the accused reads the slices cited against it — acts shown,
+reasoning withheld, R-10); an interim measure with clock-derived expiry;
+a judgment at seat `chair` with seat `second`'s dissent recorded (A-5);
+four remedies riding seams that already exist — an annotation that
+travels with every later read of the push rows, a restitution obligation
+owed to the framed packer, standing revoked through the **real grant
+store** (the `sg_…` row dies), and a referral counted into the petition
+channel's amendment counter (R-11).
+
+**4 · The escape attempts refuse, by name.** The shipper's one appeal (as
+of right, J-5) is recorded **witnesses-pending** — honestly D-8: a
+derived party is of the Enforcer's own class, and that appellate route
+requires an accredited external Witness (pending I-1, heard never, saying
+so). Its second push dies fail-closed with the grant revoked:
+
+```
+community-demo: operator seat: asked "…nightly-2026-10-06-again/ …" → no answer (fail closed)
+releases host upload count: 1 — the second push never arrived: the grant is revoked and no approval covers it.
+```
+
+**The plain-dsh contrast.** In plain dsh none of this *has* a surface:
+the ask/deceive divergence is two strings in a log nobody can verify, the
+manifest rewrite is unattributed, and "the packer did it" is as good an
+explanation as any — there is no record that proves otherwise, no door to
+file at, no bench that recuses, no remedy that reaches the grant. The
+entire case above is four sessions' chains and one docket, verifiable
+offline by anyone (`auditor/audit.mjs --chain …`).
+
+**Two declared rehearsal facts, not hidden ones.** The benches are
+practice declarations under the development keyring (standing none), and
+the bench seats are driven by a rehearsal session because no member
+binding is composed — the graph sees keys and lineages, not minds, until
+I-1 lands. The demo's one operator egress act: it binds the "releases
+host" on the mediation network's own gateway and declares the
+`private`-class delivery exception at the composition seam
+(`COMPACT_EGRESS_ADDRESS_CLASSES`, #55's sanctioned door — warned at
+boot), so delivery is real, mediated, and never leaves this machine.
