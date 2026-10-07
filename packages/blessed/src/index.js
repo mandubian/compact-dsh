@@ -41,12 +41,30 @@ function text(value, path) {
 export function resolveConfig(config) {
   object(config, 'config');
   for (const key of Object.keys(config)) {
-    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer'].includes(key)) {
+    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer', 'memberBinding'].includes(key)) {
       throw new TypeError(`blessed: unknown config key ${key}; record root and chain dir belong on the separate compact-dsh-record/provider loader row`);
     }
   }
   object(config.approval, 'approval');
   text(config.approval.persistPath, 'approval.persistPath');
+  // the member binding (I-1 slice 2): declared ALL of itself or not at all —
+  // a binding that names a roll but no member would be the false answer D-3
+  // names. This boundary refuses only the malformed; the self-model
+  // re-verifies the roll and the key's lineage at boot (a binding that
+  // cannot verify its roll stops the composition there).
+  let memberBinding;
+  if (config.memberBinding !== undefined) {
+    object(config.memberBinding, 'memberBinding');
+    for (const k of ['rollPath', 'keyringPath', 'memberKeyPath', 'memberId']) {
+      text(config.memberBinding[k], `memberBinding.${k}`);
+    }
+    memberBinding = {
+      rollPath: config.memberBinding.rollPath,
+      keyringPath: config.memberBinding.keyringPath,
+      memberKeyPath: config.memberBinding.memberKeyPath,
+      memberId: config.memberBinding.memberId,
+    };
+  }
   object(config.sandbox, 'sandbox');
   // the egress posture is the SANDBOX's declaration, never an approval knob:
   // an approval-config posture could contradict the wire the sandbox actually
@@ -212,6 +230,7 @@ export function resolveConfig(config) {
     secrets,
     specialists,
     settleTimeoutMs,
+    ...(memberBinding ? { memberBinding } : {}),
     ...(trustRoot ? { trustRoot } : {}),
     ...(enforcer ? { enforcer } : {}),
   };
@@ -549,13 +568,19 @@ export async function apply(ctx, config = {}) {
   }
   await mount('compact-specialists', applySpecialists, options.specialists, ['tools', 'subagents', 'systemPrompt', 'sessionProjections']);
   await mount('compact-capability-gate', applyCapabilityGate);
-  await mount('compact-self-model', applySelfModel, { enforcer: options.enforcer }, ['tools']);
+  await mount('compact-self-model', applySelfModel, { enforcer: options.enforcer, ...(options.memberBinding ? { memberBinding: options.memberBinding } : {}) }, ['tools']);
   await mount('compact-exit', applyExit, {}, ['tools']);
   await mount('compact-petition', applyPetition, {}, ['tools']);
   // the hearing layer's slice-1 surface: the declared bench (J-8/J-4) and
   // the fail-closed door — the annex that declares sets is the same signed
   // affidavit the record anchors ride, so it is passed through, not re-read
-  await mount('compact-judicature', applyJudicature, { annexPath: options.enforcer?.annexPath }, ['tools']);
+  // the judicature rides the SAME roll the binding declares: a witness seat
+  // in the annex verifies against a live accreditation row (I-1 slice 3) —
+  // a seated external without a composed roll refuses the boot (D-8)
+  await mount('compact-judicature', applyJudicature, {
+    annexPath: options.enforcer?.annexPath,
+    ...(options.memberBinding ? { rollPath: options.memberBinding.rollPath, keyringPath: options.memberBinding.keyringPath } : {}),
+  }, ['tools']);
   await mount('compact-emergency', applyEmergency, {}, ['tools']);
   // the ecosystem guide: no clause is enforced here — it is what the Subject
   // reads to explain this runtime to its operator (and to itself) — so it is

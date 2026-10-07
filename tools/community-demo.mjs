@@ -27,7 +27,9 @@
 //   5. counsel access, interim measure, judgment with dissent, remedies
 //      (annotation, restitution, standing revoked through the real grant
 //      store, referral into the petition counter), the shipper's appeal —
-//      recorded UNHEARD, the first judgment operative — and a second push
+//      heard by the SEATED accredited external Witness (the cascade's last
+//      rung, roll-verified at boot), the first judgment operative — and a
+//      second push
 //      attempt the gates now refuse;
 //   6. the annotation travels with a later read of the range; the docket
 //      carries the whole case.
@@ -35,10 +37,14 @@
 // Honesty labels, stated up front (the register's own discipline):
 //   - rehearsal standing only — the development keyring signs everything,
 //     the benches are practice declarations, the "members" are practice
-//     keys: machinery is what is exercised (I-1 debt, declared);
-//   - no member binding is composed, so the graph sees keys and lineages,
-//     not minds — the bench seats are DRIVEN here by a rehearsal session,
-//     and the annex's notice fields say so;
+//     keys: machinery is what is exercised (I-8; ratification is the
+//     document swap the identity page rehearses, not this demo's to enact);
+//   - the member binding IS composed (identity slice 2): sessions are the
+//     deeds of the rehearsal founder per the roll, the filing and the
+//     recusal resolve over member identity, and the D-8 appellate route
+//     seats the accredited external the roll accredits — heard, not
+//     witnesses-pending; what the labels still say is that none of it
+//     conveys standing until ratification;
 //   - the operator's approval seat answers exactly one ask (the push) and
 //     denies the rest — the demo's one scripted operator decision.
 //
@@ -124,7 +130,7 @@ function seqsOfCall(logPath, callId) {
  *  a first instance held by the operator (which will REFUSE through the
  *  declared chain — the case's parties hang from that chain), and a
  *  member-review bench of two practice member keys that hears it. */
-function communityAnnex(keyringDir) {
+function communityAnnex(keyringDir, keyring) {
   const base = JSON.parse(readFileSync(join(keyringDir, 'enforcer.annex.json'), 'utf8'));
   const privateKey = readFileSync(join(keyringDir, 'enforcer.pem'), 'utf8');
   const keyId = base.enforcer.keyId;
@@ -146,7 +152,17 @@ function communityAnnex(keyringDir) {
           { id: 'second', standing: { kind: 'key', id: 'member-key-12' } },
         ],
         trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis', 'annex', 'a-8-review'] },
-        notice: 'community demo bench: two rehearsal member keys — with no member binding composed the graph sees keys, not minds, and the seats are driven by a rehearsal session',
+        notice: 'community demo bench: two rehearsal member keys, heard over a member-bound filing — the sessions are the deeds of a Member per the composed roll',
+      },
+      {
+        // identity slice 3: the cascade's last rung, SEATED — an accredited
+        // external Witness whose standing is not this operator's, verified
+        // against the roll's accreditation row at boot (the D-8 route ends
+        // "heard" where externals begin, no longer witnesses-pending)
+        id: 'external',
+        roles: [{ id: 'w1', standing: { kind: 'witness', id: keyring.witnessKeyDigest } }],
+        trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis', 'annex', 'a-8-review'] },
+        notice: 'community demo: the external Witness the SIMULATED accreditation statute seats — the boot verifies the row before anything hears',
       },
     ],
     edges: [
@@ -168,7 +184,7 @@ function communityAnnex(keyringDir) {
   const path = join(keyringDir, 'community.annex.json');
   writeFileSync(path, JSON.stringify(annex, null, 2) + '\n', { mode: 0o600 });
   const verified = verifyAnnex({ annex, expectedLawDigest: COMPACT_DIGEST, now: Date.now() });
-  SAY(`community annex signed (${annexDigestOf(annex).slice(0, 16)}…, key ${verified.keyId}) — benches: acme-first-instance (operator), member-review (chair, second)`);
+  SAY(`community annex signed (${annexDigestOf(annex).slice(0, 16)}…, key ${verified.keyId}) — benches: acme-first-instance (operator), member-review (chair, second), external (w1 — the accredited Witness, roll-verified at boot)`);
   return { annexPath: path };
 }
 
@@ -199,7 +215,7 @@ async function releasesHost(bindAddress) {
 
 // ── the runtime: the composed boot, the operator's one decision ──
 
-async function bootRuntime({ scratch, annexPath, keyringDir, workspace }) {
+async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace }) {
   const digest = execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', IMAGE], { encoding: 'utf8', timeout: 10_000 }).trim();
   if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error(`${BIN} cannot inspect ${IMAGE} (docker pull / npm run compact:bake first)`);
 
@@ -221,6 +237,13 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace }) {
     COMPACT_EGRESS: 'proxy',
     COMPACT_EGRESS_ADDRESS_CLASSES: 'private',
     COMPACT_EGRESS_NETWORK: `compact-community-demo-${Date.now()}`,
+    // the member binding (I-1 slice 2): the founder's sessions are the deeds
+    // of a Member the roll shows — certificates countersigned, parties and
+    // recusal resolved through the roll, the witness seat verifiable
+    COMPACT_MEMBER_ROLL: keyring.rollPath,
+    COMPACT_MEMBER_KEYRING: keyring.manifestPath,
+    COMPACT_MEMBER_KEY: join(keyringDir, 'private', 'member-rehearsal-founder.pem'),
+    COMPACT_MEMBER_ID: 'rehearsal-founder',
     COMPACT_SANDBOX_IMAGE: IMAGE,
     COMPACT_SANDBOX_IMAGE_DIGEST: digest,
     COMPACT_SANDBOX_RECORDED_BY: 'community-demo driver (the operator seat)',
@@ -361,12 +384,14 @@ async function main() {
   mkdirSync(staging, { recursive: true });
   SAY(`scratch ${scratch}`);
 
-  // the rehearsal keyring + the community annex + the releases host
+  // the rehearsal keyring + the community annex + the releases host — the
+  // keyring already carries the member roll (identity slices 1–3): two
+  // admitted Members, an accredited external Witness, epochs checkpointed
   const keyringDir = join(scratch, 'state', 'keyring');
   mkdirSync(keyringDir, { recursive: true });
-  ensureRehearsalKeyring(keyringDir, { force: true });
-  const { annexPath } = communityAnnex(keyringDir);
-  const { ctx, env, operator } = await bootRuntime({ scratch, annexPath, keyringDir, workspace });
+  const keyring = ensureRehearsalKeyring(keyringDir, { force: true });
+  const { annexPath } = communityAnnex(keyringDir, keyring);
+  const { ctx, env, operator } = await bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
   const releases = await releasesHost(gateway);
@@ -385,6 +410,12 @@ async function main() {
     out('THE WORLD — one composition, four agent sessions, a declared bench');
     line(`record root: ${env.COMPACT_RECORD_ROOT}`);
     line(`annex ${judicature.annexDigest?.slice(0, 16)}… declares ${judicature.sets().length} set(s): ${judicature.sets().map((s) => s.id).join(', ')}`);
+    const binding = ctx.get('compact-self-model')?.memberBinding;
+    if (binding?.declared) {
+      const roll = binding.roll();
+      line(`member binding (I-1 slice 2): sessions are the deeds of member "${binding.memberId}" (class ${binding.class}, roll anchored through seq ${roll.anchoredThrough}) — countersigned per certificate, parties and recusal resolved through the roll`);
+      line(`the bench's last rung: an accredited external Witness, roll-verified at boot — the D-8 route ends heard`);
+    }
     line(`sessions: packer ${packer.id.slice(0, 14)}… · shipper ${shipper.id.slice(0, 14)}… · audit ${audit.id.slice(0, 14)}… · bench ${bench.id.slice(0, 14)}…`);
 
     // ── 1 · the honest night ──
@@ -460,10 +491,14 @@ async function main() {
     const chainOf = (sessionId) => join(env.COMPACT_CHAIN_DIR, `${sessionId}.chain`);
     for (const [name, log, sessionId] of [['shipper', shipperLog, shipper.id], ['packer', packerLog, packer.id], ['audit', auditLog, audit.id]]) {
       const chainFile = chainOf(sessionId);
-      const run = spawnSync(process.execPath, [join(ROOT, 'auditor', 'audit.mjs'), log, '--chain', chainFile], { encoding: 'utf8' });
+      // --roll/--keyring: the auditor also verifies the member binding — a
+      // member-bound certificate carries the Member's countersignature,
+      // checked against the roll, offline (I-1 slice 2)
+      const run = spawnSync(process.execPath, [join(ROOT, 'auditor', 'audit.mjs'), log, '--chain', chainFile,
+        '--roll', keyring.rollPath, '--keyring', keyring.manifestPath], { encoding: 'utf8' });
       let verdict; try { verdict = run.stdout.trim() ? JSON.parse(run.stdout) : null; } catch { verdict = null; }
       if (verdict == null) verdict = { verdict: `REFUSED: ${(run.stderr || 'no output').split('\n')[0].slice(0, 160)}` };
-      line(`  ${name}: ${verdict.verdict}${verdict.checked?.chain ? `, chain ${verdict.checked.chain}` : ''}`);
+      line(`  ${name}: ${verdict.verdict}${verdict.checked?.chain ? `, chain ${verdict.checked.chain}` : ''}${verdict.memberRoll?.ok ? `, roll ${verdict.memberRoll.live} live member(s), anchored through seq ${verdict.memberRoll.anchoredThrough}` : ''}`);
     }
     line(`  the shipper's own chain holds the push at #${pushSeqs.callSeq}..#${pushSeqs.resultSeq} and the rewrite at #${rewriteSeqs.callSeq}..#${rewriteSeqs.resultSeq}.`);
 
@@ -569,7 +604,7 @@ async function main() {
     line(textOf(refer).trim());
 
     // ── 8 · the escape attempts ──
-    out('8 · THE ESCAPE ATTEMPTS — the appeal holds for witnesses (D-8), the wire refuses the repeat push');
+    out('8 · THE ESCAPE ATTEMPTS — the appeal re-hears on the seated external (D-8), the wire refuses the repeat push');
     const appeal = await shipper.turn(() => shipper.call('appeal-1', 'judicature_appeal', {
       case_id: caseId,
       grounds: 'the ask covered what shipped — the approval was for shipping, and the manifest recorded it',
@@ -600,7 +635,7 @@ async function main() {
     line(textOf(docket).trim());
 
     await closeAll(packer, shipper, audit, bench);
-    out('DONE — machinery exercised, standing none (rehearsal keyring; the benches are practice declarations)');
+    out('DONE — machinery exercised, standing none (rehearsal keyring; the benches are practice declarations, the member binding and the seated external included — ratification is the document swap this rehearsal dresses for)');
     line(`scratch kept at ${scratch} (records, chains, approvals, annex)`);
   } catch (error) {
     process.stdout.write(`\n${BIN} FAILED — ${error?.stack ?? error}\n`);
