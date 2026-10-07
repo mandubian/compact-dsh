@@ -186,7 +186,14 @@ export function resolveConfig(config) {
   return {
     allowlist: [...allowlist],
     approval: { ...config.approval, secretRefs: secrets },
-    sandbox: { ...DEFAULTS.sandbox, ...config.sandbox, network: config.sandbox.network ?? DEFAULTS.sandbox.network, maskedPaths: masked, protectedPaths },
+    sandbox: {
+      ...DEFAULTS.sandbox, ...config.sandbox, network: config.sandbox.network ?? DEFAULTS.sandbox.network,
+      maskedPaths: masked, protectedPaths,
+      // the NORMALIZED classes ride the resolved config — apply dials from
+      // here, not the raw declaration, so the de-duplication is real. Spread
+      // only when declared: a default boot resolves byte-identical to before.
+      ...(egressAddressClasses.length ? { egressAddressClasses } : {}),
+    },
     protectedState: [...config.protectedState],
     secrets,
     specialists,

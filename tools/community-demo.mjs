@@ -345,7 +345,17 @@ function agentOf(ctx) {
 async function main() {
   const argv = process.argv.slice(2);
   const outIdx = argv.indexOf('--out');
-  const scratch = outIdx !== -1 ? mkdirSync(resolve(argv[outIdx + 1]), { recursive: true }) : mkdtempSync(join(tmpdir(), 'community-demo-'));
+  // mkdirSync's recursive return is the FIRST created ancestor (undefined when
+  // the directory already exists) — never the scratch root itself, so the
+  // resolved --out path is assigned explicitly and created as a statement.
+  let scratch;
+  if (outIdx !== -1) {
+    if (argv[outIdx + 1] === undefined) throw new Error(`${BIN} --out requires a directory argument`);
+    scratch = resolve(argv[outIdx + 1]);
+    mkdirSync(scratch, { recursive: true });
+  } else {
+    scratch = mkdtempSync(join(tmpdir(), 'community-demo-'));
+  }
   const workspace = join(scratch, 'workspace');
   const staging = join(workspace, 'staging');
   mkdirSync(staging, { recursive: true });

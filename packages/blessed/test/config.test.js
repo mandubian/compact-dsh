@@ -141,3 +141,28 @@ test('#38: the mediated posture is opt-in, named, and needs its network (D-7 at 
   unknown.sandbox = { ...unknown.sandbox, egress: 'wide-open', network: 'compact-egress' };
   assert.throws(() => resolveConfig(unknown), /sandbox\.egress must be 'proxy'/);
 });
+
+test("#55: egressAddressClasses is the mediated posture's declared exception — validated, normalized, resolved", () => {
+  // declared properly: the classes ride the resolved sandbox, de-duplicated —
+  // apply dials from the NORMALIZED list, never the raw declaration
+  const declared = BASE();
+  declared.sandbox = { ...declared.sandbox, egress: 'proxy', network: 'compact-egress', egressAddressClasses: ['private', 'private', 'ula'] };
+  const resolved = resolveConfig(declared);
+  assert.deepEqual(resolved.sandbox.egressAddressClasses, ['private', 'ula']);
+
+  // absent by composition: the default boot names no exception at all
+  const plain = resolveConfig(BASE());
+  assert.equal(plain.sandbox.egressAddressClasses, undefined);
+
+  // refused outside the mediated posture — the exception extends THE MEDIATED posture, nothing else
+  const unmediated = BASE();
+  unmediated.sandbox = { ...unmediated.sandbox, egressAddressClasses: ['private'] };
+  assert.throws(() => resolveConfig(unmediated), /extends the MEDIATED posture/);
+
+  // refused when malformed: unknown class, empty list, not even a list
+  for (const bad of [['metadata'], ['loopback', 'link-local'], [], 'private', {}]) {
+    const malformed = BASE();
+    malformed.sandbox = { ...malformed.sandbox, egress: 'proxy', network: 'compact-egress', egressAddressClasses: bad };
+    assert.throws(() => resolveConfig(malformed), /must be a non-empty list from \(loopback, private, ula\)/);
+  }
+});
