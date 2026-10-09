@@ -57,6 +57,15 @@ export function createOperatorPrompter({ input = process.stdin, output = process
       const tty = output.isTTY === true;
       const bold = tty ? (s) => `\x1b[1m${s}\x1b[22m` : (s) => s;
       const LABEL_LEAD = /^([A-Z][A-Za-z]+): /;
+      // #175 — the pattern offers the recorded answerer computed for this
+      // ask: each renders as its own numbered choice, and an explicit pick
+      // records itself on the view (patternChoice) — the same ack channel
+      // the pin offer uses (addressesShown). The surface PICKS from the
+      // offers; the answerer's materialization guard rejects anything not
+      // among them, so this prompter can never author a row.
+      const offers = Array.isArray(view?.patternOffers) ? view.patternOffers : [];
+      const choices = `\n  1) deny (default)\n  2) allow once` +
+        offers.map((o, i) => `\n  ${3 + i}) allow + cover ${o.text} — ${o.scope}${o.methodClass ? `, ${o.methodClass}` : ''} (${ttlText(o.ttlMs)}, ${o.maxUses} uses)`).join('');
       output.write(
         `\n[compact-dsh] approval requested\n  tool: ${req.toolName ?? 'unknown'}` +
         (view?.command ? `\n  command: ${view.command}` : '') +
@@ -69,9 +78,16 @@ export function createOperatorPrompter({ input = process.stdin, output = process
           const m = LABEL_LEAD.exec(line);
           return `  ${m ? `${bold(m[1] + ':')} ${line.slice(m[0].length)}` : line}`;
         }).join('\n')}` +
-        `\n  1) deny (default)\n  2) allow once\n`);
+        `${choices}\n`);
       rl.question('choice [1]: ', answer => {
         const a = answer.trim().toLowerCase();
+        // a pattern choice is the explicit number alone — words stay exact:
+        // 'allow' can never widen, only a number that named its row can
+        const n = /^[3-9]$/.test(a) ? Number(a) - 3 : -1;
+        if (n >= 0 && offers[n]) {
+          view.patternChoice = offers[n];
+          return done('allowed-once');
+        }
         if (a === '2' || a === 'allow' || a === 'allow once') return done('allowed-once');
         if (a === '' || a === '1' || a === 'deny' || a === 'no') return done('rejected');
         output.write('unrecognized answer; defaulting to deny\n');
@@ -79,6 +95,14 @@ export function createOperatorPrompter({ input = process.stdin, output = process
       });
     });
   };
+}
+
+/** Whole hours and minutes stay whole — the same honest durations the ask
+ *  emits (index.js humanTtl), restated for the prompter's own surface. */
+function ttlText(ms) {
+  return ms % 3_600_000 === 0 ? `${ms / 3_600_000}h`
+    : ms % 60_000 === 0 ? `${ms / 60_000}min`
+    : `${ms / 1_000}s`;
 }
 
 /** Append the operator answerer to the approval/request waterfall. */

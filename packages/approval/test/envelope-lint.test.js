@@ -85,7 +85,7 @@ test('lint: #173 — the ask\'s disclosures ride labeled lines, one per line (cl
   // carries the structure the renderers bold: lead line, then one labeled
   // line per disclosure, from a closed set — a stray label would reach the
   // operator UNBOLDED, which is a bug this lint catches at the wire
-  const LABELS = ['Replay', 'Connectivity', 'Delivery', 'Tunnel', 'Scope'];
+  const LABELS = ['Replay', 'Widen', 'Connectivity', 'Delivery', 'Tunnel', 'Scope'];
   const { run } = boot({});
   const out = await run({ name: 'net.fetch', arguments: { host: 'labeled.example' }, agent: AGENT });
   const body = out.reason.slice(out.reason.indexOf('] ') + 2).split('\nLawful next moves:')[0];

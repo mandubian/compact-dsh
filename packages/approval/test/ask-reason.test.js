@@ -230,7 +230,7 @@ test('askReason golden vector: the expired cause renders the exact lead + demote
 // consequence, one line, key word first — the structure the moves block has
 // always had. The label set is closed; the renderers bold exactly it.
 
-const LABELS = ['Replay', 'Connectivity', 'Delivery', 'Tunnel', 'Scope'];
+const LABELS = ['Replay', 'Widen', 'Connectivity', 'Delivery', 'Tunnel', 'Scope'];
 
 // the pure-builder vectors drive askReason directly: its return IS the body —
 // no envelope header, no moves block (the gate's buildEnvelope appends those)
@@ -239,18 +239,21 @@ function labelsOf(reason) {
     .map(line => line.match(/^([A-Z][A-Za-z]+): /)?.[1] ?? null);
 }
 
-test('#173 structure: the plain ask renders lead line + Replay + Connectivity, one disclosure per line', () => {
+test('#173 structure: the plain ask renders lead line + Replay + Widen + Connectivity, one disclosure per line', () => {
   const reason = askReason({
     tool: 'net.fetch', args: { host: 'rows.example' },
     cause: { kind: 'first-touch' }, approval: createApproval({}),
   });
   const lines = reason.split('\n');
-  assert.equal(lines.length, 3, `lead + two labeled lines, got:\n${reason}`);
+  assert.equal(lines.length, 4, `lead + three labeled lines, got:\n${reason}`);
   assert.match(lines[0], /First touch: .* is not covered by this runtime's grant layers\.$/, 'the lead and the demoted restatement share the first line');
   assert.equal(lines[1], `Replay: Approving materializes an exec-cache entry: the identical operation replays without re-asking for 24h, across sessions of this runtime, until it lapses or is revoked — anything else asks again.`,
     'the replay sentence is verbatim behind its label');
-  assert.match(lines[2], /^Connectivity: This gate's approval is consent, not connectivity: /, 'the honesty sentence is verbatim behind its label');
-  assert.deepEqual(labelsOf(reason), ['Replay', 'Connectivity']);
+  // #175: the pattern offer rides directly beside the Replay row it qualifies
+  assert.match(lines[2], /^Widen: a pattern answer materializes one of ExactHost:rows\.example \(every call to rows\.example\) — for 1h and 50 uses, revocable \(grants-revoke\); a deciding surface offers the choice only where it can render the row\.$/,
+    'the widen row names the exact grant row, its terms, and its exits');
+  assert.match(lines[3], /^Connectivity: This gate's approval is consent, not connectivity: /, 'the honesty sentence is verbatim behind its label');
+  assert.deepEqual(labelsOf(reason), ['Replay', 'Widen', 'Connectivity']);
 });
 
 test('#173 structure: the mediated bound act adds Tunnel; nothing shares a line', () => {
@@ -263,7 +266,7 @@ test('#173 structure: the mediated bound act adds Tunnel; nothing shares a line'
     'the #65 cap rides the verbatim replay sentence');
   assert.match(reason, /^Tunnel: The grant this approval materializes names the host only: /m);
   const labels = labelsOf(reason);
-  assert.deepEqual(labels, ['Replay', 'Connectivity', 'Tunnel'], 'one row per disclosure, in emission order');
+  assert.deepEqual(labels, ['Replay', 'Widen', 'Connectivity', 'Tunnel'], 'one row per disclosure, in emission order');
   for (const label of labels) assert.ok(LABELS.includes(label), `${label} is in the closed set`);
 });
 
@@ -276,7 +279,7 @@ test('#173 structure: a missing delivery path renders Delivery; the disabled cac
   assert.match(reason, /^Delivery: This act has no delivery path under the mediated posture — /m);
   assert.match(reason, /^Replay: Approving covers this ask only: the exec cache is disabled in this runtime, so the identical operation asks again\.$/m,
     'the ttl-0 honesty is the Replay row — no replay claimed where none can happen');
-  assert.deepEqual(labelsOf(reason), ['Replay', 'Connectivity', 'Delivery']);
+  assert.deepEqual(labelsOf(reason), ['Replay', 'Widen', 'Connectivity', 'Delivery']);
 });
 
 test('#173 structure: the unprovable-effect command renders Scope', () => {
