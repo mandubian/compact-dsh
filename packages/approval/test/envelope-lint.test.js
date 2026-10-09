@@ -80,6 +80,25 @@ test('lint: #107 — the ask leads with its cause, the constant line demoted beh
   assert.ok(out.reason.indexOf('First touch:') < constant, 'the cause sentence precedes the restatement');
 });
 
+test('lint: #173 — the ask\'s disclosures ride labeled lines, one per line (closed label set)', async () => {
+  // the wall the operator skimmed was N disclosures on ONE line; the wire now
+  // carries the structure the renderers bold: lead line, then one labeled
+  // line per disclosure, from a closed set — a stray label would reach the
+  // operator UNBOLDED, which is a bug this lint catches at the wire
+  const LABELS = ['Replay', 'Connectivity', 'Delivery', 'Tunnel', 'Scope'];
+  const { run } = boot({});
+  const out = await run({ name: 'net.fetch', arguments: { host: 'labeled.example' }, agent: AGENT });
+  const body = out.reason.slice(out.reason.indexOf('] ') + 2).split('\nLawful next moves:')[0];
+  const lines = body.split('\n');
+  assert.ok(lines.length >= 3, `lead + Replay + Connectivity at minimum, got ${lines.length} lines`);
+  assert.doesNotMatch(lines[0], /^[A-Z][A-Za-z]+: /, 'the lead line is the cause, not a labeled row');
+  for (const line of lines.slice(1)) {
+    const label = line.match(/^([A-Z][A-Za-z]+): /)?.[1];
+    assert.ok(label, `every line after the lead is label-led, got: ${line.slice(0, 48)}`);
+    assert.ok(LABELS.includes(label), `label "${label}" is in the closed set`);
+  }
+});
+
 test('lint: the uncovered ask states what approval materializes, before the decision (#40 posture)', async () => {
   // the Subject is taught after (the decision note, the replay receipt);
   // the operator is taught BEFORE, at the moment of deciding

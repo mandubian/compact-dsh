@@ -597,6 +597,16 @@ function humanTtl(ms) {
  *
  * Non-goals (unchanged): the gate's semantics, the fingerprint, the layers,
  * and the envelope shape (gate, ruleId, reason, lawful next moves).
+ *
+ * #173 amendment — the disclosures, one per line. The cause lead and the
+ * demoted restatement stay the first line; every disclosure after them
+ * (replay consequence, egress honesty, the #57/#56/#26 notes) rides its own
+ * labeled line — `Replay:`, `Connectivity:`, `Delivery:`, `Tunnel:`,
+ * `Scope:` — the structure the moves block has always had. Sentences are
+ * verbatim; labels are layout. The renderers bold the labels (the card's
+ * CSS, the terminal's ANSI-on-TTY); the record carries the lines as
+ * emitted. No static prose enters the ask (the 2026-09-25 principle): a
+ * label names the row, the row's sentence still does all the talking.
  */
 export function askReason({ tool, args, secretRefs = [], cause, approval }) {
   const bits = targetBitsOf(canonicalTarget(args));
@@ -659,20 +669,30 @@ export function askReason({ tool, args, secretRefs = [], cause, approval }) {
   // demoted, exactly once: the mechanical restatement of the verdict is the
   // definition of an ask, kept for the record after the cause that differs
   const restated = `"${tool}" is not covered by this runtime's grant layers.`;
-  return lead + ` ${restated} ` +
-    `${replayConsequence(cacheTtlFor(approval, args), { egressBound: egressBound(approval, args) })} ${egressHonesty(approval.egress)}` +
-    (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null
-      ? ` This act has no delivery path under the mediated posture — the mediator speaks plain HTTP and CONNECT ` +
-        `only (#57), so approving records consent but materializes NO usable connectivity.`
-      : '') +
-    (approval.egress === 'proxy' && args?.delivery === 'mediator' && args?.url == null && args?.port == null
-      ? ` The grant this approval materializes names the host only: it carries plain HTTP, while a tunneled act ` +
-        `(CONNECT) to it would be refused at the wire — a tunnel opens only where the operator was shown the port (#56).`
-      : '') +
-    (args?.effectClass === null && typeof args?.command === 'string' && args.command
-      ? ` This command's local effects are not statically provable as read-only, so the approval covers exactly ` +
-        `this command — a differently-phrased or differently-tailed command asks again (#26).`
-      : '');
+  // #173: each disclosure rides its own LABELED LINE — one consequence, one
+  // line, key word first — the same structure the moves block has always
+  // had. The sentences are verbatim (every honesty disclosure survives
+  // byte-for-byte within its line); the label is layout, not prose, and the
+  // renderers bold it (CSS on the web card, ANSI on a TTY terminal) while
+  // the record carries the lines as emitted.
+  const lines = [
+    lead + ' ' + restated,
+    `Replay: ${replayConsequence(cacheTtlFor(approval, args), { egressBound: egressBound(approval, args) })}`,
+    `Connectivity: ${egressHonesty(approval.egress)}`,
+  ];
+  if (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null) {
+    lines.push(`Delivery: This act has no delivery path under the mediated posture — the mediator speaks plain HTTP and CONNECT ` +
+      `only (#57), so approving records consent but materializes NO usable connectivity.`);
+  }
+  if (approval.egress === 'proxy' && args?.delivery === 'mediator' && args?.url == null && args?.port == null) {
+    lines.push(`Tunnel: The grant this approval materializes names the host only: it carries plain HTTP, while a tunneled act ` +
+      `(CONNECT) to it would be refused at the wire — a tunnel opens only where the operator was shown the port (#56).`);
+  }
+  if (args?.effectClass === null && typeof args?.command === 'string' && args.command) {
+    lines.push(`Scope: This command's local effects are not statically provable as read-only, so the approval covers exactly ` +
+      `this command — a differently-phrased or differently-tailed command asks again (#26).`);
+  }
+  return lines.join('\n');
 }
 
 /**
@@ -867,10 +887,12 @@ export function approvalPlugin(opts = {}) {
         // LoopGuard cooperation, same contract as the target-bearing path
         try { ctx.emit?.(REFUSAL_EVENT, refusalPayload({ kind: 'ask', verdict: 'ask', ruleId: 'I-5/secret-use', tool, fingerprint: fp, root, session })); } catch { /* accounting must not break enforcement */ }
         const env = buildEnvelope({ gate: 'AG', ruleId: 'I-5/secret-use',
+          // #173: the injection disclosure leads, the replay consequence
+          // rides its own labeled line — same structure as askReason
           reason: `"${tool}" references declared secret${secretRefs.length > 1 ? 's' : ''} ${secretRefs.map(r => '$' + r).join(', ')}; ` +
             `approving it materializes the injection grant — session-scoped, TTL-bounded, revocable (grants-revoke) — and the credential is available to this command inside the ` +
-            `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints. ` +
-            replayConsequence(approval.execCacheTtlMs),
+            `confined execution — it never enters this conversation, but the command may print it: the record keeps what it prints.\n` +
+            `Replay: ${replayConsequence(approval.execCacheTtlMs)}`,
           lawfulNextMoves: ['rephrase without the secret reference', 'escalate to your Principal'] });
         return { kind: 'ask', reason: env.text };
       }

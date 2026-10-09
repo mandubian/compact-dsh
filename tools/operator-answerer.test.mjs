@@ -83,6 +83,30 @@ test('prompter: no offer, no pin line, no ack — the prompt is unchanged for un
   assert.equal(view.addressesShown, undefined, 'nothing shown, nothing acknowledged');
 });
 
+test('prompter: #173 — labeled disclosure lines bold on a TTY, plain when piped', async () => {
+  const REASON = '[AG/fp-abc123] First touch: nothing has ever covered host=rows.example\n' +
+    'Replay: Approving materializes an exec-cache entry: the identical operation replays without re-asking for 24h\n' +
+    'Connectivity: This gate\'s approval is consent, not connectivity: the command will fail at connect.\n' +
+    'Lawful next moves:\n— escalate to your Principal';
+  // piped stderr (the harness case): the lines arrive exactly as emitted
+  const piped = [];
+  await createOperatorPrompter(fakeReadline('2', piped))({ ...REQ, reason: REASON });
+  assert.ok(!piped.join('').includes('\x1b['), 'no ANSI codes on a non-TTY output');
+  assert.ok(piped.join('').includes('\n  Replay: Approving'), 'the labeled line is indented and plain');
+  // a TTY: the label is bolded — the codes wrap ONLY the label, the sentence
+  // text and the moves block stay clean
+  const ttyTranscript = [];
+  const ttyDeps = fakeReadline('2', ttyTranscript);
+  ttyDeps.output.isTTY = true;
+  await createOperatorPrompter(ttyDeps)({ ...REQ, reason: REASON });
+  const shown = ttyTranscript.join('');
+  assert.ok(shown.includes('\x1b[1mReplay:\x1b[22m Approving materializes'), 'the Replay label is bolded');
+  assert.ok(shown.includes('\x1b[1mConnectivity:\x1b[22m This gate\'s approval'), 'the Connectivity label is bolded');
+  assert.ok(shown.includes('\n  Lawful next moves:\n  — escalate'), 'the moves block is untouched');
+  assert.equal(shown.replace(/\x1b\[1m|\x1b\[22m/g, '').includes(REASON.split('\n').map(l => `  ${l}`).join('\n')),
+    true, 'stripping the codes reconstructs the piped prompt byte for byte');
+});
+
 test('prompter: allow aliases answer allowed-once', async () => {
   for (const answer of ['allow', ' allow once ', 'ALLOW']) {
     const prompt = createOperatorPrompter(fakeReadline(answer));

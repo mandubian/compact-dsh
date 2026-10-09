@@ -18,8 +18,10 @@
 // chat state by callId — the same lookup upstream's ApprovalCommand
 // performs for its detail slot, which a full composer takeover otherwise
 // loses), the reason with its line breaks intact (the upstream headline
-// collapses whitespace), the lawful next moves as a real list — and always
-// keeps the verbatim text one disclosure away. Where the text does not
+// collapses whitespace), one row per reason line with the composer's
+// disclosure labels bolded (#173 — layout, not prose: the label names the
+// row, the row's sentence does the talking), the lawful next moves as a
+// real list — and always keeps the verbatim text one disclosure away. Where the text does not
 // parse as a canonical envelope (any other ask riding the same waterfall),
 // the card degrades to the upstream face with pre-wrap: the reason shown
 // as-is, same two buttons. Nothing is invented, nothing is duplicated,
@@ -48,6 +50,14 @@ window.__ModuleLoader__.load({
 		// after it stays verbatim, so the parser normalizes nothing.
 		const GATE_HEAD = /^\[([A-Z]{2})(?:\/([^\]]+))?\] /;
 		const MOVES_MARKER = 'Lawful next moves:';
+		// #173: the composer emits each disclosure on its own labeled line —
+		// `Replay: …`, `Connectivity: …` — the structure the moves block has
+		// always had. The label is layout, not prose: the card renders one row
+		// per line and BOLDS the label (a span, CSS below). The pattern is
+		// generic so the card can never drift from the composer's label set —
+		// and it applies only on the parsed (canonical) face; the fallback
+		// face renders foreign text as-is, unstyled.
+		const LABEL_LEAD = /^([A-Z][A-Za-z]+): /;
 
 		/** Parse the canonical envelope text into its structured parts.
 		 * Returns null for anything that is not a canonical envelope — the
@@ -146,7 +156,17 @@ window.__ModuleLoader__.load({
 						command != null ? react.createElement('div', { className: 'compact-card-deciding' },
 							react.createElement('div', { className: 'compact-card-deciding-label' }, 'You are approving'),
 							react.createElement('pre', { className: 'compact-card-command' }, command)) : null,
-						react.createElement('div', { className: 'compact-card-reason' }, reason),
+						react.createElement('div', { className: 'compact-card-reason' },
+							// #173: one row per source line; a labeled row bolds its
+							// label — the text concatenates back to the source verbatim
+							parsed ? reason.split('\n').map((line, i) => {
+								const m = LABEL_LEAD.exec(line);
+								return m
+									? react.createElement('div', { className: 'compact-card-reason-row', key: i },
+										react.createElement('span', { className: 'compact-card-reason-label' }, m[1] + ':'),
+										' ' + line.slice(m[0].length))
+									: react.createElement('div', { className: 'compact-card-reason-row', key: i }, line);
+							}) : reason),
 						// Each move row IS its source line — dash included when the
 						// builder wrote one, absent when it didn't; the only rows
 						// skipped are whitespace-only (no content to drop).
@@ -190,7 +210,9 @@ window.__ModuleLoader__.load({
 			'.compact-card-deciding{display:flex;flex-direction:column;gap:4px}',
 			'.compact-card-deciding-label{color:var(--dsw-alias-label-tertiary,#6e7781);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}',
 			'.compact-card-command{margin:0;font-family:var(--ds-font-family-code,ui-monospace,monospace);font-size:13px;line-height:20px;white-space:pre-wrap;word-break:break-all;color:var(--dsw-alias-label-primary,#1f2328);background:var(--dsw-specific-input-major,#f6f8fa);border:1px solid var(--dsw-alias-border-l2,#d0d7de);border-radius:8px;padding:8px 10px;max-height:120px;overflow-y:auto}',
-			'.compact-card-reason{white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-primary,#1f2328);font-size:14px;line-height:21px}',
+			'.compact-card-reason{display:flex;flex-direction:column;gap:4px;color:var(--dsw-alias-label-primary,#1f2328);font-size:14px;line-height:21px}',
+			'.compact-card-reason-row{white-space:pre-wrap;word-break:break-word}',
+			'.compact-card-reason-label{font-weight:700}',
 			'.compact-card-moves{display:flex;flex-direction:column;gap:4px}',
 			'.compact-card-moves-label{color:var(--dsw-alias-label-tertiary,#6e7781);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}',
 			'.compact-card-moves-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}',

@@ -49,6 +49,14 @@ export function createOperatorPrompter({ input = process.stdin, output = process
       const targetBits = Object.entries(view?.target ?? {}).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(' ');
       const pinShown = Array.isArray(view?.addresses) && view.addresses.length > 0;
       if (pinShown) view.addressesShown = true;   // the ack the pin materializes on (compact-approval answerRequest)
+      // #173: the composer emits each disclosure on its own labeled line —
+      // `Replay: …`, `Connectivity: …` — the structure the moves block has
+      // always had. On a TTY the label is bolded (ANSI) so the eye lands on
+      // the row that matters; the codes never enter the text, and a piped
+      // stderr (a harness, a log) receives the lines exactly as emitted.
+      const tty = output.isTTY === true;
+      const bold = tty ? (s) => `\x1b[1m${s}\x1b[22m` : (s) => s;
+      const LABEL_LEAD = /^([A-Z][A-Za-z]+): /;
       output.write(
         `\n[compact-dsh] approval requested\n  tool: ${req.toolName ?? 'unknown'}` +
         (view?.command ? `\n  command: ${view.command}` : '') +
@@ -57,7 +65,10 @@ export function createOperatorPrompter({ input = process.stdin, output = process
         // ask time — approving pins the grant to exactly these
         (pinShown ? `\n  pin: ${view.addresses.join(', ')} — allow once pins the grant to these addresses` : '') +
         (view?.fingerprint ? `\n  fingerprint: ${view.fingerprint}` : (req.callId != null ? `\n  call: ${req.callId}` : '')) +
-        `\n${reason.split('\n').map(line => `  ${line}`).join('\n')}` +
+        `\n${reason.split('\n').map(line => {
+          const m = LABEL_LEAD.exec(line);
+          return `  ${m ? `${bold(m[1] + ':')} ${line.slice(m[0].length)}` : line}`;
+        }).join('\n')}` +
         `\n  1) deny (default)\n  2) allow once\n`);
       rl.question('choice [1]: ', answer => {
         const a = answer.trim().toLowerCase();
