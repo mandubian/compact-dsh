@@ -56,7 +56,7 @@ export function credentialShapedName(name) {
  *  needs it to name the row an act fell OUTSIDE of (a params-edge is not a
  *  first touch: the operator granted this route, narrower). */
 export function patternPrefixMatches(pattern, target) {
-  if (pattern.kind === 'UrlPrefix') return typeof target.url === 'string' && target.url.startsWith(pattern.value);
+  if (pattern.kind === 'UrlPrefix') return urlPrefixMatches(pattern.value, target);
   if (target.host == null) return false;
   switch (pattern.kind) {
     case 'ExactHost': return target.host === pattern.value && target.port == null;
@@ -64,6 +64,28 @@ export function patternPrefixMatches(pattern, target) {
     case 'HostAndPort': return target.host === pattern.value.host && target.port === pattern.value.port;
     default: return false;
   }
+}
+
+/**
+ * UrlPrefix matching is CANONICAL-vs-canonical (#180): the row's value is
+ * the canonical form (lowercased host, explicit port, separator-anchored
+ * trailing slash), so the call's URL is canonicalized the same way before
+ * the prefix compare — raw string matching could never match a leaf row
+ * (`…/search/`) against the natural phrasing of that same endpoint
+ * (`…/search?q=…`, no trailing slash), which made the #180 leaf offer
+ * unable to cover its own endpoint. The query never participates (G5: it
+ * is operation parameters, not target spelling) — canonicalization drops
+ * it here exactly as canonicalTarget does. Dot-segment normalization is
+ * the URL parser's own (`/a/../b/` parses to `/b/`); encoded separators
+ * stay encoded, so `/a/b%2Fc` can never masquerade as `/a/b/c`.
+ */
+function urlPrefixMatches(value, target) {
+  if (typeof target?.url !== 'string') return false;
+  try {
+    const u = new URL(target.url);
+    const path = u.pathname.replace(/\/+$/, '') + '/';
+    return `${u.protocol}//${u.hostname.toLowerCase()}${u.port ? ':' + u.port : ''}${path}`.startsWith(value);
+  } catch { return false; }   // unparsable: matches nothing, fails closed
 }
 
 /**
@@ -422,8 +444,7 @@ function targetKey(target) {
 // -- pattern matching (host/url classes as the allowlist gate, plus mount paths)
 export function patternMatches(pattern, target) {
   if (pattern.kind === 'UrlPrefix') {
-    return typeof target.url === 'string' && target.url.startsWith(pattern.value) &&
-      paramsAllows(pattern.params, target);
+    return urlPrefixMatches(pattern.value, target) && paramsAllows(pattern.params, target);
   }
   if (pattern.kind === 'PathPrefix') {
     // Mount grants (port plan Phase 2): canonical-path prefix coverage with a

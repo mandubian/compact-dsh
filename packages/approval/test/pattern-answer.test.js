@@ -12,15 +12,17 @@ const NOW = 1_700_000_000_000;
 
 // -- patternOffersFor: the computed rows, golden --------------------------------
 
-test('offers: a query-bearing URL offers the allow-axis row first, then the free rows (#176)', () => {
+test('offers: a query-bearing URL offers the leaf axis row, its free twin, then the broader scopes (#180)', () => {
   const offers = patternOffersFor(createApproval({}), { args: { url: 'https://api.example.com/v1/search?q=cats' } });
-  assert.equal(offers.length, 3, 'allow-axis dir row, free dir row, host root');
-  assert.deepEqual(offers[0].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/v1/', params: { mode: 'allow', names: ['q'] } });
+  assert.equal(offers.length, 4, 'leaf/allow, leaf/free, dir/free, host/free');
+  assert.deepEqual(offers[0].pattern,
+    { kind: 'UrlPrefix', value: 'https://api.example.com/v1/search/', params: { mode: 'allow', names: ['q'] } },
+    'the axis binds the NARROWEST scope — the full path, separator-anchored (#180)');
   assert.match(offers[0].scope, /query admits exactly the names this act carries \(q\)/);
-  assert.deepEqual(offers[1].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/v1/' });
-  assert.match(offers[1].scope, /^everything under https:\/\/api\.example\.com\/v1\//);
-  assert.deepEqual(offers[2].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/' });
-  assert.match(offers[2].scope, /^everything on api\.example\.com — any path, any query/);
+  assert.deepEqual(offers[1].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/v1/search/' });
+  assert.deepEqual(offers[2].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/v1/' });
+  assert.deepEqual(offers[3].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/' });
+  assert.match(offers[3].scope, /^everything on api\.example\.com — any path, any query/);
   // the terms ride every offer: shown before the yes, materialized after it
   for (const o of offers) {
     assert.equal(o.ttlMs, 60 * 60 * 1000, 'default TTL: one hour, like every session grant');
@@ -29,12 +31,28 @@ test('offers: a query-bearing URL offers the allow-axis row first, then the free
   }
 });
 
-test('offers: a root-path URL offers the host root alone; an explicit port survives', () => {
+test('offers: #180 consistency — a one-segment path still proposes the axis, bound to the leaf', async () => {
+  const offers = patternOffersFor(createApproval({}), { args: { url: 'https://httpbin.org/get?q=cats' } });
+  assert.equal(offers.length, 3, 'leaf/allow, leaf/free, host/free — the axis no longer vanishes at depth one');
+  assert.deepEqual(offers[0].pattern,
+    { kind: 'UrlPrefix', value: 'https://httpbin.org/get/', params: { mode: 'allow', names: ['q'] } });
+  // the leaf is separator-anchored: the endpoint and its subtree ride, a sibling prefix does not
+  const { patternMatches } = await import('../src/index.js');
+  assert.equal(patternMatches(offers[0].pattern, { url: 'https://httpbin.org/get?q=dogs' }), true, 'the endpoint itself is covered');
+  assert.equal(patternMatches(offers[0].pattern, { url: 'https://httpbin.org/getmore?q=dogs' }), false, 'a sibling prefix is not');
+  assert.equal(patternMatches(offers[0].pattern, { url: 'https://httpbin.org/get/deeper?q=x' }), true, 'the subtree under the leaf is');
+});
+
+test('offers: a root-path URL offers the host row alone — with the axis when the act carries names', () => {
   const root = patternOffersFor(createApproval({}), { args: { url: 'https://plain.example/' } });
   assert.equal(root.length, 1);
   assert.deepEqual(root[0].pattern, { kind: 'UrlPrefix', value: 'https://plain.example/' });
+  const withQ = patternOffersFor(createApproval({}), { args: { url: 'https://plain.example/?q=cats' } });
+  assert.equal(withQ.length, 2, 'the narrowest scope IS the host — the axis binds it (#180)');
+  assert.deepEqual(withQ[0].pattern, { kind: 'UrlPrefix', value: 'https://plain.example/', params: { mode: 'allow', names: ['q'] } });
   const port = patternOffersFor(createApproval({}), { args: { url: 'http://alt.example:8080/x/y' } });
-  assert.deepEqual(port.map(o => o.pattern.value), ['http://alt.example:8080/x/', 'http://alt.example:8080/']);
+  assert.deepEqual(port.map(o => o.pattern.value),
+    ['http://alt.example:8080/x/y/', 'http://alt.example:8080/x/', 'http://alt.example:8080/']);
 });
 
 test('offers: host args offer HostAndPort / ExactHost exactly as /grants-grant parses them', () => {
@@ -90,9 +108,16 @@ test('offers: under the mediated posture an underivable class offers nothing —
 test('offers: a credential-shaped path renders redacted — every rendered surface, identity unchanged', () => {
   const offers = patternOffersFor(createApproval({}),
     { args: { url: 'https://hooks.example.com/services/T00/B00/SECRET/list' } });
-  assert.match(offers[0].text, /\/services\/\*\*\*/, 'the path-family segment is masked in the rendered row');
-  assert.equal(offers[0].pattern.value, 'https://hooks.example.com/services/T00/B00/SECRET/',
+  // the catalogue anchors on the LAST family segment (/SECRET/ is itself a
+  // family word), so the leaf row masks from there and the parent row —
+  // with nothing after /SECRET/ to mask — masks from /services/
+  assert.match(offers[0].text, /\/SECRET\/\*\*\*/);
+  assert.ok(!offers[0].text.includes('/list/'), 'the credential material is masked in the rendered row');
+  assert.match(offers[1].text, /\/services\/\*\*\*/, 'the parent-directory row is masked too');
+  assert.ok(!offers[1].text.includes('B00'), 'no path detail survives the wider row either');
+  assert.equal(offers[0].pattern.value, 'https://hooks.example.com/services/T00/B00/SECRET/list/',
     'the pattern keeps the true path — matching must never collide distinct credentials');
+  assert.equal(offers[1].pattern.value, 'https://hooks.example.com/services/T00/B00/SECRET/');
 });
 
 // -- the answerer: the pick, the guard, the materialization ----------------------
@@ -235,7 +260,7 @@ test('view: the offers ride the deciding view for exactly the decision\'s durati
   await decide(ctx, approval,
     { name: 'net.fetch', arguments: { url: 'https://api.example.com/v1/x' }, agent: ag, callId: 'c1' },
     view => { seen = view; });
-  assert.ok(Array.isArray(seen.patternOffers) && seen.patternOffers.length === 2, 'the URL target carries both offers');
+  assert.ok(Array.isArray(seen.patternOffers) && seen.patternOffers.length === 3, 'leaf, parent dir, host — the scope ladder rides the view');
   assert.equal(approval.deciding.size, 0, 'cleared with the decision — offers never outlive their ask');
 });
 
