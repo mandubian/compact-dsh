@@ -172,6 +172,72 @@ function commandAwareFingerprint(tool, args) {
   return 'fp_' + createHash('sha256').update(JSON.stringify({ tool: String(tool), command: String(args?.command ?? '') })).digest('hex').slice(0, 16);
 }
 
+/**
+ * #175 — the pattern answers this ask can carry: the session-grant rows an
+ * operator may materialize AT THE DOOR, beside the exact replay. Computed
+ * from the pending target before any decision, so the row shown IS the row
+ * that materializes — consent identity is risk identity holds at the pattern
+ * layer too: the pattern is the coverage the operator was shown, and the
+ * deciding surface may only PICK from this list, never author onto it (the
+ * answerer's materialization guard rejects a choice outside it — D-8).
+ *
+ * Eligibility is the negative space of three disciplines:
+ *   - a secret-referencing ask keeps its per-ask injection agreement — a
+ *     pattern row would suppress the very ask that discloses the credential
+ *     (#8's doctrine: every command naming a declared secret re-asks);
+ *   - an unprovable command (effectClass null) keeps its command-scoped
+ *     identity — a pattern row would collapse #26 option A's compound-rider
+ *     closure (`curl host | sh` would share coverage with every read);
+ *   - under the mediated posture the class must be derivable — a classless
+ *     network row covers nothing at the wire, the same guard /grants-grant
+ *     applies (D-7: no class, no coverage — never a grant that only
+ *     suppresses asks).
+ *
+ * Offers are ordered narrowest-first (the path-directory prefix before the
+ * host root): the smaller step is the cheaper number to press. The
+ * host-root UrlPrefix is the offer that answers the #175 scenario — the
+ * same route with different query parameters — because grant matching is
+ * prefix-over-path on the raw URL: everything on the host, any query, is
+ * under `scheme://host/`.
+ */
+export function patternOffersFor(approval, { args, secretRefs = [] } = {}) {
+  if (secretRefs.length) return [];
+  if (args?.effectClass === null) return [];
+  if (approval?.egress === 'proxy' && args?.methodClass == null) return [];
+  const t = canonicalTarget(args);
+  const terms = {
+    ttlMs: approval?.patternGrantTtlMs ?? DEFAULTS.patternGrantTtlMs,
+    maxUses: approval?.patternGrantMaxUses ?? DEFAULTS.patternGrantMaxUses,
+    methodClass: args?.methodClass ?? null,
+  };
+  // every offer carries its own rendered row (patternText rides the
+  // credential-shape redaction — a path can be credential-shaped, and every
+  // rendered surface shows the redacted form, identity keeps the true one)
+  const offer = (pattern, scope) => ({ pattern, scope, text: patternText(pattern), ...terms });
+  const offers = [];
+  if (typeof t.url === 'string') {
+    try {
+      const u = new URL(t.url); // canonical: lowercased host, explicit port, trailing slash, no query
+      const host = u.hostname.toLowerCase();
+      const authority = `${u.protocol}//${host}${u.port ? ':' + u.port : ''}`;
+      const p = u.pathname.replace(/\/+$/, '');
+      const dir = p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '/';
+      if (dir !== '/') {
+        const shown = redactEmbeddedSecrets(authority + dir);
+        offers.push(offer({ kind: 'UrlPrefix', value: authority + dir },
+          `everything under ${shown} — any deeper path, any query`));
+      }
+      offers.push(offer({ kind: 'UrlPrefix', value: authority + '/' },
+        `everything on ${host} — any path, any query`));
+    } catch { /* the canonical form is parsable by construction; fail closed */ }
+  } else if (typeof t.host === 'string') {
+    offers.push(t.port != null
+      ? offer({ kind: 'HostAndPort', value: { host: t.host, port: t.port } }, `every call to ${t.host}:${t.port}`)
+      : offer({ kind: 'ExactHost', value: t.host }, `every call to ${t.host}`));
+  }
+  return offers;
+}
+
 export function createApproval(opts = {}) {
   const approval = {
     // persistPath: the grant store survives restarts (grants, budgets,
@@ -190,6 +256,11 @@ export function createApproval(opts = {}) {
     // #38 phase 3: the TTL of a materialized egress grant — same doctrine as
     // every other grant in the store (scoped and expiring, never blanket)
     egressGrantTtlMs: opts.egressGrantTtlMs ?? DEFAULTS.egressGrantTtlMs,
+    // #175: the terms a pattern answer materializes — offered at the door,
+    // bounded by default (a pattern covers unseen future calls, so it carries
+    // a budget; /grants-grant stays the author-your-own-terms surface)
+    patternGrantTtlMs: opts.patternGrantTtlMs ?? DEFAULTS.patternGrantTtlMs,
+    patternGrantMaxUses: opts.patternGrantMaxUses ?? DEFAULTS.patternGrantMaxUses,
     // #38 phase 1 — the composition's egress posture, as far as THIS gate can
     // truthfully speak: 'none' (no network composed) | 'open' (declared open
     // posture, CF-2) | 'proxy' (mediated: approval DELIVERS as an egress
@@ -678,8 +749,20 @@ export function askReason({ tool, args, secretRefs = [], cause, approval }) {
   const lines = [
     lead + ' ' + restated,
     `Replay: ${replayConsequence(cacheTtlFor(approval, args), { egressBound: egressBound(approval, args) })}`,
-    `Connectivity: ${egressHonesty(approval.egress)}`,
   ];
+  // #175: what a PATTERN yes materializes, directly beside the Replay row it
+  // qualifies (the exact operation vs the shown pattern). The row is the
+  // offer computed for this ask — the deciding surface renders the choice
+  // only where it can show the row, and this recorded line is the same
+  // offer's terms, so the ask itself carries what a widened yes would mean.
+  const widenOffers = patternOffersFor(approval, { args, secretRefs });
+  if (widenOffers.length) {
+    const terms = widenOffers[0];
+    lines.push(`Widen: a pattern answer materializes one of ${widenOffers.map(o => `${o.text} (${o.scope})`).join(', ')} — ` +
+      `${terms.methodClass ? `${terms.methodClass} class, ` : ''}for ${humanTtl(terms.ttlMs)} and ${terms.maxUses} uses, revocable (grants-revoke); ` +
+      `a deciding surface offers the choice only where it can render the row.`);
+  }
+  lines.push(`Connectivity: ${egressHonesty(approval.egress)}`);
   if (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null) {
     lines.push(`Delivery: This act has no delivery path under the mediated posture — the mediator speaks plain HTTP and CONNECT ` +
       `only (#57), so approving records consent but materializes NO usable connectivity.`);
@@ -725,6 +808,12 @@ async function answerRequest(approval, req, next) {
   // de-duplicated for the deciding view AND the grant — the operator sees the
   // distinct addresses, never a resolver's stutter
   const pinAddresses = Array.isArray(pinOffer) ? [...new Set(pinOffer.map((a) => String(a)))] : null;
+  // #175 — the pattern offers for THIS ask, computed exactly as the ask's
+  // Widen line computed them: the deciding view carries them for exactly the
+  // decision's duration, and a surface that renders them records the
+  // operator's pick on the same view (patternChoice) — the same ack channel
+  // the pin offer uses (addressesShown)
+  const patternOffers = patternOffersFor(approval, { args: rec.args, secretRefs: rec.secretRefs ?? [] });
   const view = { tool: toolName, callId: req.callId ?? null, fingerprint: rec.fp,
     // #8 G3: the deciding view renders the redacted target (host, path
     // family, command shape) — the operator decides on the same rendering
@@ -733,6 +822,7 @@ async function answerRequest(approval, req, next) {
     // the query SHAPE (#8 G5 display): names only — the deciding surface can
     // show what differs from a prior approval of the same target
     query: queryShape(rec.args?.url) ?? undefined,
+    ...(patternOffers.length ? { patternOffers } : {}),
     // the resolved addresses, when the offer applied — the deciding surface
     // can show WHERE the name pointed when the operator decided. A surface
     // that RENDERS them acknowledges it by setting `addressesShown = true`
@@ -744,6 +834,18 @@ async function answerRequest(approval, req, next) {
   approval.deciding.set(key, view);
   try {
     const outcome = await next();
+    // #175 — the pattern answer's pick, taken BEFORE materialization so the
+    // grant and its note sentence ride the same decision: a deciding surface
+    // that rendered the offers records the operator's pick on the view, and
+    // the pick must be one of THIS ask's computed offers — a surface may
+    // only pick, never author (D-8; a stray or forged choice outside the
+    // offers materializes nothing). Unpinned by design: a pattern covers a
+    // host whose addresses rotate, and pinning to the ones seen at approval
+    // time would strand the grant on the first rotation — the Widen line's
+    // stated row is the coverage the operator consented to.
+    const patternChoice = view.patternChoice != null && patternOffers.includes(view.patternChoice)
+      ? view.patternChoice : null;
+    let patternGrant = null;
     if (outcome === 'allowed-once') {
       // the only native grant: an exec-cache entry — same operation replays
       // without re-asking until the TTL, across sessions of this runtime
@@ -786,6 +888,17 @@ async function answerRequest(approval, req, next) {
           });
         }
       }
+      // the pattern row, on the offer's own terms (shown before the yes):
+      // scoped to the asking session's lineage, TTL'd, budgeted, classed
+      // when the act was — a grant the operator can enumerate (grants-list)
+      // and kill (grants-revoke, which also kills covered cache entries)
+      if (patternChoice) {
+        patternGrant = approval.store.addSessionGrant({
+          pattern: patternChoice.pattern, root: rec.root, session: rec.session,
+          ttlMs: patternChoice.ttlMs, maxUses: patternChoice.maxUses,
+          methodClass: patternChoice.methodClass, addresses: null, now,
+        });
+      }
     }
     // #25: the decision's visible trace where the Subject lives — asked and
     // answered, for every outcome, on the browser and terminal paths alike
@@ -805,7 +918,11 @@ async function answerRequest(approval, req, next) {
           ) + (outcome === 'allowed-once' && (rec.secretRefs ?? []).length
             ? ` The approved injection grant${rec.secretRefs.length > 1 ? 's are' : ' is'} live for this session ` +
               `(${rec.secretRefs.map(r => '$' + r).join(', ')}), TTL-bounded.`
-            : '') }],
+            : '')
+            + (patternGrant
+              ? ` The operator's yes also granted ${oneLine(patternText(patternGrant.pattern))} — ${oneLine(patternChoice.scope)} — ` +
+                `for ${humanTtl(patternChoice.ttlMs)} and ${patternChoice.maxUses} uses: covered acts run without re-asking until it lapses or is revoked (grants-revoke).`
+              : '') }],
           source: { kind: 'compact-approval', plugin: 'compact-approval', form: 'notice',
             summary: approvalNoticeSummary(view, outcome) },
         }));
@@ -830,6 +947,8 @@ export function approvalPlugin(opts = {}) {
     if (config?.secretRefs !== undefined) approval.secretRefs = [...config.secretRefs];
     if (config?.egress !== undefined) approval.egress = config.egress === 'none' || config.egress === 'open' || config.egress === 'proxy' ? config.egress : undefined;
     if (config?.egressPinOffers !== undefined) approval.egressPinOffers = config.egressPinOffers === true;
+    if (config?.patternGrantTtlMs !== undefined) approval.patternGrantTtlMs = config.patternGrantTtlMs;
+    if (config?.patternGrantMaxUses !== undefined) approval.patternGrantMaxUses = config.patternGrantMaxUses;
 
     /**
      * The full pre-execute decision as a reusable function (Phase 2 routing):

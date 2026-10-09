@@ -8,6 +8,12 @@ export const DEFAULTS = {
   maxPendingPerRoot: 50,               // flood cap
   pendingTtlMs: 5 * 60 * 1000,         // a pending ask older than this is forgotten (flood capacity self-heals)
   egressGrantTtlMs: 60 * 60 * 1000,    // materialized egress grants (#38): one hour, like every session grant
+  // the pattern answer's terms (#175): a pattern grant covers unseen future
+  // calls, so it is budgeted by default — scope breadth is proportional to
+  // grant breadth. Unlike /grants-grant, whose operator authors the terms
+  // aloud, these terms are offered at the door and must bound themselves
+  patternGrantTtlMs: 60 * 60 * 1000,   // one hour, like every default session grant
+  patternGrantMaxUses: 50,             // bounded blast radius: a wrong yes re-arms within 50 acts
 };
 
 /**

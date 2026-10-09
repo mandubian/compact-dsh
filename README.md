@@ -547,8 +547,13 @@ npm run compact -- --attended "Run: git push https://github.com/owner/repo.git m
 the **actual command, its canonical target, and the fingerprint the decision
 would materialize** (default **deny** — empty answer, EOF, or ^C all reject),
 and `allowed-once` materializes an exec-cache entry so the identical operation
-replays without re-asking. Without it, operations needing a fresh approval
-fail closed.
+replays without re-asking. Network asks also offer the **pattern answer**
+(#175): a numbered choice materializes the session-grant row the ask itself
+showed on its `Widen:` line — everything on that host (or under its path
+prefix), any query, bounded by a stated TTL and use budget — so the same
+route with different parameters stops re-asking; `/grants-grant` remains the
+author-your-own-terms surface. Without an answerer, operations needing a
+fresh approval fail closed.
 
 `--web` serves the browser surface over the same composition: chat in the
 browser (default `127.0.0.1:3080`; `COMPACT_WEB_PORT` / `COMPACT_WEB_HOST`

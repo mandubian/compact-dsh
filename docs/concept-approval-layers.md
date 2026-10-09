@@ -29,6 +29,28 @@ that answers wins, and every answer is recorded. The layers:
    (default ~50); over-cap requests are rejected loudly, not queued
    silently.
 
+## The pattern answer at the door (#175)
+
+Widening coverage is a grant's explicit act — never a side effect of one
+exact approval (G5: the query joins replay identity). But the door itself
+can OFFER the act. When a network ask fires, the gate computes the pattern
+rows a widened yes would materialize — the URL's directory prefix and the
+host root (`UrlPrefix`), or `ExactHost`/`HostAndPort` for host-arg targets —
+and the ask carries them on a labeled `Widen:` line; a deciding surface
+that can render the row may offer it as a numbered choice. The pick may
+only come from the computed offers: a surface picks, never authors, and
+the materialized row carries exactly the terms shown — session-scoped,
+TTL'd (default 1h), budgeted (default 50 uses: a pattern covers unseen
+future calls, so scope breadth is proportional to grant breadth), classed
+when the act was, revocable, and unpinned (a pattern covers a host whose
+addresses rotate; pinning to the addresses seen at approval time would
+strand the grant on the first rotation). Three disciplines withhold the
+offer: a secret-referencing ask (the injection agreement keeps its per-ask
+gate), an unprovable command (command-scoped identity stands — a pattern
+row would collapse the compound-rider closure), and, under the mediated
+posture, an underivable method class (no class, no coverage).
+`/grants-grant` remains the author-your-own-terms surface.
+
 ## Invariants
 
 - **Order is the semantics.** The same call may match several layers;

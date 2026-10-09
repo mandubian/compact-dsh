@@ -83,6 +83,45 @@ test('prompter: no offer, no pin line, no ack — the prompt is unchanged for un
   assert.equal(view.addressesShown, undefined, 'nothing shown, nothing acknowledged');
 });
 
+test('prompter: #175 — pattern offers render as numbered choices; the number records the pick', async () => {
+  const transcript = [];
+  const prompt = createOperatorPrompter(fakeReadline('3', transcript));
+  const view = {
+    target: { host: 'api.example.com', port: '443' },
+    patternOffers: [
+      { pattern: { kind: 'UrlPrefix', value: 'https://api.example.com/v1/' }, text: 'UrlPrefix:https://api.example.com/v1/', scope: 'everything under https://api.example.com/v1/ — any deeper path, any query', ttlMs: 3_600_000, maxUses: 50, methodClass: 'read' },
+      { pattern: { kind: 'UrlPrefix', value: 'https://api.example.com/' }, text: 'UrlPrefix:https://api.example.com/', scope: 'everything on api.example.com — any path, any query', ttlMs: 3_600_000, maxUses: 50, methodClass: 'read' },
+    ],
+  };
+  const outcome = await prompt(REQ, view);
+  assert.equal(outcome, 'allowed-once');
+  const shown = transcript.join('');
+  assert.ok(shown.includes('1) deny (default)') && shown.includes('2) allow once'), 'the exact choices stand');
+  assert.ok(shown.includes('3) allow + cover UrlPrefix:https://api.example.com/v1/ — everything under https://api.example.com/v1/ — any deeper path, any query, read (1h, 50 uses)'),
+    'each offer is its own numbered row: the row, the scope, the terms');
+  assert.ok(shown.includes('4) allow + cover UrlPrefix:https://api.example.com/ — everything on api.example.com'), 'the second offer numbers on');
+  assert.equal(view.patternChoice, view.patternOffers[0], 'the explicit number records the pick — the ack the materialization rides on');
+});
+
+test('prompter: #175 — words never widen: allow stays exact, empty stays deny, offers present', async () => {
+  // 'allow' answers allowed-once WITHOUT a pick — only a number that named
+  // its row can widen, so a habitual word-yes can never materialize a grant
+  const wordTranscript = [];
+  const wordView = { target: { host: 'api.example.com' }, patternOffers: [{ pattern: { kind: 'ExactHost', value: 'api.example.com' }, text: 'ExactHost:api.example.com', scope: 'every call to api.example.com', ttlMs: 3_600_000, maxUses: 50, methodClass: null }] };
+  await createOperatorPrompter(fakeReadline('allow', wordTranscript))(REQ, wordView);
+  assert.equal(wordView.patternChoice, undefined, 'the word answers, it never picks');
+  const denyTranscript = [];
+  const denyView = { target: { host: 'api.example.com' }, patternOffers: wordView.patternOffers };
+  assert.equal(await createOperatorPrompter(fakeReadline('', denyTranscript))(REQ, denyView), 'rejected');
+  assert.equal(denyView.patternChoice, undefined, 'the default deny picks nothing');
+  // a number past the offers is unrecognized, not a pick: default deny
+  const pastTranscript = [];
+  const pastView = { target: { host: 'api.example.com' }, patternOffers: wordView.patternOffers };
+  assert.equal(await createOperatorPrompter(fakeReadline('4', pastTranscript))(REQ, pastView), 'rejected');
+  assert.ok(pastTranscript.join('').includes('defaulting to deny'), 'out-of-range numbers deny loudly');
+  assert.equal(pastView.patternChoice, undefined);
+});
+
 test('prompter: #173 — labeled disclosure lines bold on a TTY, plain when piped', async () => {
   const REASON = '[AG/fp-abc123] First touch: nothing has ever covered host=rows.example\n' +
     'Replay: Approving materializes an exec-cache entry: the identical operation replays without re-asking for 24h\n' +
