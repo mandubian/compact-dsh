@@ -51,6 +51,40 @@ row would collapse the compound-rider closure), and, under the mediated
 posture, an underivable method class (no class, no coverage).
 `/grants-grant` remains the author-your-own-terms surface.
 
+## The query axis (#176, slice 1)
+
+A `UrlPrefix` row may bind the QUERY dimension of its coverage —
+**the query axis**, stored on the row as `params`, names only and never
+values (values live only inside the one-way fingerprint, G3/G5):
+
+- `{ mode: 'free' }` — any query, stated explicitly (what a #175 free
+  answer materializes);
+- `{ mode: 'allow', names: [...] }` — queries whose parameter NAMES are a
+  subset of the axis; a query-less call is trivially within;
+- `{ mode: 'fixed' }` — the bare target only: any query asks;
+- absent — the legacy free row: every pre-axis persisted grant keeps its
+  semantics exactly (no migration, no mass re-ask).
+
+The door offers the axis before the operator must name it: a query-bearing
+URL's narrowest offer is the path-directory prefix bound to an allow axis
+over exactly the names the act carries — the same path, different VALUES,
+no new ask. The **credential floor**: a credential-shaped NAME (the
+redaction catalogue's own family — key, token, secret, password, sig;
+substring semantics, as there, so over-flagging only ever refuses to
+widen) never joins an offered axis. The operator may still type one into
+`/grants-grant` (they saw it in the ask's query shape) — the floor binds
+the offers and every widening path after them.
+
+An act that falls outside a live row's axis asks with the edge **named**:
+the row under test, what its axis admits, what the act carries, which of
+the refused names are credential-shaped, and the floor sentence — *no axis
+admits them, by offer, by command, or by any later judgment*. This
+classification (`params-edge`, history-first: a revoked narrow row is
+revoked news, not axis news) is the **decision context** the appointed
+decider of #176's second slice will be handed — the membership question is
+always "is this call within the row's declared axis?", and the Enforcer,
+not the decider, assembles what that question means.
+
 ## Invariants
 
 - **Order is the semantics.** The same call may match several layers;

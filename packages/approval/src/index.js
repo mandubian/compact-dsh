@@ -36,7 +36,7 @@
 import { createHash } from 'node:crypto';
 import { lookup as dnsLookup } from 'node:dns';
 import { isIP } from 'node:net';
-import { GrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause } from './grants.js';
+import { GrantStore, coveringGrants, patternMatches, patternPrefixMatches, paramsAllows, credentialShapedName, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause } from './grants.js';
 import { PersistentGrantStore } from './persist.js';
 import { evaluate, DEFAULTS } from './evaluate.js';
 import { fingerprint, canonicalTarget, canonicalQuery, queryShape } from './fingerprint.js';
@@ -44,7 +44,7 @@ import { parseAllowlistLikePattern } from './pattern.js';
 import { buildEnvelope, bandReason } from 'compact-envelope';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
-export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause, evaluate, fingerprint, canonicalTarget, canonicalQuery, queryShape, parseAllowlistLikePattern, DEFAULTS };
+export { GrantStore, PersistentGrantStore, coveringGrants, patternMatches, patternPrefixMatches, paramsAllows, credentialShapedName, egressGrantsFor, networkGrantsForSession, NETWORK_PATTERN_KINDS, egressPatternFor, classifyAskCause, evaluate, fingerprint, canonicalTarget, canonicalQuery, queryShape, parseAllowlistLikePattern, DEFAULTS };
 
 export const name = 'compact-approval';
 export const inject = ['approval'];
@@ -193,12 +193,18 @@ function commandAwareFingerprint(tool, args) {
  *     applies (D-7: no class, no coverage — never a grant that only
  *     suppresses asks).
  *
- * Offers are ordered narrowest-first (the path-directory prefix before the
- * host root): the smaller step is the cheaper number to press. The
- * host-root UrlPrefix is the offer that answers the #175 scenario — the
- * same route with different query parameters — because grant matching is
- * prefix-over-path on the raw URL: everything on the host, any query, is
- * under `scheme://host/`.
+ * Offers are ordered narrowest-first (#176 slice 1): a query-bearing URL
+ * offers the path-directory prefix bound to an ALLOW axis over exactly the
+ * names this act carries — the same path, different VALUES, no new ask —
+ * before the free rows; values are never shown or stored, names only. A
+ * credential-shaped NAME (key/token/secret/… — the redaction catalogue's
+ * own family) never joins an offered axis: the operator may still type one
+ * into /grants-grant themselves (they saw it in the query shape), but the
+ * door never widens onto a credential carrier. The free rows keep the #175
+ * semantics and scope text: the path-directory prefix before the host root,
+ * the smaller step the cheaper number to press — the host root is the offer
+ * that answers the original #175 scenario (same route, different query
+ * parameters), everything on the host, any query, under `scheme://host/`.
  */
 export function patternOffersFor(approval, { args, secretRefs = [] } = {}) {
   if (secretRefs.length) return [];
@@ -214,6 +220,8 @@ export function patternOffersFor(approval, { args, secretRefs = [] } = {}) {
   // credential-shape redaction — a path can be credential-shaped, and every
   // rendered surface shows the redacted form, identity keeps the true one)
   const offer = (pattern, scope) => ({ pattern, scope, text: patternText(pattern), ...terms });
+  // the offered axis: exactly this act's non-credential parameter names
+  const names = (queryShape(args?.url) ?? []).filter(n => !credentialShapedName(n));
   const offers = [];
   if (typeof t.url === 'string') {
     try {
@@ -224,6 +232,10 @@ export function patternOffersFor(approval, { args, secretRefs = [] } = {}) {
       const dir = p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '/';
       if (dir !== '/') {
         const shown = redactEmbeddedSecrets(authority + dir);
+        if (names.length) {
+          offers.push(offer({ kind: 'UrlPrefix', value: authority + dir, params: { mode: 'allow', names } },
+            `everything under ${shown} — any deeper path, query admits exactly the names this act carries (${names.join(', ')})`));
+        }
         offers.push(offer({ kind: 'UrlPrefix', value: authority + dir },
           `everything under ${shown} — any deeper path, any query`));
       }
@@ -295,8 +307,13 @@ export function createApproval(opts = {}) {
     // the records live exactly as long as the asking agent does.
     asks: new WeakMap(),
     fingerprint: (tool, args) => fingerprint(tool, args),
-    grantSession: ({ pattern, root, session, ttlMs = 60 * 60 * 1000, maxUses = null, methodClass = null, addresses = null, now = Date.now() }) =>
-      approval.store.addSessionGrant({ pattern: parseAllowlistLikePattern(pattern), root, session, ttlMs, maxUses, methodClass, addresses, now }),
+    // pattern may arrive pre-parsed (grants-grant hands the object it echoed,
+    // so the #176 params axis it parsed survives verbatim) or as a string
+    grantSession: ({ pattern, params = null, root, session, ttlMs = 60 * 60 * 1000, maxUses = null, methodClass = null, addresses = null, now = Date.now() }) => {
+      const parsed = typeof pattern === 'string' ? parseAllowlistLikePattern(pattern) : pattern;
+      if (params) parsed.params = params;
+      return approval.store.addSessionGrant({ pattern: parsed, root, session, ttlMs, maxUses, methodClass, addresses, now });
+    },
     grantPlan: ({ pattern, planRef, ttlMs, maxUses = null, now = Date.now() }) =>
       approval.store.addPlanGrant({ pattern: parseAllowlistLikePattern(pattern), planRef, ttlMs, maxUses, now }),
     // one id space for the operator (#64): sg_… session/egress grants and
@@ -725,6 +742,23 @@ export function askReason({ tool, args, secretRefs = [], cause, approval }) {
         lead = `Your earlier grant for ${targetText} (${g.id}) expired ${iso(g.expiresAt)}. Approving re-arms coverage.`; break;
       case 'spent':
         lead = `Your earlier grant for ${targetText} (${g.id}) spent its budget (${g.uses}/${g.maxUses} uses). Approving re-arms coverage.`; break;
+      case 'params-edge': {
+        // #176 slice 1: the row under test, its axis, this act's query, the
+        // refused names — the decision context a membership decider would be
+        // handed (#176 slice 2), named by the Enforcer here. Names only,
+        // never values (G5); the credential floor is stated where it bites.
+        const axisText = cause.allowed != null
+          ? `its query axis admits exactly (${cause.allowed.join(', ')})`
+          : `its query axis is fixed — the bare target only, any query asks`;
+        const refusedText = cause.refused.length < cause.current.length
+          ? ` this act's query carries (${cause.current.join(', ')}), refused: (${cause.refused.join(', ')})`
+          : ` everything this act's query carries is refused (${cause.refused.join(', ')})`;
+        const floor = cause.credential.length
+          ? ` Credential-shaped parameters (${cause.credential.join(', ')}) never widen — no axis admits them, by offer, by command, or by any later judgment.`
+          : '';
+        lead = `Your grant (${g.id}) covers this route, but ${axisText} —${refusedText}. The act asks anew.` + floor;
+        break;
+      }
       case 'classless-grant':
         lead = `A live grant for ${targetText} (${g.id}) carries no method class, and the mediator refuses classless rows by name — ` +
           `this classed act asks. Approving materializes a classed grant the wire can deliver (D-7).`; break;
@@ -1094,7 +1128,9 @@ export function approvalPlugin(opts = {}) {
 function patternText(pattern) {
   // #8 G3: every rendering rides the redaction, whichever branch builds it —
   // the rendered string is what grants-list prints and what /grants-grant
-  // echoes into the recorded command/done
+  // echoes into the recorded command/done. #176: the query axis renders
+  // beside the row — names only, never values — so a narrowed row is
+  // visible as narrowed everywhere the row is shown.
   const text = (() => {
     switch (pattern.kind) {
       case 'HostAndPort': return `HostAndPort:${pattern.value.host}:${pattern.value.port}`;
@@ -1102,7 +1138,10 @@ function patternText(pattern) {
       default: return `${pattern.kind}:${pattern.value}`;
     }
   })();
-  return redactEmbeddedSecrets(String(text));
+  const axis = pattern.params?.mode === 'allow' ? ` params=allow(${(pattern.params.names ?? []).join(',')})`
+    : pattern.params?.mode === 'fixed' ? ' params=fixed'
+    : '';
+  return redactEmbeddedSecrets(String(text) + axis);
 }
 
 function registerGrantCommands(ctx, approval) {
@@ -1140,16 +1179,29 @@ function registerGrantCommands(ctx, approval) {
   });
   ctx.commands?.register({
     name: 'grants-grant',
-    description: 'compact-dsh: grant a target pattern for this session — /grants-grant <pattern> [ttlMinutes] [maxUses] [read|write]',
+    description: 'compact-dsh: grant a target pattern for this session — /grants-grant <pattern> [ttlMinutes] [maxUses] [read|write] [params=free|fixed|allow(a,b)]',
     handler: (inv) => {
-      // the method class (#66) may sit anywhere after the pattern; the
-      // numbers keep their order (ttl, then uses)
+      // the method class (#66) and the query axis (#176) may sit anywhere
+      // after the pattern; the numbers keep their order (ttl, then uses)
       const [pattern, ...rest] = (inv.rawInput ?? '').trim().split(/\s+/).filter(Boolean);
       const methodClass = rest.find(t => t === 'read' || t === 'write') ?? null;
-      const [ttlMin, uses] = rest.filter(t => t !== 'read' && t !== 'write');
-      if (!pattern) return { kind: 'error', text: 'usage: /grants-grant <pattern> [ttlMinutes] [maxUses] [read|write] — pattern like api.example.com, *.example.org, host:443, https://host/path/' };
+      const paramsToken = rest.find(t => t.startsWith('params='));
+      const [ttlMin, uses] = rest.filter(t => t !== 'read' && t !== 'write' && !t.startsWith('params='));
+      if (!pattern) return { kind: 'error', text: 'usage: /grants-grant <pattern> [ttlMinutes] [maxUses] [read|write] [params=free|fixed|allow(a,b)] — pattern like api.example.com, *.example.org, host:443, https://host/path/ (a query in the pattern means its parameter NAMES)' };
       let parsed;
       try { parsed = parseAllowlistLikePattern(pattern); } catch (e) { return { kind: 'error', text: String(e?.message ?? e) }; }
+      // the explicit params token overrides what a query in the pattern meant
+      if (paramsToken != null) {
+        const spec = paramsToken.slice('params='.length);
+        const allow = /^allow\(([a-z0-9_.,-]*)\)$/i.exec(spec);
+        if (spec === 'free') parsed.params = { mode: 'free' };
+        else if (spec === 'fixed') parsed.params = { mode: 'fixed' };
+        else if (allow) {
+          const names = allow[1].split(',').map(s => s.trim()).filter(Boolean).sort();
+          if (!names.length) return { kind: 'error', text: `params=allow() admits nothing — name parameters: params=allow(q,page), or params=free for any query` };
+          parsed.params = { mode: 'allow', names: [...new Set(names)] };
+        } else return { kind: 'error', text: `unknown params axis "${spec}" — params=free | params=fixed | params=allow(a,b)` };
+      }
       // under the mediated posture a classless network grant is refused by
       // the mediator ('classless-grant') and would only suppress the ask that
       // materializes a deliverable one — so it is not minted at all
@@ -1162,7 +1214,7 @@ function registerGrantCommands(ctx, approval) {
       if (!Number.isFinite(ttlMs)) return { kind: 'error', text: `ttl must be a number of minutes, got "${ttlMin}"` };
       const maxUses = uses != null ? Math.max(1, Math.floor(Number(uses))) : null;
       if (maxUses !== null && !Number.isFinite(maxUses)) return { kind: 'error', text: `maxUses must be a number, got "${uses}"` };
-      const g = approval.grantSession({ pattern, root, session, ttlMs, maxUses, methodClass });
+      const g = approval.grantSession({ pattern, root, session, ttlMs, maxUses, methodClass, params: parsed.params });
       // echo the PARSED pattern, never the raw operator input: a token in a
       // URL's userinfo is stripped by canonicalization — echoing the input
       // would leak it into the durable session log (command/done is recorded)

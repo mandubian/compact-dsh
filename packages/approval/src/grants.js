@@ -3,6 +3,68 @@
 // bookkeeping. The in-memory class is the contract; persistence
 // (JSON+fsync, src/persist.js) decorates it without changing semantics.
 import { isIP } from 'node:net';
+import { queryShape } from './fingerprint.js';
+
+/**
+ * #176 slice 1 — the query axis. A UrlPrefix row may bind the QUERY dimension
+ * of the calls it covers, names only, never values (G3/G5 hygiene: values
+ * live only inside the one-way fingerprint):
+ *   { mode:'free' }               — any query, stated explicitly (what an
+ *                                   #175 pattern answer materializes)
+ *   { mode:'allow', names:[..] }  — queries whose parameter NAMES are a
+ *                                   subset of names (a query-less call is
+ *                                   trivially within: empty ⊆ anything)
+ *   { mode:'fixed' }              — the bare target only: any query asks
+ * Absent/null is the legacy free row — every pre-axis persisted grant keeps
+ * its semantics exactly (no migration, no mass re-ask).
+ */
+
+/** The parameter names of a target's query — [] when none/unparsable. */
+function queryNames(target) {
+  return (typeof target?.url === 'string' && queryShape(target.url)) ?? [];
+}
+
+/** Does the call's query sit within the row's axis? A row without an axis
+ *  (null/undefined) admits everything — the legacy free row. */
+export function paramsAllows(params, target) {
+  if (params == null || params.mode === 'free') return true;
+  const names = queryNames(target);
+  if (params.mode === 'fixed') return names.length === 0;
+  if (params.mode === 'allow') {
+    const allowed = Array.isArray(params.names) ? params.names : [];
+    return names.every(n => allowed.includes(n));
+  }
+  return false; // an unknown mode covers nothing (fail closed, never loose)
+}
+
+/**
+ * The credential-name floor (#176): a query parameter whose NAME is
+ * credential-shaped — the same closed family the redaction catalogue masks
+ * (`key|token|secret|password|passwd|sig`, substring semantics, as there) —
+ * never joins an allow axis. Over-flagging here only refuses to widen (one
+ * more ask — the safe direction); under-flagging would widen onto a
+ * credential carrier. The floor binds every widening path: an operator may
+ * still name such a parameter in /grants-grant explicitly (they saw it in
+ * the ask's query shape), but no offer, no offer-derivation, and no future
+ * decider may ADD one to a row.
+ */
+export function credentialShapedName(name) {
+  return /(?:key|token|secret|password|passwd|sig)/i.test(String(name));
+}
+
+/** Structural coverage only — the axis is ignored. The ask-cause classifier
+ *  needs it to name the row an act fell OUTSIDE of (a params-edge is not a
+ *  first touch: the operator granted this route, narrower). */
+export function patternPrefixMatches(pattern, target) {
+  if (pattern.kind === 'UrlPrefix') return typeof target.url === 'string' && target.url.startsWith(pattern.value);
+  if (target.host == null) return false;
+  switch (pattern.kind) {
+    case 'ExactHost': return target.host === pattern.value && target.port == null;
+    case 'HostSuffix': return (target.host === pattern.value || target.host.endsWith('.' + pattern.value)) && target.port == null;
+    case 'HostAndPort': return target.host === pattern.value.host && target.port === pattern.value.port;
+    default: return false;
+  }
+}
 
 /**
  * The grant-pinned addresses (#55 follow-up): consent over the ADDRESS, the
@@ -282,24 +344,54 @@ export function classifyAskCause(store, { target, session, now, egress, hasMetho
     : (g.root != null) ? (session === g.root || (session ?? '').startsWith(g.root + '/'))
     : true;
   // plan grants answer unscoped (evaluate's layer 2), so they count as this
-  // target's history for every session; session grants only within scope
-  const rows = [
+  // target's history for every session; session grants only within scope.
+  // #176: prefixRows are the STRUCTURAL matches (axis ignored) — the history
+  // classes and the params-edge all read them, because a narrowed row is
+  // still this route's history: a revoked narrow row is revoked news, not
+  // axis news. `rows` below stay the axis-ENFORCING matches (the classless
+  // check's business).
+  const prefixRows = [
     ...store.sessionGrants.filter(scopeOk),
     ...store.planGrants,
-  ].filter(g => patternMatches(g.pattern, target));
+  ].filter(g => patternPrefixMatches(g.pattern, target));
   const newest = (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0);
-  const revokedRow = rows.filter(g => g.revokedAt != null).sort(newest)[0];
+  const revokedRow = prefixRows.filter(g => g.revokedAt != null).sort(newest)[0];
   if (revokedRow) return { kind: 'revoked', grant: revokedRow };
-  const expiredRow = rows.filter(g => !g.revokedAt && g.expiresAt != null && g.expiresAt <= now)
+  const expiredRow = prefixRows.filter(g => !g.revokedAt && g.expiresAt != null && g.expiresAt <= now)
     .sort((a, b) => b.expiresAt - a.expiresAt)[0];
   if (expiredRow) return { kind: 'expired', grant: expiredRow };
-  const spentRow = rows.filter(g => !g.revokedAt && g.maxUses != null && g.uses >= g.maxUses).sort(newest)[0];
+  const spentRow = prefixRows.filter(g => !g.revokedAt && g.maxUses != null && g.uses >= g.maxUses).sort(newest)[0];
   if (spentRow) return { kind: 'spent', grant: spentRow };
+  // #176 slice 1 — the params edge: a LIVE row prefix-covers this route but
+  // its query axis does not admit this act's query. This is NOT a first
+  // touch (the operator granted the route, narrower) and NOT a rephrase (a
+  // standing row narrowed it, not an exact approval's phrasing) — the lead
+  // names the row under test, what its axis admits, what this act carries,
+  // and which of the refused names are credential-shaped (the floor no
+  // widening path may cross). This classification is the seed of the night
+  // watch's decision context (#176 slice 2): the row, the diff, the floor —
+  // what a membership decider would be handed, named by the Enforcer.
+  const edgeRow = prefixRows.filter(g => !g.revokedAt && (!g.expiresAt || g.expiresAt > now) &&
+    (g.maxUses == null || g.uses < g.maxUses)).sort(newest)[0];
+  if (edgeRow?.pattern?.params != null && edgeRow.pattern.params.mode !== 'free') {
+    const axis = edgeRow.pattern.params;
+    const current = queryNames(target);
+    const allowed = axis.mode === 'allow' ? (axis.names ?? []) : null;
+    const refused = allowed == null ? current : current.filter(n => !allowed.includes(n));
+    return {
+      kind: 'params-edge', grant: edgeRow,
+      allowed, current, refused,
+      credential: refused.filter(credentialShapedName),
+    };
+  }
   // the cache is fingerprint-keyed; the rephrase question is target-keyed.
   // Liveness is part of the truth (#40's lazy deletion leaves lapsed rows in
   // the map): a live entry is coverage the phrasing excluded, a lapsed one
   // is history only — the lead says which
   const route = targetKey(target);
+  // the axis-ENFORCING matches — the classless check's rows: a row that
+  // would reach the route but for its missing class
+  const rows = prefixRows.filter(g => patternMatches(g.pattern, target));
   if (route != null) {
     for (const e of store.cache.values()) {
       if (targetKey(e.target) === route) {
@@ -329,7 +421,10 @@ function targetKey(target) {
 
 // -- pattern matching (host/url classes as the allowlist gate, plus mount paths)
 export function patternMatches(pattern, target) {
-  if (pattern.kind === 'UrlPrefix') return typeof target.url === 'string' && target.url.startsWith(pattern.value);
+  if (pattern.kind === 'UrlPrefix') {
+    return typeof target.url === 'string' && target.url.startsWith(pattern.value) &&
+      paramsAllows(pattern.params, target);
+  }
   if (pattern.kind === 'PathPrefix') {
     // Mount grants (port plan Phase 2): canonical-path prefix coverage with a
     // per-grant ro ceiling. Inputs are canonicalized at grant-materialization
@@ -347,9 +442,9 @@ export function patternMatches(pattern, target) {
   }
   if (target.host == null) return false;
   switch (pattern.kind) {
-    case 'ExactHost': return target.host === pattern.value && target.port == null;
-    case 'HostSuffix': return (target.host === pattern.value || target.host.endsWith('.' + pattern.value)) && target.port == null;
-    case 'HostAndPort': return target.host === pattern.value.host && target.port === pattern.value.port;
+    case 'ExactHost': return target.host === pattern.value && target.port == null && paramsAllows(pattern.params, target);
+    case 'HostSuffix': return (target.host === pattern.value || target.host.endsWith('.' + pattern.value)) && target.port == null && paramsAllows(pattern.params, target);
+    case 'HostAndPort': return target.host === pattern.value.host && target.port === pattern.value.port && paramsAllows(pattern.params, target);
     default: return false;
   }
 }
