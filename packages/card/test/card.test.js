@@ -51,9 +51,12 @@ const findByClass = (node, cls) => findAll(node, n => typeof n === 'object' && n
 
 const FINGERPRINT_ASK = buildEnvelope({
   gate: 'AG', ruleId: 'fp_ab12cd34',
-  // #107 shape: the cause leads, the mechanical restatement is demoted behind it
+  // #107 + #173 shape: the cause leads, the mechanical restatement is demoted
+  // behind it, and each disclosure rides its own labeled line
   reason: `First touch: nothing has ever covered host=api.example.com in this runtime — no grant row, no cached approval. ` +
-    `"bash" is not covered by this runtime's grant layers. Approving once also covers the identical operation until the exec-cache TTL elapses.`,
+    `"bash" is not covered by this runtime's grant layers.\n` +
+    `Replay: Approving once also covers the identical operation until the exec-cache TTL elapses.\n` +
+    `Connectivity: This gate's approval is consent, not connectivity: the command will fail at connect.`,
   lawfulNextMoves: ['request a scoped session grant for this target', 'use an approved alternative', 'escalate to your Principal'],
 });
 const SECRET_ASK = buildEnvelope({
@@ -148,7 +151,9 @@ test('the canonical face: chip, intact line breaks, one verbatim row per move, b
   assert.equal(chip.length, 1);
   assert.equal(textOf(chip[0]), 'AG/fp_ab12cd34');
   const reason = findByClass(tree, 'compact-card-reason');
-  assert.equal(textOf(reason[0]), FINGERPRINT_ASK.reason);
+  // the reason renders one row per source line (#173) — the rows concatenate
+  // back to the source; the container's flattened text has no separators
+  assert.deepEqual(findByClass(tree, 'compact-card-reason-row').map(textOf), FINGERPRINT_ASK.reason.split('\n'));
   const moves = findByClass(tree, 'compact-card-moves-list');
   const rows = findAll(moves[0], n => typeof n === 'object' && n.type === 'li');
   assert.equal(rows.length, FINGERPRINT_ASK.lawfulNextMoves.length);
@@ -158,6 +163,26 @@ test('the canonical face: chip, intact line breaks, one verbatim row per move, b
   assert.deepEqual(labels, ['Deny', 'Allow once']);
   const raw = findByClass(tree, 'compact-card-raw');
   assert.equal(textOf(findAll(raw[0], n => typeof n === 'object' && n.type === 'pre')[0]), FINGERPRINT_ASK.text);
+});
+
+test('#173: one row per reason line, the disclosure labels bolded, the text verbatim', () => {
+  const tree = card.CompactCard({ matched: { kind: 'approval', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' } });
+  const rows = findByClass(tree, 'compact-card-reason-row');
+  assert.deepEqual(rows.map(textOf), FINGERPRINT_ASK.reason.split('\n'),
+    'the rows concatenate back to the source, byte for byte');
+  const bolded = findByClass(tree, 'compact-card-reason-label');
+  assert.deepEqual(bolded.map(textOf), ['Replay:', 'Connectivity:'],
+    'exactly the composer\'s labeled lines carry a bold span — the lead row never does');
+});
+
+test('#173: the fallback face never label-styles foreign text, whatever it looks like', () => {
+  // a non-canonical ask that happens to carry a `Word: ` line renders as-is —
+  // the bold is the canonical face's layout, not a claim about foreign prose
+  const foreign = 'Approval requested by plugin X\nNote: this is not a canonical envelope';
+  const tree = card.CompactCard({ matched: { kind: 'approval', reason: foreign, answer: async () => 'rejected' } });
+  assert.equal(findByClass(tree, 'compact-card-reason-row').length, 0, 'no rows on the fallback face');
+  assert.equal(findByClass(tree, 'compact-card-reason-label').length, 0, 'no bold spans on the fallback face');
+  assert.equal(textOf(findByClass(tree, 'compact-card-reason')[0]), foreign);
 });
 
 // ── the command: what "yes" runs, read from the session's chat state ──

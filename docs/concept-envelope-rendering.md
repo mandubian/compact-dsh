@@ -201,7 +201,14 @@ mechanism is the one thing this composition cannot do honestly.
 - The gateway ask (`reason`) — carries the **canonical disclosure alone**
   (live capture, 2026-09-25: the upstream web card collapses whitespace, so
   the gloss-wrapped T3 card tripled the ask into a wall); `askCard` stays a
-  tested projection, still retired for asks.
+  tested projection, still retired for asks. #173 (2026-10-09): the
+  canonical disclosure itself is now **line-structured** — the cause lead
+  and the demoted restatement are the first line, and every disclosure
+  after them (replay consequence, egress honesty, the situational notes)
+  rides its own labeled line — `Replay:`, `Connectivity:`, `Delivery:`,
+  `Tunnel:`, `Scope:` — a closed set, lint-checked at the wire. The
+  sentences are verbatim; the labels are layout, not prose: one consequence,
+  one line, key word first, the structure the moves block has always had.
 - The web ask card (`packages/card/`, live capture 2026-09-28) — a static
   web client plugin the composition mounts on the web surface only: it
   registers a higher-priority takeover on dsh's composer chain, and when the
@@ -213,9 +220,16 @@ mechanism is the one thing this composition cannot do honestly.
   drops nothing (every line after the moves marker renders — the R-3 floor
   survives the layout), and degrades to the upstream face with pre-wrap for
   any ask that does not parse as a canonical envelope. Declining the select
-  leaves upstream's panel everything else.
+  leaves upstream's panel everything else. #173: on the parsed face the
+  reason renders one row per line and the composer's disclosure labels are
+  **bolded** — a span + CSS, presentation and never identity; the fallback
+  face renders foreign text as-is, unstyled (a `Word:` lookalike in a
+  non-canonical ask earns no bold).
 - The terminal operator prompter — renders whatever reason the ask carries,
   indented, beside the command/target/fingerprint preview it already shows.
+  #173: the disclosure labels are bolded via ANSI **on a TTY only**; a piped
+  stderr (a harness, a log) receives the lines exactly as emitted, and the
+  codes never enter the text the record carries.
 - `packages/guide/` — the gloss reading door (`gloss_read`): the Subject
   passes the `GATE/ruleId` its envelope named and reads the rule's gloss
   from the live table — why the gate exists, the worked example, what to

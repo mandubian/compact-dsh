@@ -44,8 +44,8 @@ whatever the outcome.
 | Mode | Who decides |
 |---|---|
 | plain task mode | Nobody. The ask closes `unavailable`, and the call does not run (fail-closed). |
-| `flag:--attended` | You, on stderr. The prompt shows the tool, the command (truncated, secrets masked), the target and the fingerprint. Answer `2` (or `allow`) to allow once. `1`, `deny`, an empty answer, EOF, ^C or anything unrecognized denies. |
-| `flag:--web` | A connected browser card may answer first. The terminal prompt is the fall-through. |
+| `flag:--attended` | You, on stderr. The prompt shows the tool, the command (truncated, secrets masked), the target and the fingerprint. The reason reads as rows: the first line is why THIS ask fired, then one labeled row per consequence of approving — **Replay:** (how long a yes covers), **Connectivity:** (whether the wire exists at all), plus `Delivery:`, `Tunnel:` or `Scope:` when they apply — the labels bold, the sentences plain. Answer `2` (or `allow`) to allow once. `1`, `deny`, an empty answer, EOF, ^C or anything unrecognized denies. |
+| `flag:--web` | A connected browser card may answer first. The terminal prompt is the fall-through. The card renders the same rows, one per line, labels bolded. |
 
 **Allowed once** creates an exec-cache entry. The identical operation replays
 without asking for 24h, across sessions of this runtime, until the entry lapses
