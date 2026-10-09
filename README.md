@@ -557,6 +557,17 @@ different parameters stops re-asking; `/grants-grant` remains the
 author-your-own-terms surface (its `params=` token narrows a row the same
 way). Without an answerer, operations needing a fresh approval fail closed.
 
+**Unattended runs can appoint the night watch** (#176, `--decider
+escalate|deny|allow-edges`, or `COMPACT_DECIDER`): a downstream answerer
+that decides ONLY params-edge asks — a grant row covering the route but
+refusing the query axis — when no human surface is present. Its member is
+a policy, not a judge: `escalate` answers nothing and reports everything,
+`deny` refuses every edge with its reason, `allow-edges` admits
+non-credential edges under the row's own terms (TTL, budget, class,
+revocation — a watch yes mints nothing). Every verdict is attributed and
+motivated on the chained record — the morning after reads a list, not an
+excavation. Attended mode is untouched: the operator answers first.
+
 `--web` serves the browser surface over the same composition: chat in the
 browser (default `127.0.0.1:3080`; `COMPACT_WEB_PORT` / `COMPACT_WEB_HOST`
 override, loopback-only by design), answer approval prompts on the terminal

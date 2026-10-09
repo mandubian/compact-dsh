@@ -59,14 +59,22 @@ async function main() {
       web: { type: 'boolean' },
       workspace: { type: 'string' },
       'state-dir': { type: 'string' },
+      decider: { type: 'string' },
     },
   });
   if (values.help) {
-    console.log('Usage: npm run compact -- [--attended] [--workspace PATH] [--state-dir PATH] "task"\n       npm run compact -- --web [--workspace PATH] [--state-dir PATH]\n       npm run compact -- --smoke [--workspace PATH] [--state-dir PATH]\nState defaults to ~/.compact-dsh (COMPACT_STATE_DIR overrides); DSH_HOME is isolated there.\nTask mode inherits DEEPSEEK_API_KEY; default model: deepseek-flash.\n--web serves the browser UI (default 127.0.0.1:3080; COMPACT_WEB_PORT / COMPACT_WEB_HOST override): chat in the browser, approval prompts fall through to this terminal. No task argument; takes no --smoke.\n--attended prompts the operator on the terminal for uncovered gated calls (default deny; stderr only); implied by --web.\n--smoke never prompts and forbids --attended.\nDocker image must already exist locally: COMPACT_SANDBOX_IMAGE (default ubuntu:24.04).');
+    console.log('Usage: npm run compact -- [--attended] [--workspace PATH] [--state-dir PATH] [--decider POLICY] "task"\n       npm run compact -- --web [--workspace PATH] [--state-dir PATH]\n       npm run compact -- --smoke [--workspace PATH] [--state-dir PATH]\nState defaults to ~/.compact-dsh (COMPACT_STATE_DIR overrides); DSH_HOME is isolated there.\nTask mode inherits DEEPSEEK_API_KEY; default model: deepseek-flash.\n--web serves the browser UI (default 127.0.0.1:3080; COMPACT_WEB_PORT / COMPACT_WEB_HOST override): chat in the browser, approval prompts fall through to this terminal. No task argument; takes no --smoke.\n--attended prompts the operator on the terminal for uncovered gated calls (default deny; stderr only); implied by --web.\n--decider <escalate|deny|allow-edges> appoints the night watch (#176, COMPACT_DECIDER as env): params-edge asks — a grant row covering the route but refusing the query axis — are answered in unattended runs, every verdict reported with its motivation on the record. escalate (default) answers nothing and reports; deny refuses every edge; allow-edges admits non-credential edges under the row\'s own terms. Attended mode is untouched: the operator answers first.\n--smoke never prompts and forbids --attended.\nDocker image must already exist locally: COMPACT_SANDBOX_IMAGE (default ubuntu:24.04).');
     return;
   }
   if (values.attended && values.smoke) {
     throw new Error('--attended prompts the operator; --smoke forbids prompts and model calls — pick one');
+  }
+  const decider = values.decider ?? process.env.COMPACT_DECIDER ?? null;
+  if (decider != null) {
+    if (!['escalate', 'deny', 'allow-edges'].includes(decider)) {
+      throw new Error(`--decider must be escalate | deny | allow-edges, got "${decider}"`);
+    }
+    if (values.smoke) throw new Error('--smoke appoints no decider — the watch answers gate asks, and smoke has none');
   }
   if (values.web && values.smoke) {
     throw new Error('--web serves live browser sessions; --smoke forbids model calls and prompts — pick one');
@@ -274,6 +282,17 @@ async function main() {
         // gateway; this answerer is the fall-through decider on the terminal.
         const { operatorAnswerer } = await import('./operator-answerer.mjs');
         operatorAnswerer(ctx);
+      }
+      if (decider != null) {
+        // the night watch (#176 slice 2a): appended AFTER the operator
+        // answerer, so it is downstream of every human surface — it decides
+        // only when the operator's chair is empty (unattended runs), and
+        // only on params-edge asks. Every verdict is claimed on the deciding
+        // view; the recorded answerer materializes (or refuses to) and writes
+        // the attributed, motivated note on the chained record.
+        const { nightWatchAnswerer } = await import('./night-watch.mjs');
+        nightWatchAnswerer(ctx, { policy: decider });
+        console.error(`${binName}: night watch appointed (policy: ${decider}) — params-edge asks only; every verdict reported with its motivation`);
       }
       if (ctx.get('compact-ready')?.ready !== true) throw new Error('compact-ready was not provided; refusing to run');
       console.error(`${binName}: ready${values.smoke ? ' (smoke; no LLM request)' : values.web ? ' (web; approval prompts fall through to this terminal)' : ''}; draft Compact, no Compact standing.`);
