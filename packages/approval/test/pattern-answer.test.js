@@ -12,13 +12,15 @@ const NOW = 1_700_000_000_000;
 
 // -- patternOffersFor: the computed rows, golden --------------------------------
 
-test('offers: a URL with a path offers the path-directory prefix then the host root', () => {
+test('offers: a query-bearing URL offers the allow-axis row first, then the free rows (#176)', () => {
   const offers = patternOffersFor(createApproval({}), { args: { url: 'https://api.example.com/v1/search?q=cats' } });
-  assert.equal(offers.length, 2, 'narrowest first, then the host root');
-  assert.deepEqual(offers[0].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/v1/' });
-  assert.match(offers[0].scope, /^everything under https:\/\/api\.example\.com\/v1\//);
-  assert.deepEqual(offers[1].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/' });
-  assert.match(offers[1].scope, /^everything on api\.example\.com — any path, any query/);
+  assert.equal(offers.length, 3, 'allow-axis dir row, free dir row, host root');
+  assert.deepEqual(offers[0].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/v1/', params: { mode: 'allow', names: ['q'] } });
+  assert.match(offers[0].scope, /query admits exactly the names this act carries \(q\)/);
+  assert.deepEqual(offers[1].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/v1/' });
+  assert.match(offers[1].scope, /^everything under https:\/\/api\.example\.com\/v1\//);
+  assert.deepEqual(offers[2].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/' });
+  assert.match(offers[2].scope, /^everything on api\.example\.com — any path, any query/);
   // the terms ride every offer: shown before the yes, materialized after it
   for (const o of offers) {
     assert.equal(o.ttlMs, 60 * 60 * 1000, 'default TTL: one hour, like every session grant');
