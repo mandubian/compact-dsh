@@ -193,18 +193,23 @@ function commandAwareFingerprint(tool, args) {
  *     applies (D-7: no class, no coverage — never a grant that only
  *     suppresses asks).
  *
- * Offers are ordered narrowest-first (#176 slice 1): a query-bearing URL
- * offers the path-directory prefix bound to an ALLOW axis over exactly the
- * names this act carries — the same path, different VALUES, no new ask —
- * before the free rows; values are never shown or stored, names only. A
+ * Offers are ordered narrowest-first (#180): the canonical FULL PATH is
+ * itself a scope — separator-anchored, `…/get/` covers `/get/anything/` but
+ * never `/getmore/` — and it is the row that carries the ALLOW axis
+ * (#180's consistency rule): whenever the act carries non-credential
+ * parameter names, the narrowest offer binds the axis, whatever the path's
+ * depth — one-segment paths lost the axis offer under the old
+ * directory-bound rule, which made the door's proposal depend on path
+ * depth rather than on what the act carries. The axis row and its free
+ * twin are both offered (symmetry: every row shows its axis AND its
+ * breadth), then the parent directory's free row when distinct, then the
+ * host root. Values are never shown or stored — names only (G3/G5). A
  * credential-shaped NAME (key/token/secret/… — the redaction catalogue's
- * own family) never joins an offered axis: the operator may still type one
- * into /grants-grant themselves (they saw it in the query shape), but the
- * door never widens onto a credential carrier. The free rows keep the #175
- * semantics and scope text: the path-directory prefix before the host root,
- * the smaller step the cheaper number to press — the host root is the offer
- * that answers the original #175 scenario (same route, different query
- * parameters), everything on the host, any query, under `scheme://host/`.
+ * own family) never joins an offered axis at any scope: the operator may
+ * still type one into /grants-grant (they saw it in the query shape), but
+ * the door never widens onto a credential carrier. A root-path URL's
+ * narrowest scope IS the host: the host row carries the axis when the act
+ * carries names.
  */
 export function patternOffersFor(approval, { args, secretRefs = [] } = {}) {
   if (secretRefs.length) return [];
@@ -230,17 +235,29 @@ export function patternOffersFor(approval, { args, secretRefs = [] } = {}) {
       const authority = `${u.protocol}//${host}${u.port ? ':' + u.port : ''}`;
       const p = u.pathname.replace(/\/+$/, '');
       const dir = p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '/';
-      if (dir !== '/') {
-        const shown = redactEmbeddedSecrets(authority + dir);
-        if (names.length) {
-          offers.push(offer({ kind: 'UrlPrefix', value: authority + dir, params: { mode: 'allow', names } },
-            `everything under ${shown} — any deeper path, query admits exactly the names this act carries (${names.join(', ')})`));
+      // the scope ladder, narrowest first: the full path (when the act
+      // targets one), its parent directory, the host root — deduped, the
+      // host text kept in the operator's own words. The axis rides the
+      // NARROWEST rung only (#180): the door proposes one parameter pass,
+      // at the tightest scope that exists, never an axis at every breadth.
+      const scopes = [];
+      if (p) scopes.push(authority + p + '/');
+      scopes.push(dir === '/' ? authority + '/' : authority + dir);
+      if (!scopes.includes(authority + '/')) scopes.push(authority + '/');
+      const unique = [...new Set(scopes)];
+      unique.forEach((value, i) => {
+        const isHostRoot = value === authority + '/';
+        const shown = redactEmbeddedSecrets(value);
+        const scope = isHostRoot
+          ? `everything on ${host} — any path, any query`
+          : `everything under ${shown} — any deeper path, any query`;
+        if (i === 0 && names.length) {
+          offers.push(offer({ kind: 'UrlPrefix', value, params: { mode: 'allow', names } },
+            scope.replace(/any path, any query|any deeper path, any query/,
+              `query admits exactly the names this act carries (${names.join(', ')})`)));
         }
-        offers.push(offer({ kind: 'UrlPrefix', value: authority + dir },
-          `everything under ${shown} — any deeper path, any query`));
-      }
-      offers.push(offer({ kind: 'UrlPrefix', value: authority + '/' },
-        `everything on ${host} — any path, any query`));
+        offers.push(offer({ kind: 'UrlPrefix', value }, scope));
+      });
     } catch { /* the canonical form is parsable by construction; fail closed */ }
   } else if (typeof t.host === 'string') {
     offers.push(t.port != null

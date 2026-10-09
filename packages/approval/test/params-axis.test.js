@@ -111,8 +111,9 @@ test('classifyAskCause: a FIXED row\'s edge refuses every query; revoked history
 test('offers: a credential-shaped name never joins the offered axis; an all-credential query offers none', () => {
   const mixed = patternOffersFor(createApproval({}), { args: { url: 'https://m.example/v1/x?q=1&api_key=z' } });
   assert.deepEqual(mixed[0].pattern.params, { mode: 'allow', names: ['q'] }, 'api_key is refused by the floor, q rides');
+  assert.equal(mixed[0].pattern.value, 'https://m.example/v1/x/', 'the axis binds the leaf (#180)');
   const all = patternOffersFor(createApproval({}), { args: { url: 'https://m.example/v1/x?token=z&api_key=y' } });
-  assert.equal(all.length, 2, 'no allow offer — the free rows only');
+  assert.equal(all.length, 3, 'no allow offer — the free ladder only (leaf, dir, host)');
   assert.ok(all.every(o => o.pattern.params == null), 'the free rows carry no axis');
 });
 
@@ -263,6 +264,6 @@ test('prompter: an allow-axis offer renders its names in the choice row', async 
   const outcome = await prompt({ toolName: 'net.fetch', callId: 'c1', reason: '[AG/x] r' }, view);
   assert.equal(outcome, 'allowed-once');
   assert.equal(view.patternChoice, view.patternOffers[0], 'the narrowest row was picked');
-  assert.match(transcript.join(''), /3\) allow \+ cover UrlPrefix:https:\/\/api\.example\.com\/v1\/ params=allow\(q\) — everything under .* query admits exactly the names this act carries \(q\), read \(1h, 50 uses\)/,
-    'the choice row shows the axis, the scope, the class, the terms');
+  assert.match(transcript.join(''), /3\) allow \+ cover UrlPrefix:https:\/\/api\.example\.com\/v1\/search\/ params=allow\(q\) — everything under .* query admits exactly the names this act carries \(q\), read \(1h, 50 uses\)/,
+    'the choice row shows the axis on the LEAF row (#180), the scope, the class, the terms');
 });

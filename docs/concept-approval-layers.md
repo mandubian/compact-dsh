@@ -34,8 +34,9 @@ that answers wins, and every answer is recorded. The layers:
 Widening coverage is a grant's explicit act — never a side effect of one
 exact approval (G5: the query joins replay identity). But the door itself
 can OFFER the act. When a network ask fires, the gate computes the pattern
-rows a widened yes would materialize — the URL's directory prefix and the
-host root (`UrlPrefix`), or `ExactHost`/`HostAndPort` for host-arg targets —
+rows a widened yes would materialize — the URL's full path, its parent
+directory, and the host root (`UrlPrefix`, the scope ladder narrowest
+first), or `ExactHost`/`HostAndPort` for host-arg targets —
 and the ask carries them on a labeled `Widen:` line; a deciding surface
 that can render the row may offer it as a numbered choice. The pick may
 only come from the computed offers: a surface picks, never authors, and
@@ -65,15 +66,21 @@ values (values live only inside the one-way fingerprint, G3/G5):
 - absent — the legacy free row: every pre-axis persisted grant keeps its
   semantics exactly (no migration, no mass re-ask).
 
-The door offers the axis before the operator must name it: a query-bearing
-URL's narrowest offer is the path-directory prefix bound to an allow axis
-over exactly the names the act carries — the same path, different VALUES,
-no new ask. The **credential floor**: a credential-shaped NAME (the
+The door offers the axis before the operator must name it, and it proposes
+it CONSISTENTLY (#180): whenever the act carries non-credential parameter
+names, the narrowest scope on the ladder — the full path, separator-
+anchored (`…/get/` covers `/get/anything/`, never `/getmore/`), or the
+host itself for a root-path act — carries the allow axis over exactly
+those names: the same path, different VALUES, no new ask, at any path
+depth. UrlPrefix matching is canonical-vs-canonical: the call's URL is
+canonicalized (host, port, separator-anchored path; query dropped) before
+the prefix compare, so the leaf row covers its own endpoint's natural
+phrasing. The **credential floor**: a credential-shaped NAME (the
 redaction catalogue's own family — key, token, secret, password, sig;
 substring semantics, as there, so over-flagging only ever refuses to
-widen) never joins an offered axis. The operator may still type one into
-`/grants-grant` (they saw it in the ask's query shape) — the floor binds
-the offers and every widening path after them.
+widen) never joins an offered axis at any scope. The operator may still
+type one into `/grants-grant` (they saw it in the ask's query shape) —
+the floor binds the offers and every widening path after them.
 
 An act that falls outside a live row's axis asks with the edge **named**:
 the row under test, what its axis admits, what the act carries, which of
