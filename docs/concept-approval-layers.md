@@ -85,6 +85,47 @@ decider of #176's second slice will be handed — the membership question is
 always "is this call within the row's declared axis?", and the Enforcer,
 not the decider, assembles what that question means.
 
+## The night watch's office (#176, slice 2a)
+
+The seat before the judge. An unattended run stops at the first edge ask —
+nobody is at the door. The **appointment** (`--decider POLICY` /
+`COMPACT_DECIDER`) composes a downstream answerer at launch that answers
+ONLY params-edge asks — the narrowest remit that exists; every other ask
+falls through exactly as before. It sits downstream of every human surface,
+so in attended mode the operator answers first and the watch never fires:
+it is the decider of the empty chair. Slice 2a's member is a **policy,
+not a judge** — `escalate` (default: answer nothing, report everything),
+`deny` (refuse every edge, reason named), `allow-edges` (admit
+non-credential edges). The **credential floor binds the watch**: no policy
+admits a credential-shaped refused name — the floor's own sentence ends
+"by any later judgment".
+
+The **reporting contract** is the deliverable the seat exists for — the
+part the retired autonoetic gateway got right (O-1: an external-action
+approval without a recorded reason is a violation, not a style choice) and
+the DeepSeek auto-review plugin got exactly backwards (its decisions
+persisted nothing). Every watch verdict is claimed on the deciding view
+(`view.decider`: policy, motivation, grant id); the recorded answerer —
+which owns materialization — enforces the seat's limits and writes the
+attributed, motivated note on the chained record:
+
+- **mint-nothing**: a watch allow consumes the named row's budget and
+  materializes nothing — no cached approval, no new grant, no injection; a
+  wrong yes is bounded by the terms the operator chose (TTL, budget,
+  class, revocation);
+- **narrowing**: a verdict whose basis lapsed between ask and answer is
+  narrowed to a rejection — the answerer may always answer NO to a yes it
+  cannot honor; a malformed claim (an allow with no row) is narrowed the
+  same way, never run as an operator yes (D-8: a surface claims verdicts,
+  it never authors coverage);
+- **attribution**: the note says who ("the appointed night watch (policy:
+  …)"), under what (the grant), and why (the motivation) — one line, on
+  the record, where the morning after reads it.
+
+Slice 2b replaces the policy table with a **judgment member** (a model
+call behind the same claim/card/verdict/report contract); recusal binds
+it — the policy seat has no lineage to recuse from, an agent member does.
+
 ## Invariants
 
 - **Order is the semantics.** The same call may match several layers;

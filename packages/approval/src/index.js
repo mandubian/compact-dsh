@@ -490,22 +490,37 @@ function queryDiffSentence(prior, current) {
  * (see oneLine). `execCacheDisabled` keeps the allowed-once phrasing honest
  * when the runtime disabled the cache (ttl 0): there is no entry to expire,
  * so the note teaches per-ask, never a replay that cannot happen.
+ * `decider` (#176 slice 2): when a downstream seat answered, the note says
+ * WHO — "the operator" becomes "the appointed night watch (policy …)", the
+ * motivation rides the note (the reporting contract: every auto-decision is
+ * on the record with its reason), and the detail sentences follow the same
+ * attribution. The motivation text is flattened by the caller like every
+ * value here.
  */
-export function approvalTranscriptNote({ tool, fingerprint, target }, outcome, { execCacheDisabled = false } = {}) {
+export function approvalTranscriptNote({ tool, fingerprint, target }, outcome, { execCacheDisabled = false, decider = null } = {}) {
   const targetBits = targetBitsOf(target);
   const subject = `"${oneLine(tool) || 'unknown-tool'}"` + (targetBits ? ` (${targetBits})` : '') + ` [${oneLine(fingerprint) || 'no fingerprint'}]`;
+  const by = decider ? `by the appointed night watch (policy: ${oneLine(decider.policy) || 'unrecorded'})` : 'by the operator';
   switch (outcome) {
     case 'allowed-once':
+      if (decider) {
+        return `[compact-approval] Gate decision: ${subject} was allowed ${by} — it answered under grant ${oneLine(decider.basis) || 'a basis the record names'} — ` +
+          `nothing was materialized: no cached approval, no new grant; the row's budget paid for this act.`;
+      }
       return `[compact-approval] Gate decision: ${subject} was allowed once by the operator — ` +
         (execCacheDisabled
           ? `the exec cache is disabled in this runtime, so the identical operation asks again.`
           : `the identical operation replays without re-asking until the exec-cache entry expires; anything else asks again.`);
     case 'rejected':
-      return `[compact-approval] Gate decision: ${subject} was denied by the operator — the call did not run.`;
+      if (decider?.basis === 'lapsed') {
+        return `[compact-approval] Gate decision: ${subject} did not run — the night watch's yes answered under a grant that lapsed before the verdict landed; ` +
+          `the recorded answerer narrowed it to a rejection rather than run on a dead basis (fail-safe).`;
+      }
+      return `[compact-approval] Gate decision: ${subject} was denied ${by} — the call did not run.`;
     case 'cancelled':
-      return `[compact-approval] Gate decision: ${subject} closed cancelled — no operator answer arrived; the call did not run (fail-closed).`;
+      return `[compact-approval] Gate decision: ${subject} closed cancelled — no answer arrived; the call did not run (fail-closed).`;
     default:
-      return `[compact-approval] Gate decision: ${subject} closed ${outcome ?? 'unavailable'} — no operator answer; the call did not run (fail-closed).`;
+      return `[compact-approval] Gate decision: ${subject} closed ${outcome ?? 'unavailable'} — no answer arrived; the call did not run (fail-closed).`;
   }
 }
 
@@ -515,8 +530,13 @@ export function approvalTranscriptNote({ tool, fingerprint, target }, outcome, {
  * producer-declared form upstream's chat renders with its summary on the
  * row). One line, always; the full note text is the expanded body.
  */
-export function approvalNoticeSummary({ tool }, outcome) {
+export function approvalNoticeSummary({ tool }, outcome, decider = null) {
   const t = oneLine(tool) || 'unknown-tool';
+  if (decider) {
+    const policy = oneLine(decider.policy) || 'unrecorded';
+    if (outcome === 'allowed-once') return `Night watch: "${t}" allowed (${policy}) — under the grant's terms`;
+    if (outcome === 'rejected') return `Night watch: "${t}" denied (${policy}) — did not run`;
+  }
   switch (outcome) {
     case 'allowed-once': return `Approval: "${t}" allowed once by the operator`;
     case 'rejected': return `Approval: "${t}" denied by the operator — did not run`;
@@ -857,6 +877,27 @@ async function answerRequest(approval, req, next) {
     // show what differs from a prior approval of the same target
     query: queryShape(rec.args?.url) ?? undefined,
     ...(patternOffers.length ? { patternOffers } : {}),
+    // #176 slice 2 — the decision card: the cause classification reduced to
+    // plain fields, published with the view for exactly the decision's
+    // duration. The appointed night watch (a downstream answerer) reads THIS
+    // — never session history, never the model's memory: the Enforcer
+    // assembles what its own ask means (Ri-0.15's seed, now served). Fields
+    // beyond `kind` exist where the cause carries them (params-edge: the row
+    // under test, the axis, the refused names, the credential floor).
+    ...(() => {
+      const cause = classifyAskCause(approval.store, {
+        target: rec.args, session: rec.session, now: Date.now(), egress: approval.egress,
+        hasMethodClass: Object.hasOwn(rec.args ?? {}, 'methodClass'),
+      });
+      return { cause: {
+        kind: cause.kind,
+        ...(cause.grant?.id ? { grantId: cause.grant.id } : {}),
+        ...(cause.kind === 'params-edge' ? {
+          allowed: cause.allowed, current: cause.current,
+          refused: cause.refused, credential: cause.credential,
+        } : {}),
+      } };
+    })(),
     // the resolved addresses, when the offer applied — the deciding surface
     // can show WHERE the name pointed when the operator decided. A surface
     // that RENDERS them acknowledges it by setting `addressesShown = true`
@@ -867,7 +908,39 @@ async function answerRequest(approval, req, next) {
     ...(pinAddresses ? { addresses: pinAddresses } : {}) };
   approval.deciding.set(key, view);
   try {
-    const outcome = await next();
+    let outcome = await next();
+    // #176 slice 2 — a DECIDER's verdict, as claimed by a downstream answerer
+    // on this view. The seat's discipline, enforced HERE (the recorded
+    // answerer owns materialization, so it owns the decider's limits):
+    //   - answers under a row's terms or not at all: an allow names the row
+    //     whose budget it consumes — minting NOTHING (no cache entry, no new
+    //     grant, no injection); a wrong yes is bounded by the terms the
+    //     operator chose (TTL, budget, class, revocation);
+    //   - a malformed verdict (an allow with no row, or junk on the view) is
+    //     narrowed to a rejection, never materialized (D-8: a surface may
+    //     claim a verdict, never author coverage);
+    //   - a basis that lapsed between ask and verdict narrows the yes to a
+    //     rejection — the recorded answerer may always answer NO to a yes it
+    //     can no longer honor; the note says so.
+    const decider = (view.decider && typeof view.decider === 'object') ? view.decider : null;
+    let deciderDecision = null;
+    if (decider && outcome === 'allowed-once') {
+      const now = Date.now();
+      const row = typeof decider.grantId === 'string'
+        ? approval.store.sessionGrants.find(g => g.id === decider.grantId) : null;
+      const live = !!row && !row.revokedAt && (!row.expiresAt || row.expiresAt > now) &&
+        (row.maxUses == null || row.uses < row.maxUses);
+      if (live) {
+        approval.store.consumeUse(row);
+        deciderDecision = { ...decider, basis: row.id };
+      } else {
+        outcome = 'rejected';
+        deciderDecision = { ...decider, basis: 'lapsed' };
+      }
+    } else if (decider) {
+      // a decider rejection/cancellation: attributed, materializes nothing
+      deciderDecision = { ...decider, basis: null };
+    }
     // #175 — the pattern answer's pick, taken BEFORE materialization so the
     // grant and its note sentence ride the same decision: a deciding surface
     // that rendered the offers records the operator's pick on the view, and
@@ -880,7 +953,9 @@ async function answerRequest(approval, req, next) {
     const patternChoice = view.patternChoice != null && patternOffers.includes(view.patternChoice)
       ? view.patternChoice : null;
     let patternGrant = null;
-    if (outcome === 'allowed-once') {
+    // a decider's allow materializes NOTHING of the operator path (its
+    // budget consumption happened above) — this block is the operator's yes
+    if (outcome === 'allowed-once' && !deciderDecision) {
       // the only native grant: an exec-cache entry — same operation replays
       // without re-asking until the TTL, across sessions of this runtime
       // #65: under the mediated posture the entry lives no longer than the
@@ -948,17 +1023,23 @@ async function answerRequest(approval, req, next) {
           content: [{ type: 'text', text: approvalTranscriptNote(
             { tool: view.tool, fingerprint: view.fingerprint, target: view.target },
             outcome,
-            { execCacheDisabled: approval.execCacheTtlMs === 0 },
-          ) + (outcome === 'allowed-once' && (rec.secretRefs ?? []).length
+            { execCacheDisabled: approval.execCacheTtlMs === 0, decider: deciderDecision },
+          ) + (outcome === 'allowed-once' && !deciderDecision && (rec.secretRefs ?? []).length
             ? ` The approved injection grant${rec.secretRefs.length > 1 ? 's are' : ' is'} live for this session ` +
               `(${rec.secretRefs.map(r => '$' + r).join(', ')}), TTL-bounded.`
             : '')
             + (patternGrant
               ? ` The operator's yes also granted ${oneLine(patternText(patternGrant.pattern))} — ${oneLine(patternChoice.scope)} — ` +
                 `for ${humanTtl(patternChoice.ttlMs)} and ${patternChoice.maxUses} uses: covered acts run without re-asking until it lapses or is revoked (grants-revoke).`
+              : '')
+            + (deciderDecision && deciderDecision.basis !== 'lapsed'
+              ? ` Motivation: ${oneLine(deciderDecision.motivation ?? 'none recorded')}.`
+              : '')
+            + (deciderDecision?.basis === 'lapsed'
+              ? ' The watch\'s appointment stays: the next edge ask finds it on duty.'
               : '') }],
           source: { kind: 'compact-approval', plugin: 'compact-approval', form: 'notice',
-            summary: approvalNoticeSummary(view, outcome) },
+            summary: approvalNoticeSummary(view, outcome, deciderDecision) },
         }));
       } catch { /* the note is a trace, never a gate */ }
     }
