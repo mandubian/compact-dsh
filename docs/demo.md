@@ -1271,3 +1271,114 @@ and not one tool changed. And the honest ending is unchanged: the stamps
 are still practice stamps. Incorporation day needs the real founders in
 the room — and no rehearsal can fake that, which is precisely why the
 rehearsal is worth running.
+
+---
+
+## Demo 13 — The night shift: passes at the door, a judge at the edge, a ledger in the morning (I-5 / R-3 / D-7 · #175–#187) · needs a key · `--attended`, then unattended
+
+The whole approval arc in one evening: an ask whose "yes" can be a **pass**
+(not just a badge), a pass that says *which kinds of questions* it admits,
+an appointed watcher for the run you sleep through, and a ledger you read
+in the morning. The auto-review convenience other harnesses give an LLM,
+rebuilt so that every judgment is bounded by a pass you signed and every
+judgment is written down.
+
+### Act one — mint the pass before you leave (attended)
+
+```bash
+npm run compact -- --attended --workspace /tmp/night-shift \
+  "Fetch https://httpbingo.org/get?q=cats with curl"
+```
+
+The first touch asks, and the ask offers the **scope ladder** — narrowest
+first, every row with its terms on the card. Captured **(verified
+2026-10-12)**:
+
+```
+[compact-dsh] approval requested
+  tool: bash
+  command: {"url":"https://httpbingo.org/get?q=cats", … "methodClass":"read","delivery":"mediator" …}
+  target: url=https://httpbingo.org/get/ host=httpbingo.org
+  fingerprint: fp_0498fc3e5e102d4c
+  [AG/fp_0498fc3e5e102d4c] First touch: nothing has ever covered … no grant row, no cached approval. …
+  Replay: Approving materializes an exec-cache entry: the identical operation replays …
+  Widen: a pattern answer materializes one of UrlPrefix:https://httpbingo.org/get/ params=allow(q) (everything
+    under … — query admits exactly the names this act carries (q)), UrlPrefix:https://httpbingo.org/get/ (… any
+    query), UrlPrefix:https://httpbingo.org/ (everything on httpbingo.org — any path, any query) — read class,
+    for 1h and 50 uses, revocable (grants-revoke); … appending ! to the choice mints it for EVERY session of
+    this runtime instead of this one (#187) — a bigger pass, stated here before the yes.
+  Connectivity: This gate's approval is consent that a mediator can deliver: …
+  1) deny (default)
+  2) allow once
+  3) allow + cover UrlPrefix:https://httpbingo.org/get/ params=allow(q) — … (1h, 50 uses)
+  4) allow + cover UrlPrefix:https://httpbingo.org/get/ — … any query, read (1h, 50 uses)
+  5) allow + cover UrlPrefix:https://httpbingo.org/ — everything on httpbingo.org …
+choice [1]:
+```
+
+Answer **`3!`** — the leaf pass with the `q` axis, minted for **every
+session of this runtime** (the `!` is the night pass; a plain `3` is this
+session only). The fetch returns httpbingo's `args` echo, and the pair
+lands in the store: the pattern row (gate) + the `HostAndPort` wire row
+(the leg the egress mediator delivers through).
+
+### Act two — sleep through the run (unattended, judged edges)
+
+```bash
+COMPACT_DECIDER=judge npm run compact -- --workspace /tmp/night-shift \
+  "Fetch https://httpbingo.org/get?q=cats and ?q=dogs and ?q=dogs&page=2 with curl; report each args echo"
+node tools/watch-report.mjs ~/.compact-dsh/sessions/--tmp-night-shift/<newest-session-id>/session.v4.jsonl
+```
+
+The new session is **not a stranger to the pass**: `?q=cats` and `?q=dogs`
+run silently under it (different fingerprints, same axis — budget ticks).
+`?q=dogs&page=2` is the **edge**: a live row covers the route but its axis
+refuses the new name. The gate asks; nobody human is there; the appointed
+judge is. On stderr:
+
+```
+[night-watch] allowed "bash" at the params edge (refused: page) under grant sg_… — motivation on the record
+```
+
+and the ledger, offline, from the record alone:
+
+```
+1 night-watch verdict(s):
+  Night watch: "bash" allowed (judge) — under the grant's terms
+  basis: sg_…
+  motivation: page is an ordinary pagination parameter of the same kind the pass admits
+```
+
+If the judge had been unsure — or its answer malformed, or its model call
+failed — the act **escalates**: fail-closed, on the record, nobody guessed
+a yes. A `api_key`-shaped refused name never reaches the judge at all: the
+floor refuses it before judgment ("no axis admits them, by offer, by
+command, or by any later judgment"). Swap the member by taste:
+`allow-edges` admits mechanically, `deny` refuses with reasons, `escalate`
+(default) answers nothing and reports everything.
+
+### Act three — the honest failures are the feature
+
+- **No pass on the hook**: a watch appointed over an empty store says so at
+  boot (*"no live network grant in the store — … mint the pass before you
+  leave"*) and every first touch fail-closes. Captured **(verified
+  2026-10-12)** — the agent reported the block honestly and stopped, twice,
+  then asked for an answerer. The undemoed seam that taught us the
+  workflow.
+- **A revoked pass is remembered**: the next ask leads with *The grant …
+  was revoked. Approving re-asks for consent* — history-first, not a
+  generic "uncovered". Captured **(verified 2026-10-12)**.
+
+### The story
+
+You're leaving the club for the night. At the door, the doorman offers
+passes, not just stamps: *this room, and only these kinds of questions* —
+and asks, before printing: "this evening's guest, or every guest tonight?"
+(`3` or `3!`). You take the night pass and leave. While you sleep, a
+watchman you appointed checks the edge cases against the pass you signed —
+he opens no new passes, never touches anything that looks like a key, and
+when he isn't sure he says so and leaves the guest at the door with a note
+for you. In the morning you read the ledger: one line per call — who,
+which pass, what he said, why. The old harness gave an LLM the master key
+and kept no minutes. This one gives it a clipboard, a bounded question,
+and a memory.
