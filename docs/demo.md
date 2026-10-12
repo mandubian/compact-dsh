@@ -1369,16 +1369,14 @@ command, or by any later judgment"). Swap the member by taste:
   was revoked. Approving re-asks for consent* — history-first, not a
   generic "uncovered". Captured **(verified 2026-10-12)**.
 
-### The story
+### What this shows, in one paragraph
 
-You're leaving the club for the night. At the door, the doorman offers
-passes, not just stamps: *this room, and only these kinds of questions* —
-and asks, before printing: "this evening's guest, or every guest tonight?"
-(`3` or `3!`). You take the night pass and leave. While you sleep, a
-watchman you appointed checks the edge cases against the pass you signed —
-he opens no new passes, never touches anything that looks like a key, and
-when he isn't sure he says so and leaves the guest at the door with a note
-for you. In the morning you read the ledger: one line per call — who,
-which pass, what he said, why. The old harness gave an LLM the master key
-and kept no minutes. This one gives it a clipboard, a bounded question,
-and a memory.
+Three rules did all the work. Rule 1: a tool call that matches a grant you
+created runs without a prompt (`?q=cats`, `?q=dogs`). Rule 2: a call that
+matches the URL but adds an unapproved parameter asks first — and, because
+you appointed a decider, the ask is answered by a model call that may only
+check the call against your grant, must explain its answer, and escalates
+to fail-closed when unsure (`?q=dogs&page=2`). Rule 3: everything either
+way lands in the session record, where `watch-report.mjs` lists it back.
+Plain dsh had one mode — prompt the human, every time — and kept no
+minutes of it.
