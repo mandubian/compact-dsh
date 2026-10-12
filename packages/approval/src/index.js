@@ -1331,14 +1331,36 @@ function registerGrantCommands(ctx, approval) {
       if (!Number.isFinite(ttlMs)) return { kind: 'error', text: `ttl must be a number of minutes, got "${ttlMin}"` };
       const maxUses = uses != null ? Math.max(1, Math.floor(Number(uses))) : null;
       if (maxUses !== null && !Number.isFinite(maxUses)) return { kind: 'error', text: `maxUses must be a number, got "${uses}"` };
-      const g = approval.grantSession({
-        pattern, root: scopeAll ? null : root, session: scopeAll ? null : session,
-        ttlMs, maxUses, methodClass, params: parsed.params,
-      });
+      const scopedRoot = scopeAll ? null : root;
+      const scopedSession = scopeAll ? null : session;
+      const g = approval.grantSession({ pattern, root: scopedRoot, session: scopedSession, ttlMs, maxUses, methodClass, params: parsed.params });
+      // #186 — under the mediated posture a UrlPrefix row travels WITH its
+      // wire leg: the pattern row is path-scoped, and the mediator can never
+      // carry a CONNECT tunnel on it (the path is unknowable at a tunnel —
+      // fail-closed, not guessed). The door's answers always mint the pair
+      // (pattern row + the egressBound HostAndPort companion); the front
+      // desk now does too, with the companion derived from the row's own
+      // authority (scheme port, explicit kept) and carrying identical scope
+      // and TTL — INCLUDING #187's scope=all: a night pass without its wire
+      // leg is just a smaller half-pair. Without the pair: gate-yes,
+      // wire-no — the trap the live finding died in. Host kinds are already
+      // tunnel-capable (no companion, unchanged); an unparsable value
+      // matches nothing (skip).
+      let wire = null;
+      if (approval.egress === 'proxy' && g.pattern.kind === 'UrlPrefix') {
+        try {
+          const u = new URL(g.pattern.value);
+          wire = approval.store.addSessionGrant({
+            pattern: { kind: 'HostAndPort', value: { host: u.hostname.toLowerCase(), port: String(u.port || (u.protocol === 'https:' ? '443' : '80')) } },
+            root: scopedRoot, session: scopedSession, ttlMs, maxUses: null, methodClass, now: g.createdAt,
+          });
+        } catch { /* unparsable row matches nothing — no wire leg to pair */ }
+      }
       // echo the PARSED pattern, never the raw operator input: a token in a
       // URL's userinfo is stripped by canonicalization — echoing the input
       // would leak it into the durable session log (command/done is recorded)
       return { kind: 'success', text: `grant ${g.id} covers ${patternText(g.pattern)}${methodClass ? ` (${methodClass})` : ''} for ${scopeAll ? 'EVERY session of this runtime' : `session ${session}`} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''}` +
+        (wire ? ` — wire leg ${wire.id} (${patternText(wire.pattern)}): the pair the mediator delivers through` : '') +
         `${approval.egress === 'none' && NETWORK_PATTERN_KINDS.includes(g.pattern.kind) ? ' — this changes the gate\'s answer, not the container\'s network (no egress is composed)' : ''} (recorded: command/run + command/done)` };
     },
   });

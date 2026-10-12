@@ -196,13 +196,13 @@ test('gate: a fixed row\'s edge lead says the bare target only', async () => {
 
 // -- the operator surface: /grants-grant speaks the axis ----------------------------
 
-function bootCommands() {
+function bootCommands(opts = {}) {
   const registered = {};
   const ctx = {
     on() {}, emit() {}, provide() {},
     inject(deps, fn) { fn({ commands: { register: (cmd) => { registered[cmd.name] = cmd; } } }); },
   };
-  const inst = approvalPlugin({});
+  const inst = approvalPlugin(opts);
   inst(ctx, {});
   return { registered, approval: inst.approval };
 }
@@ -241,6 +241,36 @@ test('grants-grant: a query in the typed pattern means its names; malformed axes
   const wat = registered['grants-grant'].handler({ ...INV, rawInput: 'https://t3.example/ params=mostly' });
   assert.equal(wat.kind, 'error');
   assert.match(wat.text, /unknown params axis/);
+});
+
+test('grants-grant: under the proxy posture a UrlPrefix row mints its wire leg — the pair, never the half (#186)', () => {
+  const { registered, approval } = bootCommands({ egress: 'proxy' });
+  const out = registered['grants-grant'].handler({ ...INV, rawInput: 'https://api.example.com/v1/ 60 50 read' });
+  assert.equal(out.kind, 'success');
+  assert.match(out.text, /wire leg sg_[a-z0-9]+ \(HostAndPort:api\.example\.com:443\): the pair the mediator delivers through/,
+    'the echo names both legs');
+  const rows = approval.store.sessionGrants.slice(-2);
+  assert.deepEqual(rows[0].pattern, { kind: 'UrlPrefix', value: 'https://api.example.com/v1/' });
+  assert.deepEqual(rows[1].pattern, { kind: 'HostAndPort', value: { host: 'api.example.com', port: '443' } },
+    'the companion is derived from the row\'s own authority — the tunnel leg the mediator delivers through');
+  for (const r of rows) {
+    assert.equal(r.methodClass, 'read', 'same class');
+    assert.equal(r.session, 'sess-op', 'same scope');
+    assert.equal(r.expiresAt, rows[0].expiresAt, 'same TTL');
+  }
+  // an explicit port survives; host kinds are already tunnel-capable — no companion
+  const ported = registered['grants-grant'].handler({ ...INV, rawInput: 'https://alt.example:8443/x/ read' });
+  assert.match(ported.text, /HostAndPort:alt\.example:8443/);
+  const hostKind = registered['grants-grant'].handler({ ...INV, rawInput: 'plain.example read' });
+  assert.ok(!hostKind.text.includes('wire leg'), 'ExactHost reaches tunnels already — no companion, unchanged');
+  assert.equal(approval.store.sessionGrants.filter(g => g.pattern.kind === 'ExactHost').length, 1);
+});
+
+test('grants-grant: without the proxy posture the single row stands (no wire leg to pair)', () => {
+  const { registered, approval } = bootCommands({});
+  const out = registered['grants-grant'].handler({ ...INV, rawInput: 'https://solo.example/v1/ read' });
+  assert.ok(!out.text.includes('wire leg'));
+  assert.equal(approval.store.sessionGrants.length, 1);
 });
 
 // -- the prompter: the axis renders in the numbered choices -------------------------
