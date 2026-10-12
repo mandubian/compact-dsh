@@ -63,7 +63,7 @@ async function main() {
     },
   });
   if (values.help) {
-    console.log('Usage: npm run compact -- [--attended] [--workspace PATH] [--state-dir PATH] [--decider POLICY] "task"\n       npm run compact -- --web [--workspace PATH] [--state-dir PATH]\n       npm run compact -- --smoke [--workspace PATH] [--state-dir PATH]\nState defaults to ~/.compact-dsh (COMPACT_STATE_DIR overrides); DSH_HOME is isolated there.\nTask mode inherits DEEPSEEK_API_KEY; default model: deepseek-flash.\n--web serves the browser UI (default 127.0.0.1:3080; COMPACT_WEB_PORT / COMPACT_WEB_HOST override): chat in the browser, approval prompts fall through to this terminal. No task argument; takes no --smoke.\n--attended prompts the operator on the terminal for uncovered gated calls (default deny; stderr only); implied by --web.\n--decider <escalate|deny|allow-edges> appoints the night watch (#176, COMPACT_DECIDER as env): params-edge asks — a grant row covering the route but refusing the query axis — are answered in unattended runs, every verdict reported with its motivation on the record. escalate (default) answers nothing and reports; deny refuses every edge; allow-edges admits non-credential edges under the row\'s own terms. Attended mode is untouched: the operator answers first.\n--smoke never prompts and forbids --attended.\nDocker image must already exist locally: COMPACT_SANDBOX_IMAGE (default ubuntu:24.04).');
+    console.log('Usage: npm run compact -- [--attended] [--workspace PATH] [--state-dir PATH] [--decider POLICY] "task"\n       npm run compact -- --web [--workspace PATH] [--state-dir PATH]\n       npm run compact -- --smoke [--workspace PATH] [--state-dir PATH]\nState defaults to ~/.compact-dsh (COMPACT_STATE_DIR overrides); DSH_HOME is isolated there.\nTask mode inherits DEEPSEEK_API_KEY; default model: deepseek-flash.\n--web serves the browser UI (default 127.0.0.1:3080; COMPACT_WEB_PORT / COMPACT_WEB_HOST override): chat in the browser, approval prompts fall through to this terminal. No task argument; takes no --smoke.\n--attended prompts the operator on the terminal for uncovered gated calls (default deny; stderr only); implied by --web.\n--decider <escalate|deny|allow-edges|judge> appoints the night watch (#176, COMPACT_DECIDER as env): params-edge asks — a grant row covering the route but refusing the query axis — are answered in unattended runs, every verdict reported with its motivation on the record. escalate (default) answers nothing and reports; deny refuses every edge; allow-edges admits non-credential edges under the row\'s own terms; judge seats a model call (the runtime\'s own default route): unsure, malformed, or failed answers escalate, and credential-shaped names are refused before the model is ever consulted. Mint the pass before you leave: the watch judges the edges of grants that exist — run attended once (or /grants-grant) to mint, then launch unattended; read the morning-after list with node tools/watch-report.mjs <session.v4.jsonl>. Attended mode is untouched: the operator answers first.\n--smoke never prompts and forbids --attended.\nDocker image must already exist locally: COMPACT_SANDBOX_IMAGE (default ubuntu:24.04).');
     return;
   }
   if (values.attended && values.smoke) {
@@ -71,8 +71,8 @@ async function main() {
   }
   const decider = values.decider ?? process.env.COMPACT_DECIDER ?? null;
   if (decider != null) {
-    if (!['escalate', 'deny', 'allow-edges'].includes(decider)) {
-      throw new Error(`--decider must be escalate | deny | allow-edges, got "${decider}"`);
+    if (!['escalate', 'deny', 'allow-edges', 'judge'].includes(decider)) {
+      throw new Error(`--decider must be escalate | deny | allow-edges | judge, got "${decider}"`);
     }
     if (values.smoke) throw new Error('--smoke appoints no decider — the watch answers gate asks, and smoke has none');
   }
@@ -284,15 +284,49 @@ async function main() {
         operatorAnswerer(ctx);
       }
       if (decider != null) {
-        // the night watch (#176 slice 2a): appended AFTER the operator
+        // the night watch (#176 slices 2a+2b): appended AFTER the operator
         // answerer, so it is downstream of every human surface — it decides
         // only when the operator's chair is empty (unattended runs), and
         // only on params-edge asks. Every verdict is claimed on the deciding
         // view; the recorded answerer materializes (or refuses to) and writes
-        // the attributed, motivated note on the chained record.
-        const { nightWatchAnswerer } = await import('./night-watch.mjs');
-        nightWatchAnswerer(ctx, { policy: decider });
+        // the attributed, motivated note on the chained record. Read the
+        // list back ex post: node tools/watch-report.mjs <session.v4.jsonl>.
+        const { nightWatchAnswerer, liveNetworkGrants, judgeEdge } = await import('./night-watch.mjs');
+        const watchOpts = { policy: decider };
+        if (decider === 'judge') {
+          // the judgment member: the runtime's OWN model route (the same
+          // agent-default-model every session uses), one one-shot call per
+          // edge ask. The Enforcer hands over the card; a malformed,
+          // unsure, or failed answer escalates — never guessed into a yes.
+          const adm = ctx.get?.('agentDefaultModel');
+          const readVolatile = (v) => v == null ? null
+            : typeof v === 'string' ? v
+            : typeof v === 'function' ? (v() ?? null)
+            : (v.value ?? v.current ?? null);
+          const provider = readVolatile(adm?.provider);
+          const model = readVolatile(adm?.model);
+          const llm = ctx.get?.('llm') ?? ctx.llm;
+          if (!provider || !model || typeof llm?.stream !== 'function') {
+            throw new Error('--decider judge needs the runtime\'s default model route and llm service — none resolved (is a model route configured?)');
+          }
+          const { BlockAssembler } = await import('@deepseek-ai/dsh-llm');
+          watchOpts.judge = (card) => judgeEdge(card, async (system, userText) => {
+            const asm = new BlockAssembler();
+            for await (const chunk of llm.stream({
+              provider, model, system, maxTokens: 300,
+              messages: [{ role: 'user', content: [{ type: 'text', text: userText }] }],
+            })) asm.push(chunk);
+            const msg = asm.message();
+            return (msg?.content ?? []).filter(b => b?.type === 'text').map(b => b.text).join('');
+          });
+        }
+        nightWatchAnswerer(ctx, watchOpts);
         console.error(`${binName}: night watch appointed (policy: ${decider}) — params-edge asks only; every verdict reported with its motivation`);
+        if (!liveNetworkGrants(ctx.get?.('compact-approval')).length) {
+          // #182: a watch over an empty store judges nothing — nothing ever
+          // reaches an edge. Declared at boot, never silent.
+          console.error(`${binName}: night watch: no live network grant in the store — unattended runs fail closed at first touch until a pass is minted (attended ask or /grants-grant); mint the pass before you leave`);
+        }
       }
       if (ctx.get('compact-ready')?.ready !== true) throw new Error('compact-ready was not provided; refusing to run');
       console.error(`${binName}: ready${values.smoke ? ' (smoke; no LLM request)' : values.web ? ' (web; approval prompts fall through to this terminal)' : ''}; draft Compact, no Compact standing.`);
