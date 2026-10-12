@@ -831,7 +831,8 @@ export function askReason({ tool, args, secretRefs = [], cause, approval }) {
     const terms = widenOffers[0];
     lines.push(`Widen: a pattern answer materializes one of ${widenOffers.map(o => `${o.text} (${o.scope})`).join(', ')} — ` +
       `${terms.methodClass ? `${terms.methodClass} class, ` : ''}for ${humanTtl(terms.ttlMs)} and ${terms.maxUses} uses, revocable (grants-revoke); ` +
-      `a deciding surface offers the choice only where it can render the row.`);
+      `a deciding surface offers the choice only where it can render the row; ` +
+      `appending ! to the choice mints it for EVERY session of this runtime instead of this one (#187) — a bigger pass, stated here before the yes.`);
   }
   lines.push(`Connectivity: ${egressHonesty(approval.egress)}`);
   if (approval.egress === 'proxy' && Object.hasOwn(args ?? {}, 'delivery') && args.delivery == null) {
@@ -972,6 +973,13 @@ async function answerRequest(approval, req, next) {
     // stated row is the coverage the operator consented to.
     const patternChoice = view.patternChoice != null && patternOffers.includes(view.patternChoice)
       ? view.patternChoice : null;
+    // #187 — the pick's SCOPE, part of the consent: 'runtime' (a deciding
+    // surface records it with the pick — the terminal's `3!`) mints the row
+    // UNSCOPED, every session of this runtime; anything else is this
+    // session's lineage, exactly as before. A bigger pass is a bigger yes —
+    // which is why it is only ever taken when the row was shown and the
+    // surface offered the modifier (the Widen line states it at the ask).
+    const patternScope = view.patternScope === 'runtime' ? 'runtime' : 'session';
     let patternGrant = null;
     // a decider's allow materializes NOTHING of the operator path (its
     // budget consumption happened above) — this block is the operator's yes
@@ -1023,7 +1031,9 @@ async function answerRequest(approval, req, next) {
       // and kill (grants-revoke, which also kills covered cache entries)
       if (patternChoice) {
         patternGrant = approval.store.addSessionGrant({
-          pattern: patternChoice.pattern, root: rec.root, session: rec.session,
+          pattern: patternChoice.pattern,
+          root: patternScope === 'runtime' ? null : rec.root,
+          session: patternScope === 'runtime' ? null : rec.session,
           ttlMs: patternChoice.ttlMs, maxUses: patternChoice.maxUses,
           methodClass: patternChoice.methodClass, addresses: null, now,
         });
@@ -1050,7 +1060,9 @@ async function answerRequest(approval, req, next) {
             : '')
             + (patternGrant
               ? ` The operator's yes also granted ${oneLine(patternText(patternGrant.pattern))} — ${oneLine(patternChoice.scope)} — ` +
-                `for ${humanTtl(patternChoice.ttlMs)} and ${patternChoice.maxUses} uses: covered acts run without re-asking until it lapses or is revoked (grants-revoke).`
+                `for ${humanTtl(patternChoice.ttlMs)} and ${patternChoice.maxUses} uses` +
+                (patternScope === 'runtime' ? ' for EVERY session of this runtime' : '') +
+                `: covered acts run without re-asking until it lapses or is revoked (grants-revoke).`
               : '')
             + (deciderDecision && deciderDecision.basis !== 'lapsed'
               ? ` Motivation: ${oneLine(deciderDecision.motivation ?? 'none recorded')}.`
@@ -1287,8 +1299,12 @@ function registerGrantCommands(ctx, approval) {
       const [pattern, ...rest] = (inv.rawInput ?? '').trim().split(/\s+/).filter(Boolean);
       const methodClass = rest.find(t => t === 'read' || t === 'write') ?? null;
       const paramsToken = rest.find(t => t.startsWith('params='));
-      const [ttlMin, uses] = rest.filter(t => t !== 'read' && t !== 'write' && !t.startsWith('params='));
-      if (!pattern) return { kind: 'error', text: 'usage: /grants-grant <pattern> [ttlMinutes] [maxUses] [read|write] [params=free|fixed|allow(a,b)] — pattern like api.example.com, *.example.org, host:443, https://host/path/ (a query in the pattern means its parameter NAMES)' };
+      // #187 — scope=all mints the row UNSCOPED (every session of this
+      // runtime): the night pass, taken aloud at the front desk instead of
+      // at the door's `!`
+      const scopeAll = rest.includes('scope=all');
+      const [ttlMin, uses] = rest.filter(t => t !== 'read' && t !== 'write' && !t.startsWith('params=') && t !== 'scope=all');
+      if (!pattern) return { kind: 'error', text: 'usage: /grants-grant <pattern> [ttlMinutes] [maxUses] [read|write] [params=free|fixed|allow(a,b)] [scope=all] — pattern like api.example.com, *.example.org, host:443, https://host/path/ (a query in the pattern means its parameter NAMES; scope=all = every session of this runtime)' };
       let parsed;
       try { parsed = parseAllowlistLikePattern(pattern); } catch (e) { return { kind: 'error', text: String(e?.message ?? e) }; }
       // the explicit params token overrides what a query in the pattern meant
@@ -1315,11 +1331,14 @@ function registerGrantCommands(ctx, approval) {
       if (!Number.isFinite(ttlMs)) return { kind: 'error', text: `ttl must be a number of minutes, got "${ttlMin}"` };
       const maxUses = uses != null ? Math.max(1, Math.floor(Number(uses))) : null;
       if (maxUses !== null && !Number.isFinite(maxUses)) return { kind: 'error', text: `maxUses must be a number, got "${uses}"` };
-      const g = approval.grantSession({ pattern, root, session, ttlMs, maxUses, methodClass, params: parsed.params });
+      const g = approval.grantSession({
+        pattern, root: scopeAll ? null : root, session: scopeAll ? null : session,
+        ttlMs, maxUses, methodClass, params: parsed.params,
+      });
       // echo the PARSED pattern, never the raw operator input: a token in a
       // URL's userinfo is stripped by canonicalization — echoing the input
       // would leak it into the durable session log (command/done is recorded)
-      return { kind: 'success', text: `grant ${g.id} covers ${patternText(g.pattern)}${methodClass ? ` (${methodClass})` : ''} for session ${session} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''}` +
+      return { kind: 'success', text: `grant ${g.id} covers ${patternText(g.pattern)}${methodClass ? ` (${methodClass})` : ''} for ${scopeAll ? 'EVERY session of this runtime' : `session ${session}`} for ${Math.round(ttlMs / 60_000)}min${maxUses ? ` / ${maxUses} uses` : ''}` +
         `${approval.egress === 'none' && NETWORK_PATTERN_KINDS.includes(g.pattern.kind) ? ' — this changes the gate\'s answer, not the container\'s network (no egress is composed)' : ''} (recorded: command/run + command/done)` };
     },
   });

@@ -65,7 +65,8 @@ export function createOperatorPrompter({ input = process.stdin, output = process
       // among them, so this prompter can never author a row.
       const offers = Array.isArray(view?.patternOffers) ? view.patternOffers : [];
       const choices = `\n  1) deny (default)\n  2) allow once` +
-        offers.map((o, i) => `\n  ${3 + i}) allow + cover ${o.text} — ${o.scope}${o.methodClass ? `, ${o.methodClass}` : ''} (${ttlText(o.ttlMs)}, ${o.maxUses} uses)`).join('');
+        offers.map((o, i) => `\n  ${3 + i}) allow + cover ${o.text} — ${o.scope}${o.methodClass ? `, ${o.methodClass}` : ''} (${ttlText(o.ttlMs)}, ${o.maxUses} uses)`).join('') +
+        (offers.length ? `\n  append ! to a choice to mint that pass for EVERY session of this runtime (#187)` : '');
       output.write(
         `\n[compact-dsh] approval requested\n  tool: ${req.toolName ?? 'unknown'}` +
         (view?.command ? `\n  command: ${view.command}` : '') +
@@ -82,10 +83,14 @@ export function createOperatorPrompter({ input = process.stdin, output = process
       rl.question('choice [1]: ', answer => {
         const a = answer.trim().toLowerCase();
         // a pattern choice is the explicit number alone — words stay exact:
-        // 'allow' can never widen, only a number that named its row can
-        const n = /^[3-9]$/.test(a) ? Number(a) - 3 : -1;
+        // 'allow' can never widen, only a number that named its row can.
+        // #187: `3!` picks the same row UNSCOPED — every session of this
+        // runtime (the night pass); the scope rides the view beside the pick.
+        const bang = /^([3-9])!$/.exec(a);
+        const n = bang ? Number(bang[1]) - 3 : /^[3-9]$/.test(a) ? Number(a) - 3 : -1;
         if (n >= 0 && offers[n]) {
           view.patternChoice = offers[n];
+          if (bang) view.patternScope = 'runtime';
           return done('allowed-once');
         }
         if (a === '2' || a === 'allow' || a === 'allow once') return done('allowed-once');

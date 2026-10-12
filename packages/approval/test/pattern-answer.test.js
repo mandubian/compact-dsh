@@ -276,3 +276,36 @@ test('note: the Subject is told what the widened yes materialized', async () => 
   assert.match(text, /for 1h and 50 uses/, 'the note carries the terms');
   assert.match(text, /until it lapses or is revoked \(grants-revoke\)/, 'the note names the exit');
 });
+
+test('materialize: the ! scope — a runtime pick mints the row UNSCOPED, the night pass (#187)', async () => {
+  const { ctx, approval } = boot({});
+  const ag = agent();
+  const injected = [];
+  const noting = { id: 'sess-p', session: { id: 'sess-p', header: {} }, inject(m) { injected.push(m); } };
+  const gated = approval.gate({ name: 'net.fetch', arguments: { host: 'night.example' }, agent: noting, callId: 'c-any' });
+  assert.equal(gated?.kind, 'ask');
+  const outcome = await ctx.waterfall('approval/request',
+    { toolName: 'net.fetch', agent: noting, callId: 'c-any', reason: gated.reason },
+    async () => {
+      const view = approval.deciding.get('c-any');
+      view.patternChoice = view.patternOffers[0];
+      view.patternScope = 'runtime';
+      return 'allowed-once';
+    });
+  assert.equal(outcome, 'allowed-once');
+  const g = approval.store.sessionGrants.at(-1);
+  assert.equal(g.root, null, 'unscoped — every session of this runtime');
+  assert.equal(g.session, null);
+  // a fresh stranger-session is covered: the night-shift bootstrap works
+  const v = approval.evaluate({ tool: 'net.fetch', args: { host: 'night.example' }, root: 'sess-stranger', session: 'sess-stranger', now: NOW });
+  assert.equal(v.verdict, 'allowed', 'the run that follows is not a stranger to the pass');
+  assert.match(injected.at(-1)?.content?.[0]?.text ?? '', /for EVERY session of this runtime/,
+    'the note records the bigger scope');
+  // the default stays session-scoped
+  await decide(ctx, approval,
+    { name: 'net.fetch', arguments: { host: 'day.example' }, agent: noting, callId: 'c-day' },
+    view => { view.patternChoice = view.patternOffers[0]; });
+  const day = approval.store.sessionGrants.at(-1);
+  assert.equal(day.session, 'sess-p', 'no modifier — the session pass, exactly as before');
+  assert.equal(day.root, 'sess-p');
+});

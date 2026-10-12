@@ -352,3 +352,27 @@ test('composed: operator default-deny blocks execution and a repeat asks again',
   assert.equal(transcript.filter(s => s.startsWith('\n[compact-dsh]')).length, 2,
     'a rejected ask releases the pending record — the repeat asks the operator again');
 });
+
+test('prompter: #187 — the ! modifier records the runtime scope beside the pick; the hint renders', async () => {
+  const transcript = [];
+  const prompt = createOperatorPrompter(fakeReadline('3!', transcript));
+  const view = {
+    target: { host: 'night.example' },
+    patternOffers: [{ pattern: { kind: 'ExactHost', value: 'night.example' }, text: 'ExactHost:night.example', scope: 'every call to night.example', ttlMs: 3_600_000, maxUses: 50, methodClass: null }],
+  };
+  const outcome = await prompt(REQ, view);
+  assert.equal(outcome, 'allowed-once');
+  assert.equal(view.patternChoice, view.patternOffers[0]);
+  assert.equal(view.patternScope, 'runtime', 'the ! is the night pass — the ack the unscoped mint rides');
+  assert.ok(transcript.join('').includes('append ! to a choice to mint that pass for EVERY session of this runtime'), 'the hint is on the prompt');
+  // a plain number leaves the scope untouched (session default)
+  const t2 = [];
+  const v2 = { target: { host: 'night.example' }, patternOffers: view.patternOffers };
+  await createOperatorPrompter(fakeReadline('3', t2))(REQ, v2);
+  assert.equal(v2.patternScope, undefined, 'no bang, no scope claim — session pass as always');
+  // an out-of-range bang denies
+  const t3 = [];
+  const v3 = { target: { host: 'night.example' }, patternOffers: view.patternOffers };
+  assert.equal(await createOperatorPrompter(fakeReadline('9!', t3))(REQ, v3), 'rejected');
+  assert.equal(v3.patternScope, undefined);
+});
