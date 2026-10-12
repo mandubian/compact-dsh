@@ -129,9 +129,22 @@ attributed, motivated note on the chained record:
   …)"), under what (the grant), and why (the motivation) — one line, on
   the record, where the morning after reads it.
 
-Slice 2b replaces the policy table with a **judgment member** (a model
-call behind the same claim/card/verdict/report contract); recusal binds
-it — the policy seat has no lineage to recuse from, an agent member does.
+Slice 2b seats the **judgment member**: a model call (`--decider judge`)
+behind the same claim/card/verdict/report contract — the Enforcer hands
+over the decision card (never session history), the judge answers
+allow|deny|unsure with a one-sentence motivation, and **unsure, malformed,
+or a failed call escalates** (P-2.21's shape: a decider that cannot decide
+escalates rather than rejects). The credential floor is checked BEFORE the
+model is ever consulted — a credential-shaped name never reaches judgment.
+The judged motivation is what the record keeps (O-1's discipline: the
+reason is the deliverable, and it is on the chained record); the raw model
+output is not. The call rides the runtime's own default route — one one-shot
+request per edge ask, no new trust root. Recusal: this member is a model
+call on the operator's side of the boundary — no spawn tree, no lineage to
+recuse from; the recusal rule (R-10.7's shape) binds a future AGENT member
+seated here. The morning-after read is a tool, not an excavation:
+`tools/watch-report.mjs <session.v4.jsonl>` prints every verdict with its
+basis and motivation, offline, from the record alone.
 
 ## Invariants
 
