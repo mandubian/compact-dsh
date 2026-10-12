@@ -118,7 +118,7 @@ export async function judgeEdge(card, call) {
     row: {
       id: c.grantId,
       axisAdmits: c.allowed == null ? 'the bare target only (fixed)' : c.allowed,
-      act: { tool: c.tool, carriesQueryNames: c.current, refusedNames: c.refused },
+      act: { tool: c.tool ?? 'unknown-tool', carriesQueryNames: c.current, refusedNames: c.refused },
     },
   }, null, 2);
   let raw;

@@ -908,6 +908,9 @@ async function answerRequest(approval, req, next) {
       });
       return { cause: {
         kind: cause.kind,
+        // the gated tool itself — decision context (Ri-0.15): the judge's
+        // prompt frames "ONE gated tool call", so the card names it
+        tool: toolName,
         ...(cause.grant?.id ? { grantId: cause.grant.id } : {}),
         ...(cause.kind === 'params-edge' ? {
           allowed: cause.allowed, current: cause.current,

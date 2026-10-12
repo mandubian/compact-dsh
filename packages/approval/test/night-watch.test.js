@@ -55,6 +55,7 @@ test('card: the deciding view carries the params-edge cause — the watch\'s who
   await decide(ctx, approval, { args: EDGE, callId: 'c-card', watch: v => { seen = v; } });
   assert.equal(seen.cause.kind, 'params-edge');
   assert.match(seen.cause.grantId, /^sg_/);
+  assert.equal(seen.cause.tool, 'net.fetch', 'the card names the gated tool — decision context (Ri-0.15)');
   assert.deepEqual(seen.cause.allowed, ['q']);
   assert.deepEqual(seen.cause.refused, ['page']);
   assert.deepEqual(seen.cause.credential, []);

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { decideEdge, nightWatchAnswerer } from './night-watch.mjs';
 
 const CARD = (over = {}) => ({
-  kind: 'params-edge', grantId: 'sg_test1234',
+  kind: 'params-edge', grantId: 'sg_test1234', tool: 'net.fetch',
   allowed: ['q'], current: ['page', 'q'], refused: ['page'], credential: [],
   ...over,
 });
@@ -129,7 +129,14 @@ test('judgeEdge: an allow answer maps to the verdict, motivation carried', async
   assert.equal(calls.length, 1);
   const card = JSON.parse(calls[0].user);
   assert.equal(card.row.id, 'sg_test1234');
+  assert.equal(card.row.act.tool, 'net.fetch', 'the card names the gated tool (the Copilot finding: it was silently dropped)');
   assert.deepEqual(card.row.act.refusedNames, ['page'], 'the card names the refused names — never a value, there are none to give');
+  // a card from an older shape without the tool field still judges, honestly labeled
+  const { tool, ...withoutTool } = CARD();
+  void tool;
+  const calls2 = [];
+  await judgeEdge(withoutTool, async (system, user) => { calls2.push(user); return ALLOW_JSON; });
+  assert.equal(JSON.parse(calls2[0]).row.act.tool, 'unknown-tool', 'a missing tool is labeled, never silently dropped');
 });
 
 test('judgeEdge: deny, unsure, malformed, and a thrown call all stay fail-closed', async () => {
