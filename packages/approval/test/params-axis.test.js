@@ -297,3 +297,16 @@ test('prompter: an allow-axis offer renders its names in the choice row', async 
   assert.match(transcript.join(''), /3\) allow \+ cover UrlPrefix:https:\/\/api\.example\.com\/v1\/search\/ params=allow\(q\) — everything under .* query admits exactly the names this act carries \(q\), read \(1h, 50 uses\)/,
     'the choice row shows the axis on the LEAF row (#180), the scope, the class, the terms');
 });
+
+test('grants-grant: scope=all mints the night pass at the front desk (#187)', () => {
+  const { registered, approval } = bootCommands({ egress: 'proxy' });
+  const out = registered['grants-grant'].handler({ ...INV, rawInput: 'https://desk.example/v1/ 30 20 read scope=all' });
+  assert.equal(out.kind, 'success');
+  assert.match(out.text, /for EVERY session of this runtime/);
+  const rows = approval.store.sessionGrants.slice(-2);
+  for (const r of rows) {
+    assert.equal(r.root, null, 'unscoped — the run that follows is not a stranger');
+    assert.equal(r.session, null);
+  }
+  assert.equal(rows.filter(r => r.pattern.kind === 'HostAndPort').length, 1, 'the wire leg follows the scope');
+});

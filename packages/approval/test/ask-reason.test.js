@@ -250,8 +250,8 @@ test('#173 structure: the plain ask renders lead line + Replay + Widen + Connect
   assert.equal(lines[1], `Replay: Approving materializes an exec-cache entry: the identical operation replays without re-asking for 24h, across sessions of this runtime, until it lapses or is revoked — anything else asks again.`,
     'the replay sentence is verbatim behind its label');
   // #175: the pattern offer rides directly beside the Replay row it qualifies
-  assert.match(lines[2], /^Widen: a pattern answer materializes one of ExactHost:rows\.example \(every call to rows\.example\) — for 1h and 50 uses, revocable \(grants-revoke\); a deciding surface offers the choice only where it can render the row\.$/,
-    'the widen row names the exact grant row, its terms, and its exits');
+  assert.match(lines[2], /^Widen: a pattern answer materializes one of ExactHost:rows\.example \(every call to rows\.example\) — for 1h and 50 uses, revocable \(grants-revoke\); a deciding surface offers the choice only where it can render the row; appending ! to the choice mints it for EVERY session of this runtime instead of this one \(#187\) — a bigger pass, stated here before the yes\.$/,
+    'the widen row names the exact grant row, its terms, its exits, and the scope modifier (#187)');
   assert.match(lines[3], /^Connectivity: This gate's approval is consent, not connectivity: /, 'the honesty sentence is verbatim behind its label');
   assert.deepEqual(labelsOf(reason), ['Replay', 'Widen', 'Connectivity']);
 });

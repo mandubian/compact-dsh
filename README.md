@@ -181,7 +181,7 @@ Behind a corporate proxy? Node's fetch ignores `https_proxy` by default —
 prefix runs with `NODE_USE_ENV_PROXY=1` (direct egress that times out is
 the symptom).
 
-Then take the full tour: **[docs/demo.md](docs/demo.md)** — ten runnable
+Then take the full tour: **[docs/demo.md](docs/demo.md)** — thirteen runnable
 demos, each ending in something you can *see*: the tamper-catching audit, the
 secret that never enters the conversation, the lawful network request, the
 petitions. Many need no key at all.
@@ -434,7 +434,7 @@ whose boot attests what it enforces.
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
-| `docs/demo.md` | **Start here**: eight runnable demos with expected output — the value is the difference against plain dsh |
+| `docs/demo.md` | **Start here**: thirteen runnable demos with expected output — the value is the difference against plain dsh |
 | `docs/history-phases.md` | The phase-by-phase build ledger — the full narrative from Phase 0 through Phase 8 |
 | `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
 | `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
