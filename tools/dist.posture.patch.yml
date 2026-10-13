@@ -116,6 +116,14 @@
           attestation: operator-declared
           recordedBy: !!js process.env.COMPACT_SANDBOX_RECORDED_BY
           note: !!js process.env.COMPACT_SANDBOX_PROVENANCE_NOTE
+    # #199 — the boot's workspace declaration, launcher parity: the pilot
+    # chdir's to the governed directory before composing; a plain profile
+    # inherits the process's working directory. Declared → the boot anchors
+    # that root (and refuses the boot if the directory does not exist).
+    # Default: absent (the boot declares dsh's own resolved root, byte-for-
+    # byte as before). The UI's workspace registry (#172) is unchanged.
+    workspace:
+      root: !!js 'process.env.COMPACT_WORKSPACE || undefined'
     # #195 — the night watch, armed by env (see blessed/cordis.patch.yml):
     # params-edge asks in unattended runs are decided by the appointed
     # policy. Default: absent (COMPACT_DECIDER unset → no watch).
