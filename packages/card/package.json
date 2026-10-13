@@ -2,7 +2,7 @@
   "name": "compact-dsh-card",
   "version": "0.1.0",
   "type": "module",
-  "description": "The web ask card: the canonical envelope text, structured client-side — a pure re-layout, no added prose (#90).",
+  "description": "The web ask card: the canonical envelope text, structured client-side; the host half serves the deciding view and the guarded pattern pick over the gateway (#201).",
   "exports": {
     ".": "./src/index.js",
     "./client": "./lib/client.js",
@@ -14,8 +14,12 @@
     },
     "client": {
       "platform": "web",
-      "inject": ["@deepseek-ai/dsh-client-ui-primitives"],
-      "external": ["@deepseek-ai/dsh-client-ui-primitives"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "external": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
     }
   },
   "engines": {
@@ -23,5 +27,9 @@
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": "~0.2.0-rc.2"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-typert-protocol": "^0.2.0-rc.2"
   }
 }
