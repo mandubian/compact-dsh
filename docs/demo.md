@@ -1352,7 +1352,9 @@ The new session is **not a stranger to the pass**: `?q=cats` and `?q=dogs`
 run silently under it (different fingerprints, same axis — budget ticks).
 `?q=dogs&page=2` is the **edge**: a live row covers the route but its axis
 refuses the new name. The gate asks; nobody human is there; the appointed
-judge is. On stderr:
+judge is. On stderr — the shapes below are pinned by the night-watch
+suite, not yet a live capture (the ask block in act one is the verified
+one):
 
 ```
 [night-watch] allowed "bash" at the params edge (refused: page) under grant sg_… — motivation on the record
