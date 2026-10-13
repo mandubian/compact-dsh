@@ -116,3 +116,8 @@
           attestation: operator-declared
           recordedBy: !!js process.env.COMPACT_SANDBOX_RECORDED_BY
           note: !!js process.env.COMPACT_SANDBOX_PROVENANCE_NOTE
+    # #195 — the night watch, armed by env (see blessed/cordis.patch.yml):
+    # params-edge asks in unattended runs are decided by the appointed
+    # policy. Default: absent (COMPACT_DECIDER unset → no watch).
+    nightWatch:
+      policy: !!js 'process.env.COMPACT_DECIDER || undefined'

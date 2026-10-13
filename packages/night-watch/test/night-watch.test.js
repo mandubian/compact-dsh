@@ -5,7 +5,7 @@
 // packages/approval/test/night-watch.test.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decideEdge, nightWatchAnswerer } from './night-watch.mjs';
+import { decideEdge, nightWatchAnswerer } from '../src/index.js';
 
 const CARD = (over = {}) => ({
   kind: 'params-edge', grantId: 'sg_test1234', tool: 'net.fetch',
@@ -117,7 +117,7 @@ test('answerer: an unknown policy refuses to mount', () => {
 
 // ---- the judge member (slice 2b): a model call behind the same contract -----
 
-import { decideEdge as de, judgeEdge, extractVerdictJson, liveNetworkGrants, floorRefusal } from './night-watch.mjs';
+import { decideEdge as de, judgeEdge, extractVerdictJson, liveNetworkGrants, floorRefusal } from '../src/index.js';
 
 const ALLOW_JSON = '{"decision":"allow","motivation":"page is an ordinary pagination parameter of the same kind the pass admits"}';
 

@@ -10,6 +10,7 @@ import { apply as applyPetition } from 'compact-dsh-petition';
 import { apply as applyJudicature } from 'compact-dsh-judicature';
 import { promotionPlugin } from 'compact-dsh-promotion';
 import { apply as applyRemoteAccess } from 'compact-dsh-remote-access';
+import { apply as applyNightWatch } from 'compact-dsh-night-watch';
 import { apply as applySandbox, normalizeProvenanceRecords } from 'compact-dsh-sandbox-docker';
 import { apply as applyEgressProxy } from 'compact-dsh-egress-proxy';
 import { apply as applySelfModel } from 'compact-dsh-self-model';
@@ -41,7 +42,7 @@ function text(value, path) {
 export function resolveConfig(config) {
   object(config, 'config');
   for (const key of Object.keys(config)) {
-    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer', 'memberBinding'].includes(key)) {
+    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer', 'memberBinding', 'nightWatch'].includes(key)) {
       throw new TypeError(`blessed: unknown config key ${key}; record root and chain dir belong on the separate compact-dsh-record/provider loader row`);
     }
   }
@@ -64,6 +65,20 @@ export function resolveConfig(config) {
       memberKeyPath: config.memberBinding.memberKeyPath,
       memberId: config.memberBinding.memberId,
     };
+  }
+  // the night watch (#195): declared as its policy or not at all — the
+  // vocabulary is the watch's own (the module escalates on an unknown
+  // policy; here the malformed declaration is refused at the config
+  // boundary, loudly, per the house rule that dead or broken config is
+  // refused, never ignored)
+  let nightWatch;
+  if (config.nightWatch !== undefined) {
+    object(config.nightWatch, 'nightWatch');
+    if (config.nightWatch.policy !== undefined &&
+        !['escalate', 'deny', 'allow-edges', 'judge'].includes(config.nightWatch.policy)) {
+      throw new TypeError(`blessed: nightWatch.policy "${config.nightWatch.policy}" is outside the watch's vocabulary — escalate | deny | allow-edges | judge`);
+    }
+    nightWatch = config.nightWatch.policy !== undefined ? { policy: config.nightWatch.policy } : undefined;
   }
   object(config.sandbox, 'sandbox');
   // the egress posture is the SANDBOX's declaration, never an approval knob:
@@ -231,6 +246,7 @@ export function resolveConfig(config) {
     specialists,
     settleTimeoutMs,
     ...(memberBinding ? { memberBinding } : {}),
+    ...(nightWatch ? { nightWatch } : {}),
     ...(trustRoot ? { trustRoot } : {}),
     ...(enforcer ? { enforcer } : {}),
   };
@@ -552,6 +568,18 @@ export async function apply(ctx, config = {}) {
     ...(mediated ? { proxyEnvFor: (sessionId) => egressProxy.envFor(sessionId) } : {}),
   }, ['tools', 'approval', 'compact-approval']);
   await mount('compact-remote-access', applyRemoteAccess, {}, ['compact-approval']);
+  // #195 — the night watch travels with the bundle, armed by env or profile
+  // patch: COMPACT_DECIDER (nightWatch.policy) seats the appointed decider
+  // for unattended runs — params-edge asks only; escalate | deny |
+  // allow-edges | judge. ABSENT by default: the chair stays empty and every
+  // ask belongs to a human surface. The composed runtime does not read the
+  // env for this — the launcher consumes and DELETES COMPACT_DECIDER before
+  // boot and seats the watch itself, post-boot, after the operator answerer
+  // (two sources of seating are two watches); this mount is the plain
+  // profile's, where no launcher exists.
+  if (options.nightWatch?.policy) {
+    await mount('compact-night-watch', applyNightWatch, { policy: options.nightWatch.policy }, ['compact-approval']);
+  }
   requireServices(ctx, ['sandbox']);
   // D-8 declaration: the secret-injection posture is on the record at boot —
   // BOUND (refs declared, injection only ever under a live SecretGrant) or

@@ -109,6 +109,15 @@
           # Default: absent (COMPACT_EGRESS_PIN_OFFERS unset → no offer, as
           # before). Mediated posture only, validated at resolveConfig.
           egressPinOffers: !!js '["1", "true"].includes(process.env.COMPACT_EGRESS_PIN_OFFERS) ? true : undefined'
+        # #195 — the night watch, armed by env: params-edge asks in unattended
+        # runs are decided by the appointed policy (escalate | deny |
+        # allow-edges | judge; 'judge' seats the model member on the runtime's
+        # own route). Default: absent (COMPACT_DECIDER unset → no watch, every
+        # ask belongs to a human surface). The composed launcher consumes and
+        # deletes the env before boot and seats the watch itself, so this row
+        # is the plain profile's alone.
+        nightWatch:
+          policy: !!js 'process.env.COMPACT_DECIDER || undefined'
         # the member binding (I-1 slice 2): sessions become the DEEDS of a
         # Member — certificates carry memberKeyDigest + the Member's
         # countersignature, and the judicature resolves parties and recusal
