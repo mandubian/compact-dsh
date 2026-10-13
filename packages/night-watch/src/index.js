@@ -25,7 +25,7 @@
 // and README say so: with the watch armed, params-edge asks are decided by
 // the watch, not by a human surface. Unset COMPACT_DECIDER to return every
 // ask to the humans.
-import { nightWatchAnswerer, liveNetworkGrants } from './watch.js';
+import { judgeEdge, nightWatchAnswerer, liveNetworkGrants } from './watch.js';
 
 export const name = 'compact-night-watch';
 
@@ -42,36 +42,43 @@ export {
 const POLICIES = new Set(['escalate', 'deny', 'allow-edges', 'judge']);
 
 /**
- * The judgment member's model call, closed over the settled context: the
- * route (agentDefaultModel — provider/model may be volatile values) and the
- * llm are read when the FIRST edge ask fires, never at apply time. One
- * one-shot call per edge ask; message shape follows dsh-session-title-llm,
- * the runtime's own one-shot caller (createUserMessage + BlockAssembler).
+ * The judgment member, seat-ready: `card → { verdict, motivation }` through
+ * judgeEdge's contract (malformed, unsure, or a failed call escalates —
+ * fail-closed). The RAW model call is the inner argument: the route
+ * (agentDefaultModel — provider/model may be volatile values) and the llm
+ * are read when the FIRST edge ask fires, never at apply time (#183's
+ * shape). One one-shot call per edge ask; message shape follows
+ * dsh-session-title-llm, the runtime's own one-shot caller (createUserMessage
+ * + BlockAssembler). Wrapping HERE is the contract — the seat calls
+ * `judge(card)`, never the bare route.
  */
 export function judgeFromContext(ctx) {
-  return async (system, userText) => {
-    const { BlockAssembler, createUserMessage } = await import('@deepseek-ai/dsh-llm');
-    const readVolatile = (v) => v == null ? null
-      : typeof v === 'string' ? v
-      : typeof v === 'function' ? (v() ?? null)
-      : (v.value ?? v.current ?? null);
-    const adm = ctx.get?.('agentDefaultModel');
-    const provider = readVolatile(adm?.provider);
-    const model = readVolatile(adm?.model);
-    const llm = ctx.llm;
-    if (!provider || !model || typeof llm?.stream !== 'function') {
-      throw new Error('no usable model route at judgment time (agentDefaultModel/llm unresolved)');
-    }
-    const asm = new BlockAssembler();
-    for await (const chunk of llm.stream({
-      provider, model, system, maxTokens: 300, purpose: 'night-judge',
-      messages: [createUserMessage({
-        content: [{ type: 'text', text: userText }],
-        source: { kind: 'compact-dsh-night-judge' },
-      })],
-    })) asm.push(chunk);
-    const msg = asm.message();
-    return (msg?.content ?? []).filter(b => b?.type === 'text').map(b => b.text).join('');
+  return async (card) => {
+    const raw = async (system, userText) => {
+      const { BlockAssembler, createUserMessage } = await import('@deepseek-ai/dsh-llm');
+      const readVolatile = (v) => v == null ? null
+        : typeof v === 'string' ? v
+        : typeof v === 'function' ? (v() ?? null)
+        : (v.value ?? v.current ?? null);
+      const adm = ctx.get?.('agentDefaultModel');
+      const provider = readVolatile(adm?.provider);
+      const model = readVolatile(adm?.model);
+      const llm = ctx.llm;
+      if (!provider || !model || typeof llm?.stream !== 'function') {
+        throw new Error('no usable model route at judgment time (agentDefaultModel/llm unresolved)');
+      }
+      const asm = new BlockAssembler();
+      for await (const chunk of llm.stream({
+        provider, model, system, maxTokens: 300, purpose: 'night-judge',
+        messages: [createUserMessage({
+          content: [{ type: 'text', text: userText }],
+          source: { kind: 'compact-dsh-night-judge' },
+        })],
+      })) asm.push(chunk);
+      const msg = asm.message();
+      return (msg?.content ?? []).filter(b => b?.type === 'text').map(b => b.text).join('');
+    };
+    return judgeEdge(card, raw);
   };
 }
 
@@ -89,6 +96,10 @@ export function apply(ctx, config) {
   }
   const judge = policy === 'judge' ? judgeFromContext(ctx) : null;
   const output = config?.output ?? process.stderr;
+  // the seat's own service on the provision roll — blessed's mount ends with
+  // requireServices(ctx, [service]), and an apply that provides nothing its
+  // own name aborts the very boot it armed (found by review on #195's PR)
+  ctx.provide?.('compact-night-watch', { name: 'compact-night-watch', policy });
   nightWatchAnswerer(ctx, { policy, judge, output });
   ctx.logger?.warn?.(
     `compact-night-watch: night watch appointed (policy: ${policy}) — params-edge asks only; every verdict reported with its motivation` +
