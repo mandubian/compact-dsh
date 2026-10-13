@@ -162,15 +162,18 @@ window.__ModuleLoader__.load({
 		}
 
 		async function fetchOffers(callId) {
+			// the payload is EXACTLY { args: {…} } — the gateway refuses any
+			// extra key (remoteRequest: "must contain exactly one plain-object
+			// args field"); the method rides the endpoint and the envelope
 			const view = await callCardApi('compact-card-api/decidingView', {
-				namespace: 'compact-card-api', method: 'decidingView', args: { args: { callId } },
+				args: { callId },
 			});
 			return Array.isArray(view?.offers) ? view.offers : [];
 		}
 
 		async function pickPattern(callId, index, runtime) {
 			return callCardApi('compact-card-api/patternAnswer', {
-				namespace: 'compact-card-api', method: 'patternAnswer', args: { args: { callId, index, runtime } },
+				args: { callId, index, runtime },
 			});
 		}
 

@@ -338,10 +338,15 @@ test('the client picks through the wire builders and renders the offer buttons',
   assert.equal(envelope.type, 'client-request');
   assert.equal(envelope.method, 'compact-card-api/patternAnswer');
   assert.deepEqual(envelope.payload, { args: { callId: 'call-wire', index: 0, runtime: true } }, 'exactly one plain-object args field — the gateway refuses anything else');
+  // and the body pickPattern ACTUALLY sends carries that same payload
+  const before = calls.length;
+  await card.pickPattern('call-wire', 0, true);
+  const sent = calls[before];
+  assert.equal(sent.url, '/api/compact-card-api/patternAnswer');
+  assert.deepEqual(sent.body.payload, { args: { callId: 'call-wire', index: 0, runtime: true } },
+    'the wire payload is the args object the server method reads — no extra wrapper, no extra keys');
   // the guarded flow: pick first (awaited), then the ordinary allow
   await card.pickPattern('call-wire', 0, true).then(() => approval.answer('allowed-once'));
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, '/api/compact-card-api/patternAnswer');
   assert.equal(answered[0], 'allowed-once', 'the pick rides the ordinary allow — one outcome on the wire');
   // the render: one button per offer + the runtime toggle + the hint-free deny/allow pair
   const tree = CompactCard({ matched: approval, offers });
