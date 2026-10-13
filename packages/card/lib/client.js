@@ -192,7 +192,7 @@ window.__ModuleLoader__.load({
 			const runtimeState = react.useState(false);
 			const runtime = runtimeState[0];
 			const setRuntime = runtimeState[1];
-			const widenErrorState = react.useState(null);
+			const widenErrorState = react.useState(props.widenError ?? null);
 			const widenError = widenErrorState[0];
 			const setWidenError = widenErrorState[1];
 			react.useEffect(() => {
