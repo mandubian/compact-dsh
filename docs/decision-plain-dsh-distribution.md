@@ -145,3 +145,28 @@ own interactive surface ("the launcher's web rows disable…"), which remains
 exactly true; the trial path is a different composition of the same code,
 whose posture this record declares. `verify-register` stays green (71
 entries, 48 enforced), and the register was not edited by this chain.
+
+## Decision 5 — the night-shift surfaces travel with the bundle; the door and the watch are the declared gaps (#195)
+
+The night-shift chain (#175–#187) landed after this record, and its two
+human-facing seams are composition-level, so this record names where they
+stand on the trial path (issue #195 carries the full seam-by-seam):
+
+- **The front desk travels.** `/grants-grant … scope=all` and
+  `/grants-revoke` register from the plugin's own `commands` injection — a
+  plain profile can mint the unscoped night pass with its wire leg, and the
+  mediator (posture rides the bundle, Decision 2) delivers under it.
+- **The door does not, yet.** The Widen ladder and the `!` modifier ride the
+  deciding *view*, and no plain-dsh surface renders them — the web ask card
+  ignores `patternOffers`/`patternScope` (pinned by test), and the `3!`
+  parser is the launcher's terminal answerer. On the trial path the ask
+  offers deny / allow-once only; a pass can be minted, but only at the desk.
+- **The watch now travels as a plugin row (#195).** `compact-dsh-night-watch`
+  ships in the bundle and seats on `COMPACT_DECIDER` (or `nightWatch.policy`
+  in the profile patch) — the same env-gated seam as the posture in Decision
+  2. The composed runtime keeps its own seating (post-boot, after the
+  operator answerer) and consumes the env before boot — two sources of
+  seating are two watches. DECLARED CAVEAT: with the watch armed, params-edge
+  asks are decided by the watch before any human surface; the ordering
+  invariant relative to a *seated* web human is unverified until the probe
+  covers it (the issue tracks that work).

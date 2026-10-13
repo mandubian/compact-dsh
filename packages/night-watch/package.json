@@ -1,0 +1,22 @@
+{
+  "name": "compact-dsh-night-watch",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh \u2014 the night watch (#176): the appointed decider for unattended runs, params-edge asks only. Escalate | deny | allow-edges | judge (a model call behind the claim/card/verdict contract; unsure, malformed or failed answers escalate \u2014 fail-closed). Mints nothing: an allow names the row whose budget pays.",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.2.0-rc.2"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-llm": "^0.2.0-rc.2"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.*\""
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}

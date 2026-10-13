@@ -70,6 +70,11 @@ async function main() {
     throw new Error('--attended prompts the operator; --smoke forbids prompts and model calls — pick one');
   }
   const decider = values.decider ?? process.env.COMPACT_DECIDER ?? null;
+  // the launcher seats the watch itself (post-boot, after the operator
+  // answerer — the operator stays first). Blessed's posture row reads the
+  // same env and would seat a SECOND watch: consume and delete, one chair,
+  // one occupant (#195).
+  delete process.env.COMPACT_DECIDER;
   if (decider != null) {
     if (!['escalate', 'deny', 'allow-edges', 'judge'].includes(decider)) {
       throw new Error(`--decider must be escalate | deny | allow-edges | judge, got "${decider}"`);
@@ -291,49 +296,19 @@ async function main() {
         // view; the recorded answerer materializes (or refuses to) and writes
         // the attributed, motivated note on the chained record. Read the
         // list back ex post: node tools/watch-report.mjs <session.v4.jsonl>.
-        const { nightWatchAnswerer, liveNetworkGrants, judgeEdge } = await import('./night-watch.mjs');
+        const { nightWatchAnswerer, liveNetworkGrants, judgeFromContext } = await import('compact-dsh-night-watch');
         const watchOpts = { policy: decider };
         if (decider === 'judge') {
           // the judgment member: the runtime's OWN model route (the same
           // agent-default-model every session uses), one one-shot call per
           // edge ask. The Enforcer hands over the card; a malformed,
           // unsure, or failed answer escalates — never guessed into a yes.
-          //
-          // RESOLVED AT CALL TIME, never at boot (#183 follow-up): probing
-          // agentDefaultModel/llm during the launcher's post-boot phase
-          // broke the agent factory's registration ('no agent factory
-          // registered') and aborted the boot. Here the judge closes over
-          // the context alone; the route and llm are read when the first
-          // edge ask fires — the session is live, every service is mounted —
-          // and anything unresolvable throws INSIDE the call, which
-          // judgeEdge converts into an escalation on the record (fail-
-          // closed, declared, never a boot abort). Message shape and stream
-          // assembly follow dsh-session-title-llm, the runtime's own
-          // one-shot caller (createUserMessage + BlockAssembler).
-          const { BlockAssembler, createUserMessage } = await import('@deepseek-ai/dsh-llm');
-          const readVolatile = (v) => v == null ? null
-            : typeof v === 'string' ? v
-            : typeof v === 'function' ? (v() ?? null)
-            : (v.value ?? v.current ?? null);
-          watchOpts.judge = (card) => judgeEdge(card, async (system, userText) => {
-            const adm = ctx.get?.('agentDefaultModel');
-            const provider = readVolatile(adm?.provider);
-            const model = readVolatile(adm?.model);
-            const llm = ctx.llm;
-            if (!provider || !model || typeof llm?.stream !== 'function') {
-              throw new Error('no usable model route at judgment time (agentDefaultModel/llm unresolved)');
-            }
-            const asm = new BlockAssembler();
-            for await (const chunk of llm.stream({
-              provider, model, system, maxTokens: 300, purpose: 'night-judge',
-              messages: [createUserMessage({
-                content: [{ type: 'text', text: userText }],
-                source: { kind: 'compact-dsh-night-judge' },
-              })],
-            })) asm.push(chunk);
-            const msg = asm.message();
-            return (msg?.content ?? []).filter(b => b?.type === 'text').map(b => b.text).join('');
-          });
+          // RESOLVED AT CALL TIME, never at boot (#183 follow-up) — the
+          // closure lives in the package now (judgeFromContext), shared with
+          // the plain-profile mount; the route and llm are read when the
+          // first edge ask fires and anything unresolvable throws INSIDE the
+          // call, which judgeEdge converts into an escalation on the record.
+          watchOpts.judge = judgeFromContext(ctx);
         }
         nightWatchAnswerer(ctx, watchOpts);
         console.error(`${binName}: night watch appointed (policy: ${decider}) — params-edge asks only; every verdict reported with its motivation`);
