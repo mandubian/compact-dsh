@@ -1014,8 +1014,22 @@ async function answerRequest(approval, req, next) {
       if (egressBound(approval, rec.args)) {
         const pattern = egressPatternFor(canonicalTarget(rec.args));
         if (pattern) {
+          // #186's pairing, door side (#187): the companion travels WITH the
+          // pattern answer's row — identical scope, root and session both,
+          // exactly as the front desk mints the pair. A `3!` night pass that
+          // unscopes the gate row while its wire leg stays bound to the
+          // minting session is the half-pair: the run that follows is
+          // covered at the gate and refused at the wire — dead, one leg
+          // later. No pattern answer (allow-once) keeps the row
+          // session-bound: it covers this act and its lineage, nothing
+          // more. TTL terms stay each row's own (the door's two clocks are
+          // equal by default; #65's cache cap rides this row unchanged).
+          const runtimePair = patternChoice != null && patternScope === 'runtime';
           approval.store.addSessionGrant({
-            pattern, session: rec.session, methodClass: rec.methodClass,
+            pattern,
+            root: runtimePair ? null : rec.root,
+            session: runtimePair ? null : rec.session,
+            methodClass: rec.methodClass,
             ttlMs: approval.egressGrantTtlMs, now,
             // the offer the deciding view showed — and only a surface that
             // ACKNOWLEDGED rendering it (addressesShown) pins; the web card

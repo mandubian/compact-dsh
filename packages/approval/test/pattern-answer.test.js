@@ -6,7 +6,7 @@
 // parameters, no second ask — until TTL, budget, or revocation says otherwise.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { approvalPlugin, createApproval, patternOffersFor } from '../src/index.js';
+import { approvalPlugin, createApproval, patternOffersFor, egressGrantsFor } from '../src/index.js';
 
 const NOW = 1_700_000_000_000;
 
@@ -308,4 +308,61 @@ test('materialize: the ! scope — a runtime pick mints the row UNSCOPED, the ni
   const day = approval.store.sessionGrants.at(-1);
   assert.equal(day.session, 'sess-p', 'no modifier — the session pass, exactly as before');
   assert.equal(day.root, 'sess-p');
+});
+
+// #186's pairing under #187's scope axis: a UrlPrefix answer mints the pair
+// (gate row + HostAndPort wire leg), and the wire leg follows the gate row's
+// scope — a night pass whose tunnel ticket keeps one session's name is a
+// half-pair: the run that follows is covered at the gate, refused at the wire.
+
+test('materialize: the ! scope — the wire leg follows the night pass, never a half-pair (#186/#187)', async () => {
+  const { ctx, approval } = boot({ egress: 'proxy' });
+  const noting = { id: 'sess-p', session: { id: 'sess-p', header: {} }, inject() {} };
+  const args = { url: 'https://api.example.com/v1/search?q=cats', methodClass: 'read', delivery: 'mediator' };
+  const gated = approval.gate({ name: 'net.fetch', arguments: args, agent: noting, callId: 'c-night' });
+  assert.equal(gated?.kind, 'ask');
+  const outcome = await ctx.waterfall('approval/request',
+    { toolName: 'net.fetch', agent: noting, callId: 'c-night', reason: gated.reason },
+    async () => {
+      const view = approval.deciding.get('c-night');
+      view.patternChoice = view.patternOffers[0];
+      view.patternScope = 'runtime';
+      return 'allowed-once';
+    });
+  assert.equal(outcome, 'allowed-once');
+  const rows = approval.store.sessionGrants.slice(-2);
+  assert.equal(rows.filter(r => r.pattern.kind === 'HostAndPort').length, 1, 'the door minted the pair');
+  for (const r of rows) {
+    assert.equal(r.root, null, 'the pair is unscoped — gate AND wire alike');
+    assert.equal(r.session, null);
+  }
+  // the run that follows: covered at the gate AND delivered at the wire
+  const v = approval.evaluate({ tool: 'net.fetch',
+    args: { url: 'https://api.example.com/v1/search?q=dogs', methodClass: 'read' },
+    root: 'sess-stranger', session: 'sess-stranger', now: NOW });
+  assert.equal(v.verdict, 'allowed', 'the gate says yes in the session that follows');
+  const strangerLegs = egressGrantsFor(approval.store, 'sess-stranger');
+  assert.ok(strangerLegs.some(g => g.pattern.kind === 'HostAndPort' &&
+      g.pattern.value.host === 'api.example.com' && g.pattern.value.port === '443'),
+    'the wire leg delivers there too — no half-pair');
+  assert.ok(strangerLegs.every(g => g.root === null && g.session === null),
+    'every leg the stranger reads is unscoped');
+});
+
+test('materialize: the session pass pairs session-scoped — the wire leg mirrors the gate row exactly (root included)', async () => {
+  const { ctx, approval } = boot({ egress: 'proxy' });
+  const { outcome } = await decide(ctx, approval,
+    { name: 'net.fetch', arguments: { url: 'https://api.example.com/v1/search?q=cats', methodClass: 'read', delivery: 'mediator' },
+      agent: agent(), callId: 'c-day' },
+    view => { view.patternChoice = view.patternOffers[0]; });
+  assert.equal(outcome, 'allowed-once');
+  const rows = approval.store.sessionGrants.slice(-2);
+  assert.equal(rows.filter(r => r.pattern.kind === 'HostAndPort').length, 1, 'the door minted the pair');
+  for (const r of rows) {
+    assert.equal(r.root, 'sess-p', 'the pair carries the asking lineage — gate AND wire alike');
+    assert.equal(r.session, 'sess-p');
+  }
+  assert.equal(egressGrantsFor(approval.store, 'sess-p').length, 2, 'the asking session rides the pair');
+  assert.deepEqual(egressGrantsFor(approval.store, 'sess-stranger'), [],
+    'another session still holds nothing');
 });
