@@ -1277,8 +1277,10 @@ rehearsal is worth running.
 ## Demo 13 — The night shift: passes at the door, a judge at the edge, a ledger in the morning (I-5 / R-3 / D-7 · #175–#187) · needs a key, a sandbox with curl, and `COMPACT_EGRESS=proxy` · `--attended`, then unattended
 
 Three things must be true before the evening runs as written: the runtime's
-model route is configured (the judge needs it), the sandbox image carries
-`curl` (the stock `ubuntu:24.04` does not — the demo's fetch runs *as curl*),
+model route is configured (the judge needs it); the sandbox carries `curl`
+(the stock `ubuntu:24.04` does not, and the demo's fetch runs *as curl* —
+bake the house image once, an operator act on the host daemon:
+`npm run compact:bake -- --base ubuntu:24.04 --packages curl --tag dsh-tools:basic`);
 and the composition declares the mediated posture (`COMPACT_EGRESS=proxy` —
 without it the gate says "will fail at connect", because it will: no
 mediator, no wire leg, no pass that travels). Found by the 2026-10-13
@@ -1295,7 +1297,7 @@ judgment is written down.
 ### Act one — mint the pass before you leave (attended)
 
 ```bash
-COMPACT_EGRESS=proxy npm run compact -- --attended --workspace /tmp/night-shift \
+COMPACT_EGRESS=proxy COMPACT_SANDBOX_IMAGE=dsh-tools:basic npm run compact -- --attended --workspace /tmp/night-shift \
   "Fetch https://httpbingo.org/get?q=cats with curl"
 ```
 
@@ -1341,7 +1343,7 @@ capture. What the 2026-10-13 attempt could already verify live, and what
 still blocks the rest, is recorded after the blocks.
 
 ```bash
-COMPACT_EGRESS=proxy COMPACT_DECIDER=judge npm run compact -- --workspace /tmp/night-shift \
+COMPACT_EGRESS=proxy COMPACT_SANDBOX_IMAGE=dsh-tools:basic COMPACT_DECIDER=judge npm run compact -- --workspace /tmp/night-shift \
   "Fetch https://httpbingo.org/get?q=cats and ?q=dogs and ?q=dogs&page=2 with curl; report each args echo"
 node tools/watch-report.mjs ~/.compact-dsh/sessions/--tmp-night-shift--/<newest-session-id>/session.v4.jsonl
 ```
