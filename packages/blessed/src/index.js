@@ -84,8 +84,15 @@ export function resolveConfig(config) {
   let workspace;
   if (config.workspace !== undefined) {
     object(config.workspace, 'workspace');
-    text(config.workspace.root, 'workspace.root');
-    workspace = { root: config.workspace.root };
+    // the posture patch emits the key as a STATIC object whose leaf is
+    // undefined when COMPACT_WORKSPACE is unset (`{ root: undefined }`) —
+    // the nightWatch precedent: a declared-but-undefined leaf IS the absent
+    // declaration, not a malformed one. Only a present-but-invalid root
+    // (empty string, non-string) is refused.
+    if (config.workspace.root !== undefined) {
+      text(config.workspace.root, 'workspace.root');
+      workspace = { root: config.workspace.root };
+    }
   }
   // the member binding (I-1 slice 2): declared ALL of itself or not at all —
   // a binding that names a roll but no member would be the false answer D-3

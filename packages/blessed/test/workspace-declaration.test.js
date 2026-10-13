@@ -26,6 +26,13 @@ test('resolveConfig: the workspace key passes through; malformed forms are refus
     /workspace must be a JSON object/);
   assert.throws(() => resolveConfig({ ...config, workspaceKludge: {} }),
     /unknown config key/, 'the closed key set holds');
+  // the posture patch emits the key as a static object with an undefined
+  // leaf when COMPACT_WORKSPACE is unset — that IS the absent declaration
+  // (the nightWatch precedent); the default trial boot must not regress
+  assert.equal(resolveConfig({ ...config, workspace: { root: undefined } }).workspace,
+    undefined, 'COMPACT_WORKSPACE unset: no declaration, no throw, byte-identical boot');
+  assert.equal(resolveConfig({ ...config, workspace: {} }).workspace,
+    undefined, 'an empty object is likewise the absent declaration');
 });
 
 test('declareWorkspaceRoot: the policy names the realpath of the declared directory', () => {
