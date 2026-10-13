@@ -20,6 +20,7 @@ await import('../lib/client.js');
 const fakeReact = {
   createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat() }),
   useState: (init) => [init, () => {}],
+  useEffect: () => {},
 };
 const fakeButton = (props, ...children) => ({ type: 'Button', props: props ?? {}, children: children.flat() });
 const stubRequire = (name) => {
@@ -279,4 +280,74 @@ test('a missing reason degrades to the no-reason face instead of crashing', () =
   const tree = card.CompactCard({ matched: { kind: 'approval', answer: async () => 'rejected' } });
   assert.equal(findByClass(tree, 'compact-card-chip').length, 0);
   assert.equal(textOf(findByClass(tree, 'compact-card-reason')[0]), '(no reason given)');
+});
+
+// ── #201: the pattern offers cross the wire — the server guards the pick ──
+
+test('the card-api service serves the deciding view and guards the pick (D-8: pick, never author)', async () => {
+  const { CompactCardApi } = await import('../src/index.js');
+  const { Context } = await import('@deepseek-ai/cordis');
+  const offers = [
+    { pattern: { kind: 'ExactHost', value: 'night.example' }, text: 'ExactHost:night.example', scope: 'every call to night.example', ttlMs: 3_600_000, maxUses: 50, methodClass: 'read' },
+    { pattern: { kind: 'UrlPrefix', value: 'https://night.example/' }, text: 'UrlPrefix:https://night.example/', scope: 'everything on night.example', ttlMs: 3_600_000, maxUses: 50, methodClass: 'read' },
+  ];
+  const view = { patternOffers: offers, query: ['q'] };
+  const ctx = new Context();
+  ctx.provide('compact-approval', { deciding: new Map([['call-1', view]]) });
+  const api = new CompactCardApi(ctx);
+
+  const empty = await api.decidingView({ callId: 'unknown' });
+  assert.deepEqual(empty, { offers: [], query: null }, 'an unknown ask degrades silently');
+  const seen = await api.decidingView({ callId: 'call-1' });
+  assert.equal(seen.offers, offers, 'the computed rows, byte-faithful');
+
+  // the guarded pick: a valid index writes the choice on the view
+  const ok = await api.patternAnswer({ callId: 'call-1', index: 1, runtime: true });
+  assert.deepEqual(ok, { ok: true, text: offers[1].text, scope: 'runtime' });
+  assert.equal(view.patternChoice, offers[1], 'the pick is the offer object the guard owns');
+  assert.equal(view.patternScope, 'runtime', '#187: the night-pass scope rides the pick');
+
+  // everything else is refused: forged index, malformed, unknown ask, cleared view
+  assert.equal((await api.patternAnswer({ callId: 'call-1', index: 9 })).ok, false, 'out of range');
+  assert.equal((await api.patternAnswer({ callId: 'call-1', index: '0; drop table' })).ok, false, 'malformed');
+  assert.equal((await api.patternAnswer({ callId: 'nope', index: 0 })).ok, false, 'unknown ask');
+  assert.equal((await api.patternAnswer({ index: 0 })).ok, false, 'no callId');
+  delete view.patternOffers;
+  assert.equal((await api.patternAnswer({ callId: 'call-1', index: 0 })).ok, false, 'a cleared view authorizes nothing');
+  assert.equal(view.patternChoice, offers[1], 'refused picks never touched the view');
+});
+
+test('the client picks through the wire builders and renders the offer buttons', async () => {
+  const { CompactCard } = card;
+  const offers = [
+    { pattern: { kind: 'ExactHost', value: 'night.example' }, text: 'ExactHost:night.example', scope: 'every call to night.example', ttlMs: 3_600_000, maxUses: 50, methodClass: 'read' },
+  ];
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, body: JSON.parse(init.body) });
+    return { ok: true, json: async () => ({ type: 'server-response', rpcId: 'r', result: { ok: true } }) };
+  };
+  const answered = [];
+  const approval = {
+    kind: 'approval', callId: 'call-wire',
+    reason: '[AG/fp_1] First touch: nothing has ever covered host=night.example …\nWiden: a pattern answer materializes one of ExactHost:night.example (every call to night.example) — for 1h and 50 uses, revocable (grants-revoke); …\nLawful next moves:\n— escalate to your Principal',
+    answer: async (outcome) => { answered.push(outcome); },
+  };
+  // the wire builders: envelope shape matches the gateway's schema exactly
+  const envelope = card.rpcEnvelope('compact-card-api/patternAnswer', { args: { callId: 'call-wire', index: 0, runtime: true } });
+  assert.equal(envelope.type, 'client-request');
+  assert.equal(envelope.method, 'compact-card-api/patternAnswer');
+  assert.deepEqual(envelope.payload, { args: { callId: 'call-wire', index: 0, runtime: true } }, 'exactly one plain-object args field — the gateway refuses anything else');
+  // the guarded flow: pick first (awaited), then the ordinary allow
+  await card.pickPattern('call-wire', 0, true).then(() => approval.answer('allowed-once'));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, '/api/compact-card-api/patternAnswer');
+  assert.equal(answered[0], 'allowed-once', 'the pick rides the ordinary allow — one outcome on the wire');
+  // the render: one button per offer + the runtime toggle + the hint-free deny/allow pair
+  const tree = CompactCard({ matched: approval, offers });
+  const json = JSON.stringify(tree);
+  assert.ok(json.includes('Allow + cover ExactHost:night.example'), 'the offer renders as a button');
+  assert.ok(json.includes('every session of this runtime'), 'the scope toggle renders');
+  assert.ok(json.includes('Deny') && json.includes('Allow once'), 'the two standing buttons remain');
+  delete globalThis.fetch;
 });

@@ -130,6 +130,50 @@ window.__ModuleLoader__.load({
 			}) ?? undefined;
 		}
 
+
+		// ── #201: the pattern offers, fetched from the Enforcer's own view ──
+		// The card renders the server-computed rows and sends a guarded PICK:
+		// the server re-validates the index against its own list (a click
+		// picks, never authors — D-8), then the ordinary
+		// approval.answer('allowed-once') resolves the chain and the recorded
+		// answerer materializes exactly as it does for the terminal. Any
+		// failure (no view, 401, cleared) degrades to today's two buttons.
+
+		function rpcEnvelope(method, payload) {
+			const crypto = globalThis.crypto;
+			const rpcId = crypto && typeof crypto.randomUUID === 'function'
+				? crypto.randomUUID()
+				: 'rpc-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+			return { type: 'client-request', rpcId, method, payload };
+		}
+
+		async function callCardApi(method, payload) {
+			const res = await fetch('/api/' + method, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(rpcEnvelope(method, payload)),
+			});
+			if (!res.ok) throw new Error('compact-card-api ' + res.status);
+			const body = await res.json();
+			if (body == null || body.type !== 'server-response' || body.error != null) {
+				throw new Error(body?.error?.message ?? 'compact-card-api error');
+			}
+			return body.result;
+		}
+
+		async function fetchOffers(callId) {
+			const view = await callCardApi('compact-card-api/decidingView', {
+				namespace: 'compact-card-api', method: 'decidingView', args: { args: { callId } },
+			});
+			return Array.isArray(view?.offers) ? view.offers : [];
+		}
+
+		async function pickPattern(callId, index, runtime) {
+			return callCardApi('compact-card-api/patternAnswer', {
+				namespace: 'compact-card-api', method: 'patternAnswer', args: { args: { callId, index, runtime } },
+			});
+		}
+
 		function CompactCard(props) {
 			const approval = props.matched;
 			const parsed = parseAsk(approval?.reason);
@@ -137,9 +181,32 @@ window.__ModuleLoader__.load({
 			const answeredState = react.useState(false);
 			const answered = answeredState[0];
 			const setAnswered = answeredState[1];
+			// #201 — the offers arrive from the Enforcer's own deciding view,
+			// fetched once per ask; the test face passes them via props.offers.
+			const offersState = react.useState(Array.isArray(props.offers) ? props.offers : null);
+			const offers = offersState[0];
+			const setOffers = offersState[1];
+			const runtimeState = react.useState(false);
+			const runtime = runtimeState[0];
+			const setRuntime = runtimeState[1];
+			react.useEffect(() => {
+				let live = true;
+				if (Array.isArray(props.offers) || approval?.callId == null) return undefined;
+				fetchOffers(approval.callId).then((rows) => { if (live && rows.length) setOffers(rows); })
+					.catch(() => { /* no view, no auth, no offers: the two buttons stand */ });
+				return () => { live = false; };
+			}, [approval?.callId]);
 			const answer = (outcome) => {
 				setAnswered(true);
 				approval.answer(outcome).catch(() => setAnswered(false));
+			};
+			// the guarded pick: server validates first (awaited), then the
+			// ordinary allow resolves the chain with the pick on the view
+			const answerPattern = (index) => {
+				setAnswered(true);
+				pickPattern(approval.callId, index, runtime)
+					.then(() => approval.answer('allowed-once'))
+					.catch(() => setAnswered(false));
 			};
 			const reason = parsed ? parsed.reason : String(approval?.reason ?? '(no reason given)');
 			return react.createElement('div', { className: 'compact-card-root', 'data-compact-card': '' },
@@ -177,6 +244,15 @@ window.__ModuleLoader__.load({
 						react.createElement('details', { className: 'compact-card-raw' },
 							react.createElement('summary', null, 'Raw envelope'),
 							react.createElement('pre', null, String(approval?.reason ?? '')))),
+					Array.isArray(offers) && offers.length && !answered ? react.createElement('div', { className: 'compact-card-offers' },
+						react.createElement('div', { className: 'compact-card-moves-label' }, 'Widen — allow + cover (the pass, stated above)'),
+						offers.map((o, i) => react.createElement(primitives.Button, {
+							key: i, variant: 'outline', className: 'compact-card-offer',
+							disabled: answered, onClick: () => answerPattern(i),
+						}, 'Allow + cover ' + o.text + ' — ' + o.scope + (o.methodClass ? ', ' + o.methodClass : '') + ' (' + (o.ttlMs % 3_600_000 === 0 ? (o.ttlMs / 3_600_000) + 'h' : (o.ttlMs / 60_000) + 'min') + ', ' + o.maxUses + ' uses)')),
+						react.createElement('label', { className: 'compact-card-runtime' },
+							react.createElement('input', { type: 'checkbox', disabled: answered, checked: runtime, onChange: (e) => setRuntime(e.target.checked === true) }),
+							' every session of this runtime (the night pass)')) : null,
 					react.createElement('div', { className: 'compact-card-actions' },
 						react.createElement(primitives.Button, { variant: 'outline', className: 'compact-card-reject', disabled: answered, onClick: () => answer('rejected') }, 'Deny'),
 						react.createElement(primitives.Button, { variant: 'primary', disabled: answered, onClick: () => answer('allowed-once') }, 'Allow once'))));
@@ -233,6 +309,9 @@ window.__ModuleLoader__.load({
 		exports.parseAsk = parseAsk;
 		exports.selectAsk = selectAsk;
 		exports.CompactCard = CompactCard;
+		exports.rpcEnvelope = rpcEnvelope;
+		exports.fetchOffers = fetchOffers;
+		exports.pickPattern = pickPattern;
 		exports.apply = apply;
 		exports.inject = inject;
 		return module.exports;
