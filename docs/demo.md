@@ -1274,7 +1274,18 @@ rehearsal is worth running.
 
 ---
 
-## Demo 13 — The night shift: passes at the door, a judge at the edge, a ledger in the morning (I-5 / R-3 / D-7 · #175–#187) · needs a key · `--attended`, then unattended
+## Demo 13 — The night shift: passes at the door, a judge at the edge, a ledger in the morning (I-5 / R-3 / D-7 · #175–#187) · needs a key, a sandbox with curl, and `COMPACT_EGRESS=proxy` · `--attended`, then unattended
+
+Three things must be true before the evening runs as written: the runtime's
+model route is configured (the judge needs it); the sandbox carries `curl`
+(the stock `ubuntu:24.04` does not, and the demo's fetch runs *as curl* —
+bake the house image once, an operator act on the host daemon:
+`npm run compact:bake -- --base ubuntu:24.04 --packages curl --tag dsh-tools:basic`);
+and the composition declares the mediated posture (`COMPACT_EGRESS=proxy` —
+without it the gate says "will fail at connect", because it will: no
+mediator, no wire leg, no pass that travels). Found by the 2026-10-13
+capture attempt: the commands below originally omitted the posture
+declaration and reproduced nothing.
 
 The whole approval arc in one evening: an ask whose "yes" can be a **pass**
 (not just a badge), a pass that says *which kinds of questions* it admits,
@@ -1286,7 +1297,7 @@ judgment is written down.
 ### Act one — mint the pass before you leave (attended)
 
 ```bash
-npm run compact -- --attended --workspace /tmp/night-shift \
+COMPACT_EGRESS=proxy COMPACT_SANDBOX_IMAGE=dsh-tools:basic npm run compact -- --attended --workspace /tmp/night-shift \
   "Fetch https://httpbingo.org/get?q=cats with curl"
 ```
 
@@ -1328,10 +1339,11 @@ The commands are runnable as written; the two output blocks below are the
 uncaptured ones — their wording is what the code pins (the stderr line is
 emitted by `tools/night-watch.mjs`, the ledger format by
 `tools/watch-report.mjs`), and the live run is the checklist for the next
-capture.
+capture. What the 2026-10-13 attempt could already verify live, and what
+still blocks the rest, is recorded after the blocks.
 
 ```bash
-COMPACT_DECIDER=judge npm run compact -- --workspace /tmp/night-shift \
+COMPACT_EGRESS=proxy COMPACT_SANDBOX_IMAGE=dsh-tools:basic COMPACT_DECIDER=judge npm run compact -- --workspace /tmp/night-shift \
   "Fetch https://httpbingo.org/get?q=cats and ?q=dogs and ?q=dogs&page=2 with curl; report each args echo"
 node tools/watch-report.mjs ~/.compact-dsh/sessions/--tmp-night-shift--/<newest-session-id>/session.v4.jsonl
 ```
@@ -1354,6 +1366,18 @@ and the ledger, offline, from the record alone:
   basis: sg_…
   motivation: page is an ordinary pagination parameter of the same kind the pass admits
 ```
+
+**Capture state (2026-10-13).** The door half of this act is verified: the
+attended ask rendered the scope ladder and the `!` hint exactly as Act one
+records, the `3!` answer minted the pair **unscoped** — the `UrlPrefix` gate
+row *and* the `HostAndPort` wire row, `root` and `session` both null (#187,
+#190) — and the mediator refused the pre-grant CONNECT with 403, then
+accepted it once the pair existed. The judge half stays uncaptured for an
+environmental reason: the mediator's upstream dial is a raw TCP connection,
+and the network of the 2026-10-13 attempt drops raw outbound TCP (only an
+HTTP proxy carries egress), so the tunnel stalls after the mediator's yes —
+the pass is minted, the wire refuses nothing, and the fetch still cannot
+leave. On a network with raw egress the commands above are the checklist.
 
 If the judge had been unsure — or its answer malformed, or its model call
 failed — the act **escalates**: fail-closed, on the record, nobody guessed
