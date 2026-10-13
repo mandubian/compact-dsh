@@ -1362,13 +1362,18 @@ function registerGrantCommands(ctx, approval) {
       // matches nothing (skip).
       let wire = null;
       if (approval.egress === 'proxy' && g.pattern.kind === 'UrlPrefix') {
-        try {
-          const u = new URL(g.pattern.value);
+        // the leg derives from the row's own authority through the SAME
+        // derivation every URL fact in this package uses (egressPatternFor:
+        // scheme default supplied, explicit port kept, unparsable → null) —
+        // the rule the door's act-derived companion already rode; one
+        // derivation, both surfaces, never a third inline copy
+        const leg = egressPatternFor({ url: g.pattern.value });
+        if (leg) {
           wire = approval.store.addSessionGrant({
-            pattern: { kind: 'HostAndPort', value: { host: u.hostname.toLowerCase(), port: String(u.port || (u.protocol === 'https:' ? '443' : '80')) } },
+            pattern: leg,
             root: scopedRoot, session: scopedSession, ttlMs, maxUses: null, methodClass, now: g.createdAt,
           });
-        } catch { /* unparsable row matches nothing — no wire leg to pair */ }
+        }
       }
       // echo the PARSED pattern, never the raw operator input: a token in a
       // URL's userinfo is stripped by canonicalization — echoing the input
