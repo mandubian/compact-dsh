@@ -1322,12 +1322,18 @@ session only). The fetch returns httpbingo's `args` echo, and the pair
 lands in the store: the pattern row (gate) + the `HostAndPort` wire row
 (the leg the egress mediator delivers through).
 
-### Act two — sleep through the run (unattended, judged edges)
+### Act two — sleep through the run (unattended, judged edges) · **not captured**
+
+The commands are runnable as written; the two output blocks below are the
+uncaptured ones — their wording is what the code pins (the stderr line is
+emitted by `tools/night-watch.mjs`, the ledger format by
+`tools/watch-report.mjs`), and the live run is the checklist for the next
+capture.
 
 ```bash
 COMPACT_DECIDER=judge npm run compact -- --workspace /tmp/night-shift \
   "Fetch https://httpbingo.org/get?q=cats and ?q=dogs and ?q=dogs&page=2 with curl; report each args echo"
-node tools/watch-report.mjs ~/.compact-dsh/sessions/--tmp-night-shift/<newest-session-id>/session.v4.jsonl
+node tools/watch-report.mjs ~/.compact-dsh/sessions/--tmp-night-shift--/<newest-session-id>/session.v4.jsonl
 ```
 
 The new session is **not a stranger to the pass**: `?q=cats` and `?q=dogs`
@@ -1351,7 +1357,7 @@ and the ledger, offline, from the record alone:
 
 If the judge had been unsure — or its answer malformed, or its model call
 failed — the act **escalates**: fail-closed, on the record, nobody guessed
-a yes. A `api_key`-shaped refused name never reaches the judge at all: the
+a yes. An `api_key`-shaped refused name never reaches the judge at all: the
 floor refuses it before judgment ("no axis admits them, by offer, by
 command, or by any later judgment"). Swap the member by taste:
 `allow-edges` admits mechanically, `deny` refuses with reasons, `escalate`
