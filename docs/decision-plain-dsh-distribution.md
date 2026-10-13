@@ -166,7 +166,11 @@ stand on the trial path (issue #195 carries the full seam-by-seam):
   in the profile patch) — the same env-gated seam as the posture in Decision
   2. The composed runtime keeps its own seating (post-boot, after the
   operator answerer) and consumes the env before boot — two sources of
-  seating are two watches. DECLARED CAVEAT: with the watch armed, params-edge
-  asks are decided by the watch before any human surface; the ordering
-  invariant relative to a *seated* web human is unverified until the probe
-  covers it (the issue tracks that work).
+  seating are two watches. The ordering invariant is now **verified**:
+  dist-probe's call C boots a plain profile with the watch armed and proves
+  the seated watch decides a params-edge ask upstream of a post-boot human
+  seat, which never sees the ask (see dist-probe.md, Moment 4). The one
+  case still named rather than verified: a **seated web human** answering
+  from the browser while the watch is armed — headless probes cannot seat
+  one; the ask card and README say to unset `COMPACT_DECIDER` when a human
+  is on the web surface.

@@ -100,6 +100,12 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
   // could deliver it), and the probe's second call exists to exercise the
   // approval ask that a grantable host produces
   process.env.COMPACT_EGRESS = 'proxy';
+  // the night watch, armed for the ordering verification (call C): the
+  // posture row seats it from the bundle when the env names a policy.
+  // 'allow-edges' keeps the probe model-free — the judge policy would want a
+  // route the probe refuses by design. Set AFTER the scrub, alongside the
+  // posture: the env is the plain profile's only way to seat a watch (#195).
+  process.env.COMPACT_DECIDER = 'allow-edges';
 
   const profileDir = installProfile(home, tarball, [pnpm, ...pnpmArgs]);
 
@@ -183,11 +189,16 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
 
     // the probe's operator seat: registered AFTER boot, it sits downstream
     // of the prepended recorded answerer — the same ordering the launcher's
-    // attended answerer rides (tools/operator-answerer.mjs)
+    // attended answerer rides (tools/operator-answerer.mjs). Every ask this
+    // seat decides is recorded per callId: call C asserts the watch (seated
+    // at boot, upstream of this seat) decided the edge ask BEFORE any human
+    // surface could.
     let sawEnvelope;
+    const operatorDecided = [];
     ctx.on('approval/request', async (req, next) => {
       if (!/(^|\n)\[AG(\/|\])/.test(req.reason ?? '')) return next();
       sawEnvelope = { callId: req.callId, reason: req.reason, preview: ctx.get('compact-approval').deciding.get(req.callId) ?? null };
+      operatorDecided.push(req.callId);
       return 'allowed-once';
     });
 
@@ -228,6 +239,44 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
       `${sawEnvelope.preview ? `(${String(sawEnvelope.preview.canonicalTarget ?? JSON.stringify(sawEnvelope.preview)).slice(0, 72)}…)` : '(absent)'}, decided allowed-once; ` +
       `tool result isError=${networked.isError === true} (network-less container)`);
 
+    // call C: the night watch's seat (#195). The desk mints the pass —
+    // UrlPrefix over the probe host, params=allow(q), scope=all (root and
+    // session null, exactly what /grants-grant scope=all mints) — then the
+    // edge act carries a query name the axis refuses. The ask is a
+    // params-edge: the watch (seated at boot by the posture row, upstream of
+    // this probe's post-boot operator seat) must decide it — allow-edges
+    // admits under the row's terms — and the operator seat must never see
+    // the ask. This is the ordering invariant Decision 5 declared unverified.
+    // The agent here CAPTURES its injects: the attributed note ("by the
+    // appointed night watch (policy: …)") is the morning-after's read, and
+    // the probe asserts it rode the decision, not just the stderr line.
+    const notes = [];
+    const desk = ctx.get('compact-approval').grantSession({
+      pattern: { kind: 'UrlPrefix', value: 'https://compact-probe.invalid/get/', params: { mode: 'allow', names: ['q'] } },
+      root: null, session: null, ttlMs: 60 * 60_000, methodClass: 'read',
+    });
+    say(`the desk mints the pass: ${desk.id} UrlPrefix:https://compact-probe.invalid/get/ params=allow(q), scope=all (unscoped pair)`);
+    const edge = await ctx.tools.execute({
+      name: 'bash',
+      callId: 'probe-call-c',
+      arguments: { command: "curl --max-time 3 'https://compact-probe.invalid/get?q=cats&page=2'", description: 'fetch under the pass, one axis-refused name' },
+      agent: { id: session.id, session, inject(m) { notes.push(m); } },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (operatorDecided.includes('probe-call-c')) {
+      throw new Error(`${BIN} the operator seat decided the edge ask — the watch did not sit upstream of the human surface`);
+    }
+    const edgeNotes = notes.map(m => (m?.content ?? []).filter(b => b?.type === 'text').map(b => b.text).join(' ')).join('\n');
+    if (!edgeNotes.includes('the appointed night watch (policy: allow-edges)')) {
+      throw new Error(`${BIN} the watch's attributed note did not ride the decision — captured: ${JSON.stringify(edgeNotes).slice(0, 400)}`);
+    }
+    // the deciding view is deleted when the decision resolves (the recorded
+    // answerer's own lifecycle), so the claim itself is verified from the
+    // captured note — the attribution is where the morning-after reads it
+    say(`governed call C (edge act): the watch decided it (allow-edges) — ` +
+      `the operator seat never saw the ask (ordering verified); the attributed note rode the decision; ` +
+      `result isError=${edge.isError === true} (network-less container, no curl)`);
+
     session.append('turn/end', { turn: 1 });
     if ((await ctx.sessions.flush(session)) !== true) throw new Error(`${BIN} session flush returned false`);
     await writer.close();
@@ -249,6 +298,15 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
     const asked = events.find((event) => event.type === 'approval/asked');
     const decided = events.find((event) => event.type === 'approval/decided');
     const indexOf = (event) => events.indexOf(event);
+    // call C adds a second turn-enclosed approval pair — the host-owned
+    // audit pair (asked/decided); the watch's ATTRIBUTION rides the captured
+    // note above, because the probe's fake agent does not forward injects to
+    // the record the way dsh's real session does
+    const askedEvents = events.filter((event) => event.type === 'approval/asked');
+    const decidedEvents = events.filter((event) => event.type === 'approval/decided');
+    if (askedEvents.length < 2 || decidedEvents.length < 2) {
+      throw new Error(`${BIN} the record lacks the edge pair: ${askedEvents.length} asked / ${decidedEvents.length} decided`);
+    }
     if (!(indexOf(events[0]) === 0 && indexOf(asked) < indexOf(decided) && indexOf(decided) < indexOf(events.find((event) => event.type === 'turn/end')))) {
       throw new Error(`${BIN} the approval pair is not turn-enclosed on the record`);
     }
