@@ -356,3 +356,14 @@ test('the client picks through the wire builders and renders the offer buttons',
   assert.ok(json.includes('Deny') && json.includes('Allow once'), 'the two standing buttons remain');
   delete globalThis.fetch;
 });
+
+test('#201 diagnostic: a failed offer fetch renders the named reason, and the two buttons stand', () => {
+  const offers = [{ pattern: { kind: 'ExactHost', value: 'night.example' }, text: 'ExactHost:night.example', scope: 'every call to night.example', ttlMs: 3_600_000, maxUses: 50, methodClass: null }];
+  const tree = card.CompactCard({ matched: { kind: 'approval', callId: 'c-diag', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' }, offers: [], widenError: 'compact-card-api 401' });
+  const json = JSON.stringify(tree);
+  assert.ok(json.includes('Widen unavailable'), 'the degrade is named, never silent');
+  assert.ok(json.includes('compact-card-api 401 — the two buttons stand.'), 'the reason rides the card');
+  assert.ok(json.includes('Deny') && json.includes('Allow once'), 'the two buttons stand');
+  assert.ok(!json.includes('Allow + cover'), 'no offer buttons without offers');
+  void offers;
+});
