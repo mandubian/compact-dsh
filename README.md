@@ -319,8 +319,9 @@ half-authenticates and reports host services as unavailable).
 What to expect: without the sandbox image the boot **refuses**, naming the
 move — the image and its digest are the operator's act, never defaulted; a
 session naming a directory outside the declared workspace is **refused** at
-its first act (`#18` — the boundary follows `COMPACT_WORKSPACE` or the
-invoking directory, and one boot governs exactly one workspace); the
+its first act (`#18` — the boundary is `COMPACT_WORKSPACE` when declared
+(refused at boot if the directory does not exist), otherwise the process's
+own resolved root, and one boot governs exactly one workspace); the
 record, chains, and grants land under the profile's own `compact-data/`
 (the launcher's env names override when set); and the web surface carries
 the ask card. `npm run dist:probe` replays the whole story from a clean

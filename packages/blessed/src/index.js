@@ -16,6 +16,7 @@ import { apply as applyEgressProxy } from 'compact-dsh-egress-proxy';
 import { apply as applySelfModel } from 'compact-dsh-self-model';
 import { apply as applySpecialists } from 'compact-dsh-specialists';
 import { canonicalizeBestEffort } from 'compact-dsh-sandbox-docker';
+import { realpathSync, statSync } from 'node:fs';
 import { buildEnvelope,bandReason } from 'compact-envelope';
 
 export const name = 'compact-blessed';
@@ -39,15 +40,53 @@ function text(value, path) {
   }
 }
 
+/**
+ * #199 — write the boot's workspace DECLARATION into the sandbox policy,
+ * before the boot reads it back. Launcher parity: the pilot chdir's to the
+ * governed directory before composing, so dsh's policy defaults its
+ * workspaceRoot there; a plain profile starts wherever the process did.
+ * Validates like `--workspace` does on the launcher — the directory must
+ * exist (realpath resolved: symlinks canonicalize, matching every anchor
+ * comparison) and be a directory — then assigns. The declared root is what
+ * the anchor (#18), the harness-source honesty line (#17), and the
+ * container bind all name.
+ */
+export function declareWorkspaceRoot(policy, root) {
+  let declared;
+  try {
+    declared = realpathSync(root);
+  } catch (e) {
+    throw new Error(`blessed: workspace.root "${root}" does not exist — declare a directory that exists (${e.code ?? e.message})`);
+  }
+  if (!statSync(declared).isDirectory()) {
+    throw new Error(`blessed: workspace.root "${root}" is not a directory`);
+  }
+  policy.workspaceRoot = declared;
+  return declared;
+}
+
 export function resolveConfig(config) {
   object(config, 'config');
   for (const key of Object.keys(config)) {
-    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer', 'memberBinding', 'nightWatch'].includes(key)) {
+    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer', 'memberBinding', 'nightWatch', 'workspace'].includes(key)) {
       throw new TypeError(`blessed: unknown config key ${key}; record root and chain dir belong on the separate compact-dsh-record/provider loader row`);
     }
   }
   object(config.approval, 'approval');
   text(config.approval.persistPath, 'approval.persistPath');
+  // #199 — the boot's workspace declaration, launcher parity: the launcher
+  // chdir's to the governed directory before composing, so dsh's policy
+  // defaults its workspaceRoot there; a plain profile had no equivalent and
+  // the boot inherited whatever directory the process started in. Declared
+  // as `{ root }` or not at all — the directory itself is validated at
+  // apply time (it must exist: a declaration of nothing would be the false
+  // answer), where it anchors the sandbox policy before the boot reads it.
+  let workspace;
+  if (config.workspace !== undefined) {
+    object(config.workspace, 'workspace');
+    text(config.workspace.root, 'workspace.root');
+    workspace = { root: config.workspace.root };
+  }
   // the member binding (I-1 slice 2): declared ALL of itself or not at all —
   // a binding that names a roll but no member would be the false answer D-3
   // names. This boundary refuses only the malformed; the self-model
@@ -247,6 +286,7 @@ export function resolveConfig(config) {
     settleTimeoutMs,
     ...(memberBinding ? { memberBinding } : {}),
     ...(nightWatch ? { nightWatch } : {}),
+    ...(workspace ? { workspace } : {}),
     ...(trustRoot ? { trustRoot } : {}),
     ...(enforcer ? { enforcer } : {}),
   };
@@ -446,6 +486,15 @@ export async function apply(ctx, config = {}) {
   const options = resolveConfig(config);
   requireServices(ctx, inject);
   const policy = ctx.get('sandboxPolicy');
+  // #199 — the boot's workspace declaration, before the declaration is read:
+  // the launcher chdir's to the governed directory before composing; a plain
+  // profile composes from wherever the process started, so without this the
+  // boot inherited that directory as its workspace and every registered
+  // folder the operator actually wanted was an anchor violation. Declared →
+  // validated (a declaration of nothing is refused loudly, the same posture
+  // as --workspace on the launcher) → written into the policy, so the
+  // anchor, the honesty line, and the container bind all name it.
+  if (options.workspace) declareWorkspaceRoot(policy, options.workspace.root);
   const resolve = policy.resolve;
   const declaredRoot = canonicalizeBestEffort(policy.workspaceRoot);
   const confinedPolicy = function (...args) {
