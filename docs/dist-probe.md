@@ -108,6 +108,45 @@ The auditor replays the session log against the hash chain beside it —
 caught the auditor still expecting dsh v3 session headers; v4 headers are
 metadata now, with a regression test.)
 
+## Moment 4 — the night watch seats from the bundle, and the ordering holds (#195)
+
+Armed the way a plain profile arms it — `COMPACT_DECIDER=allow-edges` (a
+mechanical policy: the probe stays model-free by design) — the boot seats
+the watch from the posture row, the desk mints the unscoped pass
+(`/grants-grant scope=all`'s own shape: `UrlPrefix … params=allow(q)`,
+root and session null), and the edge act — the same route, one extra
+query name — asks:
+
+```text
+the desk mints the pass: sg_… UrlPrefix:https://compact-probe.invalid/get/ params=allow(q), scope=all (unscoped pair)
+[night-watch] allowed "bash" at the params edge (refused: page) under grant sg_… — motivation on the record
+governed call C (edge act): the watch decided it (allow-edges) — the operator seat never saw the ask (ordering verified); the attributed note rode the decision
+```
+
+What this verifies, each against the failing alternative:
+
+- **The watch seats from the bundle** on a plain profile — no launcher, no
+  `tools/`, the tarball and the env are the whole story.
+- **The ordering invariant holds**: the watch sat upstream of the probe's
+  post-boot operator seat — the seat registered after boot, the way a human
+  surface's seat does — and decided the edge ask before any downstream
+  surface saw it. The probe asserts its operator seat never received the
+  ask.
+- **The watch decides ONLY edges**: call B's plain uncovered ask still fell
+  through the watch to the operator seat — the non-edge ask is untouched.
+- **The attribution rode the decision**: the captured inject carries
+  "by the appointed night watch (policy: allow-edges)" — the morning-after's
+  read (the probe's fake agent captures injects rather than forwarding them
+  to the record, which is dsh's real session's job — named, not hidden).
+- The record carries both turn-enclosed approval pairs; the auditor still
+  passes; still no model request.
+
+The one ordering case this cannot reach headlessly: a **seated web human**
+answering from the browser while the watch is armed. The watch decides
+before downstream surfaces by construction, and the ask card + README say
+to unset `COMPACT_DECIDER` when a human is on the web surface — the named
+limit, in the issue (#195).
+
 ## What the probe does not claim
 
 - **No model, no browser session.** The governed calls are driven through
