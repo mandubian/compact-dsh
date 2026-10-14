@@ -30,8 +30,13 @@ export const name = 'compact-dsh-scheduler';
 export function apply(ctx, config = {}) {
   const maxActive = config.maxActive ??
     (Number(process.env.COMPACT_SCHEDULER_MAX_ACTIVE) || DEFAULT_MAX_ACTIVE);
-  // the binding the capability gate reads: SCH is bound by THIS service
-  ctx.provide?.('compact-dsh-scheduler', { maxActive, at: Date.now() });
+  // the binding the capability gate reads: SCH is bound by THIS service.
+  // On the loader path the row id has ALREADY registered this key (the
+  // plugin itself is the registration — re-providing it is a cordis
+  // double-registration refusal); provide only when nothing has.
+  if (ctx.get?.('compact-dsh-scheduler') === undefined) {
+    ctx.provide?.('compact-dsh-scheduler', { maxActive, at: Date.now() });
+  }
   ctx.on?.('tools/pre-execute', async (exec, next) => {
     if (exec?.name !== 'schedule_create') return next();
     const schedule = ctx.get?.('schedule');
