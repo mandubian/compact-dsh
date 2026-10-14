@@ -272,6 +272,57 @@ window.__ModuleLoader__.load({
 						react.createElement(primitives.Button, { variant: 'primary', disabled: answered, onClick: () => answer('allowed-once') }, 'Allow once'))));
 		}
 
+		// ── #172: the directory flow the browser never had ──
+		// The stock add-workspace flow is blocked when no directoryFlow slot is
+		// registered (the desktop ships a native folder picker in that slot;
+		// the browser ships none — issue #172). The host API needs no new
+		// plumbing: workspace create is idempotent over an existing directory
+		// and takes { path }. The browser cannot browse the server's disk, so
+		// the honest affordance is a typed absolute path — the host validates
+		// existence and surfaces failures through its own folder-error dialog.
+
+		function WorkspacePathFlow(props) {
+			const open = props.open === true;
+			const pathState = react.useState('');
+			const path = pathState[0];
+			const setPath = pathState[1];
+			if (!open) return null;
+			const trimmed = path.trim();
+			const ready = trimmed.startsWith('/');
+			const submit = () => {
+				if (!ready) return;
+				props.onPicked(trimmed);
+			};
+			return react.createElement('div', { className: 'cwp-flow', 'data-compact-workspace-picker': '' },
+				react.createElement('div', { className: 'cwp-label' }, 'Absolute path on this host'),
+				react.createElement('input', {
+					className: 'cwp-input', type: 'text', placeholder: '/absolute/path',
+					value: path, autoFocus: true,
+					onChange: (e) => setPath(e.target.value),
+					onKeyDown: (e) => { if (e.key === 'Enter') submit(); },
+				}),
+				react.createElement('div', { className: 'cwp-actions' },
+					react.createElement('button', { className: 'cwp-cancel', onClick: () => props.onCancel?.() }, 'Cancel'),
+					react.createElement('button', { className: 'cwp-open', disabled: !ready, onClick: submit }, 'Open workspace')),
+				react.createElement('div', { className: 'cwp-note' },
+					'Registers the folder idempotently — an existing workspace reopens. Sessions run confined to the ',
+					react.createElement('span', { className: 'cwp-strong' }, 'boot’s declared workspace'),
+					' (#18): open the folder this boot governs, or restart with COMPACT_WORKSPACE naming it.'));
+		}
+
+		function registerDirectoryFlows(ctx) {
+			// both holes the workspace UI polls: the sidebar menu and the hero
+			// button. Presence unblocks the stock add-workspace flow; the host
+			// renders this component with its flow owner as props.
+			for (const hole of ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']) {
+				ctx.slots.inject(hole, () => ctx.slots.register({
+					name: 'compact-workspace-path-flow',
+					priority: 0,
+					select: () => true,
+				}, WorkspacePathFlow));
+			}
+		}
+
 		// ── the plugin: one composer-takeover registration, priority 0 ──
 		// (upstream's ApprovalPanel registers priority 1; the chain elects the
 		// lowest priority whose select matches, so ours claims approval asks
@@ -285,6 +336,8 @@ window.__ModuleLoader__.load({
 				priority: 0,
 				select: selectAsk,
 			}, CompactCard));
+			// #172 — the browser affordance for adding a workspace by path
+			if (ctx.slots) registerDirectoryFlows(ctx);
 		}
 
 		// ── styles (injected at materialization; lives in the factory closure
@@ -324,6 +377,8 @@ window.__ModuleLoader__.load({
 		exports.selectAsk = selectAsk;
 		exports.CompactCard = CompactCard;
 		exports.rpcEnvelope = rpcEnvelope;
+		exports.registerDirectoryFlows = registerDirectoryFlows;
+		exports.WorkspacePathFlow = WorkspacePathFlow;
 		exports.fetchOffers = fetchOffers;
 		exports.pickPattern = pickPattern;
 		exports.apply = apply;

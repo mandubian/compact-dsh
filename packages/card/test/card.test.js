@@ -136,7 +136,9 @@ test('apply registers one composer takeover at priority 0 with the same select',
     },
   };
   card.apply(ctx);
-  assert.deepEqual(injected.map(([key]) => key), ['conversation.composer']);
+  // #172: the directoryFlow holes ride the same inject — the picker flow
+  assert.deepEqual(injected.map(([key]) => key),
+    ['conversation.composer', 'sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']);
   assert.deepEqual(card.inject, ['slots']);
   injected[0][1]();
   const [[options, component]] = registered;
@@ -371,4 +373,82 @@ test('#201 diagnostic: a failed offer fetch renders the named reason, and the tw
     'Widen not applying to an ask is silence, not a failure');
   const failed = card.CompactCard({ matched: { kind: 'approval', callId: 'c-fail', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' }, widenError: 'compact-card-api 401' });
   assert.ok(JSON.stringify(failed).includes('Widen unavailable'), 'a FAILED fetch is the named degrade');
+});
+
+// ── #172: the directory flow — the browser affordance the stock surface lacks ──
+
+test('#172: the picker registers both directoryFlow holes', () => {
+  const holes = [];
+  const ctx = {
+    slots: {
+      inject: (hole, setup) => { holes.push(hole); setup(); },
+      register: (def) => { holes.push('registered:' + hole_name(def)); },
+      entries: () => [],
+    },
+  };
+  const hole_name = (def) => def.name;
+  void hole_name;
+  card.apply(ctx);
+  const registered = holes.filter(h => String(h).startsWith('registered:'));
+  assert.ok(registered.includes('registered:compact-workspace-path-flow'), 'the flow component is registered');
+  assert.equal(holes.filter(h => h === 'sidebar.workspaces.directoryFlow').length, 1);
+  assert.equal(holes.filter(h => h === 'conversation.hero.workspace.directoryFlow').length, 1);
+});
+
+test('#172: the flow renders the path form only when open, and hands the trimmed path to onPicked', () => {
+  // a STATEFUL useState stub: the typed value flows through onChange into
+  // the component's state, so submit drives the real logic — trim, the
+  // absolute-path ready gate, the onPicked handoff (the no-op setter left
+  // all of it untested — Copilot)
+  const cells = [];
+  const cursor = { i: 0 };
+  const statefulReact = {
+    createElement: fakeReact.createElement,
+    useState: (init) => {
+      const i = cursor.i++;
+      cells[i] ??= init;
+      return [cells[i], (v) => { cells[i] = v; }];
+    },
+    useEffect: () => {},
+  };
+  const statefulCard = captured.factory((name) => name === 'react' ? statefulReact : stubRequire(name));
+  const picked = [];
+  const cancelled = [];
+  const render = () => {
+    cursor.i = 0;                        // hook order is stable per render
+    return statefulCard.WorkspacePathFlow({
+      open: true,
+      onPicked: (p) => picked.push(p),
+      onCancel: () => cancelled.push(1),
+    });
+  };
+  let flow = render();
+  const nodes = () => [...walk(flow)];
+  const inputOf = () => nodes().find(n => n.type === 'input');
+  const buttonOf = (cls) => nodes().find(n => (n.props?.className ?? '').includes(cls));
+
+  // a relative path: Open renders disabled and never submits
+  inputOf().props.onChange({ target: { value: 'dsh_test' } });
+  flow = render();
+  assert.equal(inputOf().props.value, 'dsh_test', 'the typed value is the state');
+  assert.equal(buttonOf('cwp-open').props.disabled, true, 'a relative path is not ready');
+  buttonOf('cwp-open').props.onClick();
+  assert.deepEqual(picked, [], 'a non-absolute path never submits');
+
+  // an absolute path with whitespace: ready — and the TRIMMED path hands off
+  inputOf().props.onChange({ target: { value: '  /tmp/dsh_test  ' } });
+  flow = render();
+  assert.equal(inputOf().props.value, '  /tmp/dsh_test  ', 'the input tracks the state');
+  assert.equal(buttonOf('cwp-open').props.disabled, false);
+  buttonOf('cwp-open').props.onClick();
+  assert.deepEqual(picked, ['/tmp/dsh_test'], 'the trimmed absolute path reaches onPicked');
+
+  // cancel reports, and a closed flow renders nothing
+  assert.deepEqual(cancelled, []);
+  assert.equal(statefulCard.WorkspacePathFlow({ open: false, onPicked: () => {}, onCancel: () => {} }), null);
+});
+
+test('#172: closed flow renders nothing — silence when the menu is shut', () => {
+  const tree = card.WorkspacePathFlow({ open: false, onPicked: () => {}, onCancel: () => {} });
+  assert.equal(tree, null);
 });
