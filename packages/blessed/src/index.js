@@ -652,17 +652,16 @@ export async function apply(ctx, config = {}) {
   }
   await mount('compact-specialists', applySpecialists, options.specialists, ['tools', 'subagents', 'systemPrompt', 'sessionProjections']);
   // #204 — the clock binds through its OWN loader row (blessed's patch file:
-  // time-context, schedule, compact-dsh-scheduler — env-gated by
-  // COMPACT_SCHEDULER, applied in that order), not through this apply: the
-  // wrapper's seat must come after the schedule service activates, and a
-  // blessed-side mount ran before it. Unset: the rows stay disabled and SCH
-  // stays absent, byte-for-byte as before. The compact-dsh-scheduler
-  // dependency keeps the package in the dist closure.
-  // #204 — the clock's binder, BEFORE the constitution check resolves the
-  // SCH-1 register row against its service. The wrapper is self-contained
-  // (the cap reads the schedule service at CALL time), so it applies with
-  // no ordering constraint of its own; unarmed boots provide the binding
-  // with no clock behind it — the schedule tools simply do not exist.
+  // #204 — the clock's binder, seated HERE (before the constitution check
+  // resolves the SCH-1 register row against its service, this apply's
+  // provide satisfies it). The wrapper is self-contained — the cap reads
+  // the schedule service at CALL time, so it carries no ordering constraint.
+  // The HOST clock rows (dsh-schedule + dsh-time-context) travel in the
+  // scheduler package's own patch file and are composed by the launcher
+  // when the operator arms them (COMPACT_SCHEDULER); the
+  // compact-dsh-scheduler dependency keeps the wrapper in the dist closure.
+  // Unarmed boots provide the binding with no clock behind it — the
+  // schedule tools simply do not exist.
   const { apply: applySchedulerBinder } = await import('compact-dsh-scheduler');
   await mount('compact-dsh-scheduler', applySchedulerBinder);
   await mount('compact-capability-gate', applyCapabilityGate);

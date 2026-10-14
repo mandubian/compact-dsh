@@ -948,7 +948,7 @@
       "kind": "enforced",
       "plugin": "compact-capability-gate",
       "service": "compact-capability-gate",
-      "evidence": "absence enforcement, unchanged and still live: unmounted (COMPACT_SCHEDULER unset), schedule_create is denied with the SCH-1/capability-not-adopted envelope by the capability gate's absent index — the refusal is the enforcement",
+      "evidence": "absence posture, unchanged and still live when unarmed: the SCH part is bound-by-design (compact-dsh-scheduler) but DORMANT without its clock — no schedule service is mounted, the schedule tools do not exist, and the part obliges nothing (posture: absent); a bare dsh-schedule mount without the binder refuses the boot (the pairing discipline). The bound-clock row below is the armed form: same clause, the operator's act, COMPACT_SCHEDULER",
       "enforcedBy": [
         "packages/capability-gate/src/parts.js",
         "packages/capability-gate/src/index.js"
