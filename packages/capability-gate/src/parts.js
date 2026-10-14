@@ -52,12 +52,17 @@ export const CAPABILITY_PARTS = [
     clauses: ['SCH-1'],
     hostServices: ['schedule'],
     hostTools: ['schedule_create'],
-    // No service in this composition binds SCH-1. The lawful posture is
-    // ABSENT: scheduling is refused, and the refusal is the enforcement.
-    boundBy: null,
-    absentBecause:
-      'this composition adopts no scheduling capability: no pre-scheduling gate exists, so unattended acts are refused ' +
-      'outright rather than armed under an ungated clock (SCH-1)',
+    // #204 — the absence reason is obsolete: "no pre-scheduling gate exists"
+    // was written before the enforcement arc, and the pre-scheduling gate is
+    // now the composition itself. dsh-schedule does not execute anything —
+    // schedule_create arms a REMINDER whose prompt becomes a turn when due,
+    // and every act in that turn rides the same waterfall (gates, passes,
+    // workspace anchor), edges go to the appointed watch, egress is
+    // delivered per grant, and everything chains. The clock is no longer
+    // ungated; arming it arms nothing the law does not already govern.
+    // The wrapper (compact-dsh-scheduler) adds the bound the clock lacks:
+    // a cap on active schedules per session. Opt-in: COMPACT_SCHEDULER.
+    boundBy: 'compact-dsh-scheduler',
   },
   {
     part: 'A-4/DYN',

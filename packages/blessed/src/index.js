@@ -651,6 +651,20 @@ export async function apply(ctx, config = {}) {
     throw new Error(`blessed: subagent provider ${options.specialists.provider} must be registered before specialists mount`);
   }
   await mount('compact-specialists', applySpecialists, options.specialists, ['tools', 'subagents', 'systemPrompt', 'sessionProjections']);
+  // #204 — the clock binds through its OWN loader row (blessed's patch file:
+  // time-context, schedule, compact-dsh-scheduler — env-gated by
+  // COMPACT_SCHEDULER, applied in that order), not through this apply: the
+  // wrapper's seat must come after the schedule service activates, and a
+  // blessed-side mount ran before it. Unset: the rows stay disabled and SCH
+  // stays absent, byte-for-byte as before. The compact-dsh-scheduler
+  // dependency keeps the package in the dist closure.
+  // #204 — the clock's binder, BEFORE the constitution check resolves the
+  // SCH-1 register row against its service. The wrapper is self-contained
+  // (the cap reads the schedule service at CALL time), so it applies with
+  // no ordering constraint of its own; unarmed boots provide the binding
+  // with no clock behind it — the schedule tools simply do not exist.
+  const { apply: applySchedulerBinder } = await import('compact-dsh-scheduler');
+  await mount('compact-dsh-scheduler', applySchedulerBinder);
   await mount('compact-capability-gate', applyCapabilityGate);
   await mount('compact-self-model', applySelfModel, { enforcer: options.enforcer, ...(options.memberBinding ? { memberBinding: options.memberBinding } : {}) }, ['tools']);
   await mount('compact-exit', applyExit, {}, ['tools']);

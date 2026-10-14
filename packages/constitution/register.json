@@ -948,7 +948,7 @@
       "kind": "enforced",
       "plugin": "compact-capability-gate",
       "service": "compact-capability-gate",
-      "evidence": "no unsupervised escalation, discharged by declared absence rather than by a gate: this composition adopts no scheduling capability, and the absence is MECHANICALLY ENFORCED rather than merely intended — composing a host schedule provider refuses the boot, a provider that mounts after boot latches a breach that denies every tool call (D-7), and schedule_create is denied in the waterfall with an envelope naming SCH-1 and the lawful next moves. 'No scheduled act may be armed at all' is a stronger guarantee than 'a scheduled act requires its gate before scheduling', and unlike a declared debt it is a fact a verifier can check. The trigger is read narrowly — the clock (dsh-schedule), not attended background work (ctx.jobs) — because over-declaring a trigger is its own D-8 problem",
+      "evidence": "absence enforcement, unchanged and still live: unmounted (COMPACT_SCHEDULER unset), schedule_create is denied with the SCH-1/capability-not-adopted envelope by the capability gate's absent index — the refusal is the enforcement",
       "enforcedBy": [
         "packages/capability-gate/src/parts.js",
         "packages/capability-gate/src/index.js"
@@ -1009,6 +1009,19 @@
       "verifiers": [
         "packages/record/test/anchors.test.js",
         "auditor/audit.test.mjs"
+      ]
+    },
+    {
+      "clause": "SCH-1",
+      "kind": "enforced",
+      "plugin": "compact-dsh-scheduler",
+      "service": "compact-capability-gate",
+      "evidence": "the clock, bound (#204): dsh-schedule is mounted behind compact-dsh-scheduler when the operator arms it (COMPACT_SCHEDULER — opt-in, the egress-posture precedent); schedule_create arms a REMINDER whose prompt becomes a turn when due (after_seconds/at/every_seconds/daily/weekly/cron, durable in the storage domain, deliveries chained as session messages), and every act in the fired turn rides the same pre-execute waterfall — gates, passes, workspace anchor — with edges to the appointed watch; enforced at two seams under the always-composed capability-gate service: the gate refuses dsh-schedule composed without its binder (the pairing discipline), and the binder (seated by blessed before the constitution check) caps active schedules per session in the waterfall (default 20; the refusal is a named SCH/SCH-1/cap envelope with schedule_cancel as the lawful move); composing dsh-schedule without its binder refuses the boot (the pairing discipline). Adjudication: issue #204",
+      "enforcedBy": [
+        "packages/scheduler/src/index.js"
+      ],
+      "verifiers": [
+        "packages/scheduler/test/scheduler.test.js"
       ]
     }
   ]

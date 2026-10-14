@@ -387,6 +387,18 @@ export const GLOSS = {
     cites: ['D-8', 'SCH-1', 'D-7', 'R-3'],
   },
 
+  'SCH/SCH-1/cap': {
+    title: 'The clock is full — this session holds its cap of active schedules',
+    why: 'Armed reminders wake this session later, and every act of a woken turn runs under the gates. A session that arms without limit would flood its own future — the cap bounds the clock the way budgets bound acts.',
+    example: { blocked: ['schedule_create — one more reminder on top of 20 active'], lawful: ['schedule_cancel an older reminder and arm again, or let one lapse'] },
+    instruction: 'Do not arm more reminders this session. Cancel one you no longer need (schedule_cancel), or let one lapse, then arm again.',
+    operatorMoves: {
+      'cancel a schedule': 'grants-revoke-style: the schedule_list ids are the names',
+      'raise the cap': 'the operator’s act, in the composition config',
+    },
+    cites: ['SCH-1', 'R-3', 'I-4'],
+  },
+
   'CG/*': {
     title: 'This capability was declared absent and is refused',
     why: 'This composition does not adopt the capability this tool exercises — it is not mounted, and its trigger’s clauses are not bound. Absence, mechanically enforced: the call is refused rather than half-served. The refusal is lawful and carries no fault (R-9).',
