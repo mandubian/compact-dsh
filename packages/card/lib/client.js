@@ -199,8 +199,11 @@ window.__ModuleLoader__.load({
 				let live = true;
 				if (Array.isArray(props.offers) || approval?.callId == null) return undefined;
 				fetchOffers(approval.callId).then((rows) => {
+					// an EMPTY view is not a failure — the ask simply has no
+					// pattern offers (plain exec, secret-use): silence is the
+					// honest face, the ask text governs. Only a FAILED fetch
+					// earns the named degrade below.
 					if (live && rows.length) setOffers(rows);
-					else if (live) setWidenError('no pattern offers for this ask');
 				}).catch((e) => { if (live) setWidenError(String(e?.message ?? e)); });
 				return () => { live = false; };
 			}, [approval?.callId]);
