@@ -396,23 +396,56 @@ test('#172: the picker registers both directoryFlow holes', () => {
 });
 
 test('#172: the flow renders the path form only when open, and hands the trimmed path to onPicked', () => {
+  // a STATEFUL useState stub: the typed value flows through onChange into
+  // the component's state, so submit drives the real logic — trim, the
+  // absolute-path ready gate, the onPicked handoff (the no-op setter left
+  // all of it untested — Copilot)
+  const cells = [];
+  const cursor = { i: 0 };
+  const statefulReact = {
+    createElement: fakeReact.createElement,
+    useState: (init) => {
+      const i = cursor.i++;
+      cells[i] ??= init;
+      return [cells[i], (v) => { cells[i] = v; }];
+    },
+    useEffect: () => {},
+  };
+  const statefulCard = captured.factory((name) => name === 'react' ? statefulReact : stubRequire(name));
   const picked = [];
   const cancelled = [];
-  const flow = card.WorkspacePathFlow({
-    open: true,
-    onPicked: (p) => picked.push(p),
-    onCancel: () => cancelled.push(1),
-  });
-  const json = JSON.stringify(flow);
-  assert.ok(json.includes('Absolute path on this host'), 'the flow labels the affordance');
-  assert.ok(json.includes('Open workspace'), 'the open button renders');
-  assert.ok(json.includes('boot\\u2019s declared workspace') || json.includes('boot’s declared workspace'),
-    'the anchor honesty note is on the flow (#18)');
-  // interaction: the fake react captures handlers in props — drive them directly
-  const input = flow.children.flat().find(n => n.type === 'input');
-  assert.ok(input, 'the path input renders');
-  input.props.onChange({ target: { value: '  /tmp/dsh_test  ' } });
-  void picked; void cancelled;
+  const render = () => {
+    cursor.i = 0;                        // hook order is stable per render
+    return statefulCard.WorkspacePathFlow({
+      open: true,
+      onPicked: (p) => picked.push(p),
+      onCancel: () => cancelled.push(1),
+    });
+  };
+  let flow = render();
+  const nodes = () => [...walk(flow)];
+  const inputOf = () => nodes().find(n => n.type === 'input');
+  const buttonOf = (cls) => nodes().find(n => (n.props?.className ?? '').includes(cls));
+
+  // a relative path: Open renders disabled and never submits
+  inputOf().props.onChange({ target: { value: 'dsh_test' } });
+  flow = render();
+  assert.equal(inputOf().props.value, 'dsh_test', 'the typed value is the state');
+  assert.equal(buttonOf('cwp-open').props.disabled, true, 'a relative path is not ready');
+  buttonOf('cwp-open').props.onClick();
+  assert.deepEqual(picked, [], 'a non-absolute path never submits');
+
+  // an absolute path with whitespace: ready — and the TRIMMED path hands off
+  inputOf().props.onChange({ target: { value: '  /tmp/dsh_test  ' } });
+  flow = render();
+  assert.equal(inputOf().props.value, '  /tmp/dsh_test  ', 'the input tracks the state');
+  assert.equal(buttonOf('cwp-open').props.disabled, false);
+  buttonOf('cwp-open').props.onClick();
+  assert.deepEqual(picked, ['/tmp/dsh_test'], 'the trimmed absolute path reaches onPicked');
+
+  // cancel reports, and a closed flow renders nothing
+  assert.deepEqual(cancelled, []);
+  assert.equal(statefulCard.WorkspacePathFlow({ open: false, onPicked: () => {}, onCancel: () => {} }), null);
 });
 
 test('#172: closed flow renders nothing — silence when the menu is shut', () => {
