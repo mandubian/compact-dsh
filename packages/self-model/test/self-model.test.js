@@ -843,3 +843,36 @@ test('without an annex, inquiry declares the missing identity surface instead of
   assert.equal(issued.identity.certificate.known, false);
   assert.match(issued.identity.certificate.note, /no certificate was issued for this Member/);
 });
+
+// -- #184: the attestation names the appointed watch and the bound clock ----
+
+test('#184: the attestation names the appointed watch and the bound clock — from the provision roll, never claimed', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('child-1', { parentSession: 'parent-1', delegationDepth: 2, agentPreset: 'coder' });
+  // the operator armed the clock and appointed the watch: the services'
+  // own provisions ARE the facts (never anything the Subject said)
+  ctx.provide('compact-night-watch', { name: 'compact-night-watch', policy: 'judge', seatedAt: 1_700_000_000_000 });
+  ctx.provide('compact-dsh-scheduler', { maxActive: 20, at: 1_700_000_000_000 });
+  ctx.provide('schedule', { armed: true });
+  const att = composeAttestation(ctx, { sessionId: 'child-1', now: 1_700_000_005_000 });
+  assert.deepEqual(att.capabilities.watch, { policy: 'judge', seatedAt: 1_700_000_000_000 },
+    'the watch posture, from the provision roll');
+  assert.deepEqual(att.capabilities.clock, { mounted: true, maxActive: 20 },
+    'the clock posture: mounted, with the binder\'s cap');
+  const rendered = renderAttestation(att);
+  assert.match(rendered, /Watch: appointed \(policy judge\)/);
+  assert.match(rendered, /params-edge asks are decided by the appointed decider/);
+  assert.match(rendered, /Clock: armed — schedule_create exists/);
+  assert.match(rendered, /capped at 20 per session/);
+});
+
+test('#184: unappointed and unarmed render nothing — the silence is the honest face', async () => {
+  const { ctx, agents } = await boot();
+  agents.add('child-1', { parentSession: 'parent-1', delegationDepth: 2, agentPreset: 'coder' });
+  const att = composeAttestation(ctx, { sessionId: 'child-1', now: 1_700_000_005_000 });
+  assert.equal(att.capabilities.watch, null, 'no watch appointed: no posture to guess');
+  assert.equal(att.capabilities.clock, null, 'no binder: no clock posture to guess');
+  const rendered = renderAttestation(att);
+  assert.ok(!rendered.includes('Watch: appointed'), 'the unarmed attestation claims no watch');
+  assert.ok(!rendered.includes('Clock:'), 'the unarmed attestation claims no clock');
+});

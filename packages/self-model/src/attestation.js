@@ -121,6 +121,24 @@ export function capabilitiesOf(ctx) {
           digest: typeof sandbox.provenance?.digest === 'string' ? sandbox.provenance.digest : null,
         }
       : null,
+    // #184 — the appointed watch and the bound clock, read from the
+    // provision roll (the services' own declarations — the night-watch
+    // package provides its policy; the scheduler binder provides its cap;
+    // the dsh-schedule service's presence IS the mounted clock). null when
+    // unappointed/unmounted: the same silence the egress line keeps — an
+    // unarmed posture is not a posture to guess (D-7). What the Subject
+    // reads: WHO decides edge asks when no human surface answers, and
+    // whether the schedule tools exist.
+    watch: (() => {
+      const w = svc(ctx, 'compact-night-watch');
+      return w?.policy ? { policy: w.policy, seatedAt: w.seatedAt ?? w.at ?? null } : null;
+    })(),
+    clock: (() => {
+      const binder = svc(ctx, 'compact-dsh-scheduler');
+      return binder?.maxActive != null
+        ? { mounted: svc(ctx, 'schedule') != null, maxActive: binder.maxActive }
+        : null;
+    })(),
   };
 }
 
@@ -313,6 +331,18 @@ const TOOLCHAIN_LINE = (t) =>
   `  - Toolchain: ${t.image} at ${t.digest ? t.digest.slice(0, 19) + '…' : 'digest not resolvable'} — immutable: ` +
   'read-only rootfs, a fresh container per call; installs belong in the workspace, where they persist across acts';
 
+// #184 — the appointed watch and the bound clock, in the Subject's words:
+// WHO decides edge asks when no human surface answers, and whether the
+// schedule tools exist. Null postures render nothing — the same silence the
+// egress and toolchain lines keep.
+const WATCH_LINE = (w) =>
+  `  - Watch: appointed (policy ${w.policy}) — params-edge asks are decided by the appointed decider ` +
+  'when no human surface answers; every verdict is on the record';
+const CLOCK_LINE = (c) =>
+  `  - Clock: ${c.mounted ? 'armed' : 'bound, no clock mounted'} — schedule_create exists` +
+  (c.mounted ? `; active schedules capped at ${c.maxActive} per session; fired reminders are turns under the same gates`
+             : '; arm it with COMPACT_SCHEDULER if you want the schedule tools');
+
 export function renderAttestation(att) {
   const cap = att.capabilities;
   const basisLine = att.basis === 'dev-keyring'
@@ -360,6 +390,8 @@ export function renderAttestation(att) {
     // #153: the toolchain, declared. Same discipline — absent when the
     // sandbox declares no immutable rootfs, never a guessed physics.
     ...(cap.toolchain ? [TOOLCHAIN_LINE(cap.toolchain)] : []),
+    ...(cap.watch ? [WATCH_LINE(cap.watch)] : []),
+    ...(cap.clock ? [CLOCK_LINE(cap.clock)] : []),
     ...(att.exception?.declared
       ? ['',
          '[A-8/R-5] A STATE OF EXCEPTION IS IN FORCE over this runtime — your capabilities are narrowed, and you are',
