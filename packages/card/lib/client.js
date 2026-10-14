@@ -192,11 +192,19 @@ window.__ModuleLoader__.load({
 			const runtimeState = react.useState(false);
 			const runtime = runtimeState[0];
 			const setRuntime = runtimeState[1];
+			const widenErrorState = react.useState(props.widenError ?? null);
+			const widenError = widenErrorState[0];
+			const setWidenError = widenErrorState[1];
 			react.useEffect(() => {
 				let live = true;
 				if (Array.isArray(props.offers) || approval?.callId == null) return undefined;
-				fetchOffers(approval.callId).then((rows) => { if (live && rows.length) setOffers(rows); })
-					.catch(() => { /* no view, no auth, no offers: the two buttons stand */ });
+				fetchOffers(approval.callId).then((rows) => {
+					// an EMPTY view is not a failure — the ask simply has no
+					// pattern offers (plain exec, secret-use): silence is the
+					// honest face, the ask text governs. Only a FAILED fetch
+					// earns the named degrade below.
+					if (live && rows.length) setOffers(rows);
+				}).catch((e) => { if (live) setWidenError(String(e?.message ?? e)); });
 				return () => { live = false; };
 			}, [approval?.callId]);
 			const answer = (outcome) => {
@@ -247,6 +255,9 @@ window.__ModuleLoader__.load({
 						react.createElement('details', { className: 'compact-card-raw' },
 							react.createElement('summary', null, 'Raw envelope'),
 							react.createElement('pre', null, String(approval?.reason ?? '')))),
+					widenError && !answered ? react.createElement('div', { className: 'compact-card-offers', 'data-widen-error': '' },
+						react.createElement('div', { className: 'compact-card-moves-label' }, 'Widen unavailable'),
+						react.createElement('div', { className: 'compact-card-reason-row' }, widenError + ' — the two buttons stand.')) : null,
 					Array.isArray(offers) && offers.length && !answered ? react.createElement('div', { className: 'compact-card-offers' },
 						react.createElement('div', { className: 'compact-card-moves-label' }, 'Widen — allow + cover (the pass, stated above)'),
 						offers.map((o, i) => react.createElement(primitives.Button, {

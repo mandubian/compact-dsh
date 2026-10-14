@@ -356,3 +356,19 @@ test('the client picks through the wire builders and renders the offer buttons',
   assert.ok(json.includes('Deny') && json.includes('Allow once'), 'the two standing buttons remain');
   delete globalThis.fetch;
 });
+
+test('#201 diagnostic: a failed offer fetch renders the named reason, and the two buttons stand', () => {
+  const tree = card.CompactCard({ matched: { kind: 'approval', callId: 'c-diag', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' }, offers: [], widenError: 'compact-card-api 401' });
+  const json = JSON.stringify(tree);
+  assert.ok(json.includes('Widen unavailable'), 'the degrade is named, never silent');
+  assert.ok(json.includes('compact-card-api 401 — the two buttons stand.'), 'the reason rides the card');
+  assert.ok(json.includes('Deny') && json.includes('Allow once'), 'the two buttons stand');
+  assert.ok(!json.includes('Allow + cover'), 'no offer buttons without offers');
+  // empty offers WITHOUT a fetch failure render nothing — Widen not
+  // applying to an ask is silence, never an "unavailable" row
+  const quiet = card.CompactCard({ matched: { kind: 'approval', callId: 'c-quiet', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' }, offers: [] });
+  assert.ok(!JSON.stringify(quiet).includes('Widen unavailable'),
+    'Widen not applying to an ask is silence, not a failure');
+  const failed = card.CompactCard({ matched: { kind: 'approval', callId: 'c-fail', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' }, widenError: 'compact-card-api 401' });
+  assert.ok(JSON.stringify(failed).includes('Widen unavailable'), 'a FAILED fetch is the named degrade');
+});
