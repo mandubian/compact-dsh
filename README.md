@@ -304,6 +304,10 @@ pnpm add /path/to/compact-dsh/dist/compact-dsh-0.1.0.tgz
 # declare the ONE workspace this boot governs (sessions naming another
 # directory are refused — the boundary is declared at boot, not by the governed)
 export COMPACT_WORKSPACE=/absolute/path/to/the/project/to/govern
+# optionally arm the clock (#204): schedule_create becomes available —
+# reminders deliver their prompt into the session when due, and every act
+# in the fired turn rides the same gates as now; active schedules capped
+export COMPACT_SCHEDULER=1
 export COMPACT_SANDBOX_IMAGE=ubuntu:24.04
 export COMPACT_SANDBOX_IMAGE_DIGEST="$(docker image inspect ubuntu:24.04 --format '{{index .RepoDigests 0}}' | cut -d@ -f2)"
 dsh --profile compact

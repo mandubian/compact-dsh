@@ -218,6 +218,13 @@ async function main() {
     // render the ask as the structured card. Web-only — the browser is the
     // only surface it renders on; headless/attended compose nothing here.
     ...values.web ? bundle('compact-dsh-card') : [],
+    // #204 — the HOST clock rows, when the operator arms it
+    // (COMPACT_SCHEDULER): dsh-schedule + time-context mount and the
+    // schedule tools exist (capped by the binder inside blessed). Unset:
+    // no clock, no tools — the capability stays bound with nothing behind
+    // it. The binder itself rides blessed's apply, before its constitution
+    // check resolves the SCH-1 register row.
+    ...process.env.COMPACT_SCHEDULER ? bundle('compact-dsh-scheduler') : [],
     // the settings UI's own edits (#134): persisted by the config editor into
     // the profile patch file, reloaded verbatim on every settings write
     ...values.web && !values.smoke ? profilePatchRows(stateDir) : [],

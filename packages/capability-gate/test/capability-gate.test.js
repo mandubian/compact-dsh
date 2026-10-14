@@ -67,12 +67,22 @@ test('a triggered capability WITH its binding service boots', async () => {
   assert.equal(ctx.get('compact-capability-gate').assess().find(p => p.part === 'MA').posture, 'bound');
 });
 
-test('the clock is refused outright: composing a scheduler refuses the boot', async () => {
+test('#204: the clock composes only with its binder — dsh-schedule alone refuses the boot', async () => {
   const ctx = new Context();
   ctx.plugin(serviceStub('schedule'));
   await settle(ctx, 'schedule');
   assert.throws(() => apply(ctx, {}),
-    /holds the SCH capability[\s\S]*adopts no scheduling capability[\s\S]*remove the capability/);
+    /holds the SCH capability[\s\S]*nothing binds SCH-1[\s\S]*refusing to start/,
+    'the pairing discipline: the clock without its cap wrapper is an unbound capability');
+});
+
+test('#204: the clock with its binder is BOUND — scheduling is a declared capability', async () => {
+  const ctx = new Context();
+  ctx.plugin(serviceStub('schedule'));
+  ctx.plugin(serviceStub('compact-dsh-scheduler'));
+  await settle(ctx, 'compact-dsh-scheduler');
+  assert.doesNotThrow(() => apply(ctx, {}));
+  assert.equal(ctx.get('compact-capability-gate').assess().find(p => p.part === 'SCH').posture, 'bound');
 });
 
 test('the dynamic runner is refused outright: composing it refuses the boot (A-4)', async () => {
@@ -132,22 +142,12 @@ test('the breach clears when the binding service arrives, and the repair is reco
 
 // -- 3. declared absence, mechanically enforced ------------------------------
 
-test('the absent-capability index covers exactly the unbound-by-design parts', () => {
+test('the absent-capability index covers exactly the unbound-by-design parts — #204 bound the clock, so schedule_create leaves the index', () => {
   const index = absentToolIndex();
-  assert.deepEqual([...index.keys()].sort(), ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine', 'schedule_create'].sort());
-  assert.equal(index.get('schedule_create').part, 'SCH');
+  assert.deepEqual([...index.keys()].sort(), ['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine'].sort());
   assert.equal(index.get('cordis_define').part, 'A-4/DYN');
-});
-
-test('schedule_create is denied with an envelope naming SCH-1 and the lawful next moves', async () => {
-  const ctx = new Context();
-  apply(ctx, {});
-  const denial = await ctx.waterfall('tools/pre-execute', { name: 'schedule_create', arguments: { after: '1h' } }, () => ({ kind: 'pass' }));
-  assert.equal(denial.kind, 'deny');
-  assert.match(denial.reason, new RegExp(`\\[${GATE}/SCH-1/capability-not-adopted\\]`));
-  assert.match(denial.reason, /has not adopted/);
-  assert.match(denial.reason, /Lawful next moves:/);
-  assert.match(denial.reason, /petition for the capability to be adopted/);
+  assert.equal(index.get('schedule_create'), undefined,
+    '#204: a bound part gates, it does not forbid — the mounted clock serves schedule_create under its cap');
 });
 
 test('tools of capabilities this composition DOES adopt pass through untouched', async () => {
@@ -166,6 +166,9 @@ test('the service reports the live Part VI posture for the record', async () => 
   await settle(ctx, 'compact-sandbox');
   apply(ctx, {});
   const posture = Object.fromEntries(ctx.get('compact-capability-gate').assess().map(p => [p.part, p.posture]));
+  // #204: SCH is bound-by-design now — unmounted it stays DORMANT ('absent',
+  // obliges nothing) and schedule_create leaves the absent index (a bound
+  // part gates, it does not forbid)
   assert.deepEqual(posture, { MA: 'absent', CF: 'bound', SCH: 'absent', 'A-4/DYN': 'absent' });
   assert.deepEqual(ctx.get('compact-capability-gate').absent().sort((a, b) => a.tool.localeCompare(b.tool)),
     [
@@ -173,7 +176,6 @@ test('the service reports the live Part VI posture for the record', async () => 
       { tool: 'cordis_run', part: 'A-4/DYN', clauses: ['A-4'] },
       { tool: 'cordis_stop', part: 'A-4/DYN', clauses: ['A-4'] },
       { tool: 'cordis_undefine', part: 'A-4/DYN', clauses: ['A-4'] },
-      { tool: 'schedule_create', part: 'SCH', clauses: ['SCH-1'] },
     ]);
 });
 

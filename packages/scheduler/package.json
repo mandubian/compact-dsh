@@ -1,0 +1,22 @@
+{
+  "name": "compact-dsh-scheduler",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Binds the clock (#204): mounts dsh-schedule and caps active schedules per session \u2014 SCH-1 bound, opt-in via COMPACT_SCHEDULER.",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "~0.2.0-rc.2"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  }
+}

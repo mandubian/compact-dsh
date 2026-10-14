@@ -1,0 +1,12 @@
+# The clock, bound (#204) — the binder (compact-dsh-scheduler) composes in
+# every boot (it provides the SCH binding the register resolves); the HOST
+# clock rows mount only when the operator arms it (COMPACT_SCHEDULER):
+# unarmed, the schedule tools do not exist and the capability stays a bound
+# capability with no clock behind it. The egress-posture precedent.
+- id: time-context
+  name: '@deepseek-ai/dsh-time-context'
+  disabled: !!js '!process.env.COMPACT_SCHEDULER'
+
+- id: schedule
+  name: '@deepseek-ai/dsh-schedule'
+  disabled: !!js '!process.env.COMPACT_SCHEDULER'

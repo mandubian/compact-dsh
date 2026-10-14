@@ -46,13 +46,14 @@ const GATE_PACKAGES = {
   CS: ['packages/specialists/src'],
   PT: ['packages/petition/src'],
   JG: ['packages/judicature/src'],
+  SCH: ['packages/scheduler/src'],
 };
 
 // package → default gate for files without their own GATE constant
 const PACKAGE_GATE = {
   approval: 'AG', 'allowlist-gate': 'AG', 'remote-access': 'RA', loopguard: 'LG',
   'egress-proxy': 'EG', promotion: 'PG', 'capability-gate': 'CG', petition: 'PT',
-  specialists: 'CS', blessed: 'CF', judicature: 'JG', 'sandbox-docker': null, // per-file GATE consts
+  specialists: 'CS', blessed: 'CF', judicature: 'JG', scheduler: 'SCH', 'sandbox-docker': null, // per-file GATE consts
 };
 
 // a rule id is word characters, hyphens and slashes — this filters the other
@@ -263,6 +264,7 @@ const PACKAGE_REGISTER_PLUGINS = {
   specialists: ['compact-specialists', 'compact-dsh-specialists'],
   blessed: ['compact-dsh-blessed'],
   'sandbox-docker': ['compact-sandbox-docker'],
+  scheduler: ['compact-dsh-scheduler'],
 };
 
 test('every gloss anchors to the register: it cites a clause its own emitting package enforces', () => {
