@@ -136,7 +136,9 @@ test('apply registers one composer takeover at priority 0 with the same select',
     },
   };
   card.apply(ctx);
-  assert.deepEqual(injected.map(([key]) => key), ['conversation.composer']);
+  // #172: the directoryFlow holes ride the same inject — the picker flow
+  assert.deepEqual(injected.map(([key]) => key),
+    ['conversation.composer', 'sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']);
   assert.deepEqual(card.inject, ['slots']);
   injected[0][1]();
   const [[options, component]] = registered;
@@ -371,4 +373,49 @@ test('#201 diagnostic: a failed offer fetch renders the named reason, and the tw
     'Widen not applying to an ask is silence, not a failure');
   const failed = card.CompactCard({ matched: { kind: 'approval', callId: 'c-fail', reason: FINGERPRINT_ASK.text, answer: async () => 'rejected' }, widenError: 'compact-card-api 401' });
   assert.ok(JSON.stringify(failed).includes('Widen unavailable'), 'a FAILED fetch is the named degrade');
+});
+
+// ── #172: the directory flow — the browser affordance the stock surface lacks ──
+
+test('#172: the picker registers both directoryFlow holes', () => {
+  const holes = [];
+  const ctx = {
+    slots: {
+      inject: (hole, setup) => { holes.push(hole); setup(); },
+      register: (def) => { holes.push('registered:' + hole_name(def)); },
+      entries: () => [],
+    },
+  };
+  const hole_name = (def) => def.name;
+  void hole_name;
+  card.apply(ctx);
+  const registered = holes.filter(h => String(h).startsWith('registered:'));
+  assert.ok(registered.includes('registered:compact-workspace-path-flow'), 'the flow component is registered');
+  assert.equal(holes.filter(h => h === 'sidebar.workspaces.directoryFlow').length, 1);
+  assert.equal(holes.filter(h => h === 'conversation.hero.workspace.directoryFlow').length, 1);
+});
+
+test('#172: the flow renders the path form only when open, and hands the trimmed path to onPicked', () => {
+  const picked = [];
+  const cancelled = [];
+  const flow = card.WorkspacePathFlow({
+    open: true,
+    onPicked: (p) => picked.push(p),
+    onCancel: () => cancelled.push(1),
+  });
+  const json = JSON.stringify(flow);
+  assert.ok(json.includes('Absolute path on this host'), 'the flow labels the affordance');
+  assert.ok(json.includes('Open workspace'), 'the open button renders');
+  assert.ok(json.includes('boot\\u2019s declared workspace') || json.includes('boot’s declared workspace'),
+    'the anchor honesty note is on the flow (#18)');
+  // interaction: the fake react captures handlers in props — drive them directly
+  const input = flow.children.flat().find(n => n.type === 'input');
+  assert.ok(input, 'the path input renders');
+  input.props.onChange({ target: { value: '  /tmp/dsh_test  ' } });
+  void picked; void cancelled;
+});
+
+test('#172: closed flow renders nothing — silence when the menu is shut', () => {
+  const tree = card.WorkspacePathFlow({ open: false, onPicked: () => {}, onCancel: () => {} });
+  assert.equal(tree, null);
 });
