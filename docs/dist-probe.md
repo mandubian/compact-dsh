@@ -188,8 +188,9 @@ What this verifies, each against the failing alternative:
 - **The door-minted pass carries a fresh session.** A second session
   lineage's covered act (`…/get?q=dogs`) rode with no ask to any surface
   and no fail-closed refusal — the night-shift delivery, minted at the
-  door this time instead of the desk; the record carries no
-  `approval/asked` for it.
+  door this time instead of the desk; the fresh session's own record
+  (its events persist under their own directory) carries its turn facts
+  and no `approval/asked`.
 
 The named limit: the probe drives the card's **server half** — the exact
 methods the browser invokes over the gateway — headlessly; the browser

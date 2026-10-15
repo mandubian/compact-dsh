@@ -395,10 +395,21 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
     if (askedEvents.length < 2 || decidedEvents.length < 2) {
       throw new Error(`${BIN} the record lacks the edge pair: ${askedEvents.length} asked / ${decidedEvents.length} decided`);
     }
-    // the card-minted pass's delivery, on the record: the covered act in the
-    // fresh session asked NOBODY — no approval/asked may name its callId
-    if (events.some((event) => event.type === 'approval/asked' && JSON.stringify(event).includes('probe-call-d2'))) {
-      throw new Error(`${BIN} the record carries an ask for the covered act — the card-minted pass did not cover the fresh session`);
+    // the card-minted pass's delivery, on the fresh session's OWN record:
+    // call D2 ran in session 2, whose events persist under their own record
+    // directory — session 1's log above could never carry an ask for it, so
+    // the guard reads session 2's file: the turn facts must be there (the
+    // act was recorded), and no approval/asked may be (the act asked nobody)
+    const sessionLog2 = join(profileContext.dir, 'compact-data', 'records', '_no-cwd', session2.id, 'session.v4.jsonl');
+    if (!existsSync(sessionLog2)) throw new Error(`${BIN} no record for the fresh session at ${sessionLog2}`);
+    const events2 = readFileSync(sessionLog2, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    const types2 = events2.map((event) => event.type);
+    for (const needed of ['session', 'turn/start', 'turn/end']) {
+      if (!types2.includes(needed)) throw new Error(`${BIN} the fresh session's record lacks a ${needed} event: ${types2.join(', ')}`);
+    }
+    if (types2.includes('approval/asked')) {
+      const asked2 = events2.find((event) => event.type === 'approval/asked');
+      throw new Error(`${BIN} the fresh session's record carries an approval ask — the card-minted pass did not cover it: ${JSON.stringify(asked2).slice(0, 300)}`);
     }
     if (!(indexOf(events[0]) === 0 && indexOf(asked) < indexOf(decided) && indexOf(decided) < indexOf(events.find((event) => event.type === 'turn/end')))) {
       throw new Error(`${BIN} the approval pair is not turn-enclosed on the record`);
