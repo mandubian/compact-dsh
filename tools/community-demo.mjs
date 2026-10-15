@@ -233,7 +233,7 @@ async function releasesHost(bindAddress) {
 
 // ── the runtime: the composed boot, the operator's one decision ──
 
-async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace, trustedKeyringDigest }) {
+async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace, trustedKeyringDigest, egressNetwork }) {
   const digest = execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', IMAGE], { encoding: 'utf8', timeout: 10_000 }).trim();
   if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error(`${BIN} cannot inspect ${IMAGE} (docker pull / npm run compact:bake first)`);
 
@@ -264,7 +264,13 @@ async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace,
     COMPACT_ENFORCER_KEY: join(keyringDir, 'enforcer.pem'),
     COMPACT_EGRESS: 'proxy',
     COMPACT_EGRESS_ADDRESS_CLASSES: 'private',
-    COMPACT_EGRESS_NETWORK: `compact-community-demo-${Date.now()}`,
+    // the mediation network is minted ONCE per run, not per boot (#171):
+    // this driver boots three times (act one; act two's refused attempt;
+    // act two's re-pin) and all three share the name — one demo, one
+    // mediation network. ensureEgressNetwork is inspect-or-create, so the
+    // first boot creates it and the later boots reuse it; the run's exit
+    // hook removes exactly this name when the run ends.
+    COMPACT_EGRESS_NETWORK: egressNetwork,
     // the member binding (I-1 slice 2): the founder's sessions are the deeds
     // of a Member the roll shows — certificates countersigned, parties and
     // recusal resolved through the roll, the witness seat verifiable
@@ -411,6 +417,24 @@ async function main() {
   const staging = join(workspace, 'staging');
   mkdirSync(staging, { recursive: true });
   SAY(`scratch ${scratch}`);
+  // one mediation network per RUN, not per boot (#171): the name is minted
+  // here, before any boot, and every boot of this run shares it — the
+  // three boots a full run performs otherwise each leave a named internal
+  // network behind (measured: 3 per run), and nothing ever removed them.
+  // Because the name is minted per run, the teardown below removes exactly
+  // the network THIS run created — never a pre-existing one.
+  const egressNetwork = `compact-community-demo-${Date.now()}`;
+  // The teardown rides the process exit hook, not a line at the end of
+  // main: the network comes into being during the FIRST boot, and a boot
+  // that fails after that point (a refused plugin, a stale workspace link
+  // — both observed live on this host) never reaches any later line main
+  // has. Registered the moment the name exists, it removes exactly this
+  // run's network on every exit path; "no such network" is the silence of
+  // a run that died before its first boot. Best effort by shape — a
+  // SIGKILL leaves the name behind, and the name is unique per run, so a
+  // stale network is always attributable to the run that minted it and is
+  // never swept by a later run.
+  process.on('exit', () => removeRunNetwork(egressNetwork));
 
   // the rehearsal keyring + the community annex + the releases host — the
   // keyring already carries the member roll (identity slices 1–3): two
@@ -426,7 +450,7 @@ async function main() {
   const seatA = seatTrustRoot(keyringDir);
   SAY(`trust root seated: law digest ${seatA.lawDigest.slice(0, 16)}… unchanged, re-sealed (threshold ${seatA.verified.threshold}, ${seatA.verified.distinctSigners} distinct signer(s), ${seatA.verified.basis}) — the pin names manifest ${seatA.manifestDigest.slice(0, 16)}…`);
   const { annexPath } = communityAnnex(keyringDir, keyring);
-  const { ctx, env, operator } = await bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace });
+  const { ctx, env, operator } = await bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace, egressNetwork });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
   const releases = await releasesHost(gateway);
@@ -679,8 +703,25 @@ async function main() {
     await releases.close().catch(() => {});
     await ctx.fiber.dispose().catch(() => {});
   }
-  if (exitCode === 0) exitCode = await actTwo({ scratch, keyringDir });
+  if (exitCode === 0) exitCode = await actTwo({ scratch, keyringDir, egressNetwork });
   process.exitCode = exitCode;
+}
+
+/** The run's own teardown (#171), hanging off main's exit hook: remove
+ *  exactly the mediation network this run minted — the name is generated
+ *  per run, so nothing pre-existing can wear it. Best effort, failures
+ *  named: a network the daemon cannot remove (endpoints still attached,
+ *  daemon gone) is reported, not swallowed, and a "no such network" is the
+ *  honest shape of a run that died before its first boot. */
+function removeRunNetwork(name) {
+  const rm = spawnSync('docker', ['network', 'rm', name], { encoding: 'utf8' });
+  if (rm.status === 0) {
+    SAY(`mediation network ${name} removed — the run's own teardown (the #171 leak, closed: one name per run, taken down when the run ends)`);
+    return;
+  }
+  const reason = (rm.stderr || rm.stdout || '').trim().split('\n')[0] || 'unknown docker error';
+  const never = /no such network/i.test(reason) ? ' (never created — the run failed before any boot)' : '';
+  SAY(`mediation network ${name} NOT removed: ${reason}${never}`);
 }
 
 /** ACT TWO — the swap test (issue #168). A fresh rehearsal identity set —
@@ -690,7 +731,7 @@ async function main() {
  *  boots only after the re-pin: the governance act, shown. Every honesty
  *  label survives the swap; nothing here presents a dev-keyring signature
  *  as standing (D-8). */
-async function actTwo({ scratch, keyringDir }) {
+async function actTwo({ scratch, keyringDir, egressNetwork }) {
   let exitCode = 0;
   let ctxB = null;
   try {
@@ -720,7 +761,7 @@ async function actTwo({ scratch, keyringDir }) {
     try {
       ctxB = (await bootRuntime({
         scratch: scratchB, annexPath: annexPathB, keyring: keyringB, keyringDir: keyringDirB,
-        workspace: workspaceB, trustedKeyringDigest: pinA,
+        workspace: workspaceB, trustedKeyringDigest: pinA, egressNetwork,
       })).ctx;
       throw new Error(`${BIN} GUARD VOID — the swapped genesis BOOTED under set A's pin; the swap test proves nothing and is aborted`);
     } catch (e) {
@@ -758,7 +799,7 @@ async function actTwo({ scratch, keyringDir }) {
     line(`the operator re-pins: trustedKeyringDigest ← ${seatB.manifestDigest.slice(0, 16)}… (set B's own manifest). An act over configuration — zero code changed — and the swap enacts:`);
     ctxB = (await bootRuntime({
       scratch: scratchB, annexPath: annexPathB, keyring: keyringB, keyringDir: keyringDirB,
-      workspace: workspaceB, trustedKeyringDigest: seatB.manifestDigest,
+      workspace: workspaceB, trustedKeyringDigest: seatB.manifestDigest, egressNetwork,
     })).ctx;
     const bindingB = ctxB.get('compact-self-model')?.memberBinding;
     if (bindingB?.declared) {
