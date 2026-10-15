@@ -572,9 +572,13 @@ the row's own terms (TTL, budget, class, revocation — a watch yes mints
 nothing); `judge` seats a model call on the runtime's own default route —
 the Enforcer hands over the decision card, and unsure, malformed, or failed
 answers escalate while credential-shaped names are refused before the model
-is ever consulted. **Mint the pass before you leave**: the watch judges the
-edges of grants that exist — run attended once (or `/grants-grant`) to mint
-the row, then launch unattended; a watch over an empty store says so at boot
+is ever consulted. **Mint the pass before you leave — and mint it for the
+run that follows, not for this session**: the watch judges the edges of
+grants that exist — run attended once and append `!` to the ladder choice
+(or `/grants-grant … scope=all`) so the row is unscoped — every session of
+this runtime (#187); a session-scoped mint covers only its own lineage,
+and the unattended run is a stranger to it. Then launch unattended; a watch
+over an empty store says so at boot
 and every first touch fail-closes. Every verdict is attributed and
 motivated on the chained record — read the morning-after list with
 `node tools/watch-report.mjs <session.v4.jsonl>`. Attended mode is
