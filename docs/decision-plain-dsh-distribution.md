@@ -156,11 +156,24 @@ stand on the trial path (issue #195 carries the full seam-by-seam):
   `/grants-revoke` register from the plugin's own `commands` injection — a
   plain profile can mint the unscoped night pass with its wire leg, and the
   mediator (posture rides the bundle, Decision 2) delivers under it.
-- **The door does not, yet.** The Widen ladder and the `!` modifier ride the
-  deciding *view*, and no plain-dsh surface renders them — the web ask card
-  ignores `patternOffers`/`patternScope` (pinned by test), and the `3!`
-  parser is the launcher's terminal answerer. On the trial path the ask
-  offers deny / allow-once only; a pass can be minted, but only at the desk.
+- **The door now travels too (#195, probe-verified).** The web ask card
+  renders the Widen ladder and records the pick through the Enforcer's own
+  list (`compact-card-api`: `decidingView` serves the deciding view's
+  `patternOffers`, `patternAnswer` records the pick — a surface may pick,
+  never author; a forged pick is refused), and the runtime modifier is the
+  card's `runtime: true` — the terminal's `3!`. The pick rides the ordinary
+  yes: the recorded answerer materializes the picked row with its wire
+  companion, unscoped when the modifier said so. dist-probe's calls D/D2
+  prove the seam end to end on a plain profile: a first-touch ask's ladder
+  rendered, a forged pick refused, the params-row pick + runtime modifier
+  recorded, the pass materialized ("for EVERY session of this runtime" on
+  the deciding session's note), and a FRESH session's covered act riding
+  without an ask — the night-shift delivery, minted at the door (see
+  dist-probe.md, Moment 5). The named limit: the probe drives the card's
+  server half — the exact methods the browser invokes over the gateway —
+  headlessly; the browser rendering itself is pinned by the card suite's
+  DOM and wire-envelope tests, and a live browser session remains the one
+  uncaptured case.
 - **The watch now travels as a plugin row (#195).** `compact-dsh-night-watch`
   ships in the bundle and seats on `COMPACT_DECIDER` (or `nightWatch.policy`
   in the profile patch) — the same env-gated seam as the posture in Decision

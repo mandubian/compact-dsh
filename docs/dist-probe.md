@@ -29,24 +29,31 @@ npm run dist:probe
 The probe packs the composition as **one tarball** (`tools/dist.mjs`), adds
 it to a scratch stock profile with pnpm — the install the web UI's Plugins
 page performs — boots that profile in-process through dsh's own profile
-machinery, and drives two governed tool calls with **no model and no
-network**: an `llm/stream` listener throws if any model request is attempted,
-and the egress mediator delivers only what a live grant covers.
+machinery, and drives five governed tool calls across two sessions with
+**no model and no network**: an `llm/stream` listener throws if any model
+request is attempted, and the egress mediator delivers only what a live
+grant covers.
 
-What it printed **(verified)**:
+What it printed **(verified 2026-10-15)**:
 
 ```text
-dist-probe: profile /tmp/dist-probe-doc/profiles/compact — tarball installed via npx --yes pnpm@9
+dist-probe: profile /tmp/dist-probe-kAfwr7/profiles/compact — tarball installed via npx --yes pnpm@9
 dist-probe: booting the profile composition in-process (compact rows resolve from the installed artifact)
 dist-probe:: warning: 1 entry did not activate
 cordis-inspect-providers (@deepseek-ai/dsh-tool-cordis/host): pending (waiting for service: cordisInspect)
-dist-probe: compact-ready (constitution digest 27bb7078fe9a…) — dsh web: http://127.0.0.1:3080/…
+dsh web: http://127.0.0.1:43263/?token=…
+dist-probe: compact-ready (constitution digest 27bb7078fe9a…)
 dist-probe: governed call A (read-only bash): allowed, confined, recorded
-dist-probe: governed call B (curl): ask recorded, envelope preview ({"tool":"bash","callId":"probe-call-b","fingerprint":"fp_d3bef9ce922d0ec…), decided allowed-once
-dist-probe: record: 8 events under the profile dir — posture facts + turn-enclosed approval/asked/approval/decided (allowed-once)
+dist-probe: governed call B (curl): ask recorded, envelope preview ({"tool":"bash","callId":"probe-call-b","fingerprint":"fp_d3bef9ce922d0ec…), decided allowed-once; tool result isError=false (network-less container)
+dist-probe: the desk mints the pass: sg_88b5b5bf UrlPrefix:https://compact-probe.invalid/get/ params=allow(q), scope=all (unscoped pair)
+[night-watch] allowed "bash" at the params edge (refused: page) under grant sg_88b5b5bf — motivation on the record
+dist-probe: governed call C (edge act): the watch decided it (allow-edges) — the operator seat never saw the ask (ordering verified); the attributed note rode the decision; result isError=false (network-less container, no curl)
+dist-probe: governed call D (first touch, the card's ladder): 3 rung(s) rendered — pick "UrlPrefix:http://compact-card-probe.invalid/get/ params=allow(q)" + runtime modifier recorded (the web card's 3!); a forged pick was refused; the yes materialized the pass ("for EVERY session of this runtime" on the note); result isError=false (network-less container)
+dist-probe: governed call D2 (fresh session, the card's pass): covered without an ask — no ask reached any surface, no fail-closed refusal; result isError=false (network-less container — the delivery is the gate's absence)
+dist-probe: record: 12 events under the profile dir — posture facts + turn-enclosed approval/asked/approval/decided (allowed-once)
 dist-probe: auditor: conforming, chain verified (offline, no runtime cooperation)
 dist-probe: no model request was made
-dist-probe: PROBE PASSED — install → boot → governed calls → audited record
+dist-probe: PROBE PASSED — install → boot → governed calls → audited record, all under /tmp/dist-probe-kAfwr7/profiles/compact
 ```
 
 Fidelity rules the probe states up front, so the transcript can cite them:
@@ -147,6 +154,49 @@ before downstream surfaces by construction, and the ask card + README say
 to unset `COMPACT_DECIDER` when a human is on the web surface — the named
 limit, in the issue (#195).
 
+## Moment 5 — the door's ladder at the web card (#195)
+
+A fresh host's first touch (`curl http://compact-card-probe.invalid/get?q=hello`)
+— an ask the armed watch declines, because a first touch is nobody's edge —
+reaches the operator seat, which plays the browser through the card's own
+gateway methods (`compact-card-api`'s `decidingView` / `patternAnswer`, the
+same two calls the web card makes over `/api`). The Enforcer's ladder
+renders, a forged pick is refused, the params-row pick with the runtime
+modifier — the web card's `3!` — is recorded, and the ordinary
+`allowed-once` materializes the pass **(verified 2026-10-15)**:
+
+```text
+dist-probe: governed call D (first touch, the card's ladder): 3 rung(s) rendered — pick "UrlPrefix:http://compact-card-probe.invalid/get/ params=allow(q)" + runtime modifier recorded (the web card's 3!); a forged pick was refused; the yes materialized the pass ("for EVERY session of this runtime" on the note); result isError=false (network-less container)
+dist-probe: governed call D2 (fresh session, the card's pass): covered without an ask — no ask reached any surface, no fail-closed refusal; result isError=false (network-less container — the delivery is the gate's absence)
+```
+
+What this verifies, each against the failing alternative:
+
+- **The ladder renders on the trial path.** `decidingView` served this
+  ask's three rungs — the params row first (the act carries `q`), then the
+  path, then the host root — the same rows the terminal prompter draws.
+  The failing alternative is the pinned test's own words: a surface that
+  never renders offers never widens.
+- **The browser picks, never authors (D-8).** A pick addressing no offer of
+  the live view came back refused before the real pick was recorded — the
+  guard the card suite pins, here exercised on a booted plain profile.
+- **The pick rides the ordinary yes.** The seat still answered
+  `allowed-once`; the pick alone answered nothing. The recorded answerer
+  materialized the row only when the human's yes resolved, and the deciding
+  session's note carries the scope in plain words: "for EVERY session of
+  this runtime".
+- **The door-minted pass carries a fresh session.** A second session
+  lineage's covered act (`…/get?q=dogs`) rode with no ask to any surface
+  and no fail-closed refusal — the night-shift delivery, minted at the
+  door this time instead of the desk; the record carries no
+  `approval/asked` for it.
+
+The named limit: the probe drives the card's **server half** — the exact
+methods the browser invokes over the gateway — headlessly; the browser
+rendering is pinned by the card suite's DOM and wire-envelope tests, and a
+live browser session (including one seated while the watch is armed —
+Moment 4's remaining case) stays uncaptured.
+
 ## What the probe does not claim
 
 - **No model, no browser session.** The governed calls are driven through
@@ -155,6 +205,10 @@ limit, in the issue (#195).
   `tool/result` record events are the agent loop's contribution and need a
   model-driven session; the record here carries the posture facts and the
   approval pair. Named, not hidden.
+- **The card moment drives the server half.** Moment 5 invokes
+  `decidingView`/`patternAnswer` as the gateway methods the browser calls,
+  not through a rendered browser; the DOM and wire-envelope half is the
+  card suite's pins, not this probe's.
 - **The host plane keeps one operator overlay**: the probe re-arms
   `tool-bash` (the web profile keeps host-plane tools behind presets;
   sessions re-mount them per preset). The gates ride the waterfall either
