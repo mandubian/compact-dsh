@@ -195,10 +195,38 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
     // surface could.
     let sawEnvelope;
     const operatorDecided = [];
+    // the card moment's captures (#195 deliverable d): the ladder the card
+    // rendered, the pick it recorded, and the forged pick the guard refused
+    const card = { ladder: null, pick: null, forged: null };
     ctx.on('approval/request', async (req, next) => {
       if (!/(^|\n)\[AG(\/|\])/.test(req.reason ?? '')) return next();
       sawEnvelope = { callId: req.callId, reason: req.reason, preview: ctx.get('compact-approval').deciding.get(req.callId) ?? null };
       operatorDecided.push(req.callId);
+      // call D — the seat plays the browser, through the card's own API: the
+      // same two methods the web card invokes over the gateway's /api channel
+      // (the browser half — lib/client.js — cannot run headless; its
+      // rendering and its wire envelope are pinned by the card suite).
+      // Render the Enforcer's ladder, prove a pick addressing no offer is
+      // refused (the browser picks, never authors — D-8), then record the
+      // params-row pick with the runtime modifier — the web card's `3!`.
+      // The pick answers NOTHING by itself; the yes below is still the
+      // ordinary allowed-once, and the recorded answerer materializes the
+      // picked row when it resolves.
+      if (req.callId === 'probe-call-d') {
+        const api = ctx.get('compact-card-api');
+        if (!api) throw new Error(`${BIN} the card api is not mounted on the trial path — the door's ladder has no plain-profile surface`);
+        const rendered = await api.decidingView({ callId: req.callId });
+        if (!Array.isArray(rendered.offers) || rendered.offers.length === 0) {
+          throw new Error(`${BIN} the card rendered an empty ladder — a surface that never renders offers never widens: ${JSON.stringify(rendered)}`);
+        }
+        card.ladder = rendered.offers.map((offer) => offer.text);
+        card.forged = await api.patternAnswer({ callId: req.callId, index: rendered.offers.length });
+        if (card.forged?.ok !== false) throw new Error(`${BIN} the card accepted a pick that addresses no offer — the browser authored coverage: ${JSON.stringify(card.forged)}`);
+        card.pick = await api.patternAnswer({ callId: req.callId, index: 0, runtime: true });
+        if (card.pick?.ok !== true || card.pick.scope !== 'runtime') {
+          throw new Error(`${BIN} the params-row pick with the runtime modifier did not record: ${JSON.stringify(card.pick)}`);
+        }
+      }
       return 'allowed-once';
     });
 
@@ -277,9 +305,69 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
       `the operator seat never saw the ask (ordering verified); the attributed note rode the decision; ` +
       `result isError=${edge.isError === true} (network-less container, no curl)`);
 
+    // call D: the door's ladder at the web card (#195's last seam). A fresh
+    // host's first-touch ask — the watch declines it (no row covers this
+    // host: a first touch is nobody's edge, so it falls through to the
+    // human seat, exactly as call B's did) — is rendered and picked through
+    // the card api in the seat above. The pick rides the ordinary yes: the
+    // recorded answerer materializes the picked params row UNSCOPED (the
+    // runtime modifier — the `!`) with its wire companion, and the captured
+    // note carries the sentence that says so.
+    const dNotes = [];
+    const doorAsk = await ctx.tools.execute({
+      name: 'bash',
+      callId: 'probe-call-d',
+      arguments: { command: "curl --max-time 3 'http://compact-card-probe.invalid/get?q=hello'", description: 'first touch on a fresh host — the ladder ask' },
+      agent: { id: session.id, session, inject(m) { dNotes.push(m); } },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!operatorDecided.includes('probe-call-d')) {
+      throw new Error(`${BIN} the card's ask never reached the human seat — a pick answers nothing by itself`);
+    }
+    const dNotesText = dNotes.map(m => (m?.content ?? []).filter(b => b?.type === 'text').map(b => b.text).join(' ')).join('\n');
+    if (!dNotesText.includes('for EVERY session of this runtime')) {
+      throw new Error(`${BIN} the materialized pass did not carry the runtime scope — note: ${JSON.stringify(dNotesText).slice(0, 400)}`);
+    }
+    say(`governed call D (first touch, the card's ladder): ${card.ladder.length} rung(s) rendered — ` +
+      `pick "${card.ladder[0]}" + runtime modifier recorded (the web card's 3!); a forged pick was refused; ` +
+      `the yes materialized the pass ("for EVERY session of this runtime" on the note); ` +
+      `result isError=${doorAsk.isError === true} (network-less container)`);
+
     session.append('turn/end', { turn: 1 });
     if ((await ctx.sessions.flush(session)) !== true) throw new Error(`${BIN} session flush returned false`);
     await writer.close();
+
+    // call D2: the pass the CARD minted must carry a FRESH session — the
+    // night-shift delivery, minted at the door this time instead of the
+    // desk. A covered act in a new session lineage: no ask may reach any
+    // surface (the desk never minted this row — the door did), and no
+    // fail-closed refusal may answer it. The network-less container still
+    // fails the fetch itself; the delivery is the gate's and the wire's
+    // absence, which the assertions below pin.
+    const session2 = ctx.sessions.prepare('dist-probe-next');
+    const writer2 = await persistence.create(session2.header);
+    ctx.sessions.enter(session2);
+    ctx.sessions.announce(session2);
+    session2.append('turn/start', { turn: 1 });
+    const replay = await ctx.tools.execute({
+      name: 'bash',
+      callId: 'probe-call-d2',
+      arguments: { command: "curl --max-time 3 'http://compact-card-probe.invalid/get?q=dogs'", description: 'a fresh session under the card-minted pass' },
+      agent: { id: session2.id, session: session2, inject() {} },
+      signal: AbortSignal.timeout(30_000),
+    });
+    session2.append('turn/end', { turn: 1 });
+    if ((await ctx.sessions.flush(session2)) !== true) throw new Error(`${BIN} session flush returned false`);
+    await writer2.close();
+    if (operatorDecided.includes('probe-call-d2')) {
+      throw new Error(`${BIN} the covered act asked — the door-minted pass did not carry the fresh session`);
+    }
+    if (/requires approval/i.test(JSON.stringify(replay))) {
+      throw new Error(`${BIN} the covered act failed closed — the pass did not deliver: ${JSON.stringify(replay).slice(0, 400)}`);
+    }
+    say(`governed call D2 (fresh session, the card's pass): covered without an ask — ` +
+      `no ask reached any surface, no fail-closed refusal; ` +
+      `result isError=${replay.isError === true} (network-less container — the delivery is the gate's absence)`);
 
     const sessionId = session.id;
     const sessionLog = join(profileContext.dir, 'compact-data', 'records', '_no-cwd', sessionId, 'session.v4.jsonl');
@@ -307,6 +395,22 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
     if (askedEvents.length < 2 || decidedEvents.length < 2) {
       throw new Error(`${BIN} the record lacks the edge pair: ${askedEvents.length} asked / ${decidedEvents.length} decided`);
     }
+    // the card-minted pass's delivery, on the fresh session's OWN record:
+    // call D2 ran in session 2, whose events persist under their own record
+    // directory — session 1's log above could never carry an ask for it, so
+    // the guard reads session 2's file: the turn facts must be there (the
+    // act was recorded), and no approval/asked may be (the act asked nobody)
+    const sessionLog2 = join(profileContext.dir, 'compact-data', 'records', '_no-cwd', session2.id, 'session.v4.jsonl');
+    if (!existsSync(sessionLog2)) throw new Error(`${BIN} no record for the fresh session at ${sessionLog2}`);
+    const events2 = readFileSync(sessionLog2, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    const types2 = events2.map((event) => event.type);
+    for (const needed of ['session', 'turn/start', 'turn/end']) {
+      if (!types2.includes(needed)) throw new Error(`${BIN} the fresh session's record lacks a ${needed} event: ${types2.join(', ')}`);
+    }
+    if (types2.includes('approval/asked')) {
+      const asked2 = events2.find((event) => event.type === 'approval/asked');
+      throw new Error(`${BIN} the fresh session's record carries an approval ask — the card-minted pass did not cover it: ${JSON.stringify(asked2).slice(0, 300)}`);
+    }
     if (!(indexOf(events[0]) === 0 && indexOf(asked) < indexOf(decided) && indexOf(decided) < indexOf(events.find((event) => event.type === 'turn/end')))) {
       throw new Error(`${BIN} the approval pair is not turn-enclosed on the record`);
     }
@@ -330,6 +434,7 @@ export async function runProbe({ home = mkdtempSync(join(tmpdir(), 'dist-probe-'
       events: events.length, llmRequests,
       verdict: { verdict: verdict.verdict, chain: verdict.checked?.chain },
       envelope: sawEnvelope,
+      door: { ladder: card.ladder, pick: card.pick },
     };
   } finally {
     const disposed = Promise.race([
