@@ -103,12 +103,16 @@ test('answerer: deny claims and answers rejected; escalate delegates without cla
   assert.equal(view.decider.policy, 'deny');
 
   const ctx2 = fakeCtx();
-  nightWatchAnswerer(ctx2, { policy: 'escalate', output: { write() {} } });
+  const written2 = [];
+  nightWatchAnswerer(ctx2, { policy: 'escalate', output: { write: (s) => written2.push(s) } });
   const watch2 = ctx2.listeners[0];
   const view2 = { cause: CARD() };
   ctx2.get = () => ({ deciding: new Map([['c-esc', view2]]) });
   assert.equal(await watch2(REQ('c-esc'), async () => 'unavailable'), 'unavailable');
   assert.equal(view2.decider, undefined, 'escalation claims nothing — the fail-closed speaks for itself');
+  // the report duty covers escalations: the printed line must carry the
+  // policy's motivation — a silenced print fails here, not in production
+  assert.match(written2.join(''), /\[night-watch\] escalated "net\.fetch" at the params edge \(refused: page\) under grant sg_test1234 — motivation: the row covers this route; its axis refused \(page\); the appointed policy escalates — no one is deciding in the operator's absence\n$/);
 });
 
 test('answerer: an unknown policy refuses to mount', () => {
@@ -182,11 +186,15 @@ test('answerer judge: an allow claims the verdict under policy judge; unsure del
   assert.deepEqual(view.decider, { policy: 'judge', motivation: 'within the pass', grantId: 'sg_test1234' });
 
   const ctx2 = fakeCtx();
-  nightWatchAnswerer(ctx2, { policy: 'judge', output: { write() {} }, judge: async () => ({ verdict: 'unsure', motivation: 'cannot tell' }) });
+  const written2 = [];
+  nightWatchAnswerer(ctx2, { policy: 'judge', output: { write: (s) => written2.push(s) }, judge: async () => ({ verdict: 'unsure', motivation: 'cannot tell' }) });
   const view2 = { cause: CARD() };
   ctx2.get = () => ({ deciding: new Map([['c-u', view2]]) });
   assert.equal(await ctx2.listeners[0](REQ('c-u'), async () => 'unavailable'), 'unavailable');
   assert.equal(view2.decider, undefined, 'an escalation claims nothing');
+  // unsure IS escalate: the unsure verdict prints its motivation like any
+  // other — "cannot tell" must reach stderr, not die in a silent fall-through
+  assert.match(written2.join(''), /\[night-watch\] escalated "net\.fetch" at the params edge \(refused: page\) under grant sg_test1234 — motivation: cannot tell\n$/);
 });
 
 test('policy judge without a composed judge refuses to mount; decideEdge declines it', () => {
