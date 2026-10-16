@@ -86,8 +86,10 @@ An act that falls outside a live row's axis asks with the edge **named**:
 the row under test, what its axis admits, what the act carries, which of
 the refused names are credential-shaped, and the floor sentence — *no axis
 admits them, by offer, by command, or by any later judgment*. This
-classification (`params-edge`, history-first: a revoked narrow row is
-revoked news, not axis news) is the **decision context** the appointed
+classification (`params-edge`; it yields only to revocation — a revoked
+narrow row is revoked news, not axis news, the operator's word — and
+outranks lapsed history beside the live row, which is time passing, not a
+word about the axis, #211) is the **decision context** the appointed
 decider of #176's second slice will be handed — the membership question is
 always "is this call within the row's declared axis?", and the Enforcer,
 not the decider, assembles what that question means.
