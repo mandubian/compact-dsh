@@ -188,7 +188,16 @@ export function nightWatchAnswerer(ctx, { policy = 'escalate', judge = null, out
     }
     // unsure IS escalate (P-2.21): a decider that cannot decide escalates
     // rather than rejects — tolerate a judge returning the raw vocabulary
-    if (verdict === 'escalate' || verdict === 'unsure') return next();
+    if (verdict === 'escalate' || verdict === 'unsure') {
+      // the report duty covers escalations too: a silent fail-closed is the
+      // one shape this seat refuses — the operator reading stderr must tell
+      // "the judge answered no" from "the judge never answered" (found by
+      // the #188 capture: a judge escalation printed nothing at all, and the
+      // ask died as a bare 'unavailable' no one could diagnose)
+      const refused = (card.refused ?? []).join(', ');
+      output?.write?.(`[night-watch] escalated "${req.toolName ?? 'unknown'}" at the params edge (refused: ${refused || 'the whole query'}) under grant ${card.grantId} — motivation: ${motivation}\n`);
+      return next();
+    }
     // claim the verdict on the view: the recorded answerer owns what a yes
     // may materialize (nothing — the row's budget pays) and writes the
     // attributed, motivated note on the record either way

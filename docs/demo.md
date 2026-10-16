@@ -1333,53 +1333,76 @@ session only). The fetch returns httpbingo's `args` echo, and the pair
 lands in the store: the pattern row (gate) + the `HostAndPort` wire row
 (the leg the egress mediator delivers through).
 
-### Act two — sleep through the run (unattended, judged edges) · **not captured**
+### Act two — sleep through the run (unattended, judged edges) · **captured (verified 2026-10-16)**
 
-The commands are runnable as written; the two output blocks below are the
-uncaptured ones — their wording is what the code pins (the stderr line is
-emitted by `tools/night-watch.mjs`, the ledger format by
-`tools/watch-report.mjs`), and the live run is the checklist for the next
-capture. What the 2026-10-13 attempt could already verify live, and what
-still blocks the rest, is recorded after the blocks.
+The judge answers only what the Enforcer hands it, in a state where the
+pass is the youngest thing on the route: mint the pass in a fresh state
+(`COMPACT_STATE_DIR`), then run unattended — one fetch per bash call (a
+composite command asks as one composite act, and a composite is not an
+edge; act three). The model route must resolve at judgment time — on a
+proxy-only network the host-side transport needs `NODE_USE_ENV_PROXY=1`
+(Node's fetch ignores `http_proxy` otherwise; the session's model and the
+judge both ride it):
 
 ```bash
+COMPACT_STATE_DIR=/tmp/night-shift-state NODE_USE_ENV_PROXY=1 \
 COMPACT_EGRESS=proxy COMPACT_SANDBOX_IMAGE=dsh-tools:basic COMPACT_DECIDER=judge npm run compact -- --workspace /tmp/night-shift \
-  "Fetch https://httpbingo.org/get?q=cats and ?q=dogs and ?q=dogs&page=2 with curl; report each args echo"
-node tools/watch-report.mjs ~/.compact-dsh/sessions/--tmp-night-shift--/<newest-session-id>/session.v4.jsonl
+  "Make THREE separate bash calls, one URL per call, never combining URLs in one command: first fetch https://httpbingo.org/get?q=cats with curl, then fetch https://httpbingo.org/get?q=dogs with curl, then fetch https://httpbingo.org/get?q=dogs&page=2 with curl; report each args echo"
+node tools/watch-report.mjs /tmp/night-shift-state/sessions/--tmp-night-shift--/<newest-session-id>/session.v4.jsonl
 ```
 
 The new session is **not a stranger to the pass**: `?q=cats` and `?q=dogs`
-run silently under it (different fingerprints, same axis — budget ticks).
-`?q=dogs&page=2` is the **edge**: a live row covers the route but its axis
-refuses the new name. The gate asks; nobody human is there; the appointed
-judge is. On stderr — the shapes below are pinned by the night-watch
-suite, not yet a live capture (the ask block in act one is the verified
-one):
+run silently under it (no ask — the budget ticks), and stall at the wire
+on a proxy-only network (the mediator's upstream dial is raw TCP; curl
+exits 28 — the named limit below). `?q=dogs&page=2` is the **edge**: the
+live row covers the route but its axis refuses the new name. The gate
+asks; nobody human is there; the appointed judge is. Captured **(verified
+2026-10-16)** — the judge (the runtime's own default route) **denied** the
+edge:
 
 ```
-[night-watch] allowed "bash" at the params edge (refused: page) under grant sg_… — motivation on the record
+compact-dsh: night watch appointed (policy: judge) — params-edge asks only; every verdict reported with its motivation
+[night-watch] denied "bash" at the params edge (refused: page) under grant sg_5ac410c7 — motivation on the record
 ```
 
 and the ledger, offline, from the record alone:
 
 ```
 1 night-watch verdict(s):
-  Night watch: "bash" allowed (judge) — under the grant's terms
-  basis: sg_…
-  motivation: page is an ordinary pagination parameter of the same kind the pass admits
+  Night watch: "bash" denied (judge) — did not run
+  motivation: The grant axis admits only 'q', so the call's 'page' parameter falls outside the signed scope and must fail closed..
 ```
 
-**Capture state (2026-10-13).** The door half of this act is verified: the
+(the doubled final period is the captured bytes — the judge's motivation
+ends with its own). The gate decision also lands on the session's record,
+attributed:
+
+```
+[compact-approval] Gate decision: "bash" (url=https://httpbingo.org/get/ host=httpbingo.org) [fp_5d1c8da94398e015] was denied by the appointed night watch (policy: judge) — the call did not run. Motivation: The grant axis admits only 'q', so the call's 'page' parameter falls outside the signed scope and must fail closed.
+```
+
+The judged verdict in this capture is a **denial** — the judge read the
+card (route covered, `page` refused) and declined to widen the pass, and
+the session's model answered honestly ("the third was denied… I shouldn't
+retry another way (policy denial)"). An allow reads "allowed … under the
+grant's terms" — the machinery is the same either way: card in, attributed
+verdict out, motivation on the record and in the ledger.
+
+**Capture state.** The door half of this act was verified 2026-10-12: the
 attended ask rendered the scope ladder and the `!` hint exactly as Act one
 records, the `3!` answer minted the pair **unscoped** — the `UrlPrefix` gate
 row *and* the `HostAndPort` wire row, `root` and `session` both null (#187,
 #190) — and the mediator refused the pre-grant CONNECT with 403, then
-accepted it once the pair existed. The judge half stays uncaptured for an
-environmental reason: the mediator's upstream dial is a raw TCP connection,
-and the network of the 2026-10-13 attempt drops raw outbound TCP (only an
-HTTP proxy carries egress), so the tunnel stalls after the mediator's yes —
-the pass is minted, the wire refuses nothing, and the fetch still cannot
-leave. On a network with raw egress the commands above are the checklist.
+accepted it once the pair existed. 2026-10-13: the mediated posture was
+found missing from these commands, and the capture network's proxy-only
+egress named the wire-leg limit. 2026-10-16: the judge half captured on
+such a network — two defects found by the capture and fixed in the same
+commit (the judge's route read `ctx.get('agentDefaultModel')`, which no
+real boot provides — the runtime exposes
+`ctx.agentDefaultModel.currentSelection()`; and an escalation printed
+nothing, so a judge failure was indistinguishable from an empty chair).
+On a network with raw egress the covered fetches deliver instead of
+stalling; every other frame is as shown.
 
 If the judge had been unsure — or its answer malformed, or its model call
 failed — the act **escalates**: fail-closed, on the record, nobody guessed
@@ -1400,6 +1423,22 @@ command, or by any later judgment"). Swap the member by taste:
 - **A revoked pass is remembered**: the next ask leads with *The grant …
   was revoked. Approving re-asks for consent* — history-first, not a
   generic "uncovered". Captured **(verified 2026-10-12)**.
+- **A composite command asks as a composite**: bundle the three fetches
+  into one bash call (`curl …; echo; curl …`) and the gate reads one act
+  whose query shape carries every name at once — `query(page, q)` — so the
+  single-name pass covers none of it, the ask is not a params-edge, and an
+  unattended run fails closed. Captured **(verified 2026-10-16)** — the
+  model's own optimization, reported honestly ("Both attempts to execute
+  curl failed closed"). One fetch per call is the pass's shape.
+- **Expired history shadows the edge** (found by the 2026-10-16 capture,
+  open as an issue): the cause walk reads route history
+  revoked → expired → spent → *then* the live-row params-edge, so when an
+  older expired row shares the route, an edge ask classifies `expired`
+  ("Your earlier grant … expired … Approving re-arms coverage") and the
+  watch — edges only — stands down. Yesterday's operations are exactly the
+  ones with expired history; on a long-lived state the night shift fails
+  closed at every re-run until the stale row is cleaned. The capture ran in
+  a fresh state for this reason.
 
 ### What this shows, in one paragraph
 
