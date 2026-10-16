@@ -60,9 +60,17 @@ export function judgeFromContext(ctx) {
         : typeof v === 'string' ? v
         : typeof v === 'function' ? (v() ?? null)
         : (v.value ?? v.current ?? null);
-      const adm = ctx.get?.('agentDefaultModel');
-      const provider = readVolatile(adm?.provider);
-      const model = readVolatile(adm?.model);
+      // the runtime exposes the default model as a ctx PROPERTY with a
+      // currentSelection() reader — dsh-api-session-controller's own shape
+      // (ctx.agentDefaultModel.currentSelection()). ctx.get('agentDefaultModel')
+      // resolves nothing on a real boot, and the judge's first live call found
+      // that out the hard way (#188 capture: "no usable model route at judgment
+      // time" on every edge ask, silently escalated). The getter stays as a
+      // test-shape fallback.
+      const adm = ctx.agentDefaultModel ?? ctx.get?.('agentDefaultModel');
+      const selection = typeof adm?.currentSelection === 'function' ? adm.currentSelection() : adm;
+      const provider = readVolatile(selection?.provider);
+      const model = readVolatile(selection?.model);
       const llm = ctx.llm;
       if (!provider || !model || typeof llm?.stream !== 'function') {
         throw new Error('no usable model route at judgment time (agentDefaultModel/llm unresolved)');
