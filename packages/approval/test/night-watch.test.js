@@ -61,6 +61,24 @@ test('card: the deciding view carries the params-edge cause — the watch\'s who
   assert.deepEqual(seen.cause.credential, []);
 });
 
+test('card: yesterday\'s expired row beside the live pass does not stand the watch down (#211)', async () => {
+  // the capture's long-lived state: the night shift replays a route that
+  // has history. Before the reorder the ask classified `expired` — the
+  // watch's jurisdiction is params-edge only, so nobody answered and the
+  // re-run died `unavailable`. The card must still be an edge.
+  const { ctx, approval } = boot({});
+  const old = approval.grantSession({
+    pattern: parseAllowlistLikePattern('https://api.example.com/v1/'),
+    root: 'sess-nw', session: 'sess-nw', ttlMs: 3_600_000, methodClass: 'read',
+  });
+  old.expiresAt = 1;                           // lapsed long ago, never revoked
+  const live = GRANT(approval);                // tonight's allow(q) pass
+  let seen = null;
+  await decide(ctx, approval, { args: EDGE, callId: 'c-211', watch: v => { seen = v; } });
+  assert.equal(seen.cause.kind, 'params-edge', 'the live row\'s edge — judged, not stood down');
+  assert.equal(seen.cause.grantId, live.id, 'the card names the LIVE row');
+});
+
 test('mint-nothing: a watch allow consumes the row\'s budget and materializes NOTHING else', async () => {
   const { ctx, approval } = boot({});
   const g = GRANT(approval, { maxUses: 2 });

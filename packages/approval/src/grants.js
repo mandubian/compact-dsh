@@ -339,6 +339,11 @@ export class GrantStore {
  *
  * Classes, in priority order (the first that applies answers):
  *   revoked        — a grant row covering this target was revoked
+ *   params-edge    — a LIVE row prefix-covers this route and its query axis
+ *                    refuses this act's names (#211: only revocation — the
+ *                    operator's word — outranks the live row; lapsed history
+ *                    is time passing, and the night shift replays yesterday's
+ *                    jobs, so yesterday's rows are the common case)
  *   expired        — a covering row lapsed by TTL
  *   spent          — a covering row exhausted its budget (a spent grant IS
  *                    an expired one: widening requires a new decision)
@@ -379,11 +384,6 @@ export function classifyAskCause(store, { target, session, now, egress, hasMetho
   const newest = (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0);
   const revokedRow = prefixRows.filter(g => g.revokedAt != null).sort(newest)[0];
   if (revokedRow) return { kind: 'revoked', grant: revokedRow };
-  const expiredRow = prefixRows.filter(g => !g.revokedAt && g.expiresAt != null && g.expiresAt <= now)
-    .sort((a, b) => b.expiresAt - a.expiresAt)[0];
-  if (expiredRow) return { kind: 'expired', grant: expiredRow };
-  const spentRow = prefixRows.filter(g => !g.revokedAt && g.maxUses != null && g.uses >= g.maxUses).sort(newest)[0];
-  if (spentRow) return { kind: 'spent', grant: spentRow };
   // #176 slice 1 — the params edge: a LIVE row prefix-covers this route but
   // its query axis does not admit this act's query. This is NOT a first
   // touch (the operator granted the route, narrower) and NOT a rephrase (a
@@ -393,6 +393,12 @@ export function classifyAskCause(store, { target, session, now, egress, hasMetho
   // widening path may cross). This classification is the seed of the night
   // watch's decision context (#176 slice 2): the row, the diff, the floor —
   // what a membership decider would be handed, named by the Enforcer.
+  // #211: this check precedes the expired/spent history classes — an
+  // expired row is time passing, not a word about the axis, and the night
+  // shift replays yesterday's jobs, so lapsed history beside a live row is
+  // the common case; letting it lead stood the watch down on every re-run.
+  // Only revocation — the operator's own word — keeps its lead over the
+  // live row. A route whose rows are ALL lapsed still classifies below.
   const edgeRow = prefixRows.filter(g => !g.revokedAt && (!g.expiresAt || g.expiresAt > now) &&
     (g.maxUses == null || g.uses < g.maxUses)).sort(newest)[0];
   if (edgeRow?.pattern?.params != null && edgeRow.pattern.params.mode !== 'free') {
@@ -406,6 +412,11 @@ export function classifyAskCause(store, { target, session, now, egress, hasMetho
       credential: refused.filter(credentialShapedName),
     };
   }
+  const expiredRow = prefixRows.filter(g => !g.revokedAt && g.expiresAt != null && g.expiresAt <= now)
+    .sort((a, b) => b.expiresAt - a.expiresAt)[0];
+  if (expiredRow) return { kind: 'expired', grant: expiredRow };
+  const spentRow = prefixRows.filter(g => !g.revokedAt && g.maxUses != null && g.uses >= g.maxUses).sort(newest)[0];
+  if (spentRow) return { kind: 'spent', grant: spentRow };
   // the cache is fingerprint-keyed; the rephrase question is target-keyed.
   // Liveness is part of the truth (#40's lazy deletion leaves lapsed rows in
   // the map): a live entry is coverage the phrasing excluded, a lapsed one

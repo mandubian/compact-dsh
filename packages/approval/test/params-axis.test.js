@@ -106,6 +106,42 @@ test('classifyAskCause: a FIXED row\'s edge refuses every query; revoked history
   assert.equal(revoked.kind, 'revoked', 'history first: a revoked row is the cause, not the axis it once had');
 });
 
+test('classifyAskCause: a live row\'s edge outranks lapsed history beside it (#211)', () => {
+  // the #211 capture: the night shift replays yesterday's jobs in a
+  // long-lived state — an expired row from a previous night beside
+  // tonight's live allow(q) pass on the same route. Time passed; the live
+  // row's word about the axis did not. The edge must classify, or the
+  // watch — params-edge asks only — stands down and every re-run of a
+  // previously-approved operation fails closed.
+  const store = new GrantStore();
+  const yesterday = store.addSessionGrant({ pattern: parseAllowlistLikePattern('https://api.example.com/v1/'), root: 'sess-p', session: 'sess-p', ttlMs: 60_000, now: NOW - 86_400_000 });
+  yesterday.expiresAt = NOW - 1000;            // lapsed overnight, never revoked
+  store.addSessionGrant({ pattern: parseAllowlistLikePattern('https://api.example.com/v1/?q=x'), root: 'sess-p', session: 'sess-p', ttlMs: 60_000, now: NOW });
+  const cause = classifyAskCause(store, { target: { url: 'https://api.example.com/v1/search?q=dogs&page=2', methodClass: 'read' }, session: 'sess-p', now: NOW, egress: undefined });
+  assert.equal(cause.kind, 'params-edge', 'the live row answers for the axis; the expired ancestor is history, not a word');
+  assert.deepEqual(cause.refused, ['page']);
+  assert.equal(cause.grant.createdAt, NOW, 'the row under test is the LIVE one, never yesterday\'s');
+
+  const store2 = new GrantStore();
+  const spent = store2.addSessionGrant({ pattern: parseAllowlistLikePattern('https://s.example/?q=x'), root: 'sess-p', session: 'sess-p', ttlMs: 60_000, maxUses: 1, now: NOW });
+  spent.uses = 1;                              // live by TTL, dead by budget
+  assert.equal(classifyAskCause(store2, { target: { url: 'https://s.example/x?page=2' }, session: 'sess-p', now: NOW, egress: undefined }).kind, 'spent',
+    'a spent row is no live coverage — widening still requires a new decision');
+
+  const store3 = new GrantStore();
+  const lapsed = store3.addSessionGrant({ pattern: parseAllowlistLikePattern('https://o.example/?q=x'), root: 'sess-p', session: 'sess-p', ttlMs: 60_000, now: NOW - 86_400_000 });
+  lapsed.expiresAt = NOW - 1000;
+  assert.equal(classifyAskCause(store3, { target: { url: 'https://o.example/x?page=2' }, session: 'sess-p', now: NOW, egress: undefined }).kind, 'expired',
+    'a route whose rows are ALL lapsed is genuinely stale — the re-arm lead stands');
+
+  const store4 = new GrantStore();
+  const dead = store4.addSessionGrant({ pattern: parseAllowlistLikePattern('https://r.example/?q=x'), root: 'sess-p', session: 'sess-p', ttlMs: 60_000, now: NOW - 86_400_000 });
+  store4.revokeSessionGrant(dead.id, NOW - 500);
+  store4.addSessionGrant({ pattern: parseAllowlistLikePattern('https://r.example/?q=x'), root: 'sess-p', session: 'sess-p', ttlMs: 60_000, now: NOW });
+  assert.equal(classifyAskCause(store4, { target: { url: 'https://r.example/x?page=2' }, session: 'sess-p', now: NOW, egress: undefined }).kind, 'revoked',
+    'revocation — the operator\'s word — still outranks the live row (#211 pins this)');
+});
+
 // -- the door: offers carry the axis, the credential name never joins ---------------
 
 test('offers: a credential-shaped name never joins the offered axis; an all-credential query offers none', () => {

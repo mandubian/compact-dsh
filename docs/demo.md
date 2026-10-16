@@ -1430,15 +1430,22 @@ command, or by any later judgment"). Swap the member by taste:
   unattended run fails closed. Captured **(verified 2026-10-16)** — the
   model's own optimization, reported honestly ("Both attempts to execute
   curl failed closed"). One fetch per call is the pass's shape.
-- **Expired history shadows the edge** (found by the 2026-10-16 capture,
-  open as an issue): the cause walk reads route history
-  revoked → expired → spent → *then* the live-row params-edge, so when an
-  older expired row shares the route, an edge ask classifies `expired`
-  ("Your earlier grant … expired … Approving re-arms coverage") and the
-  watch — edges only — stands down. Yesterday's operations are exactly the
-  ones with expired history; on a long-lived state the night shift fails
-  closed at every re-run until the stale row is cleaned. The capture ran in
-  a fresh state for this reason.
+- **Expired history no longer shadows the edge** (found by the 2026-10-16
+  capture, open as an issue, fixed the same day, #211): the cause walk read route
+  history revoked → expired → spent → *then* the live-row params-edge, so
+  when an older expired row shared the route, an edge ask classified
+  `expired` ("Your earlier grant … expired … Approving re-arms coverage")
+  and the watch — edges only — stood down. Yesterday's operations are
+  exactly the ones with expired history; on a long-lived state the night
+  shift failed closed at every re-run. Fixed by the reorder: the walk now
+  reads revoked → the live-row params-edge → expired/spent — only
+  revocation, the operator's word, outranks the live pass; lapsed history
+  beside it is time passing, not a word about the axis, and a route whose
+  rows are ALL lapsed still leads `expired` (the re-arm ask). Pinned by
+  the approval suites **(verified 2026-10-16, `params-axis.test.js` and
+  `packages/approval/test/night-watch.test.js`)**; the 2026-10-16 capture
+  ran in a fresh state ahead of the fix — a live re-run over an aged state
+  is the next capture's checklist.
 
 ### What this shows, in one paragraph
 
