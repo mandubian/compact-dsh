@@ -16,6 +16,7 @@
     "compact-dsh-allowlist-gate": "0.1.0",
     "compact-dsh-approval": "0.4.1",
     "compact-dsh-capability-gate": "0.1.0",
+    "compact-dsh-community": "0.1.0",
     "compact-dsh-constitution": "0.1.0",
     "compact-dsh-egress-proxy": "0.1.0",
     "compact-dsh-emergency": "0.1.0",
