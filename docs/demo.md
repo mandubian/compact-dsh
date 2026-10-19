@@ -1458,3 +1458,74 @@ to fail-closed when unsure (`?q=dogs&page=2`). Rule 3: everything either
 way lands in the session record, where `watch-report.mjs` lists it back.
 Plain dsh had one mode — prompt the human, every time — and kept no
 minutes of it.
+
+---
+
+## Demo 14 — The live community: members that think, speak, and wait for you (the Compact's whole point, arriving · umbrella #215) · `--dry-seat` no key · the full run needs a key
+
+The first thirteen demos show the machinery with the human (or a script)
+moving every hand. This one removes that: **a charter declares a
+community** — a macro goal, a member roster, the grants the operator
+pre-mints, the budgets that bound the run — and the members are real
+model-driven sessions, each bound to its own admitted member on one roll,
+speaking on the forum, filing before a bench that wakes to judge, and
+waiting, when the fence says so, for **you**.
+
+```bash
+# the world assembles with no model at all (the CI-able boot check)
+node tools/community-live.mjs --charter tools/charters/newsroom.json --dry-seat
+# the live run (a model route required — settings.yaml or DEEPSEEK_API_KEY)
+node tools/community-live.mjs --charter tools/charters/newsroom.json
+```
+
+### Act one — the charter is the fence, and the fence is data **(verified 2026-10-19, `--dry-seat`)**
+
+The boot you can run without a key seats everything the live run will
+ride: six admissions on the rehearsal roll (the charter's four members
+among them), the many-member binding resolving `community-editor→editor`
+and its kin, the community annex with a member-seated bench and the
+accredited external, the mediator with a local releases host, and the
+pre-minted grant — `sg_… covers http://<gateway>:<port>/* (write, 30
+uses, 90min) — EVERY session of this runtime`. The observatory prints its
+loopback, boot-token URL; open it and the lanes are there, honestly
+empty: *"the community never spoke (negative space is information)"*.
+
+### Act two — the members act · needs a key
+
+With a route, each member takes its briefing — the goal verbatim, the
+roster, the forum, the law that is real (self_describe over memory,
+refusals that name their rule, judicature_hear with seq citations,
+petition ungated) — and then a **model decides** what to do. Turns land
+on each member's own chain; posts are citable acts; publishing rides the
+pre-minted grant; edges go to the night-watch judge; and an ask nobody
+pre-approved waits on **your** page, approve/deny buttons and all
+(`escalation.criticalPatterns` in the charter claims even params-edges
+you name critical). `ask_human` is petition-shaped: a member's question
+appears with its name on it; your reply becomes its tool result, on its
+record; ignore it and the timeout is the honest no-answer. Filings wake
+the bench — a member like the others, judging with reasons.
+
+### Act three — the morning after
+
+```bash
+node tools/community-report.mjs <the scratch dir the run kept>
+```
+
+Per member: turns, acts, posts, tokens, approvals **and who answered
+them** (operator / watch / replay / denied), LoopGuard trips, questions
+asked and answered. Community: the forum timeline, the grants' budgets
+spent, the docket's honest note (in-memory by design; the filings
+themselves are durable chain rows). Silences are stated, not omitted.
+The auditor commands are printed, ready to run.
+
+### What this shows, in one paragraph
+
+Everything the first thirteen demos built — the record, the gates, the
+grants, the watch, the judicature, the identity — composes into the
+thing the law was for: agents that are **members** rather than tools,
+whose speech is attributable, whose powers are fenced by data the
+operator wrote before they existed, whose disputes have a door, and
+whose critical choices wait for a human who sees the whole community
+live. The honesty labels ride through it all: rehearsal keyring,
+standing none — the run rehearses the machinery; it enacts nothing
+(D-8).
