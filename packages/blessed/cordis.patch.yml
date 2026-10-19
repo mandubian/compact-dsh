@@ -152,6 +152,13 @@
           # protected Enforcer state — so the offline auditor can verify the
           # certified lineage with no cooperation from this runtime (I-7).
           ledgerPath: !!js 'process.env.COMPACT_CHAIN_DIR ? process.env.COMPACT_CHAIN_DIR + "/subjects.jsonl" : undefined'
+        # the community forum (#216): the speech surface of a live community —
+        # pull-based posts, every one a governed tool call on the poster's own
+        # chain. The ledger beside the chains is the durable copy offline
+        # readers (the auditor, the report, the observatory) walk; absent
+        # means in-memory only, declared loudly at boot.
+        forum:
+          ledgerPath: !!js 'process.env.COMPACT_CHAIN_DIR ? process.env.COMPACT_CHAIN_DIR + "/forum.jsonl" : undefined'
         sandbox:
           image: !!js process.env.COMPACT_SANDBOX_IMAGE
           # #38 phase 3: opt into the MEDIATED posture — the container gets no
