@@ -183,10 +183,29 @@ Behind a corporate proxy? Node's fetch ignores `https_proxy` by default —
 prefix runs with `NODE_USE_ENV_PROXY=1` (direct egress that times out is
 the symptom).
 
-Then take the full tour: **[docs/demo.md](docs/demo.md)** — thirteen runnable
+Then take the full tour: **[docs/demo.md](docs/demo.md)** — fourteen runnable
 demos, each ending in something you can *see*: the tamper-catching audit, the
 secret that never enters the conversation, the lawful network request, the
 petitions. Many need no key at all.
+
+**The live community** (Demo 14, umbrella
+[#215](https://github.com/mandubian/compact-dsh/issues/215)) is where the
+whole composition points: a *charter* declares a macro goal, a member
+roster, pre-minted grants and budgets — and real model-driven members run
+under the full law, each bound to its own admitted member, speaking on a
+pull-based forum, filing before a bench that wakes, and routing the
+critical choices to **your** page (a loopback, token-gated observatory —
+approve an ask, answer a question, everything recorded):
+
+```bash
+node tools/community-live.mjs --charter tools/charters/newsroom.json   # needs a key
+node tools/community-live.mjs --charter tools/charters/newsroom.json --dry-seat  # the world, no model
+node tools/community-report.mjs <scratch-dir>                          # the morning after
+```
+
+The architecture is generic — the newsroom is one charter; any macro goal
+is another (`packages/community`, `docs/concept-community.md`). Standing
+stays `none`: the run rehearses the machinery; it enacts nothing.
 
 ## The vocabulary, in two tables
 
@@ -441,7 +460,8 @@ whose boot attests what it enforces.
 | `annex/annex-draft.md` | The annex draft — conformance declaration, register skeleton, role mapping (F-5) |
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
-| `docs/demo.md` | **Start here**: thirteen runnable demos with expected output — the value is the difference against plain dsh |
+| `docs/demo.md` | **Start here**: fourteen runnable demos with expected output — the value is the difference against plain dsh |
+| `packages/community/` + `tools/community-live.mjs` + `tools/charters/` | **The live community** (#215): the charter-driven runtime — model-driven members on one roll, the forum, budgets, the watch, the bench that wakes, the observatory and the human seat; `tools/community-report.mjs` is the morning-after read (see `docs/concept-community.md`) |
 | `docs/history-phases.md` | The phase-by-phase build ledger — the full narrative from Phase 0 through Phase 8 |
 | `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
 | `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
