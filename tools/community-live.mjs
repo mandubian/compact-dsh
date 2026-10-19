@@ -44,7 +44,7 @@ import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
-import { validateCharter, memberBindingsOf, apply as applyCommunity } from '../packages/community/src/index.js';
+import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory } from '../packages/community/src/index.js';
 
 const BIN = 'community-live:';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -214,18 +214,31 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedK
   // the token meter: usage lands on every assistant message the loop
   // writes — summed here, enforced by the engine's budget check. The
   // stream itself is NEVER forbidden: the night-watch judge rides it.
+  // The same listener feeds the observatory's notice lane: the attributed
+  // user/message notices members receive (watch verdicts, approvals,
+  // loopguard) — the shapes the after-run report reads, live.
   let tokensUsed = 0;
+  let noticeSink = null; // the observatory's notice lane, wired post-boot
+  const onSessionEvent = (session, event) => {
+    if (event?.type === 'assistant/message') {
+      const u = event?.data?.usage ?? event?.usage;
+      if (u) tokensUsed += (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadTokens ?? 0) + (u.cacheWriteTokens ?? 0);
+      return;
+    }
+    if (event?.type === 'user/message') {
+      const source = event?.data?.source ?? event?.source;
+      const kind = String(source?.kind ?? '');
+      if (kind === 'compact-approval' || kind === 'compact-loopguard') {
+        noticeSink?.({ type: 'notice', to: String(session?.id ?? '?'), summary: String(source?.summary ?? '') });
+      }
+    }
+  };
   const ctx = await boot(BIN, configFile, patches, (host) => {
     provideCmdline(host, { args: [], exit: () => {} });
-    host.on('session/event', (session, event) => {
-      if (event?.type !== 'assistant/message') return;
-      const u = event?.data?.usage ?? event?.usage;
-      if (!u) return;
-      tokensUsed += (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadTokens ?? 0) + (u.cacheWriteTokens ?? 0);
-    });
+    host.on('session/event', onSessionEvent);
   }, pathToFileURL(join(ROOT, 'package.json')).href);
   if (ctx.get('compact-ready')?.ready !== true) throw new Error(`${BIN} the composition never became compact-ready`);
-  return { ctx, env, tokenMeter: () => tokensUsed };
+  return { ctx, env, tokenMeter: () => tokensUsed, setNoticeSink: (fn) => { noticeSink = fn; } };
 }
 
 /** Pre-mint the charter's grants — the operator's act, before any member
@@ -346,24 +359,67 @@ async function main() {
     ? communityAnnex(keyringDir, keyring, charter, benchDigests)
     : { annexPath: join(keyringDir, 'enforcer.annex.json') };
 
-  const { ctx, env, tokenMeter } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
+  const { ctx, env, tokenMeter, setNoticeSink } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
   const releases = await releasesHost(gateway);
   SAY(`releases host listening on ${releases.origin} (the mediation gateway — all-local delivery, #55 private-class exception)`);
 
-  // the answerer seating: the recorded answerer is already first (the
-  // approval plugin's own); the driver seat claims NOTHING (fail closed —
-  // its decisions would not be the members'); the night watch judge sits
-  // last for params-edge asks on the rows the operator pre-minted
+  // the answerer seating, in order: the recorded answerer is already
+  // first (the approval plugin's own); the driver seat claims NOTHING (its
+  // decisions would not be the members'); THE HUMAN SEAT claims what the
+  // fence routes to the operator — asks that would otherwise fail closed,
+  // and the charter's critical patterns even at the params edge (#219);
+  // the night watch judge sits last for the params-edge remainder
   let asksSeen = 0;
+  const observe = !argv.includes('--no-observe');
+  let observatory = null;
+  const publishSafe = (event) => { try { observatory?.publish(event); } catch { /* a dead page never breaks the run */ } };
   ctx.on('approval/request', (req, next) => {
     asksSeen += 1;
-    SAY(`ask #${asksSeen}: ${String(req?.reason ?? '').split('\n')[0].slice(0, 110)}… → not the driver's to answer (fail closed downstream)`);
+    const headline = String(req?.reason ?? '').split('\n')[0];
+    SAY(`ask #${asksSeen}: ${headline.slice(0, 110)}… → not the driver's to answer`);
+    publishSafe({ type: 'ask-seen', headline: headline.slice(0, 200), to: 'the human seat / the watch' });
     return next();
   });
+  const escalation = charter.escalation ?? {};
+  const humanSeat = mountHumanSeat(ctx, {
+    criticalPatterns: escalation.criticalPatterns ?? [],
+    askTimeoutMs: escalation.askTimeoutMs ?? Number(flag('ask-timeout') ?? 120_000),
+    questionTimeoutMs: escalation.questionTimeoutMs ?? 300_000,
+    onPose: (record) => {
+      publishSafe(record.kind === 'ask' ? { type: 'ask-posed', headline: record.headline, critical: record.critical } : { type: 'question-posed', by: record.by, headline: record.headline });
+      SAY(`human seat: ${record.kind === 'ask' ? 'an approval ask waits for you' : `a member asks you: ${record.headline.slice(0, 80)}…`} ${observatory ? `(on the page: ${observatory.url})` : '(NO PAGE — --no-observe; it will time out fail-closed)'}`);
+    },
+    onResolve: (record) => {
+      if (record.kind === 'ask') {
+        publishSafe(record.answer === 'timeout' ? { type: 'ask-timeout', id: record.id } : { type: 'ask-decided', id: record.id, decision: record.answer });
+      } else {
+        publishSafe(record.answer == null ? { type: 'question-timeout', by: record.by } : { type: 'question-answered', by: record.by });
+      }
+    },
+  });
+  ctx.on('approval/request', humanSeat.answerer);
   nightWatchAnswerer(ctx, { policy: 'judge', judge: judgeFromContext(ctx) });
-  SAY('night watch seated (judge policy): params-edge asks on pre-minted rows are judged, attributed, motivated; novel asks escalate on the record');
+  SAY('night watch seated (judge policy): params-edge asks on pre-minted rows are judged, attributed, motivated');
+  try {
+    ctx.get('tools')?.register?.(humanSeat.tool);
+  } catch (error) {
+    SAY(`ask_human registration failed: ${error.message} — questions will not reach the human this run`);
+  }
+  if (observe) {
+    observatory = await startObservatory(ctx, {
+      humanSeat,
+      port: Number(flag('port') ?? 3090),
+      charterName: charter.name,
+    });
+    // the page's feed: forum posts as they land, and the notices members
+    // receive (watch verdicts, loopguard) read off session events — the
+    // same shapes the after-run report reads
+    ctx.get('compact-forum')?.onPost?.((post) => publishSafe({ type: 'forum-post', id: post.id, topic: post.topic, by: post.by, text: post.text }));
+    setNoticeSink(publishSafe);
+    SAY(`observatory (loopback, boot-token): ${observatory.url} — the forum live, the acts as they happen, and what waits for you`);
+  }
 
   // the community runtime comes with the composition (blessed mounts it);
   // applying it directly is the fallback for compositions that do not
@@ -386,11 +442,12 @@ async function main() {
     const hooks = {
       onRoute: (s) => SAY(`model route: ${s.provider}/${s.model}`),
       onSeat: (m, agent) => SAY(`seated ${m.id} (${m.prefix}${m.bench ? ', bench' : ''}) — session ${String(agent?.session?.id ?? agent?.id ?? '?').slice(0, 20)}…`),
-      onTurn: (m) => line(`  → ${m.id} takes a turn`),
-      onTurnDone: (m, turns) => SAY(`  ← ${m.id} turn ${turns} done (flushed to its chain)`),
-      onBenchWake: (m, c) => line(`  ⚖ bench ${m.id} woken for ${c.id}`),
+      onTurn: (m) => { line(`  → ${m.id} takes a turn`); publishSafe({ type: 'turn', member: m.id, bench: m.bench === true }); },
+      onTurnDone: (m, turns) => { SAY(`  ← ${m.id} turn ${turns} done (flushed to its chain)`); publishSafe({ type: 'turn-done', member: m.id, turns }); },
+      onBenchWake: (m, c) => { line(`  ⚖ bench ${m.id} woken for ${c.id}`); publishSafe({ type: 'bench-wake', member: m.id, caseId: c.id }); },
       onSkip: (m, why) => SAY(`  · ${m.id} skipped (${why})`),
       onFlushError: (m, e) => SAY(`  ! ${m.id} flush failed: ${e.message}`),
+      onEnd: (s) => publishSafe({ type: 'end', reason: s.endReason }),
     };
     const stats = await community.runCommunity({
       charter, workspace, hooks, tokenMeter, releasesOrigin: releases.origin,
@@ -417,6 +474,11 @@ async function main() {
     process.stdout.write(`\n${BIN} FAILED — ${error?.stack ?? error}\n`);
     exitCode = 1;
   } finally {
+    // the page outlives the run by a breath (the END event reaches it);
+    // a --dry-seat run lingers longer — the point is to LOOK at the world
+    // that assembled (members seated, grants minted, the page itself)
+    if (observatory) await new Promise((r) => setTimeout(r, drySeat ? 60_000 : 2_500));
+    await observatory?.close?.().catch?.(() => {});
     await releases.close().catch(() => {});
     await ctx.fiber.dispose().catch(() => {});
   }

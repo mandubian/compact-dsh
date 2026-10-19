@@ -109,6 +109,37 @@ export function validateCharter(doc) {
     ? { note: String(doc.publish.note ?? '').trim() || null, route: String(doc.publish.route ?? '').trim() || null }
     : null;
 
+  // the escalation classes (#219): what the fence routes to the HUMAN
+  // rather than the watch — regexes over the ask's reason (the decision
+  // card the approval gate publishes), plus the seat's patience
+  let escalation = null;
+  if (doc.escalation !== undefined) {
+    if (!doc.escalation || typeof doc.escalation !== 'object') throw bad('escalation', 'an object {criticalPatterns, askTimeoutMs, questionTimeoutMs}');
+    for (const key of Object.keys(doc.escalation)) {
+      if (!['criticalPatterns', 'askTimeoutMs', 'questionTimeoutMs'].includes(key)) throw bad(`escalation.${key}`, 'unknown key — {criticalPatterns, askTimeoutMs, questionTimeoutMs}');
+    }
+    const criticalPatterns = [];
+    for (const p of doc.escalation.criticalPatterns ?? []) {
+      if (typeof p !== 'string' || !p.trim()) throw bad('escalation.criticalPatterns[]', 'each pattern is a non-empty regex source over the ask\'s reason');
+      try {
+        new RegExp(p, 'i');
+      } catch (e) {
+        throw bad('escalation.criticalPatterns[]', `"${p.slice(0, 40)}" does not compile: ${e.message}`);
+      }
+      criticalPatterns.push(p);
+    }
+    for (const k of ['askTimeoutMs', 'questionTimeoutMs']) {
+      if (doc.escalation[k] !== undefined && (!Number.isInteger(doc.escalation[k]) || doc.escalation[k] < 1000)) {
+        throw bad(`escalation.${k}`, 'an integer of milliseconds ≥ 1000 — a human needs at least a second');
+      }
+    }
+    escalation = {
+      criticalPatterns,
+      ...(doc.escalation.askTimeoutMs !== undefined ? { askTimeoutMs: doc.escalation.askTimeoutMs } : {}),
+      ...(doc.escalation.questionTimeoutMs !== undefined ? { questionTimeoutMs: doc.escalation.questionTimeoutMs } : {}),
+    };
+  }
+
   return {
     version: CHARTER_VERSION,
     name, goal: doc.goal.trim(), topic,
@@ -117,6 +148,7 @@ export function validateCharter(doc) {
     grants,
     sources,
     ...(publish ? { publish } : {}),
+    ...(escalation ? { escalation } : {}),
     ...(typeof doc.briefingExtra === 'string' && doc.briefingExtra.trim() ? { briefingExtra: doc.briefingExtra.trim() } : {}),
   };
 }
