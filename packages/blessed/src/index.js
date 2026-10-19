@@ -4,6 +4,7 @@ import { apply as applyCapabilityGate } from 'compact-dsh-capability-gate';
 import { apply as applyConstitution, DEFAULT_REQUIRES } from 'compact-dsh-constitution';
 import { apply as applyEmergency } from 'compact-dsh-emergency';
 import { apply as applyExit } from 'compact-dsh-exit';
+import { apply as applyForum } from 'compact-dsh-forum';
 import { apply as applyGuide } from 'compact-dsh-guide';
 import { apply as applyLoopguard } from 'compact-dsh-loopguard';
 import { apply as applyPetition } from 'compact-dsh-petition';
@@ -68,7 +69,7 @@ export function declareWorkspaceRoot(policy, root) {
 export function resolveConfig(config) {
   object(config, 'config');
   for (const key of Object.keys(config)) {
-    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer', 'memberBinding', 'nightWatch', 'workspace'].includes(key)) {
+    if (!['allowlist', 'approval', 'sandbox', 'specialists', 'settleTimeoutMs', 'protectedState', 'secrets', 'trustRoot', 'enforcer', 'memberBinding', 'nightWatch', 'workspace', 'forum'].includes(key)) {
       throw new TypeError(`blessed: unknown config key ${key}; record root and chain dir belong on the separate compact-dsh-record/provider loader row`);
     }
   }
@@ -276,6 +277,23 @@ export function resolveConfig(config) {
       if (config.enforcer.ledgerPath !== undefined) enforcer.ledgerPath = config.enforcer.ledgerPath;
     }
   }
+  // the community forum (optional, #216): the speech surface of a live
+  // community — pull-based posts, every one a governed tool call on the
+  // poster's own chain. Only the ledger beside the chains is configurable
+  // here; not declared means the forum runs in memory only and says so at
+  // boot. No clause is enforced by the forum, so it mounts like the guide —
+  // declared, never coupled on.
+  let forum;
+  if (config.forum !== undefined) {
+    object(config.forum, 'forum');
+    for (const key of Object.keys(config.forum)) {
+      if (!['ledgerPath'].includes(key)) throw new TypeError(`blessed: unknown forum key ${key}`);
+    }
+    if (config.forum.ledgerPath !== undefined) {
+      text(config.forum.ledgerPath, 'forum.ledgerPath');
+      forum = { ledgerPath: config.forum.ledgerPath };
+    }
+  }
   return {
     allowlist: [...allowlist],
     approval: { ...config.approval, secretRefs: secrets, ...(egressPinOffers !== undefined ? { egressPinOffers } : {}) },
@@ -296,6 +314,7 @@ export function resolveConfig(config) {
     ...(workspace ? { workspace } : {}),
     ...(trustRoot ? { trustRoot } : {}),
     ...(enforcer ? { enforcer } : {}),
+    ...(forum ? { forum } : {}),
   };
 }
 
@@ -668,6 +687,12 @@ export async function apply(ctx, config = {}) {
   await mount('compact-self-model', applySelfModel, { enforcer: options.enforcer, ...(options.memberBinding ? { memberBinding: options.memberBinding } : {}) }, ['tools']);
   await mount('compact-exit', applyExit, {}, ['tools']);
   await mount('compact-petition', applyPetition, {}, ['tools']);
+  // the community forum (#216): pull-based member speech, every post a
+  // governed act on the poster's own chain. Like the guide it enforces no
+  // clause, so it is mounted and declared, never coupled on; like the
+  // petition channel it rides ungated — a forum a gate could close is not
+  // a forum. The ledger beside the chains is the only config it takes.
+  await mount('compact-forum', applyForum, options.forum ?? {}, ['tools']);
   // the hearing layer's slice-1 surface: the declared bench (J-8/J-4) and
   // the fail-closed door — the annex that declares sets is the same signed
   // affidavit the record anchors ride, so it is passed through, not re-read

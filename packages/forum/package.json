@@ -1,0 +1,10 @@
+{
+  "name": "compact-dsh-forum",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — the community's speech surface: a pull-based forum where every post is a governed tool call on the poster's own record, citable in judicature.",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.2.0-rc.2" },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" }
+}
