@@ -1,0 +1,14 @@
+{
+  "name": "compact-dsh-community",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Compact on dsh — the live community runtime: a charter-driven round engine over real model-driven member sessions, with budgets, bench waking, and the approval posture of an autonomous run (umbrella #215).",
+  "main": "src/index.js",
+  "peerDependencies": { "@deepseek-ai/dsh": "~0.2.0-rc.2" },
+  "dependencies": {
+    "compact-dsh-approval": "0.4.1",
+    "compact-dsh-night-watch": "0.1.0"
+  },
+  "scripts": { "test": "node --test \"test/*.test.js\"" },
+  "engines": { "node": ">=22.19" }
+}

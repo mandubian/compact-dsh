@@ -1,6 +1,7 @@
 import { apply as applyAllowlist } from 'compact-dsh-allowlist-gate';
 import { approvalPlugin, redactEmbeddedSecrets } from 'compact-dsh-approval';
 import { apply as applyCapabilityGate } from 'compact-dsh-capability-gate';
+import { apply as applyCommunity } from 'compact-dsh-community';
 import { apply as applyConstitution, DEFAULT_REQUIRES } from 'compact-dsh-constitution';
 import { apply as applyEmergency } from 'compact-dsh-emergency';
 import { apply as applyExit } from 'compact-dsh-exit';
@@ -721,6 +722,12 @@ export async function apply(ctx, config = {}) {
   // petition channel it rides ungated — a forum a gate could close is not
   // a forum. The ledger beside the chains is the only config it takes.
   await mount('compact-forum', applyForum, options.forum ?? {}, ['tools']);
+  // the live community runtime (#218): the charter-driven round engine over
+  // real member sessions. Inert by nature — nothing runs until a driver
+  // calls runCommunity — but carried by every composition so the dist
+  // closure ships it with the law it rides (and its declared gaps ride the
+  // boot record wherever the composition boots).
+  await mount('compact-community', applyCommunity, {}, ['tools']);
   // the hearing layer's slice-1 surface: the declared bench (J-8/J-4) and
   // the fail-closed door — the annex that declares sets is the same signed
   // affidavit the record anchors ride, so it is passed through, not re-read
