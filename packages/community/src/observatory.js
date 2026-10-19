@@ -31,6 +31,7 @@ export const DEFAULT_OBSERVATORY_PORT = 3090;
  */
 export function startObservatory(ctx, {
   humanSeat,
+  controls = null,
   port = DEFAULT_OBSERVATORY_PORT,
   host = '127.0.0.1',
   charterName = 'community',
@@ -105,6 +106,7 @@ export function startObservatory(ctx, {
         pending: humanSeat ? humanSeat.pending() : [],
         forum: forum ? forum.snapshot() : null,
         docket: (() => { try { return jud?.docket?.() ?? []; } catch { return []; } })(),
+        controls: controls ? controls.state() : null,
       });
     }
     if (route.startsWith('/answer/') && req.method === 'POST') {
@@ -126,6 +128,30 @@ export function startObservatory(ctx, {
       if (!record) return json(res, 404, { error: `no pending question ${id}` });
       publish({ type: 'question-answered', id, by: 'the human (page)' });
       return json(res, 200, { ok: true, id });
+    }
+    // the operator's hand (#229): pause, resume, stop — the same controls
+    // the engine loop and the terminal signals share. Every press is an
+    // operator act, published to the feed like any other recorded event.
+    if (route === '/pause' && req.method === 'POST') {
+      if (!controls) return json(res, 501, { error: 'no run controls on this observatory' });
+      controls.pause();
+      publish({ type: 'operator-pause', by: 'the human (page)' });
+      return json(res, 200, { ok: true, controls: controls.state() });
+    }
+    if (route === '/resume' && req.method === 'POST') {
+      if (!controls) return json(res, 501, { error: 'no run controls on this observatory' });
+      controls.resume();
+      publish({ type: 'operator-resume', by: 'the human (page)' });
+      return json(res, 200, { ok: true, controls: controls.state() });
+    }
+    if (route === '/stop' && req.method === 'POST') {
+      if (!controls) return json(res, 501, { error: 'no run controls on this observatory' });
+      const body = await readBody(req);
+      const mode = body.mode === 'now' ? 'now' : 'graceful';
+      if (mode === 'now') controls.stopNow();
+      else controls.stop('graceful');
+      publish({ type: 'operator-stop', mode, by: 'the human (page)' });
+      return json(res, 200, { ok: true, mode, controls: controls.state() });
     }
     return json(res, 404, { error: 'not found' });
   });

@@ -35,13 +35,13 @@
 // Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { validateCharter, memberBindingsOf, CHARTER_VERSION, DEFAULT_BUDGETS } from './charter.js';
-import { runCommunity, currentSelectionOf, briefingText, roundFramingText, benchFramingText, DRIVER_SOURCE } from './engine.js';
+import { runCommunity, currentSelectionOf, createRunControls, briefingText, roundFramingText, benchFramingText, DRIVER_SOURCE } from './engine.js';
 import { mountHumanSeat, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS } from './human.js';
 import { startObservatory, DEFAULT_OBSERVATORY_PORT } from './observatory.js';
 
 export {
   validateCharter, memberBindingsOf, CHARTER_VERSION, DEFAULT_BUDGETS,
-  runCommunity, currentSelectionOf, briefingText, roundFramingText, benchFramingText, DRIVER_SOURCE,
+  runCommunity, currentSelectionOf, createRunControls, briefingText, roundFramingText, benchFramingText, DRIVER_SOURCE,
   mountHumanSeat, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS,
   startObservatory, DEFAULT_OBSERVATORY_PORT,
 };

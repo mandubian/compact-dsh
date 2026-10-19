@@ -44,7 +44,7 @@ import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
-import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory } from '../packages/community/src/index.js';
+import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls } from '../packages/community/src/index.js';
 
 const BIN = 'community-live:';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -229,7 +229,7 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedK
       const source = event?.data?.source ?? event?.source;
       const kind = String(source?.kind ?? '');
       if (kind === 'compact-approval' || kind === 'compact-loopguard') {
-        noticeSink?.({ type: 'notice', to: String(session?.id ?? '?'), summary: String(source?.summary ?? '') });
+        noticeSink?.({ type: 'notice', kind, to: String(session?.id ?? '?'), summary: String(source?.summary ?? '') });
       }
     }
   };
@@ -384,6 +384,11 @@ async function main() {
   const observe = !argv.includes('--no-observe');
   let observatory = null;
   const publishSafe = (event) => { try { observatory?.publish(event); } catch { /* a dead page never breaks the run */ } };
+  // the divergence counters (#229): what the charter's auto-pause reads —
+  // LoopGuard notices members receive, and the human seat's honest
+  // no-answers (asks that timed out, questions nobody answered in time)
+  let loopguardTrips = 0;
+  let humanSeatTimeouts = 0;
   ctx.on('approval/request', (req, next) => {
     asksSeen += 1;
     const headline = String(req?.reason ?? '').split('\n')[0];
@@ -402,8 +407,10 @@ async function main() {
     },
     onResolve: (record) => {
       if (record.kind === 'ask') {
+        if (record.answer === 'timeout') humanSeatTimeouts += 1;
         publishSafe(record.answer === 'timeout' ? { type: 'ask-timeout', id: record.id } : { type: 'ask-decided', id: record.id, decision: record.answer });
       } else {
+        if (record.answer == null) humanSeatTimeouts += 1;
         publishSafe(record.answer == null ? { type: 'question-timeout', by: record.by } : { type: 'question-answered', by: record.by });
       }
     },
@@ -416,9 +423,13 @@ async function main() {
   } catch (error) {
     SAY(`ask_human registration failed: ${error.message} — questions will not reach the human this run`);
   }
+  // the operator's hand (#229): one controls object shared by the engine
+  // loop, the page's buttons, and the terminal's signals
+  const controls = createRunControls();
   if (observe) {
     observatory = await startObservatory(ctx, {
       humanSeat,
+      controls,
       port: Number(flag('port') ?? 3090),
       charterName: charter.name,
     });
@@ -426,7 +437,10 @@ async function main() {
     // receive (watch verdicts, loopguard) read off session events — the
     // same shapes the after-run report reads
     ctx.get('compact-forum')?.onPost?.((post) => publishSafe({ type: 'forum-post', id: post.id, topic: post.topic, by: post.by, text: post.text }));
-    setNoticeSink(publishSafe);
+    setNoticeSink((e) => {
+      if (e.kind === 'compact-loopguard') loopguardTrips += 1;
+      publishSafe(e);
+    });
     SAY(`observatory (loopback, boot-token): ${observatory.url} — the forum live, the acts as they happen, and what waits for you`);
   }
 
@@ -447,6 +461,40 @@ async function main() {
   line('');
 
   let exitCode = 0;
+  // the terminal's signals share the page's controls (#229): first
+  // Ctrl-C stops gracefully (the current turn drains and flushes), the
+  // second stops immediately (the in-flight agent cancels)
+  let signals = 0;
+  const onSignal = (sig) => {
+    signals += 1;
+    if (signals === 1) {
+      SAY(`${sig}: stopping GRACEFULLY — the current turn drains, the record flushes, the reason is recorded (press again to stop immediately)`);
+      controls.resume();
+      controls.stop('graceful');
+    } else {
+      SAY(`${sig}: stopping IMMEDIATELY — the in-flight turn cancels, what the record holds is flushed`);
+      controls.stopNow();
+    }
+  };
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+  let runStats = null;
+  let runTag = null;
+  const writeRunManifest = (extra = {}) => {
+    try {
+      writeFileSync(join(scratch, 'run.json'), `${JSON.stringify({
+        charter: charter.name, runTag, resumed,
+        endedAt: new Date().toISOString(),
+        endReason: runStats?.endReason ?? (exitCode ? 'failed' : 'unknown'),
+        rounds: runStats?.rounds ?? 0, turns: runStats?.turns ?? 0,
+        benchCasesSeen: runStats?.casesSeen ?? 0,
+        tokens: tokenMeter(),
+        members: runStats?.members ?? {},
+        divergence: charter.divergence ?? null,
+        ...extra,
+      }, null, 2)}\n`);
+    } catch (e) { SAY(`run.json could not be written: ${e.message}`); }
+  };
   try {
     const hooks = {
       onRoute: (s) => SAY(`model route: ${s.provider}/${s.model}`),
@@ -457,15 +505,25 @@ async function main() {
       onSkip: (m, why) => SAY(`  · ${m.id} skipped (${why})`),
       onFlushError: (m, e) => SAY(`  ! ${m.id} flush failed: ${e.message}`),
       onEnd: (s) => publishSafe({ type: 'end', reason: s.endReason }),
+      onPauseState: (paused) => {
+        SAY(paused ? '⏸ the community is PAUSED — nothing new starts; resume from the page' : '▶ the community RESUMES');
+        publishSafe(paused ? { type: 'community-paused' } : { type: 'community-resumed' });
+      },
+      onAutoPause: (info) => {
+        SAY(`⏸ AUTO-PAUSED (divergence: ${info.why}) — the community waits for you on ${observatory?.url ?? 'the terminal'}`);
+        publishSafe({ type: 'auto-pause', ...info });
+      },
     };
     // the run tag (#227): this run's deeds get their own chains while the
     // member binding's prefixes still claim the ids — the community
     // continues, the sessions are its per-run records
-    const runTag = randomBytes(3).toString('hex');
+    runTag = randomBytes(3).toString('hex');
     const stats = await community.runCommunity({
       charter, workspace, hooks, tokenMeter, releasesOrigin: releases.origin,
-      sessionTag: runTag, resumed,
+      sessionTag: runTag, resumed, controls,
+      divergenceCounters: { loopguardTrips: () => loopguardTrips, humanSeatTimeouts: () => humanSeatTimeouts },
     });
+    runStats = stats;
     SAY(`run ${runTag}${resumed ? ' (a resumed run — the forum replayed its archive)' : ''}`);
     out(`THE RUN ENDS — ${stats.endReason}`);
     line(`rounds: ${stats.rounds} · governed turns: ${stats.turns} · bench cases seen: ${stats.casesSeen} · tokens: ${tokenMeter()}`);
@@ -489,6 +547,10 @@ async function main() {
     process.stdout.write(`\n${BIN} FAILED — ${error?.stack ?? error}\n`);
     exitCode = 1;
   } finally {
+    // the run's own manifest (#229): why it ended and what it did — the
+    // after-run report reads this instead of guessing from stdout
+    writeRunManifest();
+    // the page outlives the run by a breath (the END event reaches it);
     // the page outlives the run by a breath (the END event reaches it);
     // a --dry-seat run lingers longer — the point is to LOOK at the world
     // that assembled (members seated, grants minted, the page itself)

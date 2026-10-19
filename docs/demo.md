@@ -1512,7 +1512,12 @@ pre-approved waits on **your** page, approve/deny buttons and all
 you name critical). `ask_human` is petition-shaped: a member's question
 appears with its name on it; your reply becomes its tool result, on its
 record; ignore it and the timeout is the honest no-answer. Filings wake
-the bench — a member like the others, judging with reasons.
+the bench — a member like the others, judging with reasons. And the run
+is **steerable** (#229): ⏸ pause / ▶ resume / ⏹ stop / ✂ kill on the
+page (first Ctrl-C is the graceful stop, the second is immediate), and
+the charter's `divergence` lines pause the community *itself* — cross
+them and the page says it awaits you. Whatever way it ends, `run.json`
+records the reason, and `community-report` reads it back.
 
 ### Act three — the morning after
 
