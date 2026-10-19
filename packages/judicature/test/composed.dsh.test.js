@@ -148,7 +148,7 @@ async function boot(t, annexPath, { withRecord = true, signer = null, memberDoma
     writeFileSync(join(smDir, 'enforcer.pem'), enforcerKp.privateKeyPem);
     selfModelService = selfModelApply(ctx, {
       enforcer: { annexPath: join(smDir, 'annex.json'), privateKeyPath: join(smDir, 'enforcer.pem'), ledgerPath: join(smDir, 'subjects.jsonl') },
-      memberBinding: {
+      memberBinding: memberDomain.binding ?? {
         rollPath: memberDomain.rollPath, keyringPath: memberDomain.keyringPath,
         memberKeyPath: memberDomain.memberKeyPath, memberId: memberDomain.memberId,
       },
@@ -204,6 +204,44 @@ function buildMemberDomain(dir, { revoke = false } = {}) {
   const memberKeyPath = join(dir, 'member.pem');
   writeFileSync(memberKeyPath, k1.privateKeyPem);
   return { rollPath, keyringPath: join(dir, 'keyring.json'), memberKeyPath, memberId: 'test-principal', memberDigest: digest };
+}
+
+/** A community roll for the many-member binding (#217): N members on one
+ *  roll, one per fixture session prefix (specialist, customer) plus one
+ *  never-party bench member — the shape a live community seats. Returns
+ *  the domain AND the many-shape binding the boot passes through. */
+function buildCommunityMemberDomain(dir) {
+  const { memberKeyDigestOf, signRollEvent, appendRollEvent, closeEpoch, parseManifest } = seals;
+  const auth = [1, 2, 3].map((i) => { const kp = generateEd25519(); return { id: `auth-${i}`, publicKey: kp.publicKey, privateKeyPem: kp.privateKeyPem }; });
+  const manifestText = JSON.stringify({ kind: 'dev-keyring', declaration: 'test keyring', threshold: { k: 2, n: 3 }, keys: auth.map(({ id, publicKey }) => ({ id, publicKey })), rotations: [] }, null, 2);
+  const manifest = parseManifest(manifestText);
+  writeFileSync(join(dir, 'keyring.json'), manifestText);
+  const privates = new Map(auth.map(({ id, privateKeyPem }) => [id, privateKeyPem]));
+  const quorum = (n = 2) => auth.slice(0, n).map(({ id, privateKeyPem }) => ({ keyId: id, privateKey: privateKeyPem }));
+  const roll = { kind: 'test-roll', version: 1, genesis: { epochLength: { events: 64 }, admissionStatute: { digest: 'a'.repeat(64) } }, entries: [], checkpoints: [] };
+  const NOW2 = '2026-10-01T00:00:00.000Z';
+  const members = [];
+  for (const m of [
+    { prefix: 'specialist', memberId: 'member-specialist' },
+    { prefix: 'customer', memberId: 'member-customer' },
+    { prefix: 'bench', memberId: 'member-bench' },
+  ]) {
+    const kp = generateEd25519();
+    const digest = memberKeyDigestOf(kp.publicKey);
+    const pemPath = join(dir, `member-${m.memberId}.pem`);
+    writeFileSync(pemPath, kp.privateKeyPem);
+    const adm = { kind: 'admission', memberKeyDigest: digest, class: 'long-lived-subject', memberKey: kp.publicKey, member: m.memberId, holder: 'a community member under test', grounds: 'test admission', recordedAt: NOW2 };
+    appendRollEvent(roll, { ...adm, signedBy: signRollEvent(adm, [...quorum(2), { keyId: digest, privateKey: kp.privateKeyPem }]) });
+    members.push({ ...m, memberKeyPath: pemPath, digest });
+  }
+  closeEpoch({ roll, epoch: 0, manifest, privateKeys: privates, now: NOW2 });
+  const rollPath = join(dir, 'roll.json');
+  writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n');
+  const keyringPath = join(dir, 'keyring.json');
+  return {
+    rollPath, keyringPath, members,
+    binding: { rollPath, keyringPath, members: members.map(({ prefix, memberId, memberKeyPath }) => ({ prefix, memberId, memberKeyPath })) },
+  };
 }
 
 const call = (tools, tool, args, agentId = 'bystander') => tools.execute({
@@ -834,6 +872,39 @@ test('the member-binding seam (identity slice 2, #125): MEMBER parties, recusal 
   const sets = text(await call(tools, 'judicature_sets', { parties: `key:${domain.memberDigest}` }));
   assert.match(sets, /REFUSED first\/member-seat — overlap: key:/);
   void sets;
+});
+
+test('the many-member seam (#217): a filing derives BOTH member parties; a party-member seat recuses, a never-party member stays', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildCommunityMemberDomain(dir);
+  const [specialistMember, customerMember, benchMember] = domain.members;
+  // the bench: one seat held under a PARTY member's key (it must recuse),
+  // one under the never-party bench member's key (it must stay seated)
+  const section = JSON.parse(JSON.stringify(SECTION));
+  section.sets[0].roles.push({ id: 'party-seat', standing: { kind: 'key', id: specialistMember.digest } });
+  section.sets[0].roles.push({ id: 'bench-seat', standing: { kind: 'key', id: benchMember.digest } });
+  const { tools, service, selfModelService } = await boot(t, fixtureAnnex(dir, section), { memberDomain: domain });
+  assert.equal(selfModelService.memberBinding.declared, true);
+  // the cited sessions are certified at their attestation boundary, each
+  // countersigned by ITS OWN member's key
+  selfModelService.attest('specialist');
+  selfModelService.attest('customer');
+  assert.equal(selfModelService.memberBinding.resolve('specialist').memberId, 'member-specialist');
+  assert.equal(selfModelService.memberBinding.resolve('customer').memberId, 'member-customer');
+  await call(tools, 'judicature_hear', { grievance: 'the two members disagree about what shipped', citations: 'specialist:2-4,customer:2-4' }, 'customer');
+  const id = service.docket()[0].id;
+  const docket = text(await call(tools, 'judicature_case', { case_id: id }));
+  // BOTH member keys are parties — the community is two members here, not one
+  assert.match(docket, new RegExp(`parties .*key:${specialistMember.digest.slice(0, 8)}`));
+  assert.match(docket, new RegExp(`parties .*key:${customerMember.digest.slice(0, 8)}`));
+  // the party-member seat recused; the never-party member's seat heard —
+  // with ONE member this bench could never seat a member at all
+  assert.match(docket, /panel: first \(founder, peer, bench-seat\)/);
+  const partyView = text(await call(tools, 'judicature_sets', { parties: `key:${specialistMember.digest}` }));
+  assert.match(partyView, /REFUSED first\/party-seat — overlap: key:/);
+  assert.doesNotMatch(partyView, /REFUSED first\/bench-seat/,
+    'a member who is not a party keeps the seat — that is what N members buys');
 });
 
 test('a session of a revoked Member cannot file: [JG/member-revoked] cites the roll row (F-8)', async (t) => {

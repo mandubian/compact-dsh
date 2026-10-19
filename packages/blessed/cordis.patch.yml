@@ -124,7 +124,12 @@
         # through the roll. All four paths/names or none (all-or-none is
         # re-refused at resolveConfig); the self-model verifies the roll and
         # the key's lineage at boot.
-        memberBinding: !!js '(process.env.COMPACT_MEMBER_ROLL && process.env.COMPACT_MEMBER_KEYRING && process.env.COMPACT_MEMBER_KEY && process.env.COMPACT_MEMBER_ID) ? { rollPath: process.env.COMPACT_MEMBER_ROLL, keyringPath: process.env.COMPACT_MEMBER_KEYRING, memberKeyPath: process.env.COMPACT_MEMBER_KEY, memberId: process.env.COMPACT_MEMBER_ID } : undefined'
+        # The MANY-member shape (#217) rides COMPACT_MEMBER_BINDINGS: a JSON
+        # array of {prefix, memberId, memberKeyPath} — one runtime, N
+        # admitted Members on the one roll, session-id prefixes deciding
+        # whose deeds a session is. The single-member keys stay unset in
+        # that shape; mixing the two refuses at resolveConfig.
+        memberBinding: !!js '(process.env.COMPACT_MEMBER_ROLL && process.env.COMPACT_MEMBER_KEYRING && ((process.env.COMPACT_MEMBER_KEY && process.env.COMPACT_MEMBER_ID) || process.env.COMPACT_MEMBER_BINDINGS)) ? { rollPath: process.env.COMPACT_MEMBER_ROLL, keyringPath: process.env.COMPACT_MEMBER_KEYRING, memberKeyPath: process.env.COMPACT_MEMBER_KEY || undefined, memberId: process.env.COMPACT_MEMBER_ID || undefined, ...(process.env.COMPACT_MEMBER_BINDINGS ? { members: JSON.parse(process.env.COMPACT_MEMBER_BINDINGS) } : {}) } : undefined'
         protectedState:
           - !!js process.env.COMPACT_RECORD_ROOT
           - !!js process.env.COMPACT_CHAIN_DIR

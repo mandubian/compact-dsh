@@ -368,7 +368,7 @@ async function bootBound(t, domain, { withRecord = false } = {}) {
   writeFileSync(keyPath, enforcer.privateKeyPem);
   selfModel.apply(ctx, {
     enforcer: { annexPath, privateKeyPath: keyPath, ledgerPath },
-    memberBinding: { rollPath: domain.rollPath, keyringPath: domain.keyringPath, memberKeyPath: domain.memberKeyPath, memberId: domain.memberId, declarationsPath: join(dir, 'declarations.jsonl') },
+    memberBinding: domain.binding ?? { rollPath: domain.rollPath, keyringPath: domain.keyringPath, memberKeyPath: domain.memberKeyPath, memberId: domain.memberId, declarationsPath: join(dir, 'declarations.jsonl') },
   });
   if (typeof ctx.start === 'function') await ctx.start();
   for (let i = 0; i < 500 && (!ctx.tools || ctx.get('compact-self-model') === undefined); i++) {
@@ -505,4 +505,150 @@ test('composed: R-9\'s authorship limb — the Member-signed ground survives a d
   } finally {
     unbound.cleanup();
   }
+});
+
+// ── the many-member binding (#217): one runtime, N Members, session-id
+// prefixes deciding whose deeds a session is ──
+
+/** A community roll: N members admitted (each with its own key), one of
+ *  them reserved as a never-party bench seat, plus the binding config in
+ *  the many-member shape. */
+function buildCommunityDomain(dir, spec) {
+  const auth = [1, 2, 3].map((i) => { const kp = generateEd25519(); return { id: `auth-${i}`, publicKey: kp.publicKey, privateKeyPem: kp.privateKeyPem }; });
+  const manifestText = JSON.stringify({ kind: 'dev-keyring', declaration: 'test keyring', threshold: { k: 2, n: 3 }, keys: auth.map(({ id, publicKey }) => ({ id, publicKey })), rotations: [] }, null, 2);
+  writeFileSync(join(dir, 'keyring.json'), manifestText);
+  const manifest = parseManifest(manifestText);
+  const privates = new Map(auth.map(({ id, privateKeyPem }) => [id, privateKeyPem]));
+  const quorum = (n = 2) => auth.slice(0, n).map(({ id, privateKeyPem }) => ({ keyId: id, privateKey: privateKeyPem }));
+  const roll = { kind: 'test-roll', version: 1, genesis: { epochLength: { events: 64 }, admissionStatute: { digest: 'a'.repeat(64) } }, entries: [], checkpoints: [] };
+  const members = [];
+  for (const m of spec) {
+    const kp = generateEd25519();
+    const digest = memberKeyDigestOf(kp.publicKey);
+    const pemPath = join(dir, `member-${m.memberId}.pem`);
+    writeFileSync(pemPath, kp.privateKeyPem);
+    const adm = { kind: 'admission', memberKeyDigest: digest, class: m.class ?? 'long-lived-subject', memberKey: kp.publicKey, member: m.memberId, holder: m.holder ?? 'a community member under test', grounds: 'test admission', recordedAt: NOW };
+    appendRollEvent(roll, { ...adm, signedBy: signRollEvent(adm, [...quorum(2), { keyId: digest, privateKey: kp.privateKeyPem }]) });
+    members.push({ prefix: m.prefix, memberId: m.memberId, memberKeyPath: pemPath, digest, privateKeyPem: kp.privateKeyPem });
+  }
+  closeEpoch({ roll, epoch: 0, manifest, privateKeys: privates, now: NOW });
+  const rollPath = join(dir, 'roll.json');
+  writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n');
+  return {
+    rollPath, keyringPath: join(dir, 'keyring.json'), members,
+    binding: { rollPath, keyringPath: join(dir, 'keyring.json'), members: members.map(({ prefix, memberId, memberKeyPath }) => ({ prefix, memberId, memberKeyPath })), declarationsPath: join(dir, 'declarations.jsonl') },
+  };
+}
+
+test('composed: the many-member binding — two sessions, two Members, two countersignatures on one roll (#217)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'community-domain-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildCommunityDomain(dir, [
+    { prefix: 'community-packer', memberId: 'packer' },
+    { prefix: 'community-shipper', memberId: 'shipper' },
+    { prefix: 'community-bench', memberId: 'bench-1' },
+  ]);
+  const { ctx, tools, agents, service, ledgerPath } = await bootBound(t, domain);
+  const packer = agents.add('community-packer');
+  const shipper = agents.add('community-shipper');
+  const bench = agents.add('community-bench');
+  const stray = agents.add('stray-session');
+  agents.get('community-packer').status = 'idle';
+
+  // each session's certificate names ITS member, and both countersignatures
+  // verify against the roll's key for the digest each cert names
+  service.attest('community-packer');
+  service.attest('community-shipper');
+  service.attest('community-bench');
+  service.attest('stray-session');
+  const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  const bySubject = new Map(lines.map((l) => [l.subjectId, l]));
+  const [packerA, packerB, packerBench, packerStray] = [
+    bySubject.get('community-packer'), bySubject.get('community-shipper'),
+    bySubject.get('community-bench'), bySubject.get('stray-session'),
+  ];
+  const verdict = verifyRoll({ roll: JSON.parse(readFileSync(domain.rollPath, 'utf8')), manifest: parseManifest(readFileSync(domain.keyringPath, 'utf8')) });
+  const enforcerKey = service.enforcerAnnex().annex.enforcer.publicKey;
+  for (const [certLine, member] of [[packerA, domain.members[0]], [packerB, domain.members[1]], [packerBench, domain.members[2]]]) {
+    assert.equal(certLine.cert.memberKeyDigest, member.digest, `${certLine.subjectId} names its own member's key`);
+    const v = verifySubjectCert({ cert: certLine.cert, enforcerKey, memberPublicKey: verdict.byKey.get(member.digest).publicKey });
+    assert.equal(v.countersignatureVerified, true, `${certLine.subjectId}'s countersignature verifies against the roll`);
+  }
+  assert.notEqual(packerA.cert.memberKeyDigest, packerB.cert.memberKeyDigest, 'two members, two digests');
+  // the stray session binds to NOBODY and says so
+  assert.equal(packerStray.cert.memberKeyDigest, undefined);
+  const strayAtt = service.attest('stray-session');
+  assert.equal(strayAtt.subject.identity.member, null);
+  assert.match(strayAtt.subject.identity.memberNote, /no member binding matches this session's id/);
+
+  // the seam judicature consumes: per-session resolve, per-member expand,
+  // the roster for anyone asking who is here
+  const resolvedPacker = service.memberBinding.resolve('community-packer');
+  assert.equal(resolvedPacker.memberId, 'packer');
+  assert.equal(resolvedPacker.memberKeyDigest, domain.members[0].digest);
+  const resolvedShipper = service.memberBinding.resolve('community-shipper');
+  assert.equal(resolvedShipper.memberId, 'shipper');
+  assert.equal(service.memberBinding.resolve('stray-session'), null);
+  assert.deepEqual(service.memberBinding.expand(domain.members[0].digest), [domain.members[0].digest],
+    "each member expands to ITS OWN lineage — one member's key never expands into another's");
+  assert.deepEqual(service.memberBinding.members().map((m) => m.memberId), ['packer', 'shipper', 'bench-1']);
+  assert.equal(service.memberBinding.declared, true);
+
+  // self_describe names the session's OWN member, not a composition default
+  const described = String((await call(tools, 'self_describe', {}, packer))?.value ?? '');
+  assert.match(described, /this session is the deed of member "packer"/);
+  const benchDescribed = String((await call(tools, 'self_describe', {}, bench))?.value ?? '');
+  assert.match(benchDescribed, /this session is the deed of member "bench-1"/);
+
+  // a longest-prefix match is deterministic: a SPECIFIC prefix beats a
+  // broad one when both could claim the session id
+  void shipper; void ctx;
+});
+
+test('composed: many-member prior declarations name their Member — nobody signs anonymously (#217)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'community-domain-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildCommunityDomain(dir, [
+    { prefix: 'community-packer', memberId: 'packer' },
+    { prefix: 'community-shipper', memberId: 'shipper' },
+  ]);
+  const { service } = await bootBound(t, domain);
+  try {
+    service.priorDeclarations.declare({ value: 'a ground nobody attributs' });
+    assert.fail('declaring without by must refuse in many-member mode');
+  } catch (e) {
+    assert.match(e.message, /name their Member .*packer, shipper/);
+  }
+  const row = service.priorDeclarations.declare({ value: 'packer\'s own ground', by: 'packer' });
+  assert.equal(row.member, 'packer');
+  assert.equal(service.priorDeclarations.verify(row).valid, true);
+  const strangers = service.priorDeclarations.declare({ value: 'shipper\'s ground', by: 'shipper' });
+  assert.equal(strangers.member, 'shipper');
+  assert.equal(service.priorDeclarations.verify(strangers).valid, true);
+});
+
+test('composed: the many-member binding refuses its own malformed shapes loudly (#217)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'community-domain-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildCommunityDomain(dir, [{ prefix: 'community-packer', memberId: 'packer' }]);
+  const dupPrefix = buildCommunityDomain(mkdtempSync(join(tmpdir(), 'community-domain-')), [
+    { prefix: 'community-x', memberId: 'packer' },
+    { prefix: 'community-x', memberId: 'shipper' },
+  ]);
+  // a member the roll never admitted
+  const ghost = {
+    ...domain.binding,
+    members: [...domain.binding.members, { prefix: 'community-ghost', memberId: 'ghost', memberKeyPath: domain.members[0].memberKeyPath }],
+  };
+  const ctx1 = new Context();
+  t.after(() => ctx1.fiber.dispose?.());
+  assert.throws(() => selfModel.apply(ctx1, { memberBinding: ghost }), /"ghost" is not an admitted member/);
+  // one prefix claimed twice
+  const ctx2 = new Context();
+  t.after(() => ctx2.fiber.dispose?.());
+  assert.throws(() => selfModel.apply(ctx2, { memberBinding: dupPrefix.binding }), /declares prefix "community-x" twice/);
+  // an empty roster
+  const ctx3 = new Context();
+  t.after(() => ctx3.fiber.dispose?.());
+  assert.throws(() => selfModel.apply(ctx3, { memberBinding: { ...domain.binding, members: [] } }), /members is empty/);
 });

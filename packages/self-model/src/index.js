@@ -89,11 +89,26 @@ export function apply(ctx, config = {}) {
   // default-open.
   let memberBinding = null;
   let memberRollVerdict = null;
+  // Per-session bindings (#217): the many-member shape — one runtime, N
+  // admitted Members, session-id prefixes deciding whose deeds a session
+  // is. `bindings` holds every resolved Member; `bindingFor(sessionId)` is
+  // the ONE lookup every consumer uses (single mode returns the same
+  // binding for every session, exactly the former behavior). A session
+  // that matches no prefix binds to NOBODY: its certificate carries no
+  // member limb and its attestation says so — the honest interim stated
+  // per-session, never a guess (D-7).
+  const bindings = new Map(); // memberId -> binding
+  const bindingByDigest = new Map(); // every lineage digest -> binding
+  // names live on the roll's ROWS (admission and rotation carry `member`);
+  // the verdict's byKey carries keys and lineages but no names — indexed
+  // once so any certificate's digest can name its Member without guessing
+  // and without a composition-wide default
+  const memberNameByDigest = new Map();
+  const prefixBindings = []; // many mode, longest prefix first
+  let rosterOrder = []; // many mode, declaration order (the seating chart)
+  let bindingMode = null; // 'single' | 'many'
   if (config.memberBinding) {
-    const { rollPath, keyringPath, memberKeyPath, memberId } = config.memberBinding;
-    for (const [k, v] of [['rollPath', rollPath], ['keyringPath', keyringPath], ['memberKeyPath', memberKeyPath], ['memberId', memberId]]) {
-      if (!v) throw new Error(`compact-self-model: memberBinding.${k} is required — a declared binding declares all of itself, or none of it (D-7)`);
-    }
+    const { rollPath, keyringPath, members, memberKeyPath, memberId, declarationsPath } = config.memberBinding;
     const roll = JSON.parse(readFileSync(rollPath, 'utf8'));
     const manifest = parseManifest(readFileSync(keyringPath, 'utf8'));
     const verdict = verifyRoll({ roll, manifest });
@@ -101,34 +116,84 @@ export function apply(ctx, config = {}) {
       const first = verdict.findings.find((f) => f.severity === 'error');
       throw new Error(`compact-self-model: the declared member roll refuses (${first?.reason}): ${first?.detail} — a binding that cannot verify its roll stops the composition here rather than bind sessions to a broken ledger (D-7)`);
     }
-    const admission = roll.entries.find((e) => e.kind === 'admission' && e.member === memberId);
-    if (!admission) {
-      throw new Error(`compact-self-model: memberBinding.memberId "${memberId}" is not an admitted member of the declared roll — binding to a member the roll does not show would be the false answer D-3 names`);
-    }
-    const resolved = resolveMember(verdict, admission.memberKeyDigest);
-    if (resolved == null) throw new Error(`compact-self-model: member "${memberId}" does not resolve through its own roll — the roll and its rows disagree`);
-    // the countersigning key must BE the member's current key, or the
-    // countersignature would never verify anywhere: prove it now, at boot
-    const memberPrivateKey = readFileSync(memberKeyPath, 'utf8');
-    const currentPublicKey = verdict.byKey.get(resolved.lineage.at(-1)).publicKey;
-    const probe = signMessage(Buffer.from('compact-self-model member-binding probe'), memberPrivateKey);
-    if (!verifyMessage(Buffer.from('compact-self-model member-binding probe'), currentPublicKey, probe)) {
-      throw new Error(`compact-self-model: the member key at ${memberKeyPath} is not the current key of "${memberId}" per the roll (whose current key digest is ${resolved.lineage.at(-1).slice(0, 12)}…) — rotate through the roll, or point the binding at the right key (J-4: the lineage is data)`);
-    }
     memberRollVerdict = verdict;
-    const declarationsPath = config.memberBinding.declarationsPath ?? null;
-    memberBinding = {
-      memberId,
-      class: resolved.class,
-      currentKeyDigest: resolved.lineage.at(-1),
-      lineage: resolved.lineage,
-      state: resolved.state,
-      revocationRow: resolved.revocationRow ?? null,
-      privateKey: memberPrivateKey,
-      roll: { path: rollPath, anchoredThrough: verdict.summary.anchoredThrough, entries: verdict.summary.entries },
-      declarationsPath,
+    for (const row of roll.entries) {
+      if ((row.kind === 'admission' || row.kind === 'rotation') && row.memberKeyDigest) {
+        memberNameByDigest.set(row.memberKeyDigest, row.member ?? null);
+      }
+    }
+    const rollInfo = { path: rollPath, anchoredThrough: verdict.summary.anchoredThrough, entries: verdict.summary.entries };
+    const buildBinding = (spec) => {
+      const admission = roll.entries.find((e) => e.kind === 'admission' && e.member === spec.memberId);
+      if (!admission) {
+        throw new Error(`compact-self-model: member "${spec.memberId}" is not an admitted member of the declared roll — binding to a member the roll does not show would be the false answer D-3 names`);
+      }
+      const resolved = resolveMember(verdict, admission.memberKeyDigest);
+      if (resolved == null) throw new Error(`compact-self-model: member "${spec.memberId}" does not resolve through its own roll — the roll and its rows disagree`);
+      // the countersigning key must BE the member's current key, or the
+      // countersignature would never verify anywhere: prove it now, at boot
+      const privateKey = readFileSync(spec.memberKeyPath, 'utf8');
+      const currentPublicKey = verdict.byKey.get(resolved.lineage.at(-1)).publicKey;
+      const probe = signMessage(Buffer.from('compact-self-model member-binding probe'), privateKey);
+      if (!verifyMessage(Buffer.from('compact-self-model member-binding probe'), currentPublicKey, probe)) {
+        throw new Error(`compact-self-model: the member key at ${spec.memberKeyPath} is not the current key of "${spec.memberId}" per the roll (whose current key digest is ${resolved.lineage.at(-1).slice(0, 12)}…) — rotate through the roll, or point the binding at the right key (J-4: the lineage is data)`);
+      }
+      const binding = {
+        memberId: spec.memberId,
+        class: resolved.class,
+        currentKeyDigest: resolved.lineage.at(-1),
+        lineage: resolved.lineage,
+        state: resolved.state,
+        revocationRow: resolved.revocationRow ?? null,
+        privateKey,
+        roll: rollInfo,
+        declarationsPath: declarationsPath ?? null,
+      };
+      for (const digest of binding.lineage) bindingByDigest.set(digest, binding);
+      bindings.set(spec.memberId, binding);
+      return binding;
     };
+    if (Array.isArray(members)) {
+      bindingMode = 'many';
+      if (members.length === 0) throw new Error('compact-self-model: memberBinding.members is empty — a many-member binding declares at least one Member, or none of itself (D-7)');
+      const seenPrefixes = new Set();
+      for (const m of members) {
+        if (!m || typeof m !== 'object' || Array.isArray(m)) throw new Error('compact-self-model: each memberBinding.members entry must be an object {prefix, memberId, memberKeyPath}');
+        for (const k of ['prefix', 'memberId', 'memberKeyPath']) {
+          if (typeof m[k] !== 'string' || !m[k].trim()) throw new Error(`compact-self-model: memberBinding.members[].${k} is required — a declared binding declares all of itself, or none of it (D-7)`);
+        }
+        if (seenPrefixes.has(m.prefix)) throw new Error(`compact-self-model: memberBinding.members declares prefix "${m.prefix}" twice — one prefix, one Member`);
+        seenPrefixes.add(m.prefix);
+        const binding = buildBinding(m);
+        prefixBindings.push({ prefix: m.prefix, binding });
+      }
+      // the roster reads in DECLARATION order — the prefix-length sort is
+      // a matching detail, not the community's seating chart
+      rosterOrder = [...prefixBindings];
+      // longest prefix first: a specific prefix beats a broad one, and the
+      // match is deterministic the operator can predict
+      prefixBindings.sort((a, b) => b.prefix.length - a.prefix.length);
+      memberBinding = null;
+    } else {
+      for (const [k, v] of [['memberKeyPath', memberKeyPath], ['memberId', memberId]]) {
+        if (!v) throw new Error(`compact-self-model: memberBinding.${k} is required — a declared binding declares all of itself, or none of it (D-7)`);
+      }
+      bindingMode = 'single';
+      memberBinding = buildBinding({ memberId, memberKeyPath });
+    }
   }
+  /** The ONE binding lookup: single mode binds every session to the one
+   *  Member; many mode matches the session id by longest prefix. Null is
+   *  the honest answer for a session this composition never spoke for. */
+  const bindingFor = (sessionId) => {
+    if (bindingMode === 'single') return memberBinding;
+    if (bindingMode === 'many') {
+      const sid = String(sessionId ?? '');
+      const hit = prefixBindings.find(({ prefix }) => sid === prefix || sid.startsWith(prefix));
+      return hit ? hit.binding : null;
+    }
+    return null;
+  };
   // The last attestation handed to each Subject, so `self_describe` can tell a
   // Subject whether the epoch it is citing is the one now in force.
   const issued = new Map();   // sessionId -> attestation
@@ -192,6 +257,13 @@ export function apply(ctx, config = {}) {
         ?? (parentLineage.known ? ensureSubject(parentId, parentLineage, seen) : null);
     }
     const kp = generateEd25519();
+    // the member binding (slice 2): the session binds to ITS declared
+    // Member at that Member's CURRENT key, and the Member countersigns —
+    // the Enforcer attests hosting, the Member attests acting. Single mode
+    // binds every session to the one Member; many mode binds by session-id
+    // prefix, and a session matched to nobody carries no member limb at
+    // all (the honest interim, stated in its attestation).
+    const sidBinding = bindingFor(sid);
     const cert = signSubjectCert({
       subjectId: sid,
       publicKey: kp.publicKey,
@@ -199,10 +271,7 @@ export function apply(ctx, config = {}) {
       depth: lineage.delegationDepth ?? 0,
       ...(parentId != null ? { parentSubjectId: parentId } : {}),
       ...(parent ? { parentCertDigest: parent.certDigest } : {}),
-      // the member binding (slice 2): the session binds to the declared
-      // Member at its CURRENT key, and the Member countersigns — the
-      // Enforcer attests hosting, the Member attests acting
-      ...(memberBinding && enforcer ? { memberKeyDigest: memberBinding.currentKeyDigest, memberPrivateKey: memberBinding.privateKey } : {}),
+      ...(sidBinding && enforcer ? { memberKeyDigest: sidBinding.currentKeyDigest, memberPrivateKey: sidBinding.privateKey } : {}),
       privateKey: enforcer.privateKey,
     });
     const certDigest = sha256Hex(canonicalBytes(withoutField(cert, 'signature')));
@@ -232,11 +301,17 @@ export function apply(ctx, config = {}) {
         depth: identity.cert.depth,
         ...(identity.cert.parentSubjectId ? { parentSubjectId: identity.cert.parentSubjectId } : {}),
         ...(identity.cert.parentCertDigest ? { parentCertDigest: identity.cert.parentCertDigest } : {}),
-        // the member binding (slice 2): present and roll-resolved when
-        // declared; the honest interim says so when not
+        // the member binding (slice 2): present and roll-resolved when the
+        // session's binding declares it; the honest interim says so when
+        // not — per SESSION in many-member mode, not per composition
         ...(identity.cert.memberKeyDigest
-          ? { member: { memberKeyDigest: identity.cert.memberKeyDigest, memberId: memberBinding.memberId, class: memberBinding.class, lineageDepth: memberBinding.lineage.length, rollAnchoredThrough: memberBinding.roll.anchoredThrough, conveysStanding: false } }
-          : { member: null, memberNote: 'no member binding is declared in this composition — the honest pre-I-1 interim (identity slice 2); the session is certified but binds to no Member' }),
+          ? (() => {
+              const b = bindingByDigest.get(identity.cert.memberKeyDigest) ?? bindingFor(sid);
+              return { member: { memberKeyDigest: identity.cert.memberKeyDigest, memberId: b.memberId, class: b.class, lineageDepth: b.lineage.length, rollAnchoredThrough: b.roll.anchoredThrough, conveysStanding: false } };
+            })()
+          : { member: null, memberNote: bindingMode === 'many'
+              ? 'no member binding matches this session\'s id — this composition binds sessions to Members by declared prefix, and this one is bound to nobody (the honest interim, stated per-session)'
+              : 'no member binding is declared in this composition — the honest pre-I-1 interim (identity slice 2); the session is certified but binds to no Member' }),
         conveysStanding: false,
       };
     }
@@ -289,9 +364,15 @@ export function apply(ctx, config = {}) {
       const member = cert?.memberKeyDigest && memberRollVerdict
         ? resolveMember(memberRollVerdict, cert.memberKeyDigest)
         : null;
+      // WHO the member is: the name comes from the roll's own row for the
+      // digest the certificate names — in a many-member binding two
+      // certificates in one runtime name two different Members
+      const memberName = cert?.memberKeyDigest
+        ? memberNameByDigest.get(cert.memberKeyDigest) ?? bindingByDigest.get(cert.memberKeyDigest)?.memberId ?? null
+        : null;
       return {
         valid: true, keyId: enforcer.keyId, basis: 'dev-keyring', conveysStanding: false,
-        ...(member ? { member: { memberId: memberBinding.memberId, class: member.class, state: member.state } } : {}),
+        ...(member ? { member: { ...(memberName ? { memberId: memberName } : {}), class: member.class, state: member.state } } : {}),
       };
     } catch (e) {
       return { valid: false, reason: e.message };
@@ -320,25 +401,41 @@ export function apply(ctx, config = {}) {
   // close; without a declared binding it is the identity function, so the
   // consumers are uniform over the honest interim too.
   const memberBindingSurface = {
-    declared: memberBinding != null,
-    ...(memberBinding ? {
+    declared: bindingMode != null,
+    // single mode keeps the composition-wide Member; many mode exposes the
+    // roster (memberId/class per admitted binding) with no single answer
+    // to "whose runtime is this" — because it is nobody's alone
+    ...(bindingMode === 'single' ? {
       memberId: memberBinding.memberId,
       class: memberBinding.class,
+    } : bindingMode === 'many' ? {
+      members: () => rosterOrder.map(({ prefix, binding }) => ({ prefix, memberId: binding.memberId, class: binding.class, state: binding.state })),
+    } : {}),
+    ...(bindingMode ? {
       resolve: (sessionId) => {
         const s = subjects.get(String(sessionId));
         if (!s?.cert?.memberKeyDigest) return null;
+        // the cert's own digest identifies the Member (any key of a
+        // lineage resolves to that lineage's binding — the rotation window
+        // closes here, as it does in expand)
+        const b = bindingByDigest.get(s.cert.memberKeyDigest);
+        if (!b) return null;
         return {
-          memberKeyDigest: memberBinding.currentKeyDigest,
-          foundingDigest: memberBinding.lineage[0],
-          class: memberBinding.class,
-          state: memberBinding.state,
-          lineage: [...memberBinding.lineage],
-          revocationRow: memberBinding.revocationRow ?? null,
+          memberKeyDigest: s.cert.memberKeyDigest,
+          foundingDigest: b.lineage[0],
+          memberId: b.memberId,
+          class: b.class,
+          state: b.state,
+          lineage: [...b.lineage],
+          revocationRow: b.revocationRow ?? null,
         };
       },
       /** Every key digest that resolves to the same Member as `digest`. */
-      expand: (digest) => (memberBinding.lineage.includes(String(digest)) ? [...memberBinding.lineage] : [String(digest)]),
-      roll: () => ({ ...memberBinding.roll }),
+      expand: (digest) => {
+        const b = bindingByDigest.get(String(digest));
+        return b ? [...b.lineage] : [String(digest)];
+      },
+      roll: () => ({ ...(memberBinding ?? bindings.values().next().value).roll }),
     } : {
       resolve: () => null,
       expand: (digest) => [String(digest)],
@@ -354,23 +451,32 @@ export function apply(ctx, config = {}) {
   // member to attribute it to is the false answer D-3 names.
   const priorDeclarations = {
     declare: ({ value, grounds = null, by = null, now = new Date().toISOString() } = {}) => {
-      if (!memberBinding || !memberRollVerdict) {
+      if (bindingMode == null || !memberRollVerdict) {
         throw new Error('compact-self-model: no member binding is declared — a prior declaration without a member key to sign it proves nothing, and the shield must not pretend otherwise (R-9/D-3)');
       }
+      // whose key signs: the one Member in single mode; a NAMED Member in
+      // many mode — a declaration nobody signed is exactly the vacuity the
+      // signature exists to prevent
+      const signer = bindingMode === 'single'
+        ? memberBinding
+        : (by != null ? bindings.get(String(by)) : null);
+      if (!signer) {
+        throw new Error(`compact-self-model: prior declarations in a many-member composition name their Member — declare({ by: memberId }) with one of: ${[...bindings.keys()].join(', ')}`);
+      }
       const row = signPriorDeclaration({
-        member: memberBinding.memberId,
-        memberKeyDigest: memberBinding.currentKeyDigest,
+        member: signer.memberId,
+        memberKeyDigest: signer.currentKeyDigest,
         value, grounds,
-        privateKey: memberBinding.privateKey,
+        privateKey: signer.privateKey,
         declaredAt: now,
         ...(by ? {} : {}),
       });
-      if (memberBinding.declarationsPath) {
+      if (signer.declarationsPath) {
         try {
-          mkdirSync(dirname(memberBinding.declarationsPath), { recursive: true, mode: 0o700 });
-          appendFileSync(memberBinding.declarationsPath, `${JSON.stringify(row)}\n`, { mode: 0o600 });
+          mkdirSync(dirname(signer.declarationsPath), { recursive: true, mode: 0o700 });
+          appendFileSync(signer.declarationsPath, `${JSON.stringify(row)}\n`, { mode: 0o600 });
         } catch (error) {
-          ctx.logger?.warn?.(`compact-self-model: could not append the declarations ledger at ${memberBinding.declarationsPath}: ${error.message} — the declaration is returned but not ledgered`);
+          ctx.logger?.warn?.(`compact-self-model: could not append the declarations ledger at ${signer.declarationsPath}: ${error.message} — the declaration is returned but not ledgered`);
         }
       }
       return row;
@@ -378,8 +484,8 @@ export function apply(ctx, config = {}) {
     verify: (row) => (memberRollVerdict
       ? verifyPriorDeclaration(row, memberRollVerdict)
       : { valid: false, reason: 'no member roll is composed — authorship cannot be resolved, and the answer says so' }),
-    declared: memberBinding != null,
-    path: () => memberBinding?.declarationsPath ?? null,
+    declared: bindingMode != null,
+    path: () => memberBinding?.declarationsPath ?? bindings.values().next().value?.declarationsPath ?? null,
   };
 
   // 1. at the boundary of the Subject's own operation
