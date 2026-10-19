@@ -121,10 +121,31 @@ export function benchFramingText(charter, member, caseRow) {
   ].join('\n');
 }
 
-/** Drive the community. Returns when the run completes, a budget trips,
+/** The run's operator controls (#229): pause idles between turns, stop
+ *  ends the run — 'graceful' drains the current turn and flushes, 'now'
+ *  cancels the in-flight agent through the loop's own cancel first. The
+ *  SAME object is shared by the driver, the observatory endpoints, and
+ *  the engine loop, so a button press and the loop agree on one state. */
+export function createRunControls() {
+  return {
+    paused: false,
+    stopMode: null, // null | 'graceful' | 'now'
+    _currentAgent: null,
+    pause() { this.paused = true; },
+    resume() { this.paused = false; },
+    stop(mode = 'graceful') { this.stopMode = mode === 'now' ? 'now' : 'graceful'; },
+    /** Immediate stop's teeth: cancel the turn in flight so `whenIdle`
+     *  resolves now and drive() flushes what the record already holds. */
+    stopNow() { this.stop('now'); try { this._currentAgent?.cancel?.({ kind: 'user' }); } catch { /* already idle */ } },
+    state() { return { paused: this.paused, stopMode: this.stopMode }; },
+  };
+}
+
+/**
+ * Drive the community. Returns when the run completes, a budget trips,
  *  or the charter's rounds are spent. `hooks` receives every observable
  *  step (the CLI narrates, Phase D's observatory will stream). */
-export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenMeter = null, releasesOrigin = null, sessionTag = null, resumed = false }) {
+export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenMeter = null, releasesOrigin = null, sessionTag = null, resumed = false, controls = createRunControls(), divergenceCounters = null }) {
   const forum = ctx.get('compact-forum');
   const judicature = ctx.get('compact-judicature');
   if (!forum) throw new Error('compact-community: no compact-forum service — the community cannot speak (is the forum mounted?)');
@@ -171,7 +192,41 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
     try { return judicature ? judicature.docket() : []; } catch { return []; }
   };
 
+  // the operator's hand on the run (#229): pause idles BETWEEN turns (the
+  // current turn always drains and flushes); graceful stop does the same
+  // and then ends with its reason; immediate stop cancels the in-flight
+  // agent through the loop's own cancel and ends with its reason. All
+  // three are the Principal's acts — the reason lands on the run summary.
+  const stopReason = () => controls.stopMode === 'now'
+    ? 'stopped by the operator (immediate)'
+    : 'stopped by the operator (graceful)';
+  const waitWhilePaused = async () => {
+    if (!controls.paused || controls.stopMode) return;
+    hooks.onPauseState?.(true);
+    while (controls.paused && !controls.stopMode) await new Promise((r) => setTimeout(r, 250));
+    if (!controls.stopMode) hooks.onPauseState?.(false);
+  };
+  const maybeAutoPause = () => {
+    if (!charter.divergence || controls.paused || controls.stopMode) return;
+    const trips = divergenceCounters?.loopguardTrips?.() ?? 0;
+    const timeouts = divergenceCounters?.humanSeatTimeouts?.() ?? 0;
+    const why = [];
+    if (charter.divergence.loopguardTrips != null && trips >= charter.divergence.loopguardTrips) {
+      why.push(`loopguard trips ${trips} ≥ ${charter.divergence.loopguardTrips}`);
+    }
+    if (charter.divergence.humanSeatTimeouts != null && timeouts >= charter.divergence.humanSeatTimeouts) {
+      why.push(`human-seat timeouts ${timeouts} ≥ ${charter.divergence.humanSeatTimeouts}`);
+    }
+    if (why.length > 0) {
+      controls.pause();
+      hooks.onAutoPause?.({ loopguardTrips: trips, humanSeatTimeouts: timeouts, why: why.join('; ') });
+    }
+  };
+
   for (let round = 1; round <= charter.budgets.rounds; round += 1) {
+    if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
+    await waitWhilePaused();
+    if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
     stats.rounds = round;
     // the bench hears first each round: justice that waits for the
     // community to finish is justice the community outgrew
@@ -182,7 +237,7 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
         seat.wokenFor.add(caseRow.id);
         stats.casesSeen += 1;
         hooks.onBenchWake?.(seat.member, caseRow);
-        await drive(seat, benchFramingText(charter, seat.member, caseRow), hooks, stats, sessionsSvc);
+        await drive(seat, benchFramingText(charter, seat.member, caseRow), hooks, stats, sessionsSvc, controls);
       }
     }
     for (const seat of workers) {
@@ -198,6 +253,10 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
         hooks.onSkip?.(seat.member, 'turn budget');
         continue;
       }
+      // the operator's hand, checked before every turn: pause idles here
+      // (the previous turn already drained and flushed), stop ends the run
+      await waitWhilePaused();
+      if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
       let framing;
       if (!seat.briefed) {
         framing = briefingText(charter, seat.member, extras);
@@ -209,9 +268,13 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
         framing = roundFramingText(charter, seat.member, round, newPosts, news);
       }
       const before = forum.forum.posts.length;
-      await drive(seat, framing, hooks, stats, sessionsSvc);
+      await drive(seat, framing, hooks, stats, sessionsSvc, controls);
       seat.lastForumSeq = forum.forum.posts.length;
       if (!seat.briefed) { seat.briefed = true; void before; }
+      // divergence lines are checked after each act (#229): the fence
+      // pauses the community itself and the page says it awaits the
+      // Principal — the loop's next pause-check does the waiting
+      maybeAutoPause();
     }
   }
   stats.endReason = 'rounds complete';
@@ -220,12 +283,19 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
 
 /** One governed turn: the briefing lands on the member's own record as a
  *  user message, the member acts through the full waterfall, the session
- *  flushes to its chain. */
-async function drive(seat, framing, hooks, stats, sessionsSvc) {
+ *  flushes to its chain. An immediate operator stop cancels the agent
+ *  through the loop's own cancel — the turn ends aborted, and what the
+ *  record already holds is flushed. */
+async function drive(seat, framing, hooks, stats, sessionsSvc, controls) {
   const { agent, member } = seat;
   hooks.onTurn?.(member, framing);
-  agent.followup(createUserMessage({ content: [{ type: 'text', text: framing }], source: DRIVER_SOURCE }));
-  await agent.whenIdle();
+  controls._currentAgent = agent;
+  try {
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: framing }], source: DRIVER_SOURCE }));
+    await agent.whenIdle();
+  } finally {
+    controls._currentAgent = null;
+  }
   // the chain is the record — a turn that never flushes is a turn the
   // offline auditor cannot see; a failed flush is named, never swallowed
   try {

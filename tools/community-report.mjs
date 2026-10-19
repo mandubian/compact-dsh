@@ -35,7 +35,14 @@ export function resolveRunPaths(dir) {
       forumLedger: join(c, 'chains', 'forum.jsonl'),
       keyring: join(c, 'keyring'),
     };
-    if (existsSync(paths.recordRoot) && existsSync(paths.chainDir)) return paths;
+    if (existsSync(paths.recordRoot) && existsSync(paths.chainDir)) {
+      // the run manifest (#229) lives at the scratch root — beside state/,
+      // whichever shape the caller passed
+      for (const candidate of [join(c, 'run.json'), join(c, '..', 'run.json')]) {
+        if (existsSync(candidate)) { paths.runJson = candidate; break; }
+      }
+      return paths;
+    }
   }
   throw new Error(`${BIN} no run state under ${base} — pass the scratch dir the run kept (it holds state/{sessions,chains,approvals.json})`);
 }
@@ -157,8 +164,16 @@ export function grantsFromStore(storePath) {
 
 const pct = (n, d) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '—');
 
-export function formatReport({ paths, logs, statsByLog, forum, grants }) {
+export function formatReport({ paths, logs, statsByLog, forum, grants, run = null }) {
   const L = [];
+  L.push('THE COMMUNITY, AFTER THE RUN — read from the chains and the store, no runtime cooperation');
+  L.push(`  state: ${paths.recordRoot.replace(/\/sessions$/, '')}`);
+  if (run) {
+    L.push(`  THE RUN: ${run.endReason}${run.runTag ? ` (run ${run.runTag}${run.resumed ? ', resumed' : ''})` : ''} — ended ${run.endedAt}`);
+    L.push(`    rounds ${run.rounds} · turns ${run.turns} · bench cases ${run.benchCasesSeen} · tokens ${run.tokens}${run.divergence ? ` · divergence lines: ${JSON.stringify(run.divergence)}` : ''}`);
+  } else {
+    L.push('  THE RUN: no run.json — this run predates #229, its end reason lived only on stdout');
+  }
   L.push('THE COMMUNITY, AFTER THE RUN — read from the chains and the store, no runtime cooperation');
   L.push(`  state: ${paths.recordRoot.replace(/\/sessions$/, '')}`);
   L.push('');
@@ -226,7 +241,11 @@ function main() {
   const statsByLog = logs.map((p) => agentStatsFromLog(readFileSync(p, 'utf8'), sessionIdOfLog(p)));
   const forum = forumFromLedger(paths.forumLedger);
   const grants = grantsFromStore(paths.approvals);
-  process.stdout.write(formatReport({ paths, logs, statsByLog, forum, grants }) + '\n');
+  let run = null;
+  if (paths.runJson) {
+    try { run = JSON.parse(readFileSync(paths.runJson, 'utf8')); } catch { run = null; }
+  }
+  process.stdout.write(formatReport({ paths, logs, statsByLog, forum, grants, run }) + '\n');
 }
 
 if (process.argv[1] && process.argv[1].endsWith('community-report.mjs')) main();

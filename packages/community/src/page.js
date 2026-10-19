@@ -35,6 +35,8 @@ export function pageHtml({ charterName, token }) {
   .ask button.deny { background: #5c1d1d; color: #fcc; border: 1px solid #a55; }
   .question textarea { width: 96%; font: inherit; background: #111; color: #ddd; border: 1px solid #444; }
   .muted { color: #666; }
+  header button { font: inherit; font-size: 11.5px; background:#222; color:#ccc; border:1px solid #444; cursor:pointer; padding:2px 8px; }
+  header button:hover { border-color:#7fd1ff; color:#7fd1ff; }
   .verdict-allow { color: #7dff8a; }
   .verdict-deny, .verdict-rejected { color: #ff7d7d; }
   @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
@@ -45,6 +47,13 @@ export function pageHtml({ charterName, token }) {
   community observatory — <b>${safeName}</b> ·
   <span id="conn" class="live">live</span> ·
   <span class="muted">the law binds the sovereign: your answers land on the record (D-6)</span>
+  <span id="ops" style="float:right">
+    <button id="btn-pause" title="drain the current turn, then idle">⏸ pause</button>
+    <button id="btn-resume" title="continue from the pause">▶ resume</button>
+    <button id="btn-stop" title="finish the current turn, flush, end with its reason">⏹ stop</button>
+    <button id="btn-kill" title="cancel the in-flight turn now, flush what exists">✂ kill</button>
+  </span>
+  <div id="banner" style="display:none; margin-top:6px; color:#ffd27d; font-weight:bold"></div>
 </header>
 <main>
   <section id="forum"><h2>the forum</h2><ul id="forum-list"><li class="empty">nothing yet — the community has not spoken</li></ul></section>
@@ -105,6 +114,23 @@ function renderPending(p) {
   }
 }
 
+async function op(path, body) {
+  return api(path, { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(body || {}) })
+    .then(r => { renderBanner(r.controls); }).catch(() => {});
+}
+$('btn-pause').onclick = () => op('/pause');
+$('btn-resume').onclick = () => op('/resume');
+$('btn-stop').onclick = () => { if (window.confirm('Stop the community gracefully? The current turn drains and flushes; the run ends with its reason.')) op('/stop', {mode:'graceful'}); };
+$('btn-kill').onclick = () => { if (window.confirm('KILL the community now? The in-flight turn is cancelled; what the record holds is flushed.')) op('/stop', {mode:'now'}); };
+
+function renderBanner(controls) {
+  const b = $('banner');
+  if (!controls) { b.style.display = 'none'; return; }
+  if (controls.stopMode) { b.textContent = 'STOPPING (' + controls.stopMode + ') — the run ends with its reason'; b.style.display = 'block'; }
+  else if (controls.paused) { b.textContent = 'PAUSED — the community waits for you (the current turn drained; nothing new will start)'; b.style.display = 'block'; }
+  else b.style.display = 'none';
+}
+
 const es = new EventSource('/' + token + '/events');
 es.onopen = () => { $('conn').textContent = 'live'; $('conn').className = 'live'; };
 es.onerror = () => { $('conn').textContent = 'reconnecting…'; $('conn').className = 'dead'; };
@@ -150,6 +176,20 @@ es.onmessage = (m) => {
       post('acts-list', at + 'notice to <span class="who">' + esc(e.to) + '</span>: ' + esc(short(e.summary, 180)),
         {});
       break;
+    case 'operator-pause':
+      post('acts-list', at + '⏸ <span class="who">the operator</span> paused the community');
+      break;
+    case 'operator-resume':
+      post('acts-list', at + '▶ <span class="who">the operator</span> resumed the community');
+      break;
+    case 'operator-stop':
+      post('acts-list', at + (e.mode === 'now'
+        ? '✂ <span class="who">the operator</span> KILLED the run (immediate — the in-flight turn cancelled)'
+        : '⏹ <span class="who">the operator</span> stopped the run (graceful — the current turn drains)'));
+      break;
+    case 'auto-pause':
+      post('acts-list', at + '⏸ AUTO-PAUSED (divergence: ' + esc(e.why) + ') — awaiting the Principal');
+      break;
     case 'end':
       post('acts-list', at + '■ THE RUN ENDS — ' + esc(e.reason));
       break;
@@ -159,8 +199,8 @@ es.onmessage = (m) => {
 
 // poll the seat's pending (SSE announces; the poll is the reconciler — a
 // page opened mid-ask sees it without waiting for an event)
-setInterval(() => api('/state').then(s => renderPending(s.pending || [])).catch(() => {}), 4000);
-api('/state').then(s => renderPending(s.pending || [])).catch(() => {});
+setInterval(() => api('/state').then(s => { renderPending(s.pending || []); renderBanner(s.controls); }).catch(() => {}), 4000);
+api('/state').then(s => { renderPending(s.pending || []); renderBanner(s.controls); }).catch(() => {});
 </script>
 </body>
 </html>

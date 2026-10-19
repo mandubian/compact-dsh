@@ -220,3 +220,55 @@ test('charter escalation: patterns compile, patience has a floor, unknown keys r
   assert.throws(() => validateCharter({ ...base, escalation: { askTimeoutMs: 10 } }), /at least a second/);
   assert.throws(() => validateCharter({ ...base, escalation: { quorum: 2 } }), /unknown key/);
 });
+
+test('the operator endpoints (#229): pause, resume, stop — one controls object shared with the run', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'observatory-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const ctx = stubCtx();
+  const seat = mountHumanSeat(ctx, { askTimeoutMs: 60_000 });
+  const controls = { paused: false, stopMode: null, _events: [], pause() { this.paused = true; }, resume() { this.paused = false; }, stop(m) { this.stopMode = m === 'now' ? 'now' : 'graceful'; }, stopNow() { this.stop('now'); }, state() { return { paused: this.paused, stopMode: this.stopMode }; } };
+  const obs = await startObservatory(ctx, { humanSeat: seat, controls, port: 0, charterName: 'c' });
+  t.after(() => obs.close());
+  const post = (p, body) => fetch(`${obs.url}${p.replace(/^\//, '')}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) });
+
+  const pause = await (await post('/pause')).json();
+  assert.deepEqual(pause.controls, { paused: true, stopMode: null });
+  const state = await (await fetch(`${obs.url}state`)).json();
+  assert.deepEqual(state.controls, { paused: true, stopMode: null }, 'a freshly opened page sees the pause');
+  await post('/resume');
+  const stop = await (await post('/stop', { mode: 'now' })).json();
+  assert.equal(stop.mode, 'now');
+  assert.equal(controls.stopMode, 'now');
+  // the feed carried every operator act (bounded read — the stream never ends)
+  const es = await fetch(`${obs.url}events`);
+  const reader = es.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  const seen = new Set();
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline && seen.size < 3) {
+    const { value } = await Promise.race([
+      reader.read(),
+      new Promise((r) => setTimeout(() => r({ value: undefined }), 200)),
+    ]);
+    if (value) {
+      buf += dec.decode(value);
+      let nl;
+      while ((nl = buf.indexOf('\n\n')) !== -1) {
+        const frame = buf.slice(0, nl);
+        buf = buf.slice(nl + 2);
+        const data = frame.split('\n').find((l) => l.startsWith('data: '));
+        if (data) seen.add(JSON.parse(data.slice(6)).type);
+      }
+    }
+  }
+  await reader.cancel();
+  for (const wanted of ['operator-pause', 'operator-resume', 'operator-stop']) {
+    assert.ok(seen.has(wanted), `the feed carried ${wanted}`);
+  }
+  // no controls mounted: the endpoints say so rather than lying
+  const bare = await startObservatory(ctx, { humanSeat: mountHumanSeat(stubCtx()), port: 0, charterName: 'c' });
+  t.after(() => bare.close());
+  const bareResp = await fetch(`${bare.url}pause`, { method: 'POST' });
+  assert.equal(bareResp.status, 501);
+});

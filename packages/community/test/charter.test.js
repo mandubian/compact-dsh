@@ -115,3 +115,12 @@ test('a resumed run is told its archive exists — the conversation continues, i
   assert.match(resumed, /forum_read \{"topic":"…","since":0\} reads one in full/);
   assert.match(resumed, /Your MEMBER identity persists \(the roll\)/);
 });
+
+test('divergence lines (#229): the auto-pause thresholds compile or refuse', () => {
+  const c = validateCharter({ ...BASE(), divergence: { loopguardTrips: 6, humanSeatTimeouts: 3 } });
+  assert.deepEqual(c.divergence, { loopguardTrips: 6, humanSeatTimeouts: 3 });
+  assert.equal(validateCharter({ ...BASE(), divergence: { loopguardTrips: 2 } }).divergence.loopguardTrips, 2);
+  assert.throws(() => validateCharter({ ...BASE(), divergence: {} }), /at least one of/);
+  assert.throws(() => validateCharter({ ...BASE(), divergence: { quorum: 2 } }), /unknown key/);
+  assert.throws(() => validateCharter({ ...BASE(), divergence: { loopguardTrips: 0 } }), /positive integer/);
+});

@@ -3,7 +3,12 @@
   "name": "newsroom",
   "goal": "Produce the nightly digest from the sources in sources/ and publish it to the releases host. Agree on the editorial line on the forum, assemble the digest from the sources, verify that what the manifest claims is what was actually packed, and publish under the community's pre-minted grant. Bylines are real: whoever's work appears in the digest is named in it.",
   "topic": "nightly-digest",
-  "budgets": { "rounds": 6, "maxTurnsPerAgent": 6, "wallClockMinutes": 25, "tokenCap": 500000 },
+  "budgets": {
+    "rounds": 6,
+    "maxTurnsPerAgent": 6,
+    "wallClockMinutes": 25,
+    "tokenCap": 500000
+  },
   "members": [
     {
       "id": "editor",
@@ -28,7 +33,12 @@
     }
   ],
   "grants": [
-    { "pattern": "{{RELEASES_ORIGIN}}/*", "methodClass": "write", "ttlMinutes": 90, "maxUses": 30 }
+    {
+      "pattern": "{{RELEASES_ORIGIN}}/*",
+      "methodClass": "write",
+      "ttlMinutes": 90,
+      "maxUses": 30
+    }
   ],
   "sources": [
     {
@@ -43,5 +53,9 @@
   "publish": {
     "note": "the nightly digest goes to the releases host as digest-<date>.md under the community's pre-minted grant",
     "route": "PUT {{RELEASES_ORIGIN}}/digest/<date>"
+  },
+  "divergence": {
+    "loopguardTrips": 6,
+    "humanSeatTimeouts": 3
   }
 }

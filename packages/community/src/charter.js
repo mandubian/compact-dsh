@@ -105,6 +105,30 @@ export function validateCharter(doc) {
     sources.push({ path: s.path, content: s.content });
   }
 
+  // the divergence auto-pause (#229): the fence does automatically what the
+  // operator would do manually — when the community's total LoopGuard trips
+  // or human-seat timeouts cross the line, the engine pauses itself and the
+  // page says it is awaiting the Principal. Optional; both keys optional,
+  // at least one must be set when the object is declared.
+  let divergence = null;
+  if (doc.divergence !== undefined) {
+    if (!doc.divergence || typeof doc.divergence !== 'object' || Array.isArray(doc.divergence)) {
+      throw bad('divergence', 'an object {loopguardTrips, humanSeatTimeouts}');
+    }
+    for (const key of Object.keys(doc.divergence)) {
+      if (!['loopguardTrips', 'humanSeatTimeouts'].includes(key)) throw bad(`divergence.${key}`, 'unknown key — {loopguardTrips, humanSeatTimeouts}');
+    }
+    const limits = {};
+    for (const k of ['loopguardTrips', 'humanSeatTimeouts']) {
+      const v = doc.divergence[k];
+      if (v === undefined) continue;
+      if (!Number.isInteger(v) || v < 1) throw bad(`divergence.${k}`, 'a positive integer — the line the community may not cross unpaused');
+      limits[k] = v;
+    }
+    if (Object.keys(limits).length === 0) throw bad('divergence', 'declare at least one of loopguardTrips, humanSeatTimeouts');
+    divergence = limits;
+  }
+
   const publish = doc.publish && typeof doc.publish === 'object'
     ? { note: String(doc.publish.note ?? '').trim() || null, route: String(doc.publish.route ?? '').trim() || null }
     : null;
@@ -149,6 +173,7 @@ export function validateCharter(doc) {
     sources,
     ...(publish ? { publish } : {}),
     ...(escalation ? { escalation } : {}),
+    ...(divergence ? { divergence } : {}),
     ...(typeof doc.briefingExtra === 'string' && doc.briefingExtra.trim() ? { briefingExtra: doc.briefingExtra.trim() } : {}),
   };
 }
