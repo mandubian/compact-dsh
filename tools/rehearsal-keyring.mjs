@@ -116,9 +116,16 @@ const registerDigest = () => sha256Hex(readFileSync(REGISTER_PATH));
  * (a regeneration is a rotation — deliberate, `--force`, and the operator's
  * recorded act).
  *
- * @returns {{manifestPath, annexPath, keyPath, annexDigest}} absolute paths
+ * `extraMembers` (#217): additional rehearsal Members admitted into the seed
+ * roll alongside the two defaults — a live community of N agents admits N
+ * Members (agent + bench seats), each with its own practice key under
+ * `private/member-<id>.pem`, each admission signed by the statute quorum
+ * AND its own key (possession, I-1). Same SIMULATED statute, same labels,
+ * same standing: none.
+ *
+ * @returns {{manifestPath, annexPath, keyPath, annexDigest, members}} absolute paths
  */
-export function ensureRehearsalKeyring(dir, { force = false, now = new Date().toISOString() } = {}) {
+export function ensureRehearsalKeyring(dir, { force = false, now = new Date().toISOString(), extraMembers = [] } = {}) {
   const manifestPath = join(dir, 'keyring.json');
   const keyPath = join(dir, 'enforcer.pem');
   const annexPath = join(dir, 'enforcer.annex.json');
@@ -244,7 +251,8 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
   // the admitting quorum the rehearsal statute names: 2-of-3 authority keys,
   // and every admitted key signs its own admission (possession, I-1)
   const authoritySigners = AUTHORITY_KEY_IDS.slice(0, 2).map((id) => ({ keyId: id, privateKey: privates.get(id) }));
-  for (const m of SEED_MEMBERS) {
+  const membersIssued = [];
+  for (const m of [...SEED_MEMBERS, ...extraMembers]) {
     const kp = generateEd25519();
     const pemPath = join(dir, 'private', `member-${m.id}.pem`);
     writeFileSync(pemPath, kp.privateKeyPem, { mode: 0o600 });
@@ -260,6 +268,7 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
       ...event,
       signedBy: signRollEvent(event, [...authoritySigners, { keyId: digest, privateKey: kp.privateKeyPem }]),
     });
+    membersIssued.push({ id: m.id, class: m.class, keyPath: pemPath, memberKeyDigest: digest });
   }
   closeEpoch({ roll, epoch: 0, manifest, privateKeys: privates, now });
   recordEnactment(dir, {
@@ -355,7 +364,7 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
   const declarationsPath = join(dir, 'declarations.jsonl');
   writeFileSync(declarationsPath, `${JSON.stringify(declaration)}\n`, { mode: 0o600 });
 
-  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, accreditationPath, witnessKeyPath: witnessPemPath, witnessKeyDigest: witnessDigest, rollPath, roll, declarationsPath, declaration };
+  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, accreditationPath, witnessKeyPath: witnessPemPath, witnessKeyDigest: witnessDigest, rollPath, roll, declarationsPath, declaration, members: membersIssued };
 }
 
 /**

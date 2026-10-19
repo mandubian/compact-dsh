@@ -217,3 +217,37 @@ test('I-1 slice 2: memberBinding is declared ALL of itself or not at all, and ri
   };
   assert.deepEqual(resolveConfig(declared).memberBinding, declared.memberBinding);
 });
+
+test('I-1 many-member binding (#217): members[] rides through whole; mixing shapes and malformed entries refuse', () => {
+  // the many shape passes with its roster intact
+  const many = BASE();
+  many.memberBinding = {
+    rollPath: '/state/roll.json', keyringPath: '/state/keyring.json',
+    members: [
+      { prefix: 'community-packer', memberId: 'packer', memberKeyPath: '/state/packer.pem' },
+      { prefix: 'community-bench', memberId: 'bench-1', memberKeyPath: '/state/bench.pem' },
+    ],
+  };
+  assert.deepEqual(resolveConfig(many).memberBinding, many.memberBinding);
+
+  // one shape per composition: the single keys do not ride along members[]
+  const mixed = BASE();
+  mixed.memberBinding = { ...many.memberBinding, memberId: 'rehearsal-founder' };
+  assert.throws(() => resolveConfig(mixed), /declares members\[\] — the single-member .* keys do not ride along/);
+
+  // every entry declares all of itself
+  for (const bad of [
+    [{ prefix: 'community-x', memberId: 'x' }],
+    [{ memberId: 'x', memberKeyPath: '/state/x.pem' }],
+    [{ prefix: 'community-x', memberKeyPath: '/state/x.pem' }],
+  ]) {
+    const p = BASE();
+    p.memberBinding = { rollPath: '/state/roll.json', keyringPath: '/state/keyring.json', members: bad };
+    assert.throws(() => resolveConfig(p), /memberBinding\.members\[\]\.\w+ must be an explicit non-empty string/, JSON.stringify(bad));
+  }
+
+  // unknown keys stay refused — the config vocabulary is closed
+  const unknown = BASE();
+  unknown.memberBinding = { rollPath: '/r', keyringPath: '/k', members: [{ prefix: 'p', memberId: 'm', memberKeyPath: '/k.pem' }], quorum: 2 };
+  assert.throws(() => resolveConfig(unknown), /unknown memberBinding key quorum/);
+});

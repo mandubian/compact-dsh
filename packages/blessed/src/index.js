@@ -103,15 +103,43 @@ export function resolveConfig(config) {
   let memberBinding;
   if (config.memberBinding !== undefined) {
     object(config.memberBinding, 'memberBinding');
-    for (const k of ['rollPath', 'keyringPath', 'memberKeyPath', 'memberId']) {
-      text(config.memberBinding[k], `memberBinding.${k}`);
+    for (const key of Object.keys(config.memberBinding)) {
+      if (!['rollPath', 'keyringPath', 'memberKeyPath', 'memberId', 'declarationsPath', 'members'].includes(key)) {
+        throw new TypeError(`blessed: unknown memberBinding key ${key}`);
+      }
     }
-    memberBinding = {
-      rollPath: config.memberBinding.rollPath,
-      keyringPath: config.memberBinding.keyringPath,
-      memberKeyPath: config.memberBinding.memberKeyPath,
-      memberId: config.memberBinding.memberId,
-    };
+    text(config.memberBinding.rollPath, 'memberBinding.rollPath');
+    text(config.memberBinding.keyringPath, 'memberBinding.keyringPath');
+    if (config.memberBinding.members !== undefined) {
+      // the many-member shape (#217): one runtime, N admitted Members,
+      // session-id prefixes deciding whose deeds a session is. The single
+      // keys are refused here — a composition declares ONE shape, never a
+      // mixture two consumers could read differently.
+      if (config.memberBinding.memberKeyPath !== undefined || config.memberBinding.memberId !== undefined) {
+        throw new TypeError('blessed: memberBinding declares members[] — the single-member memberKeyPath/memberId keys do not ride along (one shape per composition)');
+      }
+      if (!Array.isArray(config.memberBinding.members)) throw new TypeError('blessed: memberBinding.members must be an array of {prefix, memberId, memberKeyPath}');
+      for (const m of config.memberBinding.members) {
+        if (!m || typeof m !== 'object' || Array.isArray(m)) throw new TypeError('blessed: each memberBinding.members entry must be an object');
+        for (const k of ['prefix', 'memberId', 'memberKeyPath']) text(m[k], `memberBinding.members[].${k}`);
+      }
+      memberBinding = {
+        rollPath: config.memberBinding.rollPath,
+        keyringPath: config.memberBinding.keyringPath,
+        ...(config.memberBinding.declarationsPath !== undefined ? { declarationsPath: config.memberBinding.declarationsPath } : {}),
+        members: config.memberBinding.members.map((m) => ({ prefix: m.prefix, memberId: m.memberId, memberKeyPath: m.memberKeyPath })),
+      };
+    } else {
+      for (const k of ['memberKeyPath', 'memberId']) {
+        text(config.memberBinding[k], `memberBinding.${k}`);
+      }
+      memberBinding = {
+        rollPath: config.memberBinding.rollPath,
+        keyringPath: config.memberBinding.keyringPath,
+        memberKeyPath: config.memberBinding.memberKeyPath,
+        memberId: config.memberBinding.memberId,
+      };
+    }
   }
   // the night watch (#195): declared as its policy or not at all — the
   // vocabulary is the watch's own (the module escalates on an unknown
