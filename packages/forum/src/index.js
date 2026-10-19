@@ -41,7 +41,7 @@
 // Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
-import { mkdirSync, appendFileSync } from 'node:fs';
+import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import {
@@ -52,23 +52,78 @@ import {
 export {
   Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText,
   TOPIC_PATTERN, MAX_POST_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+
 };
 
 export const name = 'compact-forum';
 
 /** The declared gaps this layer carries into the boot record (I-8). */
 export const DECLARED_GAPS = [
-  'service state is in-memory: the ledger beside the chains is the durable copy for OFFLINE readers, but a restart ' +
-  'begins an empty board — the posts themselves live on the members’ chains, where they were always recorded',
+  'the board replays from the ledger beside the chains at boot (#227), but the LEDGER IS THE READABLE COPY, not the ' +
+  'record of authority — the chains are; a torn tail (a run killed mid-write) is repaired at boot and the repair is ' +
+  'named on the log, never silent',
+  'a ledger line that fails replay (a gap or a mismatch) stops the replay LOUDLY at that line — the board carries ' +
+  'what verified and the run continues, because the chains, not this copy, decide what was said',
   'no clause of the body is enforced here — the forum is community infrastructure carried like the guide, declared ' +
   'in the boot record rather than coupled on',
 ];
+
+/** Read the ledger's durable copy back into the board (#227). Strict
+ *  continuity (Forum.replay); the crash case is expected and handled: a
+ *  run killed mid-write leaves an UNFINISHED last line — the clean prefix
+ *  replays, the torn bytes are dropped and the file truncated to them,
+ *  and the repair is named. A bad line MID-file (a gap, a mismatch) is
+ *  not repairable by this layer: replay stops there, loudly — the chains,
+ *  not this copy, decide what was said. */
+export function loadLedger(forum, ledgerPath, log = () => {}) {
+  if (!ledgerPath || !existsSync(ledgerPath)) return { replayed: 0, repaired: null, stoppedAt: null };
+  const raw = readFileSync(ledgerPath, 'utf8');
+  const lastNewline = raw.lastIndexOf('\n');
+  const goodPart = lastNewline === -1 ? '' : raw.slice(0, lastNewline + 1);
+  const tornTail = raw.slice(goodPart.length);
+  let replayed = 0;
+  let stoppedAt = null;
+  for (const line_ of goodPart.split('\n')) {
+    const line = line_.trim();
+    if (!line) continue;
+    let row;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      stoppedAt = { line: replayed + 1, reason: 'not JSON' };
+      log(`could not replay ledger line ${replayed + 1} (not JSON) — replay stops there; the board carries the ${replayed} post(s) before it`);
+      break;
+    }
+    try {
+      forum.replay(row);
+      replayed += 1;
+    } catch (error) {
+      stoppedAt = { line: replayed + 1, reason: error.message };
+      log(`could not replay ledger line ${replayed + 1} (${error.message}) — replay stops there; the board carries the ${replayed} post(s) before it`);
+      break;
+    }
+  }
+  let repaired = null;
+  if (tornTail.trim().length > 0) {
+    // the truncated bytes are a half-written copy of a post the crash
+    // never finished — named here, and the chains hold what was said
+    repaired = { bytes: tornTail.length };
+    writeFileSync(ledgerPath, goodPart, { mode: 0o600 });
+    log(`repaired the torn tail of the ledger (${tornTail.length} unfinished byte(s) dropped — a run killed mid-write; the chains hold what was said)`);
+  }
+  return { replayed, repaired, stoppedAt };
+}
 
 export function apply(ctx, config = {}) {
   const forum = new Forum();
   const ledgerPath = typeof config.ledgerPath === 'string' && config.ledgerPath ? config.ledgerPath : null;
   if (!ledgerPath) {
     ctx.logger?.warn?.('compact-forum: no ledger path configured — the forum runs in memory only, and offline readers will not see the speech');
+  } else {
+    const load = loadLedger(forum, ledgerPath, (m) => ctx.logger?.warn?.(`compact-forum: ${m}`));
+    if (load.replayed > 0) {
+      ctx.logger?.warn?.(`compact-forum: replayed ${load.replayed} post(s) from the ledger — the board resumes at fp_${load.replayed} (the chains remain the record of authority)`);
+    }
   }
 
   /** The durable copy, subjects-ledger pattern: append beside the chains,

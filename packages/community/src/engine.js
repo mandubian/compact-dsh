@@ -67,6 +67,13 @@ export function briefingText(charter, member, extras) {
   if (extras?.publish) {
     lines.push('', `PUBLISHING: ${extras.publish}`);
   }
+  if (extras?.resumed) {
+    lines.push('',
+      'RESUMED RUN: this community has run before. The forum\'s earlier speech is readable —',
+      '  forum_read (no topic) lists the topics; forum_read {"topic":"…","since":0} reads one in full.',
+      '  Your MEMBER identity persists (the roll); this session is a new deed of it, on a new chain.',
+      '  Read the archive before you speak: the conversation continues, it does not start over.');
+  }
   lines.push(
     '',
     `THIS RUN: ${charter.budgets.rounds} rounds; you act once per round. Budgets are enforced, not advisory.`,
@@ -117,7 +124,7 @@ export function benchFramingText(charter, member, caseRow) {
 /** Drive the community. Returns when the run completes, a budget trips,
  *  or the charter's rounds are spent. `hooks` receives every observable
  *  step (the CLI narrates, Phase D's observatory will stream). */
-export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenMeter = null, releasesOrigin = null }) {
+export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenMeter = null, releasesOrigin = null, sessionTag = null, resumed = false }) {
   const forum = ctx.get('compact-forum');
   const judicature = ctx.get('compact-judicature');
   if (!forum) throw new Error('compact-community: no compact-forum service — the community cannot speak (is the forum mounted?)');
@@ -130,14 +137,21 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
   const publishNote = charter.publish
     ? [charter.publish.note, charter.publish.route].filter(Boolean).join(' — ')
     : null;
-  const extras = { publish: releasesOrigin ? `${publishNote ?? 'publishing under a pre-minted grant'} (route: ${releasesOrigin})` : publishNote };
+  const extras = {
+    publish: releasesOrigin ? `${publishNote ?? 'publishing under a pre-minted grant'} (route: ${releasesOrigin})` : publishNote,
+    resumed: resumed === true,
+  };
 
   // seat the members: real sessions, per-member model route from the
-  // runtime's default, session ids the member binding's prefixes claim
+  // runtime's default. Session ids carry the run tag (#227): on a resumed
+  // run the member binding's prefixes still claim them, while each run's
+  // deeds get their own chains — the MEMBER persists (the roll), the
+  // session is a per-run deed. Without a tag the bare prefix is the id.
+  const sessionSuffix = sessionTag ? `-${sessionTag}` : '';
   const seated = [];
   for (const member of charter.members) {
     const made = await agentsSvc.create({
-      sessionId: member.prefix,
+      sessionId: `${member.prefix}${sessionSuffix}`,
       meta: { cwd: workspace },
       agentOptions: { provider: selection.provider, model: selection.model },
     });

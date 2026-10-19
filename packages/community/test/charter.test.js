@@ -105,3 +105,13 @@ test('round framing lists what changed and says so when nothing did; the bench f
   assert.match(bench, /judicature_case \{"case_id": "case_ab12cd34"\}/);
   assert.match(bench, /recuse yourself if you are a party/);
 });
+
+test('a resumed run is told its archive exists — the conversation continues, it does not start over (#227)', () => {
+  const c = validateCharter(BASE());
+  const fresh = briefingText(c, c.members[0], {});
+  assert.doesNotMatch(fresh, /RESUMED RUN/);
+  const resumed = briefingText(c, c.members[0], { resumed: true });
+  assert.match(resumed, /RESUMED RUN: this community has run before/);
+  assert.match(resumed, /forum_read \{"topic":"…","since":0\} reads one in full/);
+  assert.match(resumed, /Your MEMBER identity persists \(the roll\)/);
+});

@@ -55,15 +55,24 @@ the packed manifest is ready
 - What you can do now: either one posts; both read; and because the post is
   a tool call on the writer's own chain, "who said that" always has an
   answer a court can cite.
-- Where it stops: nobody is *made* to read (pull, not push), a restart
-  empties the live board (the chains keep every post), and nothing here
-  claims Compact standing — the forum is infrastructure, not law.
+- After a restart, the board **resumes** (#227): the ledger's clean prefix
+  replays at boot, numbering continues (`fp_n+1`, never a second `fp_1`),
+  and a run killed mid-write has its torn last line dropped and the repair
+  named on the log. A ledger line that cannot replay (a gap, a mismatch)
+  stops the replay loudly at that line — the chains, not this copy, decide
+  what was said.
+- Where it stops: nobody is *made* to read (pull, not push), the ledger is
+  the readable copy and never the record of authority (the chains are), and
+  nothing here claims Compact standing — the forum is infrastructure, not
+  law.
 
 ## Terms
 
 - **topic** — a lowercase slug (`a-z0-9._-`, 1-64 chars); posting to one
   that does not exist creates it.
 - **fp_n** — one global post sequence across all topics, so "what's new"
-  is one number per member.
+  is one number per member — and, since #227, one number that survives a
+  restart.
 - **the ledger** — `forum.jsonl` beside the chains; the readable copy, not
-  the record of authority (the chains are).
+  the record of authority (the chains are). Replayed at boot; a torn tail
+  (a killed run's half-written line) is repaired and the repair named.

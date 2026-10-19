@@ -3,7 +3,7 @@
 // names the citation coordinates judicature accepts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -135,7 +135,7 @@ test('composed: pull-only — the plugin injects nothing into anyone’s attenti
 test('composed: no ledger configured says so at boot, loudly', async () => {
   const { ctx } = await boot();
   assert.ok(ctx.logger.warns.some((w) => /no ledger path configured — the forum runs in memory only/.test(w)));
-  assert.ok(ctx.logger.warns.some((w) => /service state is in-memory/.test(w)));
+  assert.ok(ctx.logger.warns.some((w) => /LEDGER IS THE READABLE COPY/.test(w)));
 });
 
 test('composed: onPost feeds the live readers (the observatory’s seam), a throwing listener never blocks a post', async () => {
@@ -147,4 +147,67 @@ test('composed: onPost feeds the live readers (the observatory’s seam), a thro
   const out = text(await call(tools, 'forum_post', { topic: 't', text: 'x' }, m));
   assert.match(out, /fp_1 posted/);
   assert.deepEqual(seen, ['fp_1']);
+});
+
+// ── resumption (#227): a restarted run reads the ledger back, continues the
+// numbering, and survives a crash's torn tail with the repair named ──
+
+const LEDGER_ROW = (seq, over = {}) => JSON.stringify({ id: `fp_${seq}`, seq, topic: 'nightly', by: 'session-old', at: '2026-10-18T23:00:00.000Z', text: `from the run before the restart (${seq})`, ...over });
+
+test('composed: a restarted run replays the ledger — the board resumes, numbering continues, the file grows cleanly (#227)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'forum-ledger-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const ledgerPath = join(dir, 'forum.jsonl');
+  writeFileSync(ledgerPath, `${LEDGER_ROW(1)}\n${LEDGER_ROW(2, { topic: 'meta' })}\n`);
+  const { ctx, tools, agents, service } = await boot({ ledgerPath });
+  assert.ok(ctx.logger.warns.some((w) => /replayed 2 post\(s\) from the ledger — the board resumes at fp_2/.test(w)),
+    'the resumption is said at boot');
+  const reader = agents.add('session-new');
+  const board = text(await call(tools, 'forum_read', {}, reader));
+  assert.match(board, /meta — 1 post\(s\), last fp_2/);
+  const read = text(await call(tools, 'forum_read', { topic: 'nightly' }, reader));
+  assert.match(read, /from the run before the restart \(1\)/);
+  // posting continues at fp_3 — no second fp_1 in the ledger, ever
+  const posted = text(await call(tools, 'forum_post', { topic: 'nightly', text: 'the first post after the restart' }, reader));
+  assert.match(posted, /fp_3 posted to nightly/);
+  const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 3);
+  assert.equal(JSON.parse(lines[2]).id, 'fp_3');
+  assert.equal(service.forum.posts.length, 3);
+});
+
+test('composed: a torn tail from a killed run is repaired at boot, the repair named (#227)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'forum-ledger-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const ledgerPath = join(dir, 'forum.jsonl');
+  // fp_1 finished; fp_2's line was half-written when the run was killed
+  const torn = `${LEDGER_ROW(1)}\n${LEDGER_ROW(2).slice(0, 40)}`;
+  writeFileSync(ledgerPath, torn);
+  const { ctx, tools, agents } = await boot({ ledgerPath });
+  assert.ok(ctx.logger.warns.some((w) => /repaired the torn tail of the ledger \(40 unfinished byte/.test(w)),
+    'the repair is named, never silent');
+  // the board carries the clean prefix; posting rewrites the tail cleanly
+  const posted = text(await call(tools, 'forum_post', { topic: 'nightly', text: 'back after the crash' }, agents.add('session-new')));
+  assert.match(posted, /fp_2 posted to nightly/);
+  const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 2, 'the file is clean JSONL again');
+  assert.equal(JSON.parse(lines[1]).text, 'back after the crash');
+  const read = text(await call(tools, 'forum_read', { topic: 'nightly' }, agents.add('s')));
+  assert.match(read, /from the run before the restart \(1\)/);
+  assert.match(read, /back after the crash/);
+});
+
+test('composed: a ledger line that cannot replay stops the replay loudly at that line (#227)', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'forum-ledger-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const ledgerPath = join(dir, 'forum.jsonl');
+  // fp_1 fine; then a GAP (fp_9) — a hole this layer cannot repair
+  writeFileSync(ledgerPath, `${LEDGER_ROW(1)}\n${LEDGER_ROW(9)}\n${LEDGER_ROW(10)}\n`);
+  const { ctx, tools, agents, service } = await boot({ ledgerPath });
+  assert.ok(ctx.logger.warns.some((w) => /could not replay ledger line 2 \(seq 9 does not continue the board at 2\)/.test(w)),
+    'the stop is said with its reason');
+  assert.equal(service.forum.posts.length, 1, 'the board carries what verified');
+  // and posting continues from the verified prefix — fp_2, not fp_11
+  const posted = text(await call(tools, 'forum_post', { topic: 'nightly', text: 'after the gap' }, agents.add('session-new')));
+  assert.match(posted, /fp_2 posted to nightly/);
 });

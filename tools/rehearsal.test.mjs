@@ -229,3 +229,72 @@ test('auditor --roll: the walk verifies offline, and a tampered roll refuses by 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── resumption (#227): `admit` reuses a verified set instead of re-minting
+// it — members keep their keys, the roll grows by admission, never by reset ──
+import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
+
+const ROSTER_A = [{ id: 'member-a', class: 'long-lived-subject', holder: 'a community member, set A' }];
+const ROSTER_AB = [
+  { id: 'member-a', class: 'long-lived-subject', holder: 'a community member, set A' },
+  { id: 'member-b', class: 'long-lived-subject', holder: 'a community member, arriving later', bench: true },
+];
+
+test('rehearsal-keyring resumption: fresh mint with admit; reuse returns the SAME keys; admit grows the roll (#227)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'rehearsal-kr-resume-'));
+  try {
+    // first run: fresh mint carrying the charter's roster
+    const first = ensureRehearsalKeyring(dir, { admit: ROSTER_A });
+    assert.equal(first.reused, false);
+    const digestA = first.members.find((m) => m.id === 'member-a').memberKeyDigest;
+    const entriesAfterMint = first.roll.entries.length;
+    const checkpointsAfterMint = first.roll.checkpoints.length;
+
+    // restart, same roster: the set is REUSED — same digests, roll untouched
+    const again = ensureRehearsalKeyring(dir, { admit: ROSTER_A });
+    assert.equal(again.reused, true);
+    assert.deepEqual(again.admittedNow, [], 'nobody new to admit');
+    assert.equal(again.members.find((m) => m.id === 'member-a').memberKeyDigest, digestA,
+      'the member keeps its key across the restart');
+    assert.equal(again.roll.entries.length, entriesAfterMint, 'the roll is untouched by a no-op resume');
+    assert.equal(again.roll.checkpoints.length, checkpointsAfterMint);
+    // and the key file on disk IS the same key the roll binds
+    const kp = readFileSync(again.members.find((m) => m.id === 'member-a').keyPath, 'utf8');
+    assert.ok(kp.includes('PRIVATE KEY'));
+
+    // restart with a GROWN charter: the new member is admitted, the old one untouched
+    const grown = ensureRehearsalKeyring(dir, { admit: ROSTER_AB });
+    assert.equal(grown.reused, true);
+    assert.deepEqual(grown.admittedNow, ['member-b']);
+    assert.equal(grown.members.find((m) => m.id === 'member-a').memberKeyDigest, digestA,
+      'the earlier member is untouched by the later admission');
+    assert.notEqual(grown.members.find((m) => m.id === 'member-b').memberKeyDigest, digestA);
+    assert.equal(grown.roll.entries.length, entriesAfterMint + 1, 'admission is a row, appended');
+    assert.equal(grown.roll.checkpoints.length, checkpointsAfterMint + 1, 'the epoch closes over the new admission');
+    // the grown roll still verifies (the CLI's own walk)
+    const out = run(KEYRING, ['verify', dir]);
+    assert.match(out, /member roll OK/);
+    assert.match(out, /conveys no standing/);
+
+    // the CLI's plain ensure still refuses (reuse is the `admit` caller's choice)
+    assert.throws(() => run(KEYRING, ['ensure', dir]), /regenerating is a rotation/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('rehearsal-keyring resumption: a broken set refuses instead of being replaced (#227)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'rehearsal-kr-resume-'));
+  try {
+    ensureRehearsalKeyring(dir, { admit: ROSTER_A });
+    // tamper the roll in place — a resumption must not paper over it
+    const rollPath = join(dir, 'roll.json');
+    writeFileSync(rollPath, readFileSync(rollPath, 'utf8').replace('"kind": "admission"', '"kind": "admission-x"'));
+    assert.throws(
+      () => ensureRehearsalKeyring(dir, { admit: ROSTER_A }),
+      /roll refuses|roll-broken|not JSON|does not parse/i,
+      'a set that does not verify is not a community to resume');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

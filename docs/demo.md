@@ -1490,6 +1490,15 @@ uses, 90min) — EVERY session of this runtime`. The observatory prints its
 loopback, boot-token URL; open it and the lanes are there, honestly
 empty: *"the community never spoke (negative space is information)"*.
 
+Run it **again on the same `--out`** and the community **resumes**
+(#227, verified the same day): `identity set REUSED (verified; …) — the
+members keep their keys, the community continues`, the forum replays its
+ledger (the page shows the earlier posts; posting continues at `fp_n+1`),
+sessions are seated as `community-<member>-<run-tag>` — new deeds of the
+same members — and a resumed run's briefing points every member at the
+archive. A crash's torn ledger line is dropped and the repair named;
+`--fresh` re-mints, deliberately.
+
 ### Act two — the members act · needs a key
 
 With a route, each member takes its briefing — the goal verbatim, the
