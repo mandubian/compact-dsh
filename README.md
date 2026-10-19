@@ -6,8 +6,10 @@ mixed communities of agents and humans) from law-shaped text into enforced
 machinery on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
 > **Status — Phase 8 complete.** The enforcement register stands at
-> **71 entries over the 62 clauses of the body — 40 enforced** (the rest
-> planned, declared convention, or rehearsal), machine-checked in CI. The law
+> **72 entries over the 62 clauses of the body — 49 enforced** (40 clauses
+> carry an enforced row; the rest of the entries are planned, declared
+> convention, or rehearsal, and MEM-1/FED-1 are declared unadopted),
+> machine-checked in CI. The law
 > itself is **draft v0.5, not yet ratified**, so this composition claims
 > **no Compact standing (F-5)** — the boot attests that out loud on every
 > start, and that honesty is the point.
@@ -450,9 +452,10 @@ whose boot attests what it enforces.
 ## Honest status
 
 `npm run verify-register` prints the authoritative line today:
-**71 entries over 62 clauses — 40 enforced**; the remainder are `planned`,
+**72 entries over 62 clauses — 49 enforced** (40 distinct clauses carry an
+enforced row); the remainder are `planned`,
 declared `convention`, or `rehearsal` (development-keyring machinery with no
-standing). The register is the ledger; the phase narrative below is the map
+standing), and MEM-1/FED-1 are declared unadopted `[O]`. The register is the ledger; the phase narrative below is the map
 of how it got there (full prose in [docs/history-phases.md](docs/history-phases.md)):
 
 | Phase | What shipped | Enforced after |
@@ -466,7 +469,7 @@ of how it got there (full prose in [docs/history-phases.md](docs/history-phases.
 | 6 | CF-2 image provenance, MA-3 child-state honesty, MA-4 consent-scoped address, SCH-1 absence enforcement, the I-2/R-7 record | 28 |
 | 7 | R-1 the self-model, R-13 inquiry | 30 |
 | 8 | R-8/R-12 exit and termination; R-11/I-6/A-5 petition and dissent; A-8/R-5 the state of exception | 37 |
-| since | R-6 `law_read` in band + the guide; the #38 egress mediator; secret hygiene (I-5/G2-G3-G5); consent identity | **40** |
+| since | R-6 `law_read` in band + the guide; the #38 egress mediator; secret hygiene (I-5/G2-G3-G5); consent identity; pattern answers + the night watch (#176); the judicature (Part V) and member-identity (I-1) tracks; the bound clock (SCH-1, #204) | **49** |
 
 **Declared gaps — stated, not papered over.** The law is an unratified draft,
 so no standing is claimed (F-5). The attestation is **unsigned** (no identity
