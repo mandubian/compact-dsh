@@ -87,11 +87,13 @@ export function mountHumanSeat(ctx, {
       wouldOtherwise: isParamsEdge ? 'the night watch (params-edge)' : 'fail closed (unavailable)',
       resolvesTo: (answer) => (answer === 'approve' ? 'allowed-once' : 'denied'),
     });
+    // NOT unref'd: a pending ask is a live decision — the loop holds while
+    // the human thinks (the turn is blocked on this answer anyway; an
+    // unref'd timer let the event loop drain under the recorded answerer's
+    // awaited promise on Node 22, which CI caught)
     const timer = setTimeout(() => {
-      const refusal = settle(record.id, 'timeout', 'the timeout (fail closed)');
-      void refusal;
+      settle(record.id, 'timeout', 'the timeout (fail closed)');
     }, askTimeoutMs);
-    timer.unref?.();
     return new Promise((resolve) => {
       const entry = pending.get(record.id);
       entry.resolve = (answer) => {
@@ -126,6 +128,8 @@ export function mountHumanSeat(ctx, {
         ...(args?.context ? { context: String(args.context) } : {}),
       });
       return await new Promise((resolve) => {
+        // NOT unref'd — same rule as the asks: a question the human has not
+        // answered is a live decision, and the loop holds for it
         const timer = setTimeout(() => {
           pending.delete(record.id);
           onResolve({ ...record, settled: true, answer: null, answeredBy: 'the timeout', answeredAt: new Date().toISOString() });
@@ -133,7 +137,6 @@ export function mountHumanSeat(ctx, {
             `[ask_human] No answer within ${Math.round(questionTimeoutMs / 1000)}s — the honest no-answer, not a guess.\n` +
             'Say plainly what you did without the human\'s answer, or ask again later with a sharper question.');
         }, questionTimeoutMs);
-        timer.unref?.();
         const entry = pending.get(record.id);
         entry.resolve = (answer) => {
           clearTimeout(timer);
