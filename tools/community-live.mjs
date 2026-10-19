@@ -31,7 +31,7 @@
 // `npm run compact:bake`), and a model route (settings.yaml under
 // $DSH_HOME or the scratch state dir, or DEEPSEEK_API_KEY in the shell).
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -335,19 +335,28 @@ async function main() {
   const egressNetwork = `compact-community-${charter.name}-${Date.now()}`;
   process.on('exit', () => removeRunNetwork(egressNetwork));
 
-  // the keyring: rehearsal identity set WITH the charter's members admitted
+  // the keyring (#227): the identity set is ENSURED, not replaced. On a
+  // fresh scratch it mints with the charter's roster; on a re-used --out
+  // the VERIFIED set is reused (members keep their keys; old chains keep
+  // verifying) and only members the roll does not show are admitted.
+  // --fresh is the deliberate re-mint, the operator's recorded act.
   const keyringDir = join(scratch, 'state', 'keyring');
   mkdirSync(keyringDir, { recursive: true });
+  const fresh = argv.includes('--fresh');
   const keyring = ensureRehearsalKeyring(keyringDir, {
-    force: true,
-    extraMembers: charter.members.map((m) => ({
+    force: fresh,
+    admit: charter.members.map((m) => ({
       id: m.id,
       class: 'long-lived-subject',
       holder: `live community member "${m.id}" — ${m.bench ? 'seated on the bench' : m.persona}`,
     })),
   });
+  const resumed = keyring.reused === true;
+  SAY(resumed
+    ? `identity set REUSED (verified;${keyring.admittedNow.length ? ` admitted now: ${keyring.admittedNow.join(', ')};` : ''} roll at ${keyring.roll.entries.length} entries, ${keyring.roll.checkpoints.length} epoch(s)) — the members keep their keys, the community continues`
+    : `identity set minted${fresh ? ' (--fresh: the operator\'s deliberate re-mint)' : ''} — ${keyring.members.length} member(s) under the SIMULATED statute, standing none, every label honest`);
   const seat = seatTrustRoot(keyringDir);
-  SAY(`trust root seated (law digest ${seat.lawDigest.slice(0, 12)}… unchanged, manifest ${seat.manifestDigest.slice(0, 12)}…) · roll admits ${keyring.members.length} member(s) under the SIMULATED statute — standing none, every label honest`);
+  SAY(`trust root seated (law digest ${seat.lawDigest.slice(0, 12)}… unchanged, manifest ${seat.manifestDigest.slice(0, 12)}…) · roll admits ${keyring.members.length} member(s) — standing none, every label honest`);
   const bindings = memberBindingsOf(charter, keyring.members);
   const benchDigests = charter.members.filter((m) => m.bench)
     .map((m) => keyring.members.find((k) => k.id === m.id)?.memberKeyDigest)
@@ -449,9 +458,15 @@ async function main() {
       onFlushError: (m, e) => SAY(`  ! ${m.id} flush failed: ${e.message}`),
       onEnd: (s) => publishSafe({ type: 'end', reason: s.endReason }),
     };
+    // the run tag (#227): this run's deeds get their own chains while the
+    // member binding's prefixes still claim the ids — the community
+    // continues, the sessions are its per-run records
+    const runTag = randomBytes(3).toString('hex');
     const stats = await community.runCommunity({
       charter, workspace, hooks, tokenMeter, releasesOrigin: releases.origin,
+      sessionTag: runTag, resumed,
     });
+    SAY(`run ${runTag}${resumed ? ' (a resumed run — the forum replayed its archive)' : ''}`);
     out(`THE RUN ENDS — ${stats.endReason}`);
     line(`rounds: ${stats.rounds} · governed turns: ${stats.turns} · bench cases seen: ${stats.casesSeen} · tokens: ${tokenMeter()}`);
     for (const [id, turns] of Object.entries(stats.members)) line(`  ${id}: ${turns} turn(s)`);

@@ -77,6 +77,14 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   the publisher wants a route nobody approved, the ask appears on your
   page; if the editor faces a real choice, its question appears with its
   name on it. Your answers are recorded like everything else.
+- **After a crash or a stop, the run resumes (#227):** re-run the same
+  command on the same `--out` and the verified identity set is **reused**
+  (members keep their keys; old chains keep verifying), the forum
+  **replays** from its ledger, and each member's briefing says the
+  conversation continues and points at the archive. Sessions are per-run
+  deeds (`community-editor-<run-tag>`) of the same persistent members —
+  new chains, same names behind them. `--fresh` is the deliberate
+  re-mint, the operator's recorded act.
 - **Where it stops (honesty):** standing is `none` everywhere — practice
   keys, practice benches, the run rehearses and enacts nothing (D-8).
   The docket lives as long as the process. And nothing here makes the

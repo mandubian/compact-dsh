@@ -55,6 +55,37 @@ export class Forum {
   stats() {
     return { topics: this.topics.size, posts: this.posts.length };
   }
+
+  /** Ingest ONE ledger row at boot (#227): the board resumes where the
+   *  ledger left off instead of beginning empty. Strict continuity — the
+   *  id must match the seq, the seq must continue the file's own order —
+   *  so a replayed board is exactly the board that was posted, never an
+   *  approximation of it. Throws on the first violation; the caller owns
+   *  what happens to the rest of the file. */
+  replay(row) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('a ledger row is an object');
+    const seq = row.seq;
+    if (!Number.isInteger(seq) || seq !== this.posts.length + 1) {
+      throw new Error(`seq ${JSON.stringify(seq ?? null)} does not continue the board at ${this.posts.length + 1}`);
+    }
+    if (row.id !== `fp_${seq}`) throw new Error(`id ${JSON.stringify(row.id ?? null)} does not match fp_${seq}`);
+    const name = normalizeTopic(row.topic);
+    if (typeof row.text !== 'string' || !row.text.length) throw new Error('a replayed post carries no text');
+    if (row.text.length > MAX_POST_CHARS) throw new Error(`a replayed post exceeds ${MAX_POST_CHARS} characters — the ledger disagrees with what the gate once admitted`);
+    const post = {
+      id: row.id, seq, topic: name,
+      by: typeof row.by === 'string' && row.by ? row.by : null,
+      at: typeof row.at === 'string' && row.at ? row.at : null,
+      text: row.text,
+    };
+    this.posts.push(post);
+    const topicRow = this.topics.get(name) ?? { topic: name, count: 0, lastSeq: 0, lastAt: null };
+    topicRow.count += 1;
+    topicRow.lastSeq = seq;
+    topicRow.lastAt = post.at;
+    this.topics.set(name, topicRow);
+    return post;
+  }
 }
 
 export function normalizeTopic(topic) {

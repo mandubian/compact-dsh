@@ -116,25 +116,122 @@ const registerDigest = () => sha256Hex(readFileSync(REGISTER_PATH));
  * (a regeneration is a rotation — deliberate, `--force`, and the operator's
  * recorded act).
  *
- * `extraMembers` (#217): additional rehearsal Members admitted into the seed
- * roll alongside the two defaults — a live community of N agents admits N
- * Members (agent + bench seats), each with its own practice key under
- * `private/member-<id>.pem`, each admission signed by the statute quorum
- * AND its own key (possession, I-1). Same SIMULATED statute, same labels,
- * same standing: none.
+ * `admit` (#227, the resumption option): the roster the caller wants
+ * present — `[{id, class, holder}]`. On a FRESH dir it behaves like the
+ * roster being minted in; on an EXISTING, VERIFIED set it REUSES the set
+ * (members keep their keys; old chains keep verifying against the same
+ * roll) and admits only the members the roll does not show yet — appended
+ * under the stored authority quorum, epoch closed, roll rewritten in
+ * place. The roll is append-only: members a shrunk charter no longer
+ * names stay admitted. A broken set refuses (verifyRehearsalKeyring)
+ * rather than being silently replaced.
  *
- * @returns {{manifestPath, annexPath, keyPath, annexDigest, members}} absolute paths
+ * `extraMembers` (legacy, #217): the fresh-mint roster — kept for callers
+ * that never resume; `admit` supersedes it when given.
+ *
+ * @returns {{manifestPath, annexPath, keyPath, annexDigest, members, reused}} absolute paths
  */
-export function ensureRehearsalKeyring(dir, { force = false, now = new Date().toISOString(), extraMembers = [] } = {}) {
+export function ensureRehearsalKeyring(dir, { force = false, now = new Date().toISOString(), extraMembers = [], admit = null } = {}) {
   const manifestPath = join(dir, 'keyring.json');
   const keyPath = join(dir, 'enforcer.pem');
   const annexPath = join(dir, 'enforcer.annex.json');
-  if (existsSync(manifestPath) || existsSync(keyPath) || existsSync(annexPath)) {
-    if (!force) {
+  const rollPath = join(dir, 'roll.json');
+  const wanted = admit ?? extraMembers;
+  if ((existsSync(manifestPath) || existsSync(keyPath) || existsSync(annexPath)) && !force) {
+    // without `admit` the answer is the rotation refusal it always was
+    if (admit == null) {
       throw new SealError('already-installed',
         `a rehearsal identity set already exists under ${dir} — regenerating is a rotation: pass --force and record it (manifest rotations list)`);
     }
+    return reuseRehearsalKeyring(dir, { wanted, now });
   }
+  return mintRehearsalKeyring(dir, { now, wanted });
+}
+
+/** The resumption half (#227): verify the installed set, admit any wanted
+ *  member the roll does not show, and reconstruct the SAME result shape
+ *  the mint returns — digests and key paths resolved from the roll, the
+ *  enforcer and authority keys read from where they were installed. */
+function reuseRehearsalKeyring(dir, { wanted, now }) {
+  // a set that does not verify is not a community to resume — refuse and
+  // let the operator decide (--fresh is the deliberate re-mint)
+  const verdict = verifyRehearsalKeyring(dir);
+  const manifestPath = join(dir, 'keyring.json');
+  const annexPath = join(dir, 'enforcer.annex.json');
+  const keyPath = join(dir, 'enforcer.pem');
+  const rollPath = join(dir, 'roll.json');
+  const roll = JSON.parse(readFileSync(rollPath, 'utf8'));
+  const manifest = verdict.manifest;
+  const admitted = new Map(roll.entries.filter((e) => e.kind === 'admission').map((e) => [e.member, e]));
+  // admit the missing — the stored authority keys sign (the same quorum
+  // that minted the set), and each new key signs its own admission
+  const missing = wanted.filter((m) => !admitted.has(m.id));
+  if (missing.length > 0) {
+    const privates = new Map();
+    for (const id of AUTHORITY_KEY_IDS) {
+      const pemPath = join(dir, 'private', `${id}.pem`);
+      privates.set(id, readFileSync(pemPath, 'utf8'));
+    }
+    const authoritySigners = AUTHORITY_KEY_IDS.slice(0, 2).map((id) => ({ keyId: id, privateKey: privates.get(id) }));
+    const statuteDigest = roll.genesis?.admissionStatute?.digest ?? 'a'.repeat(64);
+    for (const m of missing) {
+      const kp = generateEd25519();
+      const pemPath = join(dir, 'private', `member-${m.id}.pem`);
+      writeFileSync(pemPath, kp.privateKeyPem, { mode: 0o600 });
+      chmodSync(pemPath, 0o600);
+      const digest = memberKeyDigestOf(kp.publicKey);
+      const event = {
+        kind: 'admission', memberKeyDigest: digest, class: m.class ?? 'long-lived-subject', memberKey: kp.publicKey,
+        member: m.id, holder: m.holder ?? 'a rehearsal member admitted on resumption',
+        grounds: `rehearsal admission statute ${String(statuteDigest).slice(0, 16)}… (SIMULATED)`,
+        recordedAt: now,
+      };
+      appendRollEvent(roll, {
+        ...event,
+        signedBy: signRollEvent(event, [...authoritySigners, { keyId: digest, privateKey: kp.privateKeyPem }]),
+      });
+      admitted.set(m.id, roll.entries.at(-1));
+    }
+    closeEpoch({ roll, epoch: roll.checkpoints.length, manifest, privateKeys: privates, now });
+    writeFileSync(rollPath, JSON.stringify(roll, null, 2) + '\n', { mode: 0o600 });
+  }
+  // the SAME result shape, resolved from the roll as it now stands
+  const annex = JSON.parse(readFileSync(annexPath, 'utf8'));
+  const members = [...admitted.values()].map((e) => ({
+    id: e.member,
+    class: e.class,
+    keyPath: join(dir, 'private', `member-${e.member}.pem`),
+    memberKeyDigest: e.memberKeyDigest,
+  }));
+  for (const m of members) {
+    if (!existsSync(m.keyPath)) {
+      throw new SealError('member-key-missing', `the roll admits "${m.id}" but its private key is not at ${m.keyPath} — the set is incomplete; re-mint with --fresh and record it`);
+    }
+  }
+  const accreditation = roll.entries.find((e) => e.kind === 'accreditation');
+  const witnessKeyPath = join(dir, 'private', 'witness-external-1.pem');
+  const declarationsPath = join(dir, 'declarations.jsonl');
+  return {
+    manifestPath, annexPath, keyPath,
+    annexDigest: annexDigestOf(annex),
+    manifest, annex, statutePath: join(dir, 'statute-admission.md'),
+    accreditationPath: join(dir, 'statute-accreditation.md'),
+    witnessKeyPath,
+    witnessKeyDigest: accreditation?.memberKeyDigest ?? null,
+    rollPath, roll,
+    declarationsPath,
+    declaration: existsSync(declarationsPath) ? JSON.parse(readFileSync(declarationsPath, 'utf8').trim().split('\n')[0]) : null,
+    members,
+    reused: true,
+    admittedNow: missing.map((m) => m.id),
+  };
+}
+
+/** The fresh-mint half: the original behavior, with `wanted` as the roster. */
+function mintRehearsalKeyring(dir, { now, wanted }) {
+  const manifestPath = join(dir, 'keyring.json');
+  const keyPath = join(dir, 'enforcer.pem');
+  const annexPath = join(dir, 'enforcer.annex.json');
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const keys = [];
   const privates = new Map();
@@ -252,7 +349,7 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
   // and every admitted key signs its own admission (possession, I-1)
   const authoritySigners = AUTHORITY_KEY_IDS.slice(0, 2).map((id) => ({ keyId: id, privateKey: privates.get(id) }));
   const membersIssued = [];
-  for (const m of [...SEED_MEMBERS, ...extraMembers]) {
+  for (const m of [...SEED_MEMBERS, ...wanted]) {
     const kp = generateEd25519();
     const pemPath = join(dir, 'private', `member-${m.id}.pem`);
     writeFileSync(pemPath, kp.privateKeyPem, { mode: 0o600 });
@@ -364,7 +461,7 @@ export function ensureRehearsalKeyring(dir, { force = false, now = new Date().to
   const declarationsPath = join(dir, 'declarations.jsonl');
   writeFileSync(declarationsPath, `${JSON.stringify(declaration)}\n`, { mode: 0o600 });
 
-  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, accreditationPath, witnessKeyPath: witnessPemPath, witnessKeyDigest: witnessDigest, rollPath, roll, declarationsPath, declaration, members: membersIssued };
+  return { manifestPath, annexPath, keyPath, annexDigest: annexDigestOf(annex), manifest, annex, statutePath, accreditationPath, witnessKeyPath: witnessPemPath, witnessKeyDigest: witnessDigest, rollPath, roll, declarationsPath, declaration, members: membersIssued, reused: false, admittedNow: membersIssued.filter((m) => wanted.some((w) => w.id === m.id)).map((m) => m.id) };
 }
 
 /**
