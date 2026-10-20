@@ -174,8 +174,6 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
   } else {
     L.push('  THE RUN: no run.json — this run predates #229, its end reason lived only on stdout');
   }
-  L.push('THE COMMUNITY, AFTER THE RUN — read from the chains and the store, no runtime cooperation');
-  L.push(`  state: ${paths.recordRoot.replace(/\/sessions$/, '')}`);
   L.push('');
   // the members
   L.push(`THE MEMBERS (${statsByLog.length} session log(s))`);

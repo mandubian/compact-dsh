@@ -141,6 +141,27 @@ export function createRunControls() {
   };
 }
 
+/** The charter's divergence counters (#229): LoopGuard notices and the
+ *  human seat's honest no-answers. The notice lane is installed HERE, at
+ *  boot — not when the observatory starts — so a --no-observe run still
+ *  pauses itself when it crosses the charter's line. `publish` is
+ *  optional: a dead or absent page never stops the count. */
+export function createDivergenceCounters({ setNoticeSink = null, publish = () => {} } = {}) {
+  let loopguardTrips = 0;
+  let humanSeatTimeouts = 0;
+  setNoticeSink?.((event) => {
+    if (event?.kind === 'compact-loopguard') loopguardTrips += 1;
+    try { publish(event); } catch { /* a dead page never breaks the run */ }
+  });
+  return {
+    counters: {
+      loopguardTrips: () => loopguardTrips,
+      humanSeatTimeouts: () => humanSeatTimeouts,
+    },
+    humanSeatTimedOut: () => { humanSeatTimeouts += 1; },
+  };
+}
+
 /**
  * Drive the community. Returns when the run completes, a budget trips,
  *  or the charter's rounds are spent. `hooks` receives every observable
@@ -206,8 +227,12 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
     while (controls.paused && !controls.stopMode) await new Promise((r) => setTimeout(r, 250));
     if (!controls.stopMode) hooks.onPauseState?.(false);
   };
+  // the fence pauses ONCE per crossing: after the Principal resumes, the
+  // counters are still above the line, and re-pausing on every later act
+  // would make the resume a no-op. A manual pause does not consume it.
+  let autoPaused = false;
   const maybeAutoPause = () => {
-    if (!charter.divergence || controls.paused || controls.stopMode) return;
+    if (autoPaused || !charter.divergence || controls.paused || controls.stopMode) return;
     const trips = divergenceCounters?.loopguardTrips?.() ?? 0;
     const timeouts = divergenceCounters?.humanSeatTimeouts?.() ?? 0;
     const why = [];
@@ -218,6 +243,7 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
       why.push(`human-seat timeouts ${timeouts} ≥ ${charter.divergence.humanSeatTimeouts}`);
     }
     if (why.length > 0) {
+      autoPaused = true;
       controls.pause();
       hooks.onAutoPause?.({ loopguardTrips: trips, humanSeatTimeouts: timeouts, why: why.join('; ') });
     }

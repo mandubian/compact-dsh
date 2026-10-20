@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runCommunity, createRunControls } from '../src/engine.js';
+import { runCommunity, createRunControls, createDivergenceCounters } from '../src/engine.js';
 import { validateCharter } from '../src/charter.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,6 +103,36 @@ test('engine immediate stop: the in-flight agent is CANCELLED, the run ends with
   assert.ok(Date.now() - started < 400, 'the cancel cut the wait short (a 500ms tick did not have to finish)');
   assert.equal(stats.endReason, 'stopped by the operator (immediate)');
   assert.ok(ctx.agents.some((a) => a.cancelled > 0), 'the loop cancel was the knife, not a flag poll');
+});
+
+test('headless divergence: the notice lane counts without a page, and the engine pauses', async () => {
+  let sink = null;
+  const fence = createDivergenceCounters({ setNoticeSink: (fn) => { sink = fn; } });
+  for (let i = 0; i < 3; i += 1) sink({ kind: 'compact-loopguard', summary: 'LoopGuard LG-2 identical retry' });
+  assert.equal(fence.counters.loopguardTrips(), 3, 'the notice lane counts with no observatory and no publisher');
+  assert.equal(fence.counters.humanSeatTimeouts(), 0);
+  fence.humanSeatTimedOut();
+  assert.equal(fence.counters.humanSeatTimeouts(), 1);
+
+  const ctx = fakeCtx();
+  const controls = createRunControls();
+  const autoPause = [];
+  let pausedResolve;
+  const paused = new Promise((resolve) => { pausedResolve = resolve; });
+  const run = runCommunity(ctx, {
+    charter: validateCharter({ ...CHARTER(), divergence: { loopguardTrips: 3 } }),
+    workspace: '/w', controls,
+    divergenceCounters: fence.counters,
+    hooks: { onAutoPause: (info) => { autoPause.push(info); pausedResolve(info); } },
+  });
+  const info = await Promise.race([paused, sleep(1000).then(() => null)]);
+  assert.ok(info, 'the run paused itself with no page open');
+  assert.match(info.why, /loopguard trips 3 ≥ 3/);
+  assert.equal(controls.state().paused, true);
+  controls.resume();
+  const stats = await run;
+  assert.equal(stats.endReason, 'rounds complete');
+  assert.equal(autoPause.length, 1);
 });
 
 test('engine auto-pause: the divergence counters pause the run themselves (#229)', async () => {
