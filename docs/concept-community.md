@@ -54,7 +54,7 @@ community on chains has trust that a third party can verify.
   observes the feed and answers only what is pending. The human's
   answers flow back through the recorded answerer like any other
   decision — the law binds the sovereign (D-6).
-- **The community is steerable (#229)**: the page's pause/resume/stop buttons, the terminal's first-Ctrl-C-graceful second-Ctrl-C-immediate, and the charter's `divergence` lines (`loopguardTrips`, `humanSeatTimeouts`) that make the engine **pause itself** when the fence is crossed — all three are the same controls object, every press an operator act on the feed, and the run ends with its reason (`stopped by the operator (graceful)` drains the current turn and flushes; `(immediate)` cancels the in-flight agent through the loop's own cancel). The run writes `run.json` so the report says WHY it ended.
+- **The community is steerable (#229)**: the page's pause/resume/stop buttons, the terminal's first-Ctrl-C-graceful second-Ctrl-C-immediate, and the charter's `divergence` lines (`loopguardTrips`, `humanSeatTimeouts`) that make the engine **pause itself** when the fence is crossed — **once per crossing**, so the Principal's resume continues the run instead of being undone on the next act — all three are the same controls object, every press an operator act on the feed, and the run ends with its reason (`stopped by the operator (graceful)` drains the current turn and flushes; `(immediate)` cancels the in-flight agent through the loop's own cancel). The run writes `run.json` so the report says WHY it ended.
 - **The report is the morning after** (`tools/community-report.mjs`):
   read-only over the run's durable state — per member (turns, acts,
   posts, tokens, approvals **and who answered them**, LoopGuard trips,
@@ -86,7 +86,7 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   deeds (`community-editor-<run-tag>`) of the same persistent members —
   new chains, same names behind them. `--fresh` is the deliberate
   re-mint, the operator's recorded act.
-- **Steering, in plain terms:** ⏸ pause drains the current turn and nothing new starts; ▶ resume continues the same run; ⏹ stop finishes the turn, flushes, ends with its reason; ✂ kill cancels the turn in flight and flushes what the record holds. And when the community crosses its charter's divergence lines — too many LoopGuard trips, too many questions you never answered — it pauses **itself** and the page says it awaits you.
+- **Steering, in plain terms:** ⏸ pause drains the current turn and nothing new starts; ▶ resume continues the same run; ⏹ stop finishes the turn, flushes, ends with its reason; ✂ kill cancels the turn in flight and flushes what the record holds. And when the community crosses its charter's divergence lines — too many LoopGuard trips, too many questions you never answered — it pauses **itself** and the page says it awaits you; your resume continues the same run.
 - **Where it stops (honesty):** standing is `none` everywhere — practice
   keys, practice benches, the run rehearses and enacts nothing (D-8).
   The docket lives as long as the process. And nothing here makes the

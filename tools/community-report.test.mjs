@@ -107,6 +107,8 @@ test('the ledger and the store read back; the report states the negative space',
     const logs = findSessionLogs(paths.recordRoot);
     const stats = logs.map((p) => agentStatsFromLog(readFileSync(p)));
     const text = formatReport({ paths, logs, statsByLog: stats, forum, grants });
+    assert.equal((text.match(/THE COMMUNITY, AFTER THE RUN/g) ?? []).length, 1, 'the report header prints once');
+    assert.equal((text.match(/^  state: /gm) ?? []).length, 1, 'the state line prints once');
     assert.match(text, /THE MEMBERS \(2 session log\(s\)\)/);
     assert.match(text, /editor/);
     assert.match(text, /turns 2 · acts 2 · forum posts 1/);
@@ -153,6 +155,8 @@ test('the run manifest (#229): the report says WHY the run ended, not only what 
     assert.match(paths.runJson, /run\.json$/);
     const run = JSON.parse(readFileSync(paths.runJson, 'utf8'));
     const text = formatReport({ paths, logs: [], statsByLog: [], forum: [], grants: { rows: [], revoked: [] }, run });
+    assert.equal((text.match(/THE COMMUNITY, AFTER THE RUN/g) ?? []).length, 1, 'the manifest does not duplicate the header');
+    assert.equal((text.match(/^  state: /gm) ?? []).length, 1, 'the manifest does not duplicate the state line');
     assert.match(text, /THE RUN: stopped by the operator \(graceful\) \(run bf085b, resumed\)/);
     assert.match(text, /rounds 2 · turns 5 · bench cases 1 · tokens 42000 · divergence lines: \{"loopguardTrips":6/);
     // a pre-#229 run (no manifest) says so instead of guessing

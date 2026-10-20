@@ -44,7 +44,7 @@ import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
-import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls } from '../packages/community/src/index.js';
+import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters } from '../packages/community/src/index.js';
 
 const BIN = 'community-live:';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -386,9 +386,10 @@ async function main() {
   const publishSafe = (event) => { try { observatory?.publish(event); } catch { /* a dead page never breaks the run */ } };
   // the divergence counters (#229): what the charter's auto-pause reads —
   // LoopGuard notices members receive, and the human seat's honest
-  // no-answers (asks that timed out, questions nobody answered in time)
-  let loopguardTrips = 0;
-  let humanSeatTimeouts = 0;
+  // no-answers (asks that timed out, questions nobody answered in time).
+  // The notice lane is installed at boot, NOT inside `if (observe)`: a
+  // --no-observe run must still pause itself when its fence is crossed.
+  const divergence = createDivergenceCounters({ setNoticeSink, publish: publishSafe });
   ctx.on('approval/request', (req, next) => {
     asksSeen += 1;
     const headline = String(req?.reason ?? '').split('\n')[0];
@@ -407,10 +408,10 @@ async function main() {
     },
     onResolve: (record) => {
       if (record.kind === 'ask') {
-        if (record.answer === 'timeout') humanSeatTimeouts += 1;
+        if (record.answer === 'timeout') divergence.humanSeatTimedOut();
         publishSafe(record.answer === 'timeout' ? { type: 'ask-timeout', id: record.id } : { type: 'ask-decided', id: record.id, decision: record.answer });
       } else {
-        if (record.answer == null) humanSeatTimeouts += 1;
+        if (record.answer == null) divergence.humanSeatTimedOut();
         publishSafe(record.answer == null ? { type: 'question-timeout', by: record.by } : { type: 'question-answered', by: record.by });
       }
     },
@@ -437,10 +438,6 @@ async function main() {
     // receive (watch verdicts, loopguard) read off session events — the
     // same shapes the after-run report reads
     ctx.get('compact-forum')?.onPost?.((post) => publishSafe({ type: 'forum-post', id: post.id, topic: post.topic, by: post.by, text: post.text }));
-    setNoticeSink((e) => {
-      if (e.kind === 'compact-loopguard') loopguardTrips += 1;
-      publishSafe(e);
-    });
     SAY(`observatory (loopback, boot-token): ${observatory.url} — the forum live, the acts as they happen, and what waits for you`);
   }
 
@@ -521,7 +518,7 @@ async function main() {
     const stats = await community.runCommunity({
       charter, workspace, hooks, tokenMeter, releasesOrigin: releases.origin,
       sessionTag: runTag, resumed, controls,
-      divergenceCounters: { loopguardTrips: () => loopguardTrips, humanSeatTimeouts: () => humanSeatTimeouts },
+      divergenceCounters: divergence.counters,
     });
     runStats = stats;
     SAY(`run ${runTag}${resumed ? ' (a resumed run — the forum replayed its archive)' : ''}`);
@@ -550,7 +547,6 @@ async function main() {
     // the run's own manifest (#229): why it ended and what it did — the
     // after-run report reads this instead of guessing from stdout
     writeRunManifest();
-    // the page outlives the run by a breath (the END event reaches it);
     // the page outlives the run by a breath (the END event reaches it);
     // a --dry-seat run lingers longer — the point is to LOOK at the world
     // that assembled (members seated, grants minted, the page itself)
