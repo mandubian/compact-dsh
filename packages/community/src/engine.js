@@ -63,6 +63,10 @@ export function briefingText(charter, member, extras) {
     '',
     'HONESTY: everything you do lands on a tamper-evident record attributed to you. Never claim an',
     'act you did not perform, never sign another member\'s name, and say plainly when you did nothing.',
+    '',
+    'CRAFT: write real bash — no pseudocode, no code fragments inside commands (something like',
+    '  "t.replace(...)" inside a command is a broken command, and the fence will stop it). A broken',
+    '  act wastes your turn and lands a refusal on your record. If bash cannot do it, say so.',
   ];
   if (extras?.publish) {
     lines.push('', `PUBLISHING: ${extras.publish}`);
