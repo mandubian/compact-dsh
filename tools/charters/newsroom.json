@@ -34,7 +34,7 @@
   ],
   "grants": [
     {
-      "pattern": "{{RELEASES_ORIGIN}}/*",
+      "pattern": "{{RELEASES_ORIGIN}}/",
       "methodClass": "write",
       "ttlMinutes": 90,
       "maxUses": 30
