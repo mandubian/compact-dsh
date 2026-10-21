@@ -124,3 +124,9 @@ test('divergence lines (#229): the auto-pause thresholds compile or refuse', () 
   assert.throws(() => validateCharter({ ...BASE(), divergence: { quorum: 2 } }), /unknown key/);
   assert.throws(() => validateCharter({ ...BASE(), divergence: { loopguardTrips: 0 } }), /positive integer/);
 });
+
+test('divergence.headless (#235 follow-up): pause (default) or stop — nothing else', () => {
+  assert.equal(validateCharter({ ...BASE(), divergence: { loopguardTrips: 2, headless: 'stop' } }).divergence.headless, 'stop');
+  assert.equal(validateCharter({ ...BASE(), divergence: { loopguardTrips: 2 } }).divergence.headless, undefined, 'absent keeps the pause default');
+  assert.throws(() => validateCharter({ ...BASE(), divergence: { loopguardTrips: 2, headless: 'park' } }), /"pause" \(default/);
+});

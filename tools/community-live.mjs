@@ -474,6 +474,15 @@ async function main() {
   // second stops immediately (the in-flight agent cancels)
   let signals = 0;
   const onSignal = (sig) => {
+    // after the run phase is over — success OR failure — the handler must
+    // not swallow the exit: the post-run linger (the page's last breath,
+    // the dry-seat look) is not worth a stuck terminal. Keyed off the
+    // phase flag, not runStats: a FAILED run's linger swallows Ctrl-C
+    // otherwise (the Copilot finding on this very branch).
+    if (runOver) {
+      SAY(`${sig}: the run has already ended — exiting`);
+      process.exit(130);
+    }
     signals += 1;
     if (signals === 1) {
       SAY(`${sig}: stopping GRACEFULLY — the current turn drains, the record flushes, the reason is recorded (press again to stop immediately)`);
@@ -484,10 +493,17 @@ async function main() {
       controls.stopNow();
     }
   };
+  // SIGCONT is the headless resume (#235 follow-up): a paused run with no
+  // page is not a parking lot — `kill -CONT <pid>` lifts the pause
+  process.on('SIGCONT', () => {
+    SAY('SIGCONT: the community RESUMES');
+    controls.resume();
+  });
   process.on('SIGINT', onSignal);
   process.on('SIGTERM', onSignal);
   let runStats = null;
   let runTag = null;
+  let runOver = false; // the finally sets it before the linger — the signal handler reads it
   const writeRunManifest = (extra = {}) => {
     try {
       writeFileSync(join(scratch, 'run.json'), `${JSON.stringify({
@@ -518,8 +534,14 @@ async function main() {
         publishSafe(paused ? { type: 'community-paused' } : { type: 'community-resumed' });
       },
       onAutoPause: (info) => {
-        SAY(`⏸ AUTO-PAUSED (divergence: ${info.why}) — the community waits for you on ${observatory?.url ?? 'the terminal'}`);
-        publishSafe({ type: 'auto-pause', ...info });
+        if (info.action === 'stopped') {
+          SAY(`⏹ AUTO-STOPPED (divergence: ${info.why}) — the fence ended the run (charter divergence.headless: stop)`);
+          publishSafe({ type: 'auto-stop', ...info });
+        } else {
+          const how = observe ? 'resume on the page, or SIGCONT' : 'SIGCONT resumes (no page this run); Ctrl-C stops gracefully';
+          SAY(`⏸ AUTO-PAUSED (divergence: ${info.why}) — awaiting you: ${how}`);
+          publishSafe({ type: 'auto-pause', ...info });
+        }
       },
     };
     // the run tag (#227): this run's deeds get their own chains while the
@@ -555,6 +577,7 @@ async function main() {
     process.stdout.write(`\n${BIN} FAILED — ${error?.stack ?? error}\n`);
     exitCode = 1;
   } finally {
+    runOver = true; // the linger is post-run: Ctrl-C leaves (success or failure)
     // the run's own manifest (#229): why it ended and what it did — the
     // after-run report reads this instead of guessing from stdout
     writeRunManifest();

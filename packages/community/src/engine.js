@@ -232,7 +232,7 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
   // would make the resume a no-op. A manual pause does not consume it.
   let autoPaused = false;
   const maybeAutoPause = () => {
-    if (autoPaused || !charter.divergence || controls.paused || controls.stopMode) return;
+    if (autoPaused || !charter.divergence || controls.paused || controls.stopMode) return null;
     const trips = divergenceCounters?.loopguardTrips?.() ?? 0;
     const timeouts = divergenceCounters?.humanSeatTimeouts?.() ?? 0;
     const why = [];
@@ -242,11 +242,19 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
     if (charter.divergence.humanSeatTimeouts != null && timeouts >= charter.divergence.humanSeatTimeouts) {
       why.push(`human-seat timeouts ${timeouts} ≥ ${charter.divergence.humanSeatTimeouts}`);
     }
-    if (why.length > 0) {
-      autoPaused = true;
-      controls.pause();
-      hooks.onAutoPause?.({ loopguardTrips: trips, humanSeatTimeouts: timeouts, why: why.join('; ') });
+    if (why.length === 0) return null;
+    autoPaused = true;
+    const reason = why.join('; ');
+    // the headless 'stop' policy (#235 follow-up): a pause nobody can lift
+    // is a parking lot — a run with no resume path ENDS gracefully instead,
+    // and the end reason says the FENCE acted, not the operator
+    if (charter.divergence.headless === 'stop') {
+      hooks.onAutoPause?.({ loopguardTrips: trips, humanSeatTimeouts: timeouts, why: reason, action: 'stopped' });
+      return { stop: true, why: reason };
     }
+    controls.pause();
+    hooks.onAutoPause?.({ loopguardTrips: trips, humanSeatTimeouts: timeouts, why: reason, action: 'paused' });
+    return { stop: false, why: reason };
   };
 
   for (let round = 1; round <= charter.budgets.rounds; round += 1) {
@@ -263,6 +271,8 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
         seat.wokenFor.add(caseRow.id);
         stats.casesSeen += 1;
         hooks.onBenchWake?.(seat.member, caseRow);
+        await waitWhilePaused();
+        if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
         await drive(seat, benchFramingText(charter, seat.member, caseRow), hooks, stats, sessionsSvc, controls);
       }
     }
@@ -299,8 +309,13 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
       if (!seat.briefed) { seat.briefed = true; void before; }
       // divergence lines are checked after each act (#229): the fence
       // pauses the community itself and the page says it awaits the
-      // Principal — the loop's next pause-check does the waiting
-      maybeAutoPause();
+      // Principal — the loop's next pause-check does the waiting. The
+      // headless 'stop' policy ends the run with the fence's own reason.
+      const action = maybeAutoPause();
+      if (action?.stop) {
+        stats.endReason = `auto-stopped (divergence: ${action.why})`;
+        return finish(stats, seated, hooks);
+      }
     }
   }
   stats.endReason = 'rounds complete';
