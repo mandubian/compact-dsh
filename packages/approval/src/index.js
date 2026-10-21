@@ -165,6 +165,24 @@ function commandPreview(args) {
   return redactEmbeddedSecrets(cut);
 }
 
+/**
+ * The WHOLE command, secret-masked but not truncated — the deciding
+ * surface for a human who must know exactly what they approve. The
+ * 240-char preview exists so a terminal shows a shape; the live run
+ * showed why a page cannot stop there: the part of a compound command
+ * that CAUSED the ask (a curl to a nonsense host) sat beyond the cut,
+ * and the operator approved or denied the shape, not the act. The full
+ * text is already on the record (the tool/call args); this renders it
+ * for the deciding surface under the same hygiene (redactEmbeddedSecrets),
+ * with a render-sanity cap only.
+ */
+function commandFull(args) {
+  const raw = typeof args?.command === 'string' ? args.command : (() => { try { return JSON.stringify(args); } catch { return ''; } })();
+  const flat = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  const capped = flat.length > 8000 ? flat.slice(0, 7997) + '…' : flat;
+  return redactEmbeddedSecrets(capped);
+}
+
 /** Command-aware identity for targetless calls that reference declared
  *  secrets: allow-once covers exactly this command, never a blanket over the
  *  tool (the LoopGuard's command-aware doctrine, reused for the agreement). */
@@ -890,7 +908,7 @@ async function answerRequest(approval, req, next) {
     // #8 G3: the deciding view renders the redacted target (host, path
     // family, command shape) — the operator decides on the same rendering
     // every other surface carries; the userinfo masking set the precedent
-    target: redactTarget(canonicalTarget(rec.args)), command: commandPreview(rec.args),
+    target: redactTarget(canonicalTarget(rec.args)), command: commandPreview(rec.args), commandFull: commandFull(rec.args),
     // the query SHAPE (#8 G5 display): names only — the deciding surface can
     // show what differs from a prior approval of the same target
     query: queryShape(rec.args?.url) ?? undefined,
