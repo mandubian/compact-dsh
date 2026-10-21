@@ -116,7 +116,7 @@ export function validateCharter(doc) {
       throw bad('divergence', 'an object {loopguardTrips, humanSeatTimeouts}');
     }
     for (const key of Object.keys(doc.divergence)) {
-      if (!['loopguardTrips', 'humanSeatTimeouts'].includes(key)) throw bad(`divergence.${key}`, 'unknown key — {loopguardTrips, humanSeatTimeouts}');
+      if (!['loopguardTrips', 'humanSeatTimeouts', 'headless'].includes(key)) throw bad(`divergence.${key}`, 'unknown key — {loopguardTrips, humanSeatTimeouts, headless}');
     }
     const limits = {};
     for (const k of ['loopguardTrips', 'humanSeatTimeouts']) {
@@ -125,7 +125,13 @@ export function validateCharter(doc) {
       if (!Number.isInteger(v) || v < 1) throw bad(`divergence.${k}`, 'a positive integer — the line the community may not cross unpaused');
       limits[k] = v;
     }
-    if (Object.keys(limits).length === 0) throw bad('divergence', 'declare at least one of loopguardTrips, humanSeatTimeouts');
+    if (doc.divergence.headless !== undefined) {
+      if (!['pause', 'stop'].includes(doc.divergence.headless)) {
+        throw bad('divergence.headless', '"pause" (default — wait for the Principal; SIGCONT resumes) or "stop" (end the run gracefully — for runs nobody can resume)');
+      }
+      limits.headless = doc.divergence.headless;
+    }
+    if (!(limits.loopguardTrips != null || limits.humanSeatTimeouts != null)) throw bad('divergence', 'declare at least one of loopguardTrips, humanSeatTimeouts');
     divergence = limits;
   }
 

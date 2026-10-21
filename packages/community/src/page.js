@@ -201,6 +201,9 @@ es.onmessage = (m) => {
     case 'auto-pause':
       post('acts-list', at + '⏸ AUTO-PAUSED (divergence: ' + esc(e.why) + ') — awaiting the Principal');
       break;
+    case 'auto-stop':
+      post('acts-list', at + '⏹ the fence AUTO-STOPPED the run (divergence: ' + esc(e.why) + ') — nobody could have resumed it');
+      break;
     case 'end':
       post('acts-list', at + '■ THE RUN ENDS — ' + esc(e.reason));
       break;

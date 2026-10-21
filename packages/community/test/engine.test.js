@@ -157,3 +157,48 @@ test('engine auto-pause: the divergence counters pause the run themselves (#229)
   controls.resume();
   await run;
 });
+
+test('engine auto-STOP: divergence.headless stop ends the run with the fence\'s own reason, not the operator\'s (#235 follow-up)', async () => {
+  const ctx = fakeCtx();
+  const controls = createRunControls();
+  const autoPause = [];
+  const charter = validateCharter({
+    name: 'd', goal: 'a goal long enough to matter here',
+    budgets: { rounds: 4, maxTurnsPerAgent: 8, wallClockMinutes: 5, tokenCap: 100000 },
+    members: [{ id: 'alpha', persona: 'works in turns, speaks when it has something' }],
+    divergence: { loopguardTrips: 2, headless: 'stop' },
+  });
+  const stats = await runCommunity(ctx, {
+    charter, workspace: '/w', controls,
+    divergenceCounters: { loopguardTrips: () => 2, humanSeatTimeouts: () => 0 },
+    hooks: { onAutoPause: (info) => autoPause.push(info) },
+  });
+  assert.match(stats.endReason, /auto-stopped \(divergence: loopguard trips 2 ≥ 2\)/);
+  assert.notEqual(stats.endReason, 'stopped by the operator (graceful)', 'the fence acted — the reason says so');
+  assert.equal(autoPause[0].action, 'stopped');
+});
+
+test('engine bench blind spot: the hand reaches the bench loop — stop mid-wakes ends the run (#235 follow-up)', async () => {
+  const ctx = fakeCtx();
+  // a docket of 40 live cases and a bench member: without the in-bench
+  // check, all 40 wakes would run to completion before any stop check
+  ctx.get('compact-judicature').docket = () =>
+    Array.from({ length: 40 }, (_, i) => ({ id: `case_${i}`, judgment: null, grievance: 'g' }));
+  const charter = validateCharter({
+    name: 'b', goal: 'a goal long enough to matter here',
+    budgets: { rounds: 2, maxTurnsPerAgent: 8, wallClockMinutes: 5, tokenCap: 100000 },
+    members: [
+      { id: 'alpha', persona: 'works in turns, speaks when it has something' },
+      { id: 'bench-1', persona: 'a member seated on the bench', bench: true },
+    ],
+  });
+  const controls = createRunControls();
+  let wakes = 0;
+  const stats = await runCommunity(ctx, {
+    charter, workspace: '/w', controls,
+    hooks: { onBenchWake: () => { wakes += 1; if (wakes === 10) controls.stop('graceful'); } },
+  });
+  assert.equal(stats.endReason, 'stopped by the operator (graceful)');
+  assert.equal(wakes, 10, 'the stop landed inside the bench loop, not after it');
+  assert.equal(stats.casesSeen, 10);
+});
