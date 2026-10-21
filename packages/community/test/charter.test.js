@@ -86,6 +86,8 @@ test('the briefing names the member, the goal verbatim, the forum topic, and the
   assert.match(text, /self_describe reports your standing/);
   assert.match(text, /judicature_hear files a case/);
   assert.match(text, /tamper-evident record attributed to you/);
+  assert.match(text, /the only hosts that exist are the ones this briefing names/);
+  assert.match(text, /HISTORY to report about — never a place to fetch/);
   assert.match(text, /write real bash — no pseudocode/);
   assert.match(text, /A broken\s+act wastes your turn/);
   const benchText = briefingText(c, c.members[2], {});
