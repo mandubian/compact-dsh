@@ -79,8 +79,19 @@ export function mountHumanSeat(ctx, {
     const isParamsEdge = card?.kind === 'params-edge';
     const critical = patterns.some((re) => re.test(reason));
     if (isParamsEdge && !critical) return next();
+    // the HUMAN facts, found by the live run: the envelope is written for
+    // the record, and a page answering from it alone asks a human to
+    // approve a wall of law about a host that does not exist. The deciding
+    // view already carries the plain facts — WHO asks, WHAT tool, the
+    // command preview, the redacted target — so the card leads with those
+    // and the verbatim envelope rides beneath, unclamped.
     const record = pose({
       kind: 'ask',
+      by: req.agent?.id ?? null,
+      tool: view?.tool ?? req.toolName ?? null,
+      command: view?.command ?? null,
+      target: view?.target ?? null,
+      fingerprint: view?.fingerprint ?? null,
       headline: reason.split('\n')[0].slice(0, 200),
       detail: reason,
       critical,

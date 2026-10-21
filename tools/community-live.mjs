@@ -412,7 +412,9 @@ async function main() {
     askTimeoutMs: escalation.askTimeoutMs ?? Number(flag('ask-timeout') ?? 120_000),
     questionTimeoutMs: escalation.questionTimeoutMs ?? 300_000,
     onPose: (record) => {
-      publishSafe(record.kind === 'ask' ? { type: 'ask-posed', headline: record.headline, critical: record.critical } : { type: 'question-posed', by: record.by, headline: record.headline });
+      publishSafe(record.kind === 'ask'
+        ? { type: 'ask-posed', headline: record.headline, critical: record.critical, by: record.by, tool: record.tool }
+        : { type: 'question-posed', by: record.by, headline: record.headline });
       SAY(`human seat: ${record.kind === 'ask' ? 'an approval ask waits for you' : `a member asks you: ${record.headline.slice(0, 80)}…`} ${observatory ? `(on the page: ${observatory.url})` : '(NO PAGE — --no-observe; it will time out fail-closed)'}`);
     },
     onResolve: (record) => {
