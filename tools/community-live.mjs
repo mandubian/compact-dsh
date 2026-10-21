@@ -253,6 +253,15 @@ function preMintGrants(ctx, charter, substitutions) {
   for (const g of charter.grants) {
     let raw = g.pattern;
     for (const [key, value] of Object.entries(substitutions)) raw = raw.split(key).join(value);
+    // the star in a URL pattern is a LITERAL path segment (UrlPrefix …/*/ covers
+    // only paths under a directory named *), not a glob — the #232-followup
+    // finding from the live run: a charter's '{{RELEASES_ORIGIN}}/*' minted a
+    // row covering nothing real, and the community's own publish asked. A
+    // trailing star is normalized to the bare prefix, loudly.
+    if (raw.endsWith('/*')) {
+      raw = `${raw.slice(0, -2)}/`;
+      SAY(`charter grant "${g.pattern}": a trailing /* is a LITERAL path segment in a URL pattern, not a glob — normalized to "${raw}" so the row covers what it plainly meant`);
+    }
     let parsed;
     try {
       parsed = parseAllowlistLikePattern(raw);
