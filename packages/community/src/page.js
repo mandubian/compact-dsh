@@ -99,7 +99,7 @@ function renderPending(p) {
       '<div class="head">APPROVAL ASKS FOR YOU' + (a.critical ? ' · CRITICAL (charter)' : '') + '</div>' +
       '<div class="plain">member <span class="who">' + esc(a.by ?? 'unknown') + '</span> wants to run <b>' + esc(a.tool ?? 'a tool') + '</b>' +
         (a.wouldOtherwise ? ' <span class="muted">(would otherwise: ' + esc(a.wouldOtherwise) + ')</span>' : '') + '</div>' +
-      (a.command ? '<pre class="command">' + esc(a.command) + '</pre>' : '') +
+      (a.commandFull || a.command ? '<pre class="command">' + esc(a.commandFull || a.command) + '</pre>' : '') +
       (a.target ? '<div class="target">target: ' + esc(typeof a.target === 'string' ? a.target : JSON.stringify(a.target)) + '</div>' : '') +
       '<details><summary>the full ask, verbatim (the legal envelope — also on the record)</summary>' +
       '<div class="detail">' + esc(a.detail || a.headline) + '</div></details>' +

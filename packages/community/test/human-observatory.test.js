@@ -305,3 +305,26 @@ test('the ask card carries the HUMAN facts — who asks, what tool, the command,
   seat.settleAsk(ask.id, 'deny');
   seat2.settleAsk(fallback.id, 'deny');
 });
+
+test('the ask card carries the WHOLE command — the part that caused the ask sat beyond the 240-char preview (live finding)', async () => {
+  const ctx = stubCtx();
+  // a compound command whose tail holds the act that caused the ask
+  const longCommand = "W=/w/digest.md; " + Array.from({ length: 12 }, (_, i) => `echo 'line ${i}' >> $W`).join('; ') +
+    "; curl -sS http://404./check";
+  assert.ok(longCommand.length > 240, 'the fixture really is preview-truncating');
+  ctx.get('compact-approval').deciding.set('c77', {
+    tool: 'bash',
+    command: longCommand.slice(0, 237) + '…',
+    commandFull: longCommand,
+    target: { host: '404.' },
+    fingerprint: 'fp_tail',
+    cause: { kind: 'first-touch' },
+  });
+  const seat = mountHumanSeat(ctx, { askTimeoutMs: 60_000 });
+  seat.answerer(REQ({ callId: 'c77', agent: { id: 'community-editor-41286e' }, reason: '[AG/fp_tail] First touch: nothing has ever covered host=404.' }), () => Promise.resolve('unavailable'));
+  const ask = seat.pending()[0];
+  assert.match(ask.commandFull, /curl -sS http:\/\/404\.\/check/, 'the nonsense tail is VISIBLE');
+  assert.match(ask.command, /…$/, 'the preview stays a preview');
+  assert.equal(ask.target.host, '404.');
+  seat.settleAsk(ask.id, 'deny');
+});

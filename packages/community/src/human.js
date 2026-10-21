@@ -90,6 +90,7 @@ export function mountHumanSeat(ctx, {
       by: req.agent?.id ?? null,
       tool: view?.tool ?? req.toolName ?? null,
       command: view?.command ?? null,
+      commandFull: view?.commandFull ?? view?.command ?? null,
       target: view?.target ?? null,
       fingerprint: view?.fingerprint ?? null,
       headline: reason.split('\n')[0].slice(0, 200),
