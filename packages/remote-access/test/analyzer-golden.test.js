@@ -140,3 +140,38 @@ test('dangerous-adjacent verb forms stay opaque — only the inspector list supp
   // paths applies in command position only, so these stay opaque
   assert.deepEqual(targets('echo /usr/bin/curl'), ['opaque:curl']);
 });
+
+test('@-prefixed curl bodies are file references, not remotes — the named URL stands alone (live finding, #240)', () => {
+  // the live community run's publish: a literal URL gateable per-host, an
+  // @file body — and the @-token poisoned the whole command opaque
+  const withBody = targets("curl -sS -o /tmp/pub.out -w '%{http_code}' -X PUT --data-binary @build/digest.md -H 'Content-Type: text/markdown' http://172.23.0.1:43309/digest/2026-10-19; cat /tmp/pub.out");
+  assert.deepEqual(withBody, [{ url: 'http://172.23.0.1:43309/digest/2026-10-19', host: '172.23.0.1' }]);
+  // minimal shapes: @body beside a URL, no opaque
+  assert.deepEqual(targets('curl --data-binary @build/d.md http://example.com/up'), [{ url: 'http://example.com/up', host: 'example.com' }]);
+  // and the fail-closed default is untouched: @body with NO nameable target stays opaque
+  assert.deepEqual(targets('curl --data-binary @build/d.md'), ['opaque:curl']);
+  // scp-style user@host still resolves through the '@' intuition
+  assert.deepEqual(targets('scp build/d.md user@backuphost:/backups/d.md'), [{ host: 'backuphost' }]);
+});
+
+test('the bare-IP dedup is EXACT-host — a prefix collision and an IP in a path both survive (Copilot finding)', () => {
+  // '10.0.0.1' is a substring of the host '10.0.0.11' — the distinct bare
+  // IP must NOT be dropped by a substring test
+  const prefix = targets('curl -X PUT --data-binary @f http://10.0.0.11/x; ping 10.0.0.1');
+  assert.deepEqual(prefix, [
+    { url: 'http://10.0.0.11/x', host: '10.0.0.11' },
+    { host: '10.0.0.1' },
+  ]);
+  // an IP in a URL PATH is not the host — the bare-IP finding stays
+  const inPath = targets('curl http://example.com/10.0.0.1; ping 10.0.0.1');
+  assert.deepEqual(inPath, [
+    { url: 'http://example.com/10.0.0.1', host: 'example.com' },
+    { host: '10.0.0.1' },
+  ]);
+  // an IP that IS the url host dedups at the bare-IP rule — but the ping
+  // is a SECOND ACT with its own target and stays
+  assert.deepEqual(targets('curl http://10.0.0.1/x; ping 10.0.0.1'), [
+    { url: 'http://10.0.0.1/x', host: '10.0.0.1' },
+    { host: '10.0.0.1' },
+  ]);
+});

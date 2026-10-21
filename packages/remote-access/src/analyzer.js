@@ -270,8 +270,17 @@ function isFlag(token) {
 /** The remote of a verb invocation: prefer remote-shaped tokens (@, scp-colon,
  *  URLs), then dotted hosts/IPs; a URL token belongs to rule 1. */
 function remoteOf(rest) {
-  return rest.find(t => SCP_LIKE_RE.test(t) || t.includes('@') || URL_ONCE.test(t))
-       ?? rest.find(t => hostOf(t) || IPV4_RE.test(t))
+  // A token that BEGINS with '@' is curl's file-body reference (-d @file,
+  // --data-binary @file, -T @file) — provably a BODY SOURCE, never a
+  // remote. The live community run's publish died here: the editor's
+  // '--data-binary @build/digest…' matched the '@' scp intuition and
+  // poisoned a perfectly literal URL into an opaque D-7 refusal beside
+  // the gateable url finding. The scp SHAPE itself (user@host, where '@'
+  // sits mid-token) still matches below; only the leading-'@' body
+  // reference is excluded, from both candidate passes.
+  const candidates = rest.filter(t => !t.startsWith('@'));
+  return candidates.find(t => SCP_LIKE_RE.test(t) || t.includes('@') || URL_ONCE.test(t))
+       ?? candidates.find(t => hostOf(t) || IPV4_RE.test(t))
        ?? null;
 }
 
@@ -366,9 +375,21 @@ export function createAnalyzer({ commandArgKeys = DEFAULT_COMMAND_ARG_KEYS, pack
           target: host ? (port ? { host, port } : { host }) : null, verb: bare });
       }
     }
-    // 3. bare IP literals anywhere (e.g. a redirected /dev/tcp target)
+    // 3. bare IP literals anywhere (e.g. a redirected /dev/tcp target) —
+    // an IP already carried INSIDE a url finding is the same target, not a
+    // second one: the live run's publish yielded url:{host: 172.23.0.1}
+    // AND a duplicate bare-IP host finding for the same address
     for (const m of command.matchAll(new RegExp(IPV4_RE.source, 'g'))) {
-      if (validIpv4(m[0])) out.push({ arg: argKey, match: m[0], kind: 'host', target: { host: m[0] } });
+      if (!validIpv4(m[0])) continue;
+      // EXACT host equality, never a substring: '10.0.0.1' inside the host
+      // '10.0.0.11' is a different address, and an IP in a URL PATH is not
+      // the host at all — dropping either would be the fail-open direction
+      // (a finding lost is a gate skipped). An IP that IS a url finding's
+      // host is the same target and dedups. (Copilot finding on this branch.)
+      // bare-for-bare only: a port-qualified finding (host + port) is a
+      // DIFFERENT consent shape and coexists (the golden suite's own case)
+      if (out.some((o) => o.target?.host === m[0] && o.target?.port == null)) continue;
+      out.push({ arg: argKey, match: m[0], kind: 'host', target: { host: m[0] } });
     }
     return out;
   }
