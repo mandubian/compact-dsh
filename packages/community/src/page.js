@@ -84,8 +84,22 @@ function post(listId, html, { empty = false } = {}) {
   while (ul.children.length > 200) ul.removeChild(ul.lastChild);
 }
 
+let lastPendingSig = null;
 function renderPending(p) {
+  // the reconciler rule (#239 follow-up): the 4s poll must never fight the
+  // human. If nothing changed, touch NOTHING — an expanded details and a
+  // half-typed reply stay exactly as the human left them. When something
+  // DID change, rebuild, but carry over what was open and what was typed.
+  const sig = JSON.stringify(p.map(x => [x.id, x.kind, x.critical, x.wouldOtherwise, x.headline, x.question, x.options, x.context, x.by, x.detail]));
+  if (sig === lastPendingSig) return;
+  lastPendingSig = sig;
   const box = $('pending');
+  const saved = {};
+  box.querySelectorAll('[data-id]').forEach(el => {
+    const d = el.querySelector('details');
+    const ta = el.querySelector('textarea');
+    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null };
+  });
   const asks = p.filter(x => x.kind === 'ask');
   const questions = p.filter(x => x.kind === 'question');
   box.innerHTML = '';
@@ -95,6 +109,7 @@ function renderPending(p) {
   for (const a of asks) {
     const div = document.createElement('div');
     div.className = 'ask';
+    div.dataset.id = a.id;
     div.innerHTML =
       '<div class="head">APPROVAL ASKS FOR YOU' + (a.critical ? ' · CRITICAL (charter)' : '') + '</div>' +
       '<div class="plain">member <span class="who">' + esc(a.by ?? 'unknown') + '</span> wants to run <b>' + esc(a.tool ?? 'a tool') + '</b>' +
@@ -107,10 +122,16 @@ function renderPending(p) {
     div.querySelector('.approve').onclick = () => api('/answer/' + encodeURIComponent(a.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ decision: 'approve' }) }).then(() => div.remove()).catch(() => {});
     div.querySelector('.deny').onclick = () => api('/answer/' + encodeURIComponent(a.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ decision: 'deny' }) }).then(() => div.remove()).catch(() => {});
     box.appendChild(div);
+    const was = saved[a.id];
+    if (was) {
+      const d = div.querySelector('details');
+      if (d && was.open) d.open = true;
+    }
   }
   for (const q of questions) {
     const div = document.createElement('div');
     div.className = 'ask question';
+    div.dataset.id = q.id;
     div.innerHTML =
       '<div class="head">A MEMBER ASKS YOU — ' + esc(q.by ?? 'a member') + (q.options ? ' · options: ' + esc(q.options) : '') + '</div>' +
       '<div class="detail">' + esc(q.question) + (q.context ? '\\n(context: ' + esc(q.context) + ')' : '') + '</div>' +
@@ -122,6 +143,12 @@ function renderPending(p) {
       api('/reply/' + encodeURIComponent(q.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ text: ta.value }) }).then(() => div.remove()).catch(() => {});
     };
     box.appendChild(div);
+    const wasQ = saved[q.id];
+    if (wasQ) {
+      const d = div.querySelector('details');
+      if (d && wasQ.open) d.open = true;
+      if (wasQ.text != null) ta.value = wasQ.text;
+    }
   }
 }
 

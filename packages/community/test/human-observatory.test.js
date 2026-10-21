@@ -328,3 +328,19 @@ test('the ask card carries the WHOLE command — the part that caused the ask sa
   assert.equal(ask.target.host, '404.');
   seat.settleAsk(ask.id, 'deny');
 });
+
+test('the page never fights the human: the 4s poll skips unchanged renders and carries open/typed state across real changes (#239 follow-up)', async () => {
+  const { pageHtml } = await import('../src/page.js');
+  const html = pageHtml({ charterName: 'x', token: 'tkn' });
+  const script = html.match(/<script>([\s\S]*)<\/script>/)[1];
+  // the reconciler guard: an unchanged pending set touches nothing
+  assert.match(script, /const sig = JSON\.stringify\(p\.map/);
+  assert.match(script, /if \(sig === lastPendingSig\) return;/);
+  // and a real change carries the human's state across the rebuild
+  assert.match(script, /saved\[el\.dataset\.id\] = \{ open: d \? d\.open : false, text: ta \? ta\.value : null \}/);
+  assert.match(script, /if \(d && was\.open\) d\.open = true;/);
+  assert.match(script, /if \(wasQ\.text != null\) ta\.value = wasQ\.text;/);
+  // cards are addressable by their ask/question id
+  assert.match(script, /div\.dataset\.id = a\.id;/);
+  assert.match(script, /div\.dataset\.id = q\.id;/);
+});
