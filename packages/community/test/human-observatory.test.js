@@ -272,3 +272,36 @@ test('the operator endpoints (#229): pause, resume, stop — one controls object
   const bareResp = await fetch(`${bare.url}pause`, { method: 'POST' });
   assert.equal(bareResp.status, 501);
 });
+
+test('the ask card carries the HUMAN facts — who asks, what tool, the command, the target (#233 follow-up)', async () => {
+  const ctx = stubCtx();
+  // the deciding view as the recorded answerer publishes it: plain facts
+  ctx.get('compact-approval').deciding.set('c9', {
+    tool: 'bash',
+    command: 'curl -sS -X PUT --data-binary @digest/2026-10-21.md http://172.22.0.1:35257/digest/2026-10-21/',
+    target: { url: 'http://172.22.0.1:35257/digest/2026-10-21/', host: '172.22.0.1' },
+    fingerprint: 'fp_deadbeef',
+    cause: { kind: 'first-touch' },
+  });
+  const seat = mountHumanSeat(ctx, { askTimeoutMs: 60_000 });
+  const envelope = '[AG/fp_deadbeef] First touch: nothing has ever covered host=172.22.0.1 in this runtime — no grant row, no cached approval. Approving materializes scoped, expiring coverage.';
+  seat.answerer(REQ({ callId: 'c9', toolName: 'bash', agent: { id: 'community-publisher-abc123' }, reason: envelope }), () => Promise.resolve('unavailable'));
+  const ask = seat.pending()[0];
+  assert.equal(ask.by, 'community-publisher-abc123', 'the card names the member asking');
+  assert.equal(ask.tool, 'bash');
+  assert.match(ask.command, /curl -sS -X PUT/);
+  assert.equal(ask.target.host, '172.22.0.1');
+  assert.equal(ask.fingerprint, 'fp_deadbeef');
+  // and the verbatim envelope still rides — the record's text, unlost
+  assert.match(ask.detail, /First touch: nothing has ever covered/);
+  // a view-less ask (the stub paths) still falls back to the request's own facts
+  const seat2 = mountHumanSeat(stubCtx(), { askTimeoutMs: 60_000 });
+  seat2.answerer(REQ({ toolName: 'web_fetch' }), () => Promise.resolve('unavailable'));
+  const fallback = seat2.pending()[0];
+  assert.equal(fallback.tool, 'web_fetch');
+  assert.equal(fallback.by, 'community-publisher');
+  assert.equal(fallback.command, null);
+  // settle the pending so the test exits clean
+  seat.settleAsk(ask.id, 'deny');
+  seat2.settleAsk(fallback.id, 'deny');
+});

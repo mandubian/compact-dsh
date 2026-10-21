@@ -29,7 +29,13 @@ export function pageHtml({ charterName, token }) {
   li.empty { color: #666; font-style: italic; }
   .ask { border: 1px solid #a83; background: #241c10; padding: 8px; margin: 8px 10px; font-size: 12.5px; }
   .ask .head { color: #ffb46b; font-weight: bold; }
-  .ask .detail { color: #999; font-size: 11.5px; max-height: 9em; overflow: auto; white-space: pre-wrap; }
+  .ask .plain { margin: 6px 0; }
+  .ask .plain .who { color: #7fd1ff; font-weight: bold; }
+  .ask pre.command { background: #111; border: 1px solid #444; padding: 6px; margin: 6px 0; white-space: pre-wrap; word-break: break-all; color: #d8d8d8; font-size: 12px; max-height: none; }
+  .ask .target { color: #9ab; font-size: 11.5px; }
+  .ask details { margin-top: 6px; }
+  .ask details summary { cursor: pointer; color: #886; font-size: 11px; }
+  .ask .detail { color: #999; font-size: 11.5px; white-space: pre-wrap; max-height: none; overflow: visible; }
   .ask button { margin-right: 6px; margin-top: 6px; padding: 4px 12px; font: inherit; cursor: pointer; }
   .ask button.approve { background: #1d5c2f; color: #cfe; border: 1px solid #3a7; }
   .ask button.deny { background: #5c1d1d; color: #fcc; border: 1px solid #a55; }
@@ -90,9 +96,14 @@ function renderPending(p) {
     const div = document.createElement('div');
     div.className = 'ask';
     div.innerHTML =
-      '<div class="head">APPROVAL ASKS FOR YOU — ' + esc(a.wouldOtherwise ? 'would otherwise: ' + a.wouldOtherwise : 'claimed') + (a.critical ? ' · CRITICAL (charter)' : '') + '</div>' +
-      '<div class="detail">' + esc(a.detail || a.headline) + '</div>' +
-      '<button class="approve">approve</button><button class="deny">deny</button>';
+      '<div class="head">APPROVAL ASKS FOR YOU' + (a.critical ? ' · CRITICAL (charter)' : '') + '</div>' +
+      '<div class="plain">member <span class="who">' + esc(a.by ?? 'unknown') + '</span> wants to run <b>' + esc(a.tool ?? 'a tool') + '</b>' +
+        (a.wouldOtherwise ? ' <span class="muted">(would otherwise: ' + esc(a.wouldOtherwise) + ')</span>' : '') + '</div>' +
+      (a.command ? '<pre class="command">' + esc(a.command) + '</pre>' : '') +
+      (a.target ? '<div class="target">target: ' + esc(typeof a.target === 'string' ? a.target : JSON.stringify(a.target)) + '</div>' : '') +
+      '<details><summary>the full ask, verbatim (the legal envelope — also on the record)</summary>' +
+      '<div class="detail">' + esc(a.detail || a.headline) + '</div></details>' +
+      '<button class="approve">approve once</button><button class="deny">deny</button>';
     div.querySelector('.approve').onclick = () => api('/answer/' + encodeURIComponent(a.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ decision: 'approve' }) }).then(() => div.remove()).catch(() => {});
     div.querySelector('.deny').onclick = () => api('/answer/' + encodeURIComponent(a.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ decision: 'deny' }) }).then(() => div.remove()).catch(() => {});
     box.appendChild(div);
