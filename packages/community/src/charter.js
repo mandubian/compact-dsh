@@ -73,9 +73,20 @@ export function validateCharter(doc) {
     if (typeof m.persona !== 'string' || m.persona.trim().length < 5) {
       throw bad(`members[${id}].persona`, 'every member carries a persona — what it is FOR, one honest sentence at least');
     }
+    // an optional model route: a member may be seated on a model other
+    // than the runtime default ("zai/glm-5.3-flash") — diversity is the
+    // operator's choice, declared here, recorded in the run manifest.
+    let route = null;
+    if (m.model !== undefined) {
+      if (typeof m.model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(m.model)) {
+        throw bad(`members[${id}].model`, `"${String(m.model).slice(0, 40)}" is not a route — "provider/model" (e.g. "zai/glm-5.3-flash"), or omit it to take the runtime default`);
+      }
+      const [provider, modelName] = m.model.split('/');
+      route = { provider, model: modelName };
+    }
     const bench = m.bench === true;
     if (!bench) workers += 1;
-    members.push({ id, prefix, persona: m.persona.trim(), bench });
+    members.push({ id, prefix, persona: m.persona.trim(), bench, ...(route ? { model: route } : {}) });
   }
   if (workers === 0) throw bad('members', 'at least one non-bench member — a bench with nobody to judge is theater');
 

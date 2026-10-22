@@ -312,9 +312,14 @@ const short = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, 
 const bare = (s) => String(s ?? '').replace(/^community-/, '');
 
 const r = DATA.run || {};
+const mod = r.model || {};
+const routes = Object.values(mod.members || {});
+const modelTxt = !mod.model ? '' : ' · model ' + (new Set(routes).size > 1
+  ? Object.keys(mod.members).map((k) => k + '=' + mod.members[k]).join(' ')
+  : mod.provider + '/' + mod.model);
 $('meta').textContent = (r.charter || '${safeName}') + ' · run ' + (r.runTag ?? '—') + (r.resumed ? ' (resumed)' : '') +
   ' · ended ' + (r.endedAt ?? '?') + ' · reason: ' + (r.endReason ?? '?') +
-  ' · rounds ' + (r.rounds ?? 0) + ' · turns ' + (r.turns ?? 0) + ' · tokens ' + (r.tokens ?? 0);
+  ' · rounds ' + (r.rounds ?? 0) + ' · turns ' + (r.turns ?? 0) + ' · tokens ' + (r.tokens ?? 0) + modelTxt;
 
 for (const p of DATA.forum) {
   const li = document.createElement('li');

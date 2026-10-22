@@ -30,9 +30,9 @@ function fakeCtx({ turnMs = 15 } = {}) {
     ['compact-judicature', { docket: () => [] }],
     ['sessions', { flush: async () => true }],
     ['agents', {
-      create: async ({ sessionId }) => {
+      create: async ({ sessionId, agentOptions }) => {
         const agent = {
-          id: sessionId, session: { id: sessionId }, cancelled: 0, turns: 0,
+          id: sessionId, session: { id: sessionId }, cancelled: 0, turns: 0, agentOptions,
           followup() { this.turns += 1; },
           async whenIdle() { await sleep(turnMs); },
           cancel() { this.cancelled += 1; this._cancelledNow = true; },
@@ -103,6 +103,42 @@ test('engine immediate stop: the in-flight agent is CANCELLED, the run ends with
   assert.ok(Date.now() - started < 400, 'the cancel cut the wait short (a 500ms tick did not have to finish)');
   assert.equal(stats.endReason, 'stopped by the operator (immediate)');
   assert.ok(ctx.agents.some((a) => a.cancelled > 0), 'the loop cancel was the knife, not a flag poll');
+});
+
+test('the run records the model route it seated each member on — provenance, not vibes', async () => {
+  const ctx = fakeCtx();
+  const stats = await runCommunity(ctx, { charter: CHARTER(), workspace: '/w' });
+  assert.equal(stats.endReason, 'rounds complete');
+  assert.deepEqual(stats.model, {
+    provider: 'fake',
+    model: 'fake-1',
+    members: { alpha: 'fake/fake-1', beta: 'fake/fake-1' },
+  }, 'the manifest names the model each member actually spoke with, member by member');
+});
+
+test('a charter-declared route overrides the default per member — seated as declared, recorded as seated', async () => {
+  const ctx = fakeCtx();
+  const charter = validateCharter({
+    name: 'mixed-routes',
+    goal: 'a goal long enough to matter for this run of the fake loop',
+    budgets: { rounds: 1, maxTurnsPerAgent: 2, wallClockMinutes: 5, tokenCap: 100000 },
+    members: [
+      { id: 'alpha', persona: 'works in turns, speaks when it has something', model: 'fake/turbo' },
+      { id: 'beta', persona: 'works in turns, speaks when it has something' },
+    ],
+  });
+  const stats = await runCommunity(ctx, { charter, workspace: '/w' });
+  assert.equal(stats.endReason, 'rounds complete');
+  // the seating loop handed each member its own route
+  const seatedOn = Object.fromEntries(ctx.agents.map((a) => [a.id.replace('community-', ''), a.agentOptions]));
+  assert.deepEqual(seatedOn.alpha, { provider: 'fake', model: 'turbo' });
+  assert.deepEqual(seatedOn.beta, { provider: 'fake', model: 'fake-1' });
+  // and the manifest records exactly that
+  assert.deepEqual(stats.model, {
+    provider: 'fake',
+    model: 'fake-1',
+    members: { alpha: 'fake/turbo', beta: 'fake/fake-1' },
+  });
 });
 
 test('headless divergence: the notice lane counts without a page, and the engine pauses', async () => {
