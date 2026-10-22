@@ -20,10 +20,10 @@ function buildState(dir) {
     members: { guardian: 2 },
   }, null, 2) + '\n');
   writeFileSync(join(dir, 'state', 'sessions', 'ws', 'community-guardian-aaa', 'session.v4.jsonl'), [
-    JSON.stringify({ type: 'turn/end', time: '2026-10-22T20:00:00.000Z', data: {} }),
-    JSON.stringify({ type: 'tool/call', time: '2026-10-22T20:00:01.000Z', data: { name: 'law_read', arguments: '{}' } }),
-    JSON.stringify({ type: 'user/message', time: '2026-10-22T20:00:02.000Z', data: { source: { kind: 'compact-loopguard', summary: 'LoopGuard LG-2 identical retry' } } }),
-    JSON.stringify({ type: 'turn/end', time: '2026-10-22T20:01:00.000Z', data: {} }),
+    JSON.stringify({ type: 'turn/end', time: 1792700400000, data: {} }),
+    JSON.stringify({ type: 'tool/call', time: 1792700401000, data: { name: 'law_read', arguments: '{}' } }),
+    JSON.stringify({ type: 'user/message', time: 1792700402000, data: { source: { kind: 'compact-loopguard', summary: 'LoopGuard LG-2 identical retry' } } }),
+    JSON.stringify({ type: 'turn/end', time: 1792700460000, data: {} }),
   ].join('\n') + '\n');
   writeFileSync(join(dir, 'state', 'chains', 'forum.jsonl'), [
     JSON.stringify({ id: 'fp_1', seq: 1, topic: 'agreement-floor', by: 'community-guardian-aaa', at: '2026-10-22T20:02:00.000Z', text: 'POSITION: yes, and I cite R-9' }),
@@ -40,6 +40,9 @@ test('readArchive: the run manifest, the full forum, and an ordered timeline', (
     assert.match(a.forum[0].text, /R-9/);
     assert.equal(a.members.length, 1);
     assert.deepEqual(a.timeline.map((t) => t.type), ['turn-done', 'act', 'notice', 'turn-done'], 'the timeline is ordered as the member lived it');
+    // EPOCH-NUMBER times normalize to ISO strings at the source (the live
+    // finding: the renderer sliced a number and the acts lane died)
+    assert.match(a.timeline[0].at, /^2026-10-2[0-9]T/, 'numeric times come out ISO');
     assert.equal(a.timeline[1].text, 'law_read');
     assert.match(a.timeline[2].text, /LG-2/);
   } finally {

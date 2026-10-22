@@ -10,6 +10,16 @@ import { resolveRunPaths, findSessionLogs, forumFromLedger } from './community-r
 
 const cut = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n) : s; };
 
+/** Timestamps as ISO strings, whatever the logs carried — the live v4
+ *  logs write `time` as EPOCH MILLISECONDS (a number), and a renderer
+ *  that sliced it as a string died on the first entry (the live
+ *  finding). Normalized here, at the source, so every reader sees one
+ *  shape. */
+const when = (v) => {
+  if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
+  return String(v ?? '');
+};
+
 /** One member's ordered timeline from its own log: turns, governed acts,
  *  and the notices it received — the acts lane of a replay. */
 export function timelineFromLog(logText, member) {
@@ -19,7 +29,7 @@ export function timelineFromLog(logText, member) {
     let row;
     try { row = JSON.parse(line); } catch { continue; } // a torn tail never kills the archive
     const data = row?.data ?? row;
-    const at = row?.time ?? null;
+    const at = when(row?.time);
     switch (row?.type) {
       case 'turn/end':
         timeline.push({ at, who: member, type: 'turn-done', text: `${member} finished a turn` });
