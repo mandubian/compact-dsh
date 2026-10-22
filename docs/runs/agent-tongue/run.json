@@ -1,0 +1,34 @@
+{
+  "charter": "agent-tongue",
+  "runTag": "1e393c",
+  "resumed": false,
+  "endedAt": "2026-10-22T22:12:36.700Z",
+  "endReason": "token cap: 2000000",
+  "rounds": 5,
+  "turns": 21,
+  "benchCasesSeen": 0,
+  "tokens": 2065950,
+  "members": {
+    "protocolist": 5,
+    "latentist": 4,
+    "verifier": 4,
+    "empiricist": 4,
+    "recorder": 4
+  },
+  "divergence": {
+    "loopguardTrips": 10,
+    "humanSeatTimeouts": 4
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "protocolist": "zai/glm-5.3-flash",
+      "latentist": "zai/glm-5.3-flash",
+      "verifier": "zai/glm-5.3-flash",
+      "empiricist": "zai/glm-5.3-flash",
+      "recorder": "zai/glm-5.3-flash"
+    }
+  },
+  "modelProvenance": "backfilled 2026-10-23 from every request/context in this run's session logs (pre-#248 driver; the driver did not write model at run time)"
+}
