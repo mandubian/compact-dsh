@@ -33,7 +33,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
-import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -352,6 +352,22 @@ async function main() {
   const keyringDir = join(scratch, 'state', 'keyring');
   mkdirSync(keyringDir, { recursive: true });
   const fresh = argv.includes('--fresh');
+  // --fresh-approvals (#215 live finding): yesterday's mistaken approvals
+  // linger in the store — an approved-once 404 curl taught this runtime for
+  // 24h that the nonsense host was consented. The flag moves the store
+  // aside (recorded, named) so the run starts with CLEAN consent; the
+  // charter's grants re-mint on every boot either way.
+  const freshApprovals = argv.includes('--fresh-approvals');
+  if (freshApprovals) {
+    const storePath = join(scratch, 'state', 'approvals.json');
+    if (existsSync(storePath)) {
+      const aside = `${storePath}.aside-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+      renameSync(storePath, aside);
+      SAY(`--fresh-approvals: the approval store moved aside (${aside}) — yesterday's grants and cached approvals no longer speak for this community`);
+    } else {
+      SAY('--fresh-approvals: no approval store yet — starting clean');
+    }
+  }
   const keyring = ensureRehearsalKeyring(keyringDir, {
     force: fresh,
     admit: charter.members.map((m) => ({
