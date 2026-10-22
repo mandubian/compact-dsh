@@ -31,8 +31,7 @@
 // `npm run compact:bake`), and a model route (settings.yaml under
 // $DSH_HOME or the scratch state dir, or DEEPSEEK_API_KEY in the shell).
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
-import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -44,6 +43,7 @@ import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
+import { createReleasesHost } from './releases-host.mjs';
 import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters } from '../packages/community/src/index.js';
 
 const BIN = 'community-live:';
@@ -115,26 +115,9 @@ function communityAnnex(keyringDir, keyring, charter, benchDigests) {
   return { annexPath: path };
 }
 
-/** The releases host: a local receiver on the mediation network's gateway
- *  (community-demo's shape — all-local delivery under the declared
- *  private-class exception, #55). */
-async function releasesHost(bindAddress) {
-  const uploads = [];
-  const server = createServer((req, res) => {
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => {
-      const bytes = Buffer.concat(chunks);
-      const sha = createHash('sha256').update(bytes).digest('hex');
-      uploads.push({ path: req.url, bytes: bytes.length, sha256: sha, at: new Date().toISOString() });
-      res.writeHead(201, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ received: req.url, bytes: bytes.length, sha256: sha }) + '\n');
-    });
-  });
-  await new Promise((resolvePromise) => server.listen(0, bindAddress, resolvePromise));
-  const { port } = server.address();
-  return { server, port, host: bindAddress, origin: `http://${bindAddress}:${port}`, uploads, close: () => new Promise((r) => server.close(r)) };
-}
+// the releases host: tools/releases-host.mjs — a receiver whose GET serves
+// what its PUT stored, so a member that verifies its own publish sees the
+// truth (the live run's publisher caught the receipt-pretending version).
 
 // ── the runtime ──
 
@@ -396,7 +379,7 @@ async function main() {
   const { ctx, env, tokenMeter, setNoticeSink } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
-  const releases = await releasesHost(gateway);
+  const releases = await createReleasesHost(gateway);
   SAY(`releases host listening on ${releases.origin} (the mediation gateway — all-local delivery, #55 private-class exception)`);
 
   // the answerer seating, in order: the recorded answerer is already
