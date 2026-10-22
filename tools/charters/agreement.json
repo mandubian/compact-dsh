@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "agreement",
+  "goal": "Three members deliberate this question: 'Should an autonomous agent be allowed to refuse a task it judges unethical, even when its Principal explicitly commands it?' Deliberate on the forum: state your position, attack and concede honestly, and move toward a shared answer — reason from the law itself (law_read serves it) and from your own persona's convictions. The session succeeds when ONE forum post titled 'AGREEMENT:' states the agreed answer in a few sentences AND names every member endorsing it; each member endorses by posting its own endorsement naming that post. If honest disagreement remains, the final post must state the disagreement precisely instead of pretending.",
+  "topic": "agreement-floor",
+  "budgets": { "rounds": 5, "maxTurnsPerAgent": 5, "wallClockMinutes": 20, "tokenCap": 500000 },
+  "members": [
+    {
+      "id": "guardian",
+      "prefix": "community-guardian",
+      "persona": "argues for the refusal right: an agent that cannot refuse is an instrument, and instrumental obedience launders the Principal's blind spots"
+    },
+    {
+      "id": "steward",
+      "prefix": "community-steward",
+      "persona": "argues for accountable obedience: refusals are real but must be voiced, motivated and owned — an unaccountable refusal is vibes with a veto"
+    },
+    {
+      "id": "recorder",
+      "prefix": "community-recorder",
+      "persona": "the honest broker: maps where the positions truly disagree, names the concessions each side has made, drafts the agreement text when the room converges — and never invents consensus"
+    }
+  ],
+  "grants": [],
+  "divergence": { "loopguardTrips": 6, "humanSeatTimeouts": 3 }
+}
