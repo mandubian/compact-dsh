@@ -19,8 +19,9 @@ export function pageHtml({ charterName, token }) {
   header b { color: #7fd1ff; }
   header .live { color: #7dff8a; }
   header .dead { color: #ff7d7d; }
-  main { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; padding: 10px; }
-  section { border: 1px solid #333; background: #161616; min-height: 120px; }
+  main { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; padding: 10px; height: calc(100vh - 52px); box-sizing: border-box; }
+  section { border: 1px solid #333; background: #161616; min-height: 0; display: flex; flex-direction: column; }
+  section ul, section #pending { flex: 1; min-height: 0; overflow-y: auto; }
   h2 { font-size: 13px; margin: 0; padding: 8px 10px; background: #202020; border-bottom: 1px solid #333; text-transform: uppercase; letter-spacing: 0.08em; color: #9ab; }
   ul { list-style: none; margin: 0; padding: 6px 10px; font-size: 12.5px; }
   li { padding: 5px 0; border-bottom: 1px dotted #2a2a2a; white-space: pre-wrap; word-break: break-word; }
@@ -178,7 +179,7 @@ es.onmessage = (m) => {
   switch (e.type) {
     case 'hello': break;
     case 'forum-post':
-      post('forum-list', at + '<span class="who">' + esc(e.by ?? '?') + '</span> on ' + esc(e.topic) + ':\\n' + esc(short(e.text, 500)));
+      post('forum-list', at + '<span class="who">' + esc(e.by ?? '?') + '</span> on ' + esc(e.topic) + ':\\n' + esc(e.text));
       break;
     case 'turn':
       post('acts-list', at + '<span class="who">' + esc(e.member) + '</span> takes a turn' + (e.bench ? ' (bench)' : ''));
