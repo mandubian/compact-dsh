@@ -196,14 +196,20 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
   // run the member binding's prefixes still claim them, while each run's
   // deeds get their own chains — the MEMBER persists (the roll), the
   // session is a per-run deed. Without a tag the bare prefix is the id.
+  // The seating is recorded as performed — the route each member actually
+  // got — so the run's manifest cannot claim a model nobody spoke with;
+  // the raw session logs (request/context per deed) remain the per-request
+  // authority this summary derives from.
   const sessionSuffix = sessionTag ? `-${sessionTag}` : '';
   const seated = [];
+  const model = { provider: selection.provider, model: selection.model, members: {} };
   for (const member of charter.members) {
     const made = await agentsSvc.create({
       sessionId: `${member.prefix}${sessionSuffix}`,
       meta: { cwd: workspace },
       agentOptions: { provider: selection.provider, model: selection.model },
     });
+    model.members[member.id] = `${selection.provider}/${selection.model}`;
     const agent = made?.agent ?? made;
     seated.push({ member, agent, lastForumSeq: 0, turns: 0, briefed: false, wokenFor: new Set() });
     hooks.onSeat?.(member, agent);
@@ -212,7 +218,7 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
   const bench = seated.filter((s) => s.member.bench);
 
   const startedAt = Date.now();
-  const stats = { rounds: 0, turns: 0, casesSeen: 0, endReason: null, members: {} };
+  const stats = { rounds: 0, turns: 0, casesSeen: 0, endReason: null, members: {}, model };
   const budgetTripped = (why) => { stats.endReason = why; return true; };
   const tokensUsed = () => (tokenMeter ? tokenMeter() : 0);
 

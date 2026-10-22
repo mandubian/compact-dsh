@@ -149,6 +149,7 @@ test('the run manifest (#229): the report says WHY the run ended, not only what 
       endReason: 'stopped by the operator (graceful)',
       rounds: 2, turns: 5, benchCasesSeen: 1, tokens: 42000,
       members: { editor: 2, publisher: 3 },
+      model: { provider: 'zai', model: 'glm-5.3-flash', members: { editor: 'zai/glm-5.3-flash', publisher: 'zai/glm-5.3-flash' } },
       divergence: { loopguardTrips: 6, humanSeatTimeouts: 3 },
     }, null, 2) + '\n');
     const paths = resolveRunPaths(dir);
@@ -159,6 +160,13 @@ test('the run manifest (#229): the report says WHY the run ended, not only what 
     assert.equal((text.match(/^  state: /gm) ?? []).length, 1, 'the manifest does not duplicate the state line');
     assert.match(text, /THE RUN: stopped by the operator \(graceful\) \(run bf085b, resumed\)/);
     assert.match(text, /rounds 2 · turns 5 · bench cases 1 · tokens 42000 · divergence lines: \{"loopguardTrips":6/);
+    assert.match(text, /model: zai\/glm-5\.3-flash \(every member\)/, 'the report names the model the run spoke with');
+    // a heterogeneous seating names each member on its own route
+    const het = formatReport({
+      paths: { ...paths, runJson: null }, logs: [], statsByLog: [], forum: [], grants: { rows: [], revoked: [] },
+      run: { endReason: 'rounds complete', model: { provider: 'zai', model: 'glm-5.3-flash', members: { editor: 'zai/glm-5.3-flash', publisher: 'deepseek/chat' } } },
+    });
+    assert.match(het, /model: editor=zai\/glm-5\.3-flash publisher=deepseek\/chat/);
     // a pre-#229 run (no manifest) says so instead of guessing
     const noManifest = formatReport({ paths: { ...paths, runJson: null }, logs: [], statsByLog: [], forum: [], grants: { rows: [], revoked: [] } });
     assert.match(noManifest, /no run\.json — this run predates #229/);

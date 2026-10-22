@@ -521,6 +521,7 @@ async function main() {
         benchCasesSeen: runStats?.casesSeen ?? 0,
         tokens: tokenMeter(),
         members: runStats?.members ?? {},
+        model: runStats?.model ?? null,
         divergence: charter.divergence ?? null,
         ...extra,
       }, null, 2)}\n`);

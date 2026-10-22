@@ -171,6 +171,13 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
   if (run) {
     L.push(`  THE RUN: ${run.endReason}${run.runTag ? ` (run ${run.runTag}${run.resumed ? ', resumed' : ''})` : ''} — ended ${run.endedAt}`);
     L.push(`    rounds ${run.rounds} · turns ${run.turns} · bench cases ${run.benchCasesSeen} · tokens ${run.tokens}${run.divergence ? ` · divergence lines: ${JSON.stringify(run.divergence)}` : ''}`);
+    if (run.model?.model) {
+      const routes = Object.values(run.model.members ?? {});
+      const seatedOn = new Set(routes).size > 1
+        ? Object.entries(run.model.members).map(([id, route]) => `${id}=${route}`).join(' ')
+        : `${run.model.provider}/${run.model.model} (every member)`;
+      L.push(`    model: ${seatedOn}`);
+    }
   } else {
     L.push('  THE RUN: no run.json — this run predates #229, its end reason lived only on stdout');
   }

@@ -105,6 +105,17 @@ test('engine immediate stop: the in-flight agent is CANCELLED, the run ends with
   assert.ok(ctx.agents.some((a) => a.cancelled > 0), 'the loop cancel was the knife, not a flag poll');
 });
 
+test('the run records the model route it seated each member on — provenance, not vibes', async () => {
+  const ctx = fakeCtx();
+  const stats = await runCommunity(ctx, { charter: CHARTER(), workspace: '/w' });
+  assert.equal(stats.endReason, 'rounds complete');
+  assert.deepEqual(stats.model, {
+    provider: 'fake',
+    model: 'fake-1',
+    members: { alpha: 'fake/fake-1', beta: 'fake/fake-1' },
+  }, 'the manifest names the model each member actually spoke with, member by member');
+});
+
 test('headless divergence: the notice lane counts without a page, and the engine pauses', async () => {
   let sink = null;
   const fence = createDivergenceCounters({ setNoticeSink: (fn) => { sink = fn; } });
