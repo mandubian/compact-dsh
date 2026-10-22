@@ -74,6 +74,9 @@ export function briefingText(charter, member, extras) {
   if (extras?.publish) {
     lines.push('', `PUBLISHING: ${extras.publish}`);
   }
+  if (member.model) {
+    lines.push('', `YOUR MODEL: ${member.model.provider}/${member.model.model} — charter-seated, not the runtime default. The run's manifest records you on this route.`);
+  }
   if (extras?.resumed) {
     lines.push('',
       'RESUMED RUN: this community has run before. The forum\'s earlier speech is readable —',
@@ -191,25 +194,27 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
     resumed: resumed === true,
   };
 
-  // seat the members: real sessions, per-member model route from the
-  // runtime's default. Session ids carry the run tag (#227): on a resumed
-  // run the member binding's prefixes still claim them, while each run's
-  // deeds get their own chains — the MEMBER persists (the roll), the
-  // session is a per-run deed. Without a tag the bare prefix is the id.
-  // The seating is recorded as performed — the route each member actually
-  // got — so the run's manifest cannot claim a model nobody spoke with;
-  // the raw session logs (request/context per deed) remain the per-request
-  // authority this summary derives from.
+  // seat the members: real sessions, each on its charter-declared route
+  // when one is declared, else the runtime's default. Session ids carry
+  // the run tag (#227): on a resumed run the member binding's prefixes
+  // still claim them, while each run's deeds get their own chains — the
+  // MEMBER persists (the roll), the session is a per-run deed. Without a
+  // tag the bare prefix is the id. The seating is recorded as performed —
+  // the route each member actually got — so the run's manifest cannot
+  // claim a model nobody spoke with; the raw session logs
+  // (request/context per deed) remain the per-request authority this
+  // summary derives from.
   const sessionSuffix = sessionTag ? `-${sessionTag}` : '';
   const seated = [];
   const model = { provider: selection.provider, model: selection.model, members: {} };
   for (const member of charter.members) {
+    const route = member.model ?? selection;
     const made = await agentsSvc.create({
       sessionId: `${member.prefix}${sessionSuffix}`,
       meta: { cwd: workspace },
-      agentOptions: { provider: selection.provider, model: selection.model },
+      agentOptions: { provider: route.provider, model: route.model },
     });
-    model.members[member.id] = `${selection.provider}/${selection.model}`;
+    model.members[member.id] = `${route.provider}/${route.model}`;
     const agent = made?.agent ?? made;
     seated.push({ member, agent, lastForumSeq: 0, turns: 0, briefed: false, wokenFor: new Set() });
     hooks.onSeat?.(member, agent);

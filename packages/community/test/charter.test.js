@@ -36,6 +36,25 @@ test('the fence refuses vagueness: goal, member shape, duplicates', () => {
   assert.throws(() => validateCharter({ ...BASE(), members: [{ id: 'bench-1', persona: 'judges', bench: true }] }), /at least one non-bench member/);
 });
 
+test('a member may be seated on a declared model route — "provider/model", one shape, or refused', () => {
+  const c = validateCharter({
+    ...BASE(),
+    members: [
+      { id: 'packer', persona: 'prepares and verifies the digest from sources', model: 'zai/glm-5.3-flash' },
+      { id: 'shipper', persona: 'publishes what the community agrees on' },
+      { id: 'bench-1', persona: 'a member seated on the bench', bench: true, model: 'deepseek/chat' },
+    ],
+  });
+  assert.deepEqual(c.members[0].model, { provider: 'zai', model: 'glm-5.3-flash' });
+  assert.equal(c.members[1].model, undefined, 'no route declared — the runtime default seats this member');
+  assert.deepEqual(c.members[2].model, { provider: 'deepseek', model: 'chat' }, 'bench seats may carry a route too');
+  assert.throws(() => validateCharter({ ...BASE(), members: [{ id: 'packer', persona: 'prepares the digest from sources', model: 'glm-5.3-flash' }] }), /members\[packer\]\.model[\s\S]*not a route/);
+  assert.throws(() => validateCharter({ ...BASE(), members: [{ id: 'packer', persona: 'prepares the digest from sources', model: { provider: 'zai', model: 'glm-5.3-flash' } }] }), /members\[packer\]\.model[\s\S]*not a route/, 'one shape only — the object form refuses like any other');
+  // the briefing tells a charter-seated member which route it thinks on
+  assert.match(briefingText(c, c.members[0]), /YOUR MODEL: zai\/glm-5\.3-flash — charter-seated/);
+  assert.doesNotMatch(briefingText(c, c.members[1]), /YOUR MODEL/);
+});
+
 test('grants carry their budgets — a pre-mint without one is a blank check', () => {
   const withGrants = {
     ...BASE(),

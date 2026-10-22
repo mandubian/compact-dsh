@@ -18,7 +18,9 @@ community on chains has trust that a third party can verify.
 
 - **The charter is data** (`packages/community/src/charter.js`): macro
   goal, member roster (worker and bench seats, unique session-id
-  prefixes, honest personas), the grants the operator pre-mints — each
+  prefixes, honest personas, and — optionally — a model route per member
+  `"provider/model"`, seating that member on something other than the
+  runtime default), the grants the operator pre-mints — each
   with a mandatory budget, "a pre-mint without a budget is a blank
   check" — the budgets that bound the run (rounds, turns per member,
   wall clock, shared token cap), the workspace sources, and the
@@ -26,7 +28,10 @@ community on chains has trust that a third party can verify.
   mid-run (D-7).
 - **The members are real sessions** (`engine.js`): the stock agent loop
   (`agents.create` → `followup` → `whenIdle` → `flush`), one model route
-  resolved at call time, briefings that teach only machinery that exists.
+  resolved at call time (per-member where the charter declares one),
+  briefings that teach only machinery that exists. The run's manifest
+  (`run.json`) records the route each member was actually seated on —
+  uniform seating shows one route, a mixed roster names each member.
   The many-member binding (#217) countersigns each session with its own
   member's key; a session matching no prefix binds to nobody, stated.
 - **The driver decides nothing for the members**: its only acts are the
