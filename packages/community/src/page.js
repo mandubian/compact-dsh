@@ -248,3 +248,94 @@ api('/state').then(s => { renderPending(s.pending || []); renderBanner(s.control
 </html>
 `;
 }
+
+// The replay view (#215): a finished run, rendered read-only from its
+// archive — the same three lanes, the same style, no seat and no buttons.
+// `data` is the archive object (run manifest, full forum, the members'
+// ordered timeline); the tools embed it as JSON over the __DATA__ mark.
+export function replayPageHtml({ charterName, data }) {
+  // embedded HERE, verbatim: template interpolation has no $-sequence
+  // semantics, so archived shell commands ($W, $$, $'…) cannot corrupt the
+  // data — a String.replace('__DATA__', json) replacement DID (the Copilot
+  // finding on #245): $& re-inserts the match, $' the tail, and the
+  // exported HTML broke exactly where members wrote shell. One embed site,
+  // in the renderer both tools share.
+  const safeName = String(charterName).replace(/[^a-zA-Z0-9._-]/g, '');
+  const embedded = JSON.stringify(data).replace(/</g, '\\u003c');
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>community replay — ${safeName}</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; margin: 0; background: #111; color: #ddd; }
+  header { padding: 10px 16px; background: #1b1b1b; border-bottom: 1px solid #333; }
+  header b { color: #7fd1ff; }
+  header .meta { color: #9ab; font-size: 12px; }
+  header .muted { color: #666; font-size: 11.5px; }
+  main { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; padding: 10px; height: calc(100vh - 74px); box-sizing: border-box; }
+  section { border: 1px solid #333; background: #161616; min-height: 0; display: flex; flex-direction: column; }
+  h2 { font-size: 13px; margin: 0; padding: 8px 10px; background: #202020; border-bottom: 1px solid #333; text-transform: uppercase; letter-spacing: 0.08em; color: #9ab; }
+  ul { list-style: none; margin: 0; padding: 6px 10px; font-size: 12.5px; overflow-y: auto; flex: 1; min-height: 0; }
+  li { padding: 6px 0; border-bottom: 1px dotted #2a2a2a; white-space: pre-wrap; word-break: break-word; }
+  li .who { color: #7fd1ff; }
+  li .at { color: #666; font-size: 11px; }
+  li.act { color: #bbb; font-size: 12px; }
+  li.notice { color: #ffb46b; font-size: 12px; }
+  li.empty { color: #666; font-style: italic; }
+  table { font-size: 12px; margin: 8px 10px; border-collapse: collapse; }
+  td, th { padding: 3px 10px; text-align: left; border-bottom: 1px dotted #2a2a2a; }
+  th { color: #9ab; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; height: auto; } section { height: 70vh; } }
+</style>
+</head>
+<body>
+<header>
+  community replay — <b>${safeName}</b>
+  <div class="meta" id="meta"></div>
+  <div class="muted">read-only replay from the durable artifacts — the chains remain the record of authority</div>
+</header>
+<main>
+  <section id="forum"><h2>the forum — the whole conversation, oldest first</h2><ul id="forum-list"></ul></section>
+  <section>
+    <h2>the members' acts</h2><ul id="acts-list"></ul>
+    <h2>the members</h2><table id="members"></table>
+  </section>
+</main>
+<script>
+const DATA = ${embedded};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const short = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+const bare = (s) => String(s ?? '').replace(/^community-/, '');
+
+const r = DATA.run || {};
+$('meta').textContent = (r.charter || '${safeName}') + ' · run ' + (r.runTag ?? '—') + (r.resumed ? ' (resumed)' : '') +
+  ' · ended ' + (r.endedAt ?? '?') + ' · reason: ' + (r.endReason ?? '?') +
+  ' · rounds ' + (r.rounds ?? 0) + ' · turns ' + (r.turns ?? 0) + ' · tokens ' + (r.tokens ?? 0);
+
+for (const p of DATA.forum) {
+  const li = document.createElement('li');
+  li.innerHTML = '<span class="at">' + esc((p.at || '').slice(0, 19)) + '</span> <span class="who">' + esc(bare(p.by) ?? '?') + '</span> on ' + esc(p.topic) + ':\\n' + esc(p.text);
+  $('forum-list').appendChild(li);
+}
+if (!DATA.forum.length) $('forum-list').innerHTML = '<li class="empty">the forum never spoke — negative space is information</li>';
+
+for (const t of DATA.timeline) {
+  const li = document.createElement('li');
+  li.className = t.type === 'notice' ? 'notice' : (t.type === 'act' ? 'act' : '');
+  li.innerHTML = '<span class="at">' + esc((t.at || '').slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
+  $('acts-list').appendChild(li);
+}
+if (!DATA.timeline.length) $('acts-list').innerHTML = '<li class="empty">no acts recorded</li>';
+
+const tbl = $('members');
+tbl.innerHTML = '<tr><th>member</th><th>turns</th></tr>' +
+  (DATA.members || []).map((m) => '<tr><td>' + esc(bare(m.session)) + '</td><td>' + esc(m.turns) + '</td></tr>').join('');
+</script>
+</body>
+</html>
+`;
+}
