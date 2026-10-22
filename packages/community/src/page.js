@@ -326,7 +326,7 @@ if (!DATA.forum.length) $('forum-list').innerHTML = '<li class="empty">the forum
 for (const t of DATA.timeline) {
   const li = document.createElement('li');
   li.className = t.type === 'notice' ? 'notice' : (t.type === 'act' ? 'act' : '');
-  li.innerHTML = '<span class="at">' + esc((t.at || '').slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
+  li.innerHTML = '<span class="at">' + esc(String(t.at ?? '').slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
   $('acts-list').appendChild(li);
 }
 if (!DATA.timeline.length) $('acts-list').innerHTML = '<li class="empty">no acts recorded</li>';
