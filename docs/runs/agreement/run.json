@@ -1,0 +1,30 @@
+{
+  "charter": "agreement",
+  "runTag": "b421a5",
+  "resumed": false,
+  "endedAt": "2026-10-22T20:31:41.481Z",
+  "endReason": "rounds complete",
+  "rounds": 5,
+  "turns": 15,
+  "benchCasesSeen": 0,
+  "tokens": 450551,
+  "members": {
+    "guardian": 5,
+    "steward": 5,
+    "recorder": 5
+  },
+  "divergence": {
+    "loopguardTrips": 6,
+    "humanSeatTimeouts": 3
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "guardian": "zai/glm-5.3-flash",
+      "steward": "zai/glm-5.3-flash",
+      "recorder": "zai/glm-5.3-flash"
+    }
+  },
+  "modelProvenance": "backfilled 2026-10-23 from every request/context in this run's session logs (pre-#248 run; the driver did not write model at run time)"
+}

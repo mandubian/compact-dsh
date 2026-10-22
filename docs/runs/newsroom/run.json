@@ -1,0 +1,31 @@
+{
+  "charter": "newsroom",
+  "runTag": "412836",
+  "resumed": true,
+  "endedAt": "2026-10-22T14:49:44.370Z",
+  "endReason": "token cap: 500000",
+  "rounds": 3,
+  "turns": 7,
+  "benchCasesSeen": 0,
+  "tokens": 528120,
+  "members": {
+    "editor": 3,
+    "writer": 2,
+    "publisher": 2
+  },
+  "divergence": {
+    "loopguardTrips": 6,
+    "humanSeatTimeouts": 3
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "editor": "zai/glm-5.3-flash",
+      "writer": "zai/glm-5.3-flash",
+      "publisher": "zai/glm-5.3-flash",
+      "bench-1": "zai/glm-5.3-flash"
+    }
+  },
+  "modelProvenance": "backfilled 2026-10-23 from every request/context in this run's session logs (pre-#248 run; the driver did not write model at run time)"
+}
