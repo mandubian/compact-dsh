@@ -379,8 +379,14 @@ async function main() {
   const { ctx, env, tokenMeter, setNoticeSink } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
-  const releases = await createReleasesHost(gateway);
-  SAY(`releases host listening on ${releases.origin} (the mediation gateway — all-local delivery, #55 private-class exception)`);
+  // a charter with no grants and no publish section is a FORUM-ONLY
+  // community (debate, agreement) — no releases host, and no false
+  // "publishing" whisper in the members' briefings
+  const needsReleases = charter.grants.length > 0 || charter.publish != null;
+  const releases = needsReleases ? await createReleasesHost(gateway) : null;
+  SAY(releases
+    ? `releases host listening on ${releases.origin} (the mediation gateway — all-local delivery, #55 private-class exception)`
+    : 'no releases host — this charter is forum-only (no grants, no publish route)');
 
   // the answerer seating, in order: the recorded answerer is already
   // first (the approval plugin's own); the driver seat claims NOTHING (its
@@ -454,7 +460,9 @@ async function main() {
   // the community runtime comes with the composition (blessed mounts it);
   // applying it directly is the fallback for compositions that do not
   const community = ctx.get('compact-community') ?? applyCommunity(ctx);
-  const minted = preMintGrants(ctx, charter, { '{{RELEASES_ORIGIN}}': releases.origin });
+  // null-safe for forum-only charters: no releases host, and the one
+  // substitution it would carry is never read (charter.grants is empty)
+  const minted = preMintGrants(ctx, charter, { '{{RELEASES_ORIGIN}}': releases ? releases.origin : null });
 
   out(`THE COMMUNITY — "${charter.name}": one composition, ${charter.members.length} live member(s), a chartered fence`);
   line(`record root: ${env.COMPACT_RECORD_ROOT}`);
@@ -548,7 +556,7 @@ async function main() {
     // continues, the sessions are its per-run records
     runTag = randomBytes(3).toString('hex');
     const stats = await community.runCommunity({
-      charter, workspace, hooks, tokenMeter, releasesOrigin: releases.origin,
+      charter, workspace, hooks, tokenMeter, releasesOrigin: releases ? releases.origin : null,
       sessionTag: runTag, resumed, controls,
       divergenceCounters: divergence.counters,
     });
@@ -567,7 +575,7 @@ async function main() {
     for (const c of docket) {
       line(`  ${c.id} — ${c.judgment ? 'JUDGED' : 'unjudged'}: ${String(c.grievance).slice(0, 100)}`);
     }
-    line(`releases host received ${releases.uploads.length} upload(s)${releases.uploads.length ? ': ' + releases.uploads.map((u) => `${u.path} (${u.bytes}b)`).join(', ') : ''}`);
+    if (releases) line(`releases host received ${releases.uploads.length} upload(s)${releases.uploads.length ? ': ' + releases.uploads.map((u) => `${u.path} (${u.bytes}b)`).join(', ') : ''}`);
     line('');
     line(`scratch kept at ${scratch} (records, chains, approvals, annex, keyring)`);
     line(`morning-after: node auditor/audit.mjs <session-log> --chain <chain> --roll ${join(keyringDir, 'roll.json')} --keyring ${join(keyringDir, 'keyring.json')}`);
@@ -585,7 +593,7 @@ async function main() {
     // that assembled (members seated, grants minted, the page itself)
     if (observatory) await new Promise((r) => setTimeout(r, drySeat ? 60_000 : 2_500));
     await observatory?.close?.().catch?.(() => {});
-    await releases.close().catch(() => {});
+    await releases?.close().catch(() => {});
     await ctx.fiber.dispose().catch(() => {});
   }
   process.exitCode = exitCode;
