@@ -137,6 +137,25 @@ test('the ledger and the store read back; the report states the negative space',
   }
 });
 
+test('the pass overflow stays attached to the passes it summarizes', () => {
+  const lines = [];
+  for (let i = 1; i <= 4; i += 1) {
+    lines.push(row('tool/call', { callId: `p${i}`, name: 'forum_pass', arguments: JSON.stringify({ reason: `quiet ${i}` }) }));
+    lines.push(row('tool/result', { message: { toolCallId: `p${i}`, content: [{ type: 'text', text: '[forum] pass recorded — not a post.' }] } }));
+  }
+  lines.push(row('tool/call', { callId: 'p5', name: 'forum_pass', arguments: JSON.stringify({ reason: 'nope' }) }));
+  lines.push(row('tool/result', { message: { toolCallId: 'p5', content: [{ type: 'text', text: '[forum] not passed: a pass needs a reason' }] } }));
+  const stats = agentStatsFromLog(lines.join('\n'), 'community-quiet');
+  const text = formatReport({
+    paths: { recordRoot: '/tmp/run/state/sessions', keyring: '/tmp/run/state/keyring', chainDir: '/tmp/run/state/chains' },
+    logs: [], statsByLog: [stats], forum: [], grants: { rows: [], revoked: [] },
+  });
+  const overflow = text.indexOf('… +1 more pass(es)');
+  const refused = text.indexOf('pass refused: nope');
+  assert.ok(overflow >= 0, 'the overflow line is printed');
+  assert.ok(refused > overflow, 'the overflow line stays with the passes, before the refused list');
+});
+
 test('an empty run reports its silences instead of omitting them', () => {
   const dir = mkdtempSync(join(tmpdir(), 'community-report-'));
   try {

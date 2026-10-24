@@ -221,8 +221,8 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
       L.push(`    passes recorded ${s.passes.length}, refused ${s.passRefused.length} (the result on the chain decides, not the call)`);
     }
     for (const p of s.passes.slice(0, 3)) L.push(`      pass: ${p.reason}`);
-    for (const p of s.passRefused.slice(0, 3)) L.push(`      pass refused: ${p.reason}`);
     if (s.passes.length > 3) L.push(`      … +${s.passes.length - 3} more pass(es)`);
+    for (const p of s.passRefused.slice(0, 3)) L.push(`      pass refused: ${p.reason}`);
   }
   // the forum
   L.push('');
