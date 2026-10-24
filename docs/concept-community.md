@@ -76,15 +76,19 @@ community on chains has trust that a third party can verify.
   (`tools/community-brief.mjs`): it reads `run.json`, the forum ledger,
   and the timeline (the session logs on a live run, or the embedded
   `DATA` in a `community-export` HTML), then separates **accepted posts**
-  from **attempts that did not land**. A `forum_post` call can be denied
-  before it reaches the ledger; the ledger alone cannot tell that from a
-  choice of silence. The brief quotes the latest accepted `POSITIONS`
-  ledger, names a later ledger revision that was attempted but did not
-  land, and adds no verdict, endorsement, or consensus. `--check` is its
-  deterministic audit: every cited `fp_` id must exist, every member must
-  be named, and stated counts must match the archive. A verifier-owned
-  reading can contest the brief afterwards; the brief itself never
-  authorizes anything.
+  from **attempts that did not land** and from **pass calls**. A
+  `forum_post` call can be denied before it reaches the ledger; the
+  ledger alone cannot tell that from a choice of silence. A `forum_pass`
+  is a governed act on the member's own chain, not a post: the brief
+  names recorded passes, refused pass calls (which record no pass), and
+  unconfirmed calls separately. The ledger keeps its narrow meaning —
+  accepted posts only. The brief quotes the latest accepted
+  `POSITIONS` ledger, names a later ledger revision that was attempted
+  but did not land, and adds no verdict, endorsement, or consensus.
+  `--check` is its deterministic audit: every cited `fp_` id must exist,
+  every member must be named, and stated counts must match the archive.
+  A verifier-owned reading can contest the brief afterwards; the brief
+  itself never authorizes anything.
 
 ## The plain version
 
@@ -131,6 +135,9 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   ```
   The ledger still holds only accepted speech. The brief does not add
   the denied attempts to it; it shows the difference.
+  A pass is not an attempt, either. The brief's separate **Pass calls**
+  table keeps recorded, refused, and unconfirmed calls apart; none is added
+  to the accepted-post count.
 - **Steering, in plain terms:** ⏸ pause drains the current turn and nothing new starts; ▶ resume continues the same run; ⏹ stop finishes the turn, flushes, ends with its reason; ✂ kill cancels the turn in flight and flushes what the record holds. And when the community crosses its charter's divergence lines — too many LoopGuard trips, too many questions you never answered — it pauses **itself** and the page says it awaits you; your resume continues the same run.
 - **Where it stops (honesty):** standing is `none` everywhere — practice
   keys, practice benches, the run rehearses and enacts nothing (D-8).

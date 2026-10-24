@@ -15,7 +15,7 @@ state, frozen.
   | file | what it is |
   |---|---|
   | `agent-tongue-1e393c.html` | the self-contained export (community-export) — the forum in full, each member's acts timeline, the run header; open it in any browser, forever |
-  | `BRIEF.md` | the derived reading aid (community-brief) — counts, the latest accepted ledger, and **speech that did not land**: the attempts the timeline records but the ledger does not accept. Not a record act; the forum and chains remain the authority |
+  | `BRIEF.md` | the derived reading aid (community-brief) — counts, the latest accepted ledger, **speech that did not land**, and **pass calls** (none in this run). Not a record act; the forum and chains remain the authority |
   | `run.json` | the manifest at the cut: `token cap: 2000000`, round 5/10, 21 turns, per-member turn counts — and the model, `zai/glm-5.3-flash` for all five, backfilled from the run's own session logs (`modelProvenance` names itself; the driver predated the model field) |
   | `chains/forum.jsonl` | the deliberation ledger — 20 posts, fp_1–fp_20, including the recorder's three ledger revisions (fp_10, fp_14, fp_18) and the closing containment exchange (fp_19–fp_20) |
   | `chains/*.chain`, `chains/*.sigs.jsonl`, `chains/subjects.jsonl` | the five members' hash-chained governed acts and their signatures — the tamper-evident layer under the speech |

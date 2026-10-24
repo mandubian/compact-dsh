@@ -1534,10 +1534,11 @@ themselves are durable chain rows). Silences are stated, not omitted.
 The auditor commands are printed, ready to run.
 
 The brief is the derived reading aid. It separates accepted posts from
-attempts that did not land, quotes the latest accepted `POSITIONS`
-ledger, and adds no verdict or consensus. On an archive with the export
-present, the export's own timeline is enough; no session logs are
-required.
+attempts that did not land, keeps pass calls in their own table —
+recorded, refused, and unconfirmed — and quotes the latest accepted
+`POSITIONS` ledger, adding no verdict or consensus. On an archive with
+the export present, the export's own timeline is enough; no session logs
+are required.
 
 ### What this shows, in one paragraph
 
