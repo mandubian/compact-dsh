@@ -44,7 +44,7 @@ import { parseAllowlistLikePattern, egressPatternFor } from 'compact-dsh-approva
 import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
-import { continuationOf, readPreviousRun, shellPath } from './run-manifest.mjs';
+import { continuationOf, preservePreviousRun, readPreviousRun, shellPath } from './run-manifest.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
 import { createReleasesHost } from './releases-host.mjs';
 import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters } from '../packages/community/src/index.js';
@@ -326,6 +326,7 @@ async function main() {
   // resumed run on the same --out can name the previous manifest in the new
   // one. A malformed old manifest never blocks a continuation.
   const previousRun = readPreviousRun(scratch);
+  preservePreviousRun(scratch, previousRun);
   const workspace = join(scratch, 'workspace');
   mkdirSync(workspace, { recursive: true });
   for (const s of charter.sources) {
@@ -522,6 +523,7 @@ async function main() {
   process.on('SIGTERM', onSignal);
   let runStats = null;
   let runTag = null;
+  let runStarted = false; // set when the community resolves a route or seats a member
   let runOver = false; // the finally sets it before the linger — the signal handler reads it
   const writeRunManifest = (extra = {}) => {
     try {
@@ -541,9 +543,11 @@ async function main() {
         ...extra,
       };
       const text = `${JSON.stringify(manifest, null, 2)}\n`;
-      // a run that failed before it got a tag never became a cut: keep the
-      // previous run.json authoritative and record the failure beside it
-      if (!runTag && previousRun) {
+      // a run that never resolved a route or seated a member is not a cut:
+      // keep the previous run.json authoritative and record the failure
+      // beside it. The previous cut was copied before boot, so even a
+      // started run that dies later cannot lose it.
+      if (!runStarted && !runStats && previousRun) {
         const runs = join(scratch, 'runs');
         mkdirSync(runs, { recursive: true });
         writeFileSync(join(runs, `failed-${Date.now()}.json`), text);
@@ -564,8 +568,8 @@ async function main() {
   };
   try {
     const hooks = {
-      onRoute: (s) => SAY(`model route: ${s.provider}/${s.model}`),
-      onSeat: (m, agent) => SAY(`seated ${m.id} (${m.prefix}${m.bench ? ', bench' : ''}) — session ${String(agent?.session?.id ?? agent?.id ?? '?').slice(0, 20)}…`),
+      onRoute: (s) => { runStarted = true; SAY(`model route: ${s.provider}/${s.model}`); },
+      onSeat: (m, agent) => { runStarted = true; SAY(`seated ${m.id} (${m.prefix}${m.bench ? ', bench' : ''}) — session ${String(agent?.session?.id ?? agent?.id ?? '?').slice(0, 20)}…`); },
       onTurn: (m) => { line(`  → ${m.id} takes a turn`); publishSafe({ type: 'turn', member: m.id, bench: m.bench === true }); },
       onTurnDone: (m, turns) => { SAY(`  ← ${m.id} turn ${turns} done (flushed to its chain)`); publishSafe({ type: 'turn-done', member: m.id, turns }); },
       onBenchWake: (m, c) => { line(`  ⚖ bench ${m.id} woken for ${c.id}`); publishSafe({ type: 'bench-wake', member: m.id, caseId: c.id }); },

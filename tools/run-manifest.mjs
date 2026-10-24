@@ -4,9 +4,13 @@
 // and the launcher keeps a per-run copy under runs/<runTag>.json so the
 // naming survives the next overwrite.
 //
+// `preservePreviousRun` takes the copy BEFORE the new run boots. That is
+// the real guard against loss: even a run that fails after starting writes
+// a failed run.json, but the previous cut is already on disk.
+//
 // Pure on purpose: the live launcher reads before it boots and writes after
 // the community ends, and both directions are testable without a runtime.
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Read the manifest already in `dir`, or null when there is none or it
@@ -35,6 +39,19 @@ export function continuationOf(previous, runTag) {
   }
   if (previous.continuedFrom?.runTag) out.continuedFrom = previous.continuedFrom.runTag;
   return out;
+}
+
+/** Copy the previous cut into runs/<tag>.json before the new run boots.
+ *  Idempotent: an existing copy is left alone, so a failed attempt cannot
+ *  overwrite the good copy. Returns the copy path, or null when there is
+ *  no previous cut to keep. */
+export function preservePreviousRun(dir, previous) {
+  if (!previous?.runTag) return null;
+  const runs = join(dir, 'runs');
+  mkdirSync(runs, { recursive: true });
+  const path = join(runs, `${previous.runTag}.json`);
+  if (!existsSync(path)) writeFileSync(path, `${JSON.stringify(previous, null, 2)}\n`);
+  return path;
 }
 
 /** Quote a path for the printed continuation command, but leave ordinary
