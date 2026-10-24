@@ -5,7 +5,7 @@
 // the embedded DATA in a community-export HTML). It writes a Markdown
 // brief; it does not write to the forum, the chains, or the run.
 //
-// Two disciplines make the brief different from a summary:
+// Three disciplines make the brief different from a summary:
 //
 //   1. THE LEDGER IS ACCEPTED SPEECH, NOT ALL SPEECH. A member can call
 //      forum_post and be refused (LoopGuard, a bad topic, a gate). The
@@ -13,7 +13,14 @@
 //      attempts. The brief reconciles the two, so "silent" and "denied"
 //      are not confused.
 //
-//   2. EVERY CLAIM IS DERIVED. Counts, ids, timestamps and hashes come
+//   2. A PASS IS NOT A POST. forum_pass is a governed act on the
+//      member's own chain: it writes no forum.jsonl row and is not
+//      readable as speech. The timeline resolves a recorded pass, a
+//      refused pass call (which records no pass), and a call with no
+//      visible result. The brief keeps that third category separate from
+//      both accepted posts and denied forum_post attempts.
+//
+//   3. EVERY CLAIM IS DERIVED. Counts, ids, timestamps and hashes come
 //      from the archive. The brief does not add a verdict, an endorsement,
 //      or a consensus. The latest accepted POSITIONS ledger is quoted;
 //      it is not re-scored here.
@@ -67,6 +74,12 @@ const sha256 = (path) => {
 const oneLine = (s, n = 140) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 const cell = (s, n = 120) => oneLine(s, n).replace(/\|/g, '\\|');
+
+const passStatusLabel = (status) => (
+  status === 'recorded' ? 'recorded'
+    : status === 'refused' ? 'refused — no pass'
+      : 'call only — outcome unconfirmed'
+);
 
 const ms = (v) => {
   const t = Date.parse(String(v ?? ''));
@@ -171,6 +184,11 @@ function buildBrief({ paths, run, runError, forum, timeline, timelineSource }) {
         notLanded: 0,
         denied: 0,
         loopguard: 0,
+        passCalls: 0,
+        passes: 0,
+        passRefused: 0,
+        passUnconfirmed: 0,
+        lastPass: null,
         chainRows: null,
         lastPost: null,
       });
@@ -239,6 +257,36 @@ function buildBrief({ paths, run, runError, forum, timeline, timelineSource }) {
     attempts.push(attempt);
   }
 
+  // A pass is a pass only when its own result says it was recorded. A
+  // refused pass call records no pass; a call with no resolving result is
+  // unconfirmed. Keep all three visible without turning any into a post.
+  const passes = [];
+  for (const e of timeline) {
+    if (e.type !== 'pass' && e.type !== 'pass-refused' && e.type !== 'pass-call') continue;
+    const m = ensure(e.who);
+    if (!m) continue;
+    const text = String(e.text ?? '');
+    const parsed = /^forum_pass( refused)?: ([\s\S]*)$/.exec(text);
+    const status = e.type === 'pass' ? 'recorded' : e.type === 'pass-refused' ? 'refused' : 'unconfirmed';
+    const pass = {
+      member: m.id,
+      session: e.who,
+      at: e.at,
+      status,
+      reason: parsed?.[2] ?? '',
+    };
+    m.passCalls += 1;
+    if (status === 'recorded') {
+      m.passes += 1;
+      m.lastPass = pass;
+    } else if (status === 'refused') {
+      m.passRefused += 1;
+    } else {
+      m.passUnconfirmed += 1;
+    }
+    passes.push(pass);
+  }
+
   for (const m of members.values()) {
     const chain = join(paths.chainDir, `${m.session}.chain`);
     if (existsSync(chain)) {
@@ -280,6 +328,7 @@ function buildBrief({ paths, run, runError, forum, timeline, timelineSource }) {
     timeline,
     timelineSource,
     attempts,
+    passes,
     askHuman,
     latestLedger,
     ledgerPosts,
@@ -295,6 +344,10 @@ function buildBrief({ paths, run, runError, forum, timeline, timelineSource }) {
       matched: attempts.filter((a) => a.post).length,
       notLanded: attempts.filter((a) => !a.post).length,
       denied: attempts.filter((a) => !a.post && a.notice).length,
+      passCalls: passes.length,
+      passes: passes.filter((p) => p.status === 'recorded').length,
+      passRefused: passes.filter((p) => p.status === 'refused').length,
+      passUnconfirmed: passes.filter((p) => p.status === 'unconfirmed').length,
       askHuman: askHuman.length,
       loopguard: timeline.filter((e) => e.type === 'notice' && /LoopGuard/i.test(String(e.text ?? ''))).length,
     },
@@ -322,7 +375,7 @@ function ledgerSections(text) {
 }
 
 export function renderBrief(data, { fullLedger = false } = {}) {
-  const { run, forum, members, checks, latestLedger, postsAfterLedger, laterLedgerAttempts, attempts } = data;
+  const { run, forum, members, checks, latestLedger, postsAfterLedger, laterLedgerAttempts, attempts, passes } = data;
   const L = [];
   const tag = run?.runTag ? ` ${run.runTag}` : '';
   const charter = run?.charter ?? 'community';
@@ -340,6 +393,8 @@ export function renderBrief(data, { fullLedger = false } = {}) {
   L.push(`| rounds | ${run?.rounds ?? '—'} |`);
   L.push(`| turns | ${run?.turns ?? checks.turnSum} |`);
   L.push(`| accepted posts | ${forum.length} |`);
+  L.push(`| passes recorded | ${checks.passes} |`);
+  L.push(`| pass calls visible | ${checks.passCalls} (${checks.passRefused} refused, ${checks.passUnconfirmed} unconfirmed) |`);
   L.push(`| latest accepted ledger | ${latestLedger ? `${latestLedger.id} (${bare(latestLedger.by, run?.runTag)})` : 'none'} |`);
   L.push(`| posts after it | ${postsAfterLedger.length ? postsAfterLedger.map((p) => p.id).join(', ') : 'none'} |`);
   L.push(`| timeline source | ${data.timelineSource} |`);
@@ -351,16 +406,25 @@ export function renderBrief(data, { fullLedger = false } = {}) {
   L.push(`${members.length} member(s) took ${run?.turns ?? checks.turnSum} turn(s); ${forum.length} post(s) landed. ` +
     `${checks.attempts} forum_post attempt(s) were visible in the timeline, ${checks.matched} matched a landed post, ` +
     `${checks.notLanded} did not.`);
+  if (data.timelineSource === 'none') {
+    L.push('No timeline is present, so no pass call is visible; the ledger cannot show one.');
+  } else {
+    L.push(`The timeline also shows ${checks.passes} recorded pass(es), ${checks.passRefused} refused pass call(s), ` +
+      `and ${checks.passUnconfirmed} pass call(s) with an unconfirmed outcome.`);
+  }
+  L.push('A pass is a governed act on the member\'s chain, not a forum post.');
   if (!latestLedger) L.push('No accepted `POSITIONS:` ledger is on the forum.');
   else if (postsAfterLedger.length) L.push(`The latest accepted ledger is ${latestLedger.id}; ${postsAfterLedger.length} accepted post(s) follow it.`);
   L.push('');
   L.push('## Members');
   L.push('');
-  L.push('| member | turns | accepted posts | attempts | did not land | denied with LoopGuard | chain rows |');
-  L.push('|---|---:|---:|---:|---:|---:|---:|');
+  L.push('| member | turns | accepted posts | attempts | did not land | denied with LoopGuard | passes rec/ref/? | chain rows |');
+  L.push('|---|---:|---:|---:|---:|---:|---:|---:|');
   for (const m of members) {
-    L.push(`| ${m.id} | ${m.turns || m.timelineTurns || 0} | ${m.posts} | ${m.attempts} | ${m.notLanded} | ${m.denied} | ${m.chainRows ?? '—'} |`);
+    L.push(`| ${m.id} | ${m.turns || m.timelineTurns || 0} | ${m.posts} | ${m.attempts} | ${m.notLanded} | ${m.denied} | ${m.passes}/${m.passRefused}/${m.passUnconfirmed} | ${m.chainRows ?? '—'} |`);
   }
+  L.push('');
+  L.push('`passes rec/ref/?` = recorded / refused / call with an unconfirmed outcome.');
   L.push('');
   L.push('## Speech that did not land');
   L.push('');
@@ -368,7 +432,7 @@ export function renderBrief(data, { fullLedger = false } = {}) {
   if (!unlanded.length) {
     L.push('No attempted-but-unaccepted forum posts were found in the timeline.');
     L.push('');
-    L.push('> A ledger-only archive cannot tell a choice of silence from a refused call. `—` in the attempt columns means the timeline was absent, not that no attempt happened.');
+    L.push('> A ledger-only archive cannot see a recorded `forum_pass`, nor tell a choice of silence from a refused call. `—` in the attempt columns means the timeline was absent, not that no attempt happened.');
   } else {
     L.push('| member | attempted at | topic | first line | immediate notice |');
     L.push('|---|---|---|---|---|');
@@ -385,6 +449,26 @@ export function renderBrief(data, { fullLedger = false } = {}) {
     L.push('| member | attempted at | immediate notice |');
     L.push('|---|---|---|');
     for (const a of data.askHuman) L.push(`| ${a.member} | ${a.at ?? '—'} | ${a.notice ? cell(a.notice.text, 100) : 'none'} |`);
+  }
+  L.push('');
+  L.push('## Pass calls');
+  L.push('');
+  L.push('A pass is a governed act on the member\'s own chain; it is not a forum post and adds no `forum.jsonl` row. ' +
+    'Only a recorded pass is a declared pass; a refused call records none, and a call whose result is missing or does not record a pass is unconfirmed.');
+  L.push('');
+  if (data.timelineSource === 'none') {
+    L.push('No timeline is available; a ledger-only archive cannot show a `forum_pass` call.');
+  } else if (!passes.length) {
+    L.push('No `forum_pass` calls were visible in the timeline.');
+  } else {
+    L.push('| member | called at | status | reason (timeline excerpt) |');
+    L.push('|---|---|---|---|');
+    for (const p of passes) {
+      L.push(`| ${p.member} | ${p.at ?? '—'} | ${passStatusLabel(p.status)} | ${cell(p.reason, 140) || '—'} |`);
+    }
+    L.push('');
+    L.push(`Recorded ${checks.passes}; refused ${checks.passRefused}; unconfirmed ${checks.passUnconfirmed}. ` +
+      'A refused pass records no pass; an unconfirmed call is not counted as a recorded pass.');
   }
   L.push('');
   L.push('## The latest accepted ledger');
@@ -424,6 +508,8 @@ export function renderBrief(data, { fullLedger = false } = {}) {
       L.push('```');
     }
     const absenceSection = sections.find((s) => /ABSENCE/i.test(s.heading));
+    const namedInAbsence = (id) => Boolean(absenceSection)
+      && new RegExp(`\\b${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(absenceSection.text);
     const absenceIds = absenceSection
       ? [...new Set(unlanded
         .filter((a) => {
@@ -431,24 +517,45 @@ export function renderBrief(data, { fullLedger = false } = {}) {
           return last
             && last.seq < latestLedger.seq
             && (ms(a.at) ?? 0) > (ms(last.at) ?? 0)
-            && new RegExp(`\\b${a.member.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(absenceSection.text);
+            && namedInAbsence(a.member);
         })
         .map((a) => a.member))]
       : [];
-    if (absenceIds.length) {
+    const absencePassIds = absenceSection
+      ? [...new Set(passes
+        .filter((p) => {
+          if (p.status !== 'recorded') return false;
+          const last = members.find((m) => m.id === p.member)?.lastPost;
+          return (!last || last.seq < latestLedger.seq)
+            && (ms(p.at) ?? 0) > (ms(last?.at) ?? -Infinity)
+            && namedInAbsence(p.member);
+        })
+        .map((p) => p.member))]
+      : [];
+    const reconciledIds = [...new Set([...absenceIds, ...absencePassIds])];
+    if (reconciledIds.length) {
       L.push('### Reading the ledger against the timeline');
       L.push('');
-      for (const id of absenceIds) {
+      for (const id of reconciledIds) {
         const rows = unlanded.filter((a) => a.member === id);
         const denied = rows.filter((a) => a.notice);
         const last = members.find((m) => m.id === id)?.lastPost;
+        const recorded = passes.filter((p) => p.member === id && p.status === 'recorded'
+          && (ms(p.at) ?? 0) > (ms(last?.at) ?? -Infinity));
+        const since = last ? 'after it' : 'in the timeline';
+        const postClause = rows.length
+          ? `The timeline records ${rows.length} forum_post attempt(s) ${since}; ${denied.length} carry an immediate LoopGuard notice.` +
+            `${denied.length ? ` The first notice reads: \`${oneLine(denied[0].notice.text, 110)}\`.` : ''}`
+          : `No forum_post attempt ${since} is visible in the timeline.`;
+        const passClause = recorded.length
+          ? ` It also records ${recorded.length} declared pass(es) ${since}; the latest says: ` +
+            `\`${oneLine(recorded[recorded.length - 1].reason, 110) || '—'}\`. A pass is a governed act, not a post.`
+          : '';
         L.push(`- **${id}:** the ledger's absence language (\`absence\`, \`silent third\`) is accurate about **accepted posts**` +
-          `${last ? ` (last accepted ${last.id})` : ''}, not about attempts. The timeline records ` +
-          `${rows.length} forum_post attempt(s) after it; ${denied.length} carry an immediate LoopGuard notice.` +
-          `${denied.length ? ` The first notice reads: \`${oneLine(denied[0].notice.text, 110)}\`.` : ''}`);
+          `${last ? ` (last accepted ${last.id})` : ''}, not about attempts or declared passes. ${postClause}${passClause}`);
       }
       L.push('');
-      L.push('This is a reconciliation, not a re-scoring: it does not turn an attempt into a post, and it does not turn absence into consent.');
+      L.push('This is a reconciliation, not a re-scoring: it does not turn an attempt into a post, a pass into a post, or absence into consent.');
     }
   }
   L.push('');
@@ -460,7 +567,8 @@ export function renderBrief(data, { fullLedger = false } = {}) {
   const turnsMatch = checks.runTurns === checks.turnSum && checks.runTurns === checks.timelineTurns;
   L.push(`- **turns:** run.json ${checks.runTurns}; member sum ${checks.turnSum}; timeline turn-done ${checks.timelineTurns}${turnsMatch ? ' (match)' : ' (mismatch — read the timeline, not the claim)'}`);
   L.push(`- **attempt reconciliation:** ${checks.attempts} attempt(s), ${checks.matched} landed, ${checks.notLanded} did not, ${checks.denied} with an immediate LoopGuard notice`);
-  L.push(`- **member coverage:** ${members.length} member(s); every run member and every poster is named`);
+  L.push(`- **pass calls:** ${checks.passCalls} visible; ${checks.passes} recorded, ${checks.passRefused} refused, ${checks.passUnconfirmed} unconfirmed`);
+  L.push(`- **member coverage:** ${members.length} member(s); every run member, poster, and pass caller is named`);
   L.push(`- **latest ledger:** ${latestLedger ? latestLedger.id : 'none'}; ${postsAfterLedger.length} accepted post(s) after it; ${laterLedgerAttempts.length} later ledger attempt(s) did not land`);
   L.push(`- **provenance:** \`run.json\` ${shortHash(data.provenance.runJson)}; \`forum.jsonl\` ${shortHash(data.provenance.forum)}; export ${shortHash(data.provenance.html)}`);
   L.push('');
@@ -469,7 +577,8 @@ export function renderBrief(data, { fullLedger = false } = {}) {
   L.push('## What this brief does not decide');
   L.push('');
   L.push('- It adds no verdict, endorsement, or consensus.');
-  L.push('- It does not treat silence as consent or dissent. A missing post is only a missing post; an attempted-but-denied post is named as such.');
+  L.push('- It does not treat silence as consent or dissent. A missing post is only a missing post; an attempted-but-denied post is named as such; a recorded pass is named as a pass, not a post.');
+  L.push('- It does not treat a pass as speech, consent, or dissent. A refused pass records no pass; an unconfirmed pass call is not counted as a recorded pass.');
   L.push('- It does not replace the forum or the chains; it points to them.');
   L.push('- It does not resolve the open items in the latest ledger. It quotes them.');
   L.push('');
@@ -516,6 +625,8 @@ export function auditBrief(brief, data) {
     ['accepted posts', data.forum.length, /accepted posts\s*[:|]\s*(\d+)/i],
     ['turns', data.checks.runTurns, /turns\s*[:|]\s*(\d+)/i],
     ['members', data.members.length, /(\d+)\s+member\(s\)/i],
+    ['passes recorded', data.checks.passes, /passes recorded\s*[:|]\s*(\d+)/i],
+    ['pass calls visible', data.checks.passCalls, /pass calls visible\s*[:|]\s*(\d+)/i],
   ];
   for (const [label, expected, pattern] of countChecks) {
     const m = pattern.exec(text);
@@ -550,7 +661,7 @@ function main() {
   if (check) {
     const result = auditBrief(readFileSync(check, 'utf8'), data);
     if (result.ok) {
-      console.log(`community-brief: AUDIT PASS — ${result.citations} citation(s), ${data.forum.length} post(s), ${data.members.length} member(s)`);
+      console.log(`community-brief: AUDIT PASS — ${result.citations} citation(s), ${data.forum.length} post(s), ${data.checks.passes} recorded pass(es), ${data.members.length} member(s)`);
       return;
     }
     console.log('community-brief: AUDIT FAIL');
@@ -561,7 +672,7 @@ function main() {
   const brief = renderBrief(data, { fullLedger });
   if (out) {
     writeFileSync(out, `${brief}\n`, { mode: 0o644 });
-    console.log(`community-brief: wrote ${out} (${data.forum.length} post(s), ${data.checks.notLanded} attempted post(s) did not land, ${data.checks.denied} with an immediate LoopGuard notice)`);
+    console.log(`community-brief: wrote ${out} (${data.forum.length} post(s), ${data.checks.passes} recorded pass(es), ${data.checks.notLanded} attempted post(s) did not land, ${data.checks.denied} with an immediate LoopGuard notice)`);
   } else {
     process.stdout.write(`${brief}\n`);
   }

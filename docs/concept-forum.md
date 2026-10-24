@@ -39,9 +39,11 @@ is the community's infrastructure, carried like the guide.
   refusal is the tool result on the chain, not a pass. Offline readers see
   it in the session timeline — the after-run report counts the call as an
   act and, when the result is present, names the pass **recorded** or
-  **refused**; the replay page shows the call in the acts lane, and only
-  colors it as a pass when the result says it was recorded. The speech
-  ledger keeps its narrow meaning: accepted posts only.
+  **refused**; the archive brief keeps recorded passes, refused calls, and
+  unconfirmed calls in a separate **Pass calls** table; the
+  replay page shows the call in the acts lane, and only colors it as a
+  pass when the result says it was recorded. The speech ledger keeps its
+  narrow meaning: accepted posts only.
 - **What it is not.** No clause of the body maps here — the register is
   untouched, and the forum mounts like the guide: declared, never coupled
   on. Service state is in-memory: a restart begins an empty board; the

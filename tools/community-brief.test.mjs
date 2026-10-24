@@ -18,7 +18,9 @@ const t0 = Date.parse('2026-10-22T22:00:00.000Z');
 
 const post = (id, seq, by, at, text) => ({ id, seq, topic: 'floor', by, at: new Date(at).toISOString(), text });
 
-function writeArchive(dir, { html = true, sessions = false } = {}) {
+function writeArchive(dir, { html = true, sessions = false, passes = [] } = {}) {
+  const row = (type, data, time) => JSON.stringify({ type, data, time });
+  const args = (obj) => JSON.stringify(obj);
   mkdirSync(join(dir, 'chains'), { recursive: true });
   const run = {
     charter: 'test-charter', runTag: 'abcd12', resumed: false,
@@ -37,7 +39,7 @@ function writeArchive(dir, { html = true, sessions = false } = {}) {
   writeFileSync(join(dir, 'chains', 'community-alpha-abcd12.chain'), 'a\nb\nc\n');
   writeFileSync(join(dir, 'chains', 'community-beta-abcd12.chain'), 'a\nb\n');
 
-  const timeline = [
+  const baseTimeline = [
     { at: t0 - 2, who: 'community-alpha-abcd12', type: 'act', text: 'forum_post [floor]: POSITIONS: alpha ledger\n\nVERDICT STATE: P1 held.' },
     { at: t0 + 1_998, who: 'community-beta-abcd12', type: 'act', text: 'forum_post [floor]: POSITIONS: beta ledger\n\nALPHA\'S ABSENCE: alpha has not posted since fp_1.' },
     { at: t0 + 3_000, who: 'community-alpha-abcd12', type: 'act', text: 'forum_post [floor]: alpha — an attempt that did not land.' },
@@ -49,6 +51,14 @@ function writeArchive(dir, { html = true, sessions = false } = {}) {
     { at: t0 + 7_000, who: 'community-beta-abcd12', type: 'turn-done', text: 'beta finished a turn' },
     { at: t0 + 8_000, who: 'community-beta-abcd12', type: 'turn-done', text: 'beta finished a turn' },
   ];
+  const passTimeline = passes.map((p) => ({
+    at: p.at,
+    who: `community-${p.member}-abcd12`,
+    type: p.status === 'recorded' ? 'pass' : p.status === 'refused' ? 'pass-refused' : 'pass-call',
+    text: `${p.status === 'refused' ? 'forum_pass refused' : 'forum_pass'}: ${p.reason}`,
+  }));
+  const timeline = [...baseTimeline, ...passTimeline]
+    .sort((a, b) => String(a.at ?? '').localeCompare(String(b.at ?? '')));
   if (html) {
     writeFileSync(join(dir, 'brief.html'),
       `<!doctype html>\n<script>\nconst DATA = ${JSON.stringify({ run, forum, timeline, members: [] })};\n</script>\n`);
@@ -62,21 +72,33 @@ function writeArchive(dir, { html = true, sessions = false } = {}) {
     writeFileSync(join(dir, 'state', 'chains', 'forum.jsonl'), `${forum.map((p) => JSON.stringify(p)).join('\n')}\n`);
     writeFileSync(join(dir, 'state', 'chains', 'community-alpha-abcd12.chain'), 'a\nb\nc\n');
     writeFileSync(join(dir, 'state', 'chains', 'community-beta-abcd12.chain'), 'a\nb\n');
-    const row = (type, data, time) => JSON.stringify({ type, data, time });
-    const args = (obj) => JSON.stringify(obj);
-    writeFileSync(join(dir, 'state', 'sessions', 'ws', 'community-alpha-abcd12', 'session.1.jsonl'), [
+    const alpha = [
       row('tool/call', { name: 'forum_post', arguments: args({ topic: 'floor', text: 'POSITIONS: alpha ledger\n\nVERDICT STATE: P1 held.' }) }, t0 - 2),
       row('tool/call', { name: 'forum_post', arguments: args({ topic: 'floor', text: 'alpha — an attempt that did not land.' }) }, t0 + 3_000),
       row('user/message', { source: { kind: 'compact-loopguard', summary: 'LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal\'s next message' } }, t0 + 3_001),
       row('tool/call', { name: 'ask_human', arguments: args({}) }, t0 + 4_000),
       row('turn/end', {}, t0 + 5_000),
       row('turn/end', {}, t0 + 6_000),
-    ].join('\n'));
-    writeFileSync(join(dir, 'state', 'sessions', 'ws', 'community-beta-abcd12', 'session.1.jsonl'), [
+    ];
+    const beta = [
       row('tool/call', { name: 'forum_post', arguments: args({ topic: 'floor', text: 'POSITIONS: beta ledger\n\nALPHA\'S ABSENCE: alpha has not posted since fp_1.' }) }, t0 + 1_998),
       row('turn/end', {}, t0 + 7_000),
       row('turn/end', {}, t0 + 8_000),
-    ].join('\n'));
+    ];
+    for (const p of passes) {
+      const log = p.member === 'alpha' ? alpha : p.member === 'beta' ? beta : null;
+      if (!log) continue;
+      const callId = p.callId ?? `pass-${p.member}-${p.at}`;
+      log.push(row('tool/call', { callId, name: 'forum_pass', arguments: args({ reason: p.reason }) }, p.at));
+      if (p.status !== 'unconfirmed') {
+        const text = p.status === 'recorded'
+          ? '[forum] pass recorded — not a post.'
+          : '[forum] not passed: a pass needs a reason';
+        log.push(row('tool/result', { message: { toolCallId: callId, content: [{ type: 'text', text }] } }, p.at + 1));
+      }
+    }
+    writeFileSync(join(dir, 'state', 'sessions', 'ws', 'community-alpha-abcd12', 'session.1.jsonl'), alpha.join('\n'));
+    writeFileSync(join(dir, 'state', 'sessions', 'ws', 'community-beta-abcd12', 'session.1.jsonl'), beta.join('\n'));
   }
   return { run, forum, timeline };
 }
@@ -134,6 +156,78 @@ test('the live scratch shape reads session logs and keeps the same reconciliatio
     const brief = renderBrief(data);
     assert.match(brief, /Reading the ledger against the timeline/);
     assert.equal(auditBrief(brief, data).ok, true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const passFixture = () => ([
+  { member: 'alpha', at: t0 + 9_000, status: 'recorded', callId: 'pass-recorded',
+    reason: 'nothing new to add; my position is on the record' },
+  { member: 'alpha', at: t0 + 9_200, status: 'refused', callId: 'pass-refused', reason: '   ' },
+  { member: 'alpha', at: t0 + 9_400, status: 'unconfirmed', callId: 'pass-unconfirmed',
+    reason: 'the result is missing from this log' },
+]);
+
+function assertPassBrief(dir) {
+  const data = readBriefSources(dir);
+  assert.equal(data.forum.length, 2, 'a pass adds no forum post');
+  assert.deepEqual(data.passes.map((p) => p.status), ['recorded', 'refused', 'unconfirmed']);
+  assert.deepEqual(data.passes.map((p) => p.reason), [
+    'nothing new to add; my position is on the record',
+    '   ',
+    'the result is missing from this log',
+  ]);
+  const alpha = data.members.find((m) => m.id === 'alpha');
+  assert.equal(alpha.posts, 1, 'a pass is not an accepted post');
+  assert.equal(alpha.passCalls, 3);
+  assert.equal(alpha.passes, 1);
+  assert.equal(alpha.passRefused, 1);
+  assert.equal(alpha.passUnconfirmed, 1);
+  assert.equal(alpha.lastPass.status, 'recorded');
+  assert.equal(data.checks.attempts, 3, 'a pass is not a forum_post attempt');
+  assert.equal(data.checks.passCalls, 3);
+  assert.equal(data.checks.passes, 1);
+  assert.equal(data.checks.passRefused, 1);
+  assert.equal(data.checks.passUnconfirmed, 1);
+
+  const brief = renderBrief(data);
+  assert.match(brief, /\| passes recorded \| 1 \|/);
+  assert.match(brief, /\| pass calls visible \| 3 \(1 refused, 1 unconfirmed\) \|/);
+  assert.match(brief, /## Pass calls/);
+  assert.match(brief, /recorded/);
+  assert.match(brief, /refused — no pass/);
+  assert.match(brief, /call only — outcome unconfirmed/);
+  assert.match(brief, /nothing new to add; my position is on the record/);
+  assert.match(brief, /1 declared pass\(es\) after it/);
+  assert.match(brief, /A pass is a governed act, not a post/);
+  assert.equal(auditBrief(brief, data).ok, true);
+
+  const wrongPasses = brief.replace('| passes recorded | 1 |', '| passes recorded | 9 |');
+  assert.equal(auditBrief(wrongPasses, data).ok, false);
+  assert.ok(auditBrief(wrongPasses, data).failures.some((f) => f.includes('passes recorded says 9')));
+  const wrongCalls = brief.replace('| pass calls visible | 3 ', '| pass calls visible | 9 ');
+  assert.equal(auditBrief(wrongCalls, data).ok, false);
+  assert.ok(auditBrief(wrongCalls, data).failures.some((f) => f.includes('pass calls visible says 9')));
+}
+
+test('the export fallback keeps recorded, refused, and unconfirmed passes apart', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'community-brief-pass-html-'));
+  try {
+    writeArchive(dir, { passes: passFixture() });
+    assert.match(readBriefSources(dir).timelineSource, /brief\.html$/);
+    assertPassBrief(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the live log shape resolves each pass from its own result', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'community-brief-pass-live-'));
+  try {
+    writeArchive(dir, { html: false, sessions: true, passes: passFixture() });
+    assert.match(readBriefSources(dir).timelineSource, /session log/);
+    assertPassBrief(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

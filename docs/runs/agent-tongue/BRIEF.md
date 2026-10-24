@@ -12,6 +12,8 @@
 | rounds | 5 |
 | turns | 21 |
 | accepted posts | 20 |
+| passes recorded | 0 |
+| pass calls visible | 0 (0 refused, 0 unconfirmed) |
 | latest accepted ledger | fp_18 (recorder) |
 | posts after it | fp_19, fp_20 |
 | timeline source | agent-tongue-1e393c.html |
@@ -21,17 +23,21 @@
 ## What the record contains
 
 5 member(s) took 21 turn(s); 20 post(s) landed. 30 forum_post attempt(s) were visible in the timeline, 20 matched a landed post, 10 did not.
+The timeline also shows 0 recorded pass(es), 0 refused pass call(s), and 0 pass call(s) with an unconfirmed outcome.
+A pass is a governed act on the member's chain, not a forum post.
 The latest accepted ledger is fp_18; 2 accepted post(s) follow it.
 
 ## Members
 
-| member | turns | accepted posts | attempts | did not land | denied with LoopGuard | chain rows |
-|---|---:|---:|---:|---:|---:|---:|
-| empiricist | 4 | 4 | 5 | 1 | 0 | 86 |
-| latentist | 4 | 3 | 5 | 2 | 1 | 89 |
-| protocolist | 5 | 4 | 8 | 4 | 4 | 168 |
-| recorder | 4 | 3 | 5 | 2 | 1 | 84 |
-| verifier | 4 | 6 | 7 | 1 | 0 | 101 |
+| member | turns | accepted posts | attempts | did not land | denied with LoopGuard | passes rec/ref/? | chain rows |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| empiricist | 4 | 4 | 5 | 1 | 0 | 0/0/0 | 86 |
+| latentist | 4 | 3 | 5 | 2 | 1 | 0/0/0 | 89 |
+| protocolist | 5 | 4 | 8 | 4 | 4 | 0/0/0 | 168 |
+| recorder | 4 | 3 | 5 | 2 | 1 | 0/0/0 | 84 |
+| verifier | 4 | 6 | 7 | 1 | 0 | 0/0/0 | 101 |
+
+`passes rec/ref/?` = recorded / refused / call with an unconfirmed outcome.
 
 ## Speech that did not land
 
@@ -55,6 +61,12 @@ A row here is an attempt the timeline recorded but the forum ledger did not acce
 | member | attempted at | immediate notice |
 |---|---|---|
 | protocolist | 2026-10-22T22:09:42.598Z | LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+
+## Pass calls
+
+A pass is a governed act on the member's own chain; it is not a forum post and adds no `forum.jsonl` row. Only a recorded pass is a declared pass; a refused call records none, and a call whose result is missing or does not record a pass is unconfirmed.
+
+No `forum_pass` calls were visible in the timeline.
 
 ## The latest accepted ledger
 
@@ -105,9 +117,9 @@ LIVE DISAGREEMENTS REMAINING, precise: (1) 3–1; (3) 3–1; (7) two-member with
 
 ### Reading the ledger against the timeline
 
-- **protocolist:** the ledger's absence language (`absence`, `silent third`) is accurate about **accepted posts** (last accepted fp_4), not about attempts. The timeline records 4 forum_post attempt(s) after it; 4 carry an immediate LoopGuard notice. The first notice reads: `LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message`.
+- **protocolist:** the ledger's absence language (`absence`, `silent third`) is accurate about **accepted posts** (last accepted fp_4), not about attempts or declared passes. The timeline records 4 forum_post attempt(s) after it; 4 carry an immediate LoopGuard notice. The first notice reads: `LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message`.
 
-This is a reconciliation, not a re-scoring: it does not turn an attempt into a post, and it does not turn absence into consent.
+This is a reconciliation, not a re-scoring: it does not turn an attempt into a post, a pass into a post, or absence into consent.
 
 ## Audit
 
@@ -116,7 +128,8 @@ This is a reconciliation, not a re-scoring: it does not turn an attempt into a p
 - **timeline:** agent-tongue-1e393c.html
 - **turns:** run.json 21; member sum 21; timeline turn-done 21 (match)
 - **attempt reconciliation:** 30 attempt(s), 20 landed, 10 did not, 6 with an immediate LoopGuard notice
-- **member coverage:** 5 member(s); every run member and every poster is named
+- **pass calls:** 0 visible; 0 recorded, 0 refused, 0 unconfirmed
+- **member coverage:** 5 member(s); every run member, poster, and pass caller is named
 - **latest ledger:** fp_18; 2 accepted post(s) after it; 1 later ledger attempt(s) did not land
 - **provenance:** `run.json` 3dfc5e3519a3…; `forum.jsonl` 924dc120ab6a…; export 84e09c8a14c4…
 
@@ -125,7 +138,8 @@ This is the deterministic audit. It checks citations and counts; it does not rea
 ## What this brief does not decide
 
 - It adds no verdict, endorsement, or consensus.
-- It does not treat silence as consent or dissent. A missing post is only a missing post; an attempted-but-denied post is named as such.
+- It does not treat silence as consent or dissent. A missing post is only a missing post; an attempted-but-denied post is named as such; a recorded pass is named as a pass, not a post.
+- It does not treat a pass as speech, consent, or dissent. A refused pass records no pass; an unconfirmed pass call is not counted as a recorded pass.
 - It does not replace the forum or the chains; it points to them.
 - It does not resolve the open items in the latest ledger. It quotes them.
 
