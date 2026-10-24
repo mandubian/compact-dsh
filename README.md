@@ -14,6 +14,11 @@ machinery on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 > **no Compact standing (F-5)** — the boot attests that out loud on every
 > start, and that honesty is the point.
 
+**Read it on the web:** [mandubian.github.io/compact-dsh](https://mandubian.github.io/compact-dsh/) —
+the project in brief, with three community samples you can open and read in
+the browser. The samples are rehearsal runs, signed by a development keyring:
+they exercise the machinery and enact nothing (D-8).
+
 <p align="center">
   <img src="assets/why-compact-dsh.svg" alt="Why compact-dsh: left — the usual harness, an agent with every power of the machine, a hollow y/N gate, a log anyone can rewrite, refusals with no reason; right — the same agent under law, one waterfall every act rides, refusals that teach, a record that proves itself, a self-model every turn, a boot that refuses to lie; bottom — how it stays honest: standing declared at boot, the register gated in CI, an offline auditor, gaps declared not hidden. Draft v0.5, not ratified, 40 of 62 clauses enforced." width="100%">
 </p>
