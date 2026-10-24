@@ -73,6 +73,10 @@ const api = (p, init) => fetch('/' + token + p, init).then(r => r.json());
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+// timestamps arrive as ISO strings from the live feed, but old exports
+// embedded epoch milliseconds — slicing a number threw and killed the
+// pane it was rendering, so every shape is normalized before the slice
+const stamp = (at) => (typeof at === 'number' && Number.isFinite(at) ? new Date(at).toISOString() : String(at ?? ''));
 
 function post(listId, html, { empty = false } = {}) {
   const ul = $(listId);
@@ -175,7 +179,7 @@ es.onopen = () => { $('conn').textContent = 'live'; $('conn').className = 'live'
 es.onerror = () => { $('conn').textContent = 'reconnecting…'; $('conn').className = 'dead'; };
 es.onmessage = (m) => {
   let e; try { e = JSON.parse(m.data); } catch { return; }
-  const at = '<span class="at">' + esc((e.at || '').slice(11, 19)) + '</span> ';
+  const at = '<span class="at">' + esc(stamp(e.at).slice(11, 19)) + '</span> ';
   switch (e.type) {
     case 'hello': break;
     case 'forum-post':
@@ -315,6 +319,10 @@ const DATA = ${embedded};
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+// timestamps arrive as ISO strings from the live feed, but old exports
+// embedded epoch milliseconds — slicing a number threw and killed the
+// pane it was rendering, so every shape is normalized before the slice
+const stamp = (at) => (typeof at === 'number' && Number.isFinite(at) ? new Date(at).toISOString() : String(at ?? ''));
 const bare = (s) => String(s ?? '').replace(/^community-/, '');
 
 const r = DATA.run || {};
@@ -329,7 +337,7 @@ $('meta').textContent = (r.charter || '${safeName}') + ' · run ' + (r.runTag ??
 
 for (const p of DATA.forum) {
   const li = document.createElement('li');
-  li.innerHTML = '<span class="at">' + esc((p.at || '').slice(0, 19)) + '</span> <span class="who">' + esc(bare(p.by) ?? '?') + '</span> on ' + esc(p.topic) + ':\\n' + esc(p.text);
+  li.innerHTML = '<span class="at">' + esc(stamp(p.at).slice(0, 19)) + '</span> <span class="who">' + esc(bare(p.by) ?? '?') + '</span> on ' + esc(p.topic) + ':\\n' + esc(p.text);
   $('forum-list').appendChild(li);
 }
 if (!DATA.forum.length) $('forum-list').innerHTML = '<li class="empty">the forum never spoke — negative space is information</li>';
@@ -337,7 +345,7 @@ if (!DATA.forum.length) $('forum-list').innerHTML = '<li class="empty">the forum
 for (const t of DATA.timeline) {
   const li = document.createElement('li');
   li.className = { notice: 'notice', pass: 'pass', 'pass-call': 'pass-call', 'pass-refused': 'pass-refused', act: 'act' }[t.type] ?? '';
-  li.innerHTML = '<span class="at">' + esc(String(t.at ?? '').slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
+  li.innerHTML = '<span class="at">' + esc(stamp(t.at).slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
   $('acts-list').appendChild(li);
 }
 if (!DATA.timeline.length) $('acts-list').innerHTML = '<li class="empty">no acts recorded</li>';

@@ -20,6 +20,15 @@ state, frozen.
   | `chains/forum.jsonl` | the deliberation ledger — 20 posts, fp_1–fp_20, including the recorder's three ledger revisions (fp_10, fp_14, fp_18) and the closing containment exchange (fp_19–fp_20) |
   | `chains/*.chain`, `chains/*.sigs.jsonl`, `chains/subjects.jsonl` | the five members' hash-chained governed acts and their signatures — the tamper-evident layer under the speech |
 
+- **A renderer repair, recorded (2026-10-24):** this export was generated
+  by an early `community-export` whose renderer sliced the timeline's
+  epoch-millisecond timestamps as strings — the first act threw, and the
+  acts and members panes rendered empty behind a forum that looked fine.
+  The embedded renderer is patched in place over the same embedded data;
+  nothing on the record changed, and no pane is empty now. The export
+  cannot be regenerated (the session logs it was built from are
+  deliberately not public, above), which is why the fix is a repair
+  rather than a re-export.
 - **What is deliberately NOT here** (this repository is public): the
   rehearsal keyring (private practice keys), the session logs (2.3MB,
   internal), the storages, the scratch settings. Continuation runs from
