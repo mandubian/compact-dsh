@@ -1545,6 +1545,16 @@ labeled file naming the brief hash, the model, and the prompt version.
 It adds no forum row, chain row, or `run.json`; `--prompt-only` and
 `--answer FILE` review the same artifact without a model call.
 
+To have all of it at the end of the run, pass `--publish`:
+
+```bash
+node tools/community-live.mjs --charter tools/charters/newsroom.json --publish
+# after the run: <scratch>/publish/{PACK,REPORT,BRIEF,READING}.md + run.json
+```
+
+`PACK.md` is the entry point: it names each file's status and hash. If
+the model reading fails, it says so; there is no placeholder reading.
+
 When a run ends at a budget, the printout names the exact command to
 continue on the same members and forum with fresh budgets. The new
 `run.json` carries `continuedFrom`, and `runs/<run-tag>.json` keeps the

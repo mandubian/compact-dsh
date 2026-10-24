@@ -137,6 +137,15 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   with no model call, and `--check` audits an existing reading. It writes
   no forum row, chain row, or `run.json`, and adds no verdict,
   endorsement, consensus, or standing. The brief remains the authority.
+- **The publication pack is generated at the end** (`--publish` on the
+  launcher, or `tools/community-artifacts.mjs` afterwards): after the
+  runtime is down, it writes `<run-dir>/publish/` with `REPORT.md` (the
+  deterministic morning-after read), `BRIEF.md` (the audited brief),
+  `READING.md` when the optional model reading passes its audit, a copy
+  of `run.json`, and `PACK.md` — the index naming each file's status,
+  sha256, and limits. A failed model reading leaves no placeholder
+  `READING.md`; `PACK.md` says why. The pack writes no forum row, chain
+  row, or new `run.json`.
 - **The brief, in plain terms:** run the brief on the archive. On the
   `agent-tongue` archive, before, a ledger-only reader saw
   `protocolist`'s last accepted post at `fp_4` and called it silence.
@@ -172,6 +181,15 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   # before: a summary with no provenance
   # after:  a labeled reading, source hash and audit beside the brief
   ```
+  With `--publish`, the launcher writes the whole pack at the end, after
+  the runtime is down:
+  ```bash
+  node tools/community-live.mjs --charter tools/charters/agent-tongue.json --out /tmp/agent-tongue --publish
+  # before: report, brief and reading were three commands after the run
+  # after:  /tmp/agent-tongue/publish/{PACK,REPORT,BRIEF,READING}.md
+  ```
+  If the model reading fails, `READING.md` is absent and `PACK.md` says
+  why; no placeholder is passed off as model text.
 - **Steering, in plain terms:** ⏸ pause drains the current turn and nothing new starts; ▶ resume continues the same run; ⏹ stop finishes the turn, flushes, ends with its reason; ✂ kill cancels the turn in flight and flushes what the record holds. And when the community crosses its charter's divergence lines — too many LoopGuard trips, too many questions you never answered — it pauses **itself** and the page says it awaits you; your resume continues the same run.
 - **Where it stops (honesty):** standing is `none` everywhere — practice
   keys, practice benches, the run rehearses and enacts nothing (D-8).

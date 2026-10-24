@@ -197,6 +197,35 @@ async function bootRoute(settingsPath, modelOverride) {
   };
 }
 
+/** Produce one reading and its audit. The caller decides where it goes;
+ *  this function writes no archive artifact. `answerPath` is the offline
+ *  path: no model is called and the header says so. */
+export async function generateReading({
+  brief, data, answerPath = null, settingsPath = null, model = null, maxTokens = 1800,
+}) {
+  const prompt = buildReadingPrompt(brief);
+  let body;
+  let modelLabel = 'answer-file (no model called)';
+  if (answerPath) {
+    body = cleanModelText(readFileSync(resolve(answerPath), 'utf8'));
+  } else {
+    const route = await bootRoute(
+      settingsPath || process.env.COMPACT_READING_SETTINGS
+        || process.env.COMPACT_LIVE_SETTINGS
+        || join(homedir(), '.compact-dsh', 'settings.yaml'),
+      model,
+    );
+    try {
+      body = cleanModelText(await route.generate(prompt, maxTokens));
+      modelLabel = `${route.selection.provider}/${route.selection.model}`;
+    } finally {
+      await route.dispose();
+    }
+  }
+  const text = renderReading({ body, brief, model: modelLabel });
+  return { text, model: modelLabel, audit: auditReading(text, data) };
+}
+
 function argValue(argv, name) {
   const i = argv.indexOf(`--${name}`);
   return i === -1 ? undefined : argv[i + 1];
@@ -236,24 +265,16 @@ async function main() {
     return;
   }
   const answerPath = argValue(argv, 'answer');
-  let body;
-  let model = 'answer-file (no model called)';
-  if (answerPath) {
-    body = readFileSync(resolve(answerPath), 'utf8');
-  } else {
-    const settingsPath = process.env.COMPACT_READING_SETTINGS
+  const maxTokens = Number(argValue(argv, 'max-tokens') ?? 1800);
+  const { text: reading, audit: result } = await generateReading({
+    brief, data,
+    answerPath: answerPath ? resolve(answerPath) : null,
+    settingsPath: process.env.COMPACT_READING_SETTINGS
       || process.env.COMPACT_LIVE_SETTINGS
-      || join(homedir(), '.compact-dsh', 'settings.yaml');
-    const route = await bootRoute(settingsPath, argValue(argv, 'model'));
-    try {
-      body = cleanModelText(await route.generate(prompt, Number(argValue(argv, 'max-tokens') ?? 1800)));
-      model = `${route.selection.provider}/${route.selection.model}`;
-    } finally {
-      await route.dispose();
-    }
-  }
-  const reading = renderReading({ body, brief, model });
-  const result = auditReading(reading, data);
+      || join(homedir(), '.compact-dsh', 'settings.yaml'),
+    model: argValue(argv, 'model'),
+    maxTokens,
+  });
   const outPath = argValue(argv, 'out');
   if (outPath) writeFileSync(resolve(outPath), reading);
   else process.stdout.write(reading);

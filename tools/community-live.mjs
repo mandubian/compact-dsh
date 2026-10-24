@@ -26,10 +26,12 @@
 //     shared token cap — the run ENDS when one trips, with its reason.
 //
 // Usage: node tools/community-live.mjs --charter tools/charters/newsroom.json
-//          [--out DIR] [--rounds N]
+//          [--out DIR] [--rounds N] [--publish] [--publish-dir DIR]
 // Requires docker with the baked toolchain image (dsh-tools:basic —
 // `npm run compact:bake`), and a model route (settings.yaml under
 // $DSH_HOME or the scratch state dir, or DEEPSEEK_API_KEY in the shell).
+// --publish writes the end-of-run pack (REPORT.md, BRIEF.md, the optional
+// model READING.md, and PACK.md) under <out>/publish or --publish-dir.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
@@ -308,6 +310,7 @@ async function main() {
   // is ever made, and the end reason says which mode ran
   const drySeat = argv.includes('--dry-seat');
   if (drySeat) charter.budgets.rounds = 0;
+  const publish = argv.includes('--publish') || argv.includes('--publish-dir');
 
   let scratch;
   const outDir = flag('out');
@@ -317,6 +320,8 @@ async function main() {
   } else {
     scratch = mkdtempSync(join(tmpdir(), `community-${charter.name}-`));
   }
+  const publishDir = flag('publish-dir') ? resolve(flag('publish-dir')) : join(scratch, 'publish');
+  if (publish) SAY(`publish pack will be written to ${publishDir} (REPORT.md, BRIEF.md, optional READING.md, PACK.md)`);
   // the cut this run continues (#229 follow-up): read BEFORE the boot so a
   // resumed run on the same --out can name the previous manifest in the new
   // one. A malformed old manifest never blocks a continuation.
@@ -628,6 +633,23 @@ async function main() {
     await observatory?.close?.().catch?.(() => {});
     await releases?.close().catch(() => {});
     await ctx.fiber.dispose().catch(() => {});
+    // the publication pack: generated after the runtime is down so its
+    // reading boot cannot write into this run's sessions. The child gets
+    // the route settings by path, not this runtime's archive env.
+    if (publish && runTag) {
+      const settingsPath = join(scratch, 'state', 'settings.yaml');
+      const args = [join(ROOT, 'tools', 'community-artifacts.mjs'), scratch, '--out', publishDir];
+      if (existsSync(settingsPath)) args.push('--settings', settingsPath);
+      const env = { ...process.env };
+      for (const key of Object.keys(env)) {
+        if (key.startsWith('COMPACT_') || key.startsWith('DSH_')) delete env[key];
+      }
+      SAY(`publish pack: writing REPORT.md, BRIEF.md and READING.md to ${publishDir}`);
+      const pack = spawnSync(process.execPath, args, { stdio: 'inherit', env });
+      if (pack.error) SAY(`publish pack FAILED: ${pack.error.message} — the run record is at ${scratch}`);
+      else if (pack.status !== 0) SAY(`publish pack finished with exit ${pack.status} — inspect ${publishDir}`);
+      else SAY(`publish pack ready: ${publishDir}`);
+    }
   }
   process.exitCode = exitCode;
 }
