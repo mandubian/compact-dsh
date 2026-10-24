@@ -389,6 +389,9 @@ export function renderBrief(data, { fullLedger = false } = {}) {
   L.push('| field | value |');
   L.push('|---|---|');
   L.push(`| run | ${charter}${tag}${run?.resumed ? ' (resumed)' : ''} |`);
+  if (run?.continuedFrom?.runTag) {
+    L.push(`| continued from | ${run.continuedFrom.runTag} — ${run.continuedFrom.endReason ?? '—'}${run.continuedFrom.endedAt ? ` (${run.continuedFrom.endedAt})` : ''} |`);
+  }
   L.push(`| ended | ${run?.endReason ?? 'no run.json'} |`);
   L.push(`| rounds | ${run?.rounds ?? '—'} |`);
   L.push(`| turns | ${run?.turns ?? checks.turnSum} |`);

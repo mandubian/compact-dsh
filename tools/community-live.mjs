@@ -26,10 +26,12 @@
 //     shared token cap — the run ENDS when one trips, with its reason.
 //
 // Usage: node tools/community-live.mjs --charter tools/charters/newsroom.json
-//          [--out DIR] [--rounds N]
+//          [--out DIR] [--rounds N] [--publish] [--publish-dir DIR]
 // Requires docker with the baked toolchain image (dsh-tools:basic —
 // `npm run compact:bake`), and a model route (settings.yaml under
 // $DSH_HOME or the scratch state dir, or DEEPSEEK_API_KEY in the shell).
+// --publish writes the end-of-run pack (REPORT.md, BRIEF.md, the optional
+// model READING.md, and PACK.md) under <out>/publish or --publish-dir.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
@@ -42,6 +44,7 @@ import { parseAllowlistLikePattern, egressPatternFor } from 'compact-dsh-approva
 import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
+import { continuationOf, preservePreviousRun, readPreviousRun, shellPath } from './run-manifest.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
 import { createReleasesHost } from './releases-host.mjs';
 import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters } from '../packages/community/src/index.js';
@@ -307,6 +310,7 @@ async function main() {
   // is ever made, and the end reason says which mode ran
   const drySeat = argv.includes('--dry-seat');
   if (drySeat) charter.budgets.rounds = 0;
+  const publish = argv.includes('--publish') || argv.includes('--publish-dir');
 
   let scratch;
   const outDir = flag('out');
@@ -316,6 +320,13 @@ async function main() {
   } else {
     scratch = mkdtempSync(join(tmpdir(), `community-${charter.name}-`));
   }
+  const publishDir = flag('publish-dir') ? resolve(flag('publish-dir')) : join(scratch, 'publish');
+  if (publish) SAY(`publish pack will be written to ${publishDir} (REPORT.md, BRIEF.md, optional READING.md, PACK.md)`);
+  // the cut this run continues (#229 follow-up): read BEFORE the boot so a
+  // resumed run on the same --out can name the previous manifest in the new
+  // one. A malformed old manifest never blocks a continuation.
+  const previousRun = readPreviousRun(scratch);
+  preservePreviousRun(scratch, previousRun);
   const workspace = join(scratch, 'workspace');
   mkdirSync(workspace, { recursive: true });
   for (const s of charter.sources) {
@@ -512,27 +523,53 @@ async function main() {
   process.on('SIGTERM', onSignal);
   let runStats = null;
   let runTag = null;
+  let runStarted = false; // set when the community resolves a route or seats a member
   let runOver = false; // the finally sets it before the linger — the signal handler reads it
   const writeRunManifest = (extra = {}) => {
     try {
-      writeFileSync(join(scratch, 'run.json'), `${JSON.stringify({
+      const continuedFrom = continuationOf(previousRun, runTag);
+      const manifest = {
         charter: charter.name, runTag, resumed,
         endedAt: new Date().toISOString(),
         endReason: runStats?.endReason ?? (exitCode ? 'failed' : 'unknown'),
         rounds: runStats?.rounds ?? 0, turns: runStats?.turns ?? 0,
         benchCasesSeen: runStats?.casesSeen ?? 0,
         tokens: tokenMeter(),
+        budgets: charter.budgets,
+        ...(continuedFrom ? { continuedFrom } : {}),
         members: runStats?.members ?? {},
         model: runStats?.model ?? null,
         divergence: charter.divergence ?? null,
         ...extra,
-      }, null, 2)}\n`);
+      };
+      const text = `${JSON.stringify(manifest, null, 2)}\n`;
+      // a run that never resolved a route or seated a member is not a cut:
+      // keep the previous run.json authoritative and record the failure
+      // beside it. The previous cut was copied before boot, so even a
+      // started run that dies later cannot lose it.
+      if (!runStarted && !runStats && previousRun) {
+        const runs = join(scratch, 'runs');
+        mkdirSync(runs, { recursive: true });
+        writeFileSync(join(runs, `failed-${Date.now()}.json`), text);
+        return;
+      }
+      writeFileSync(join(scratch, 'run.json'), text);
+      // the per-run copy: run.json is the latest cut and is overwritten on
+      // the next continuation; runs/<tag>.json keeps every cut that ran
+      // under this feature. The tag is random, so a collision is a real
+      // error, not something to overwrite silently.
+      if (runTag) {
+        const runs = join(scratch, 'runs');
+        mkdirSync(runs, { recursive: true });
+        const copy = join(runs, `${runTag}.json`);
+        if (!existsSync(copy)) writeFileSync(copy, text);
+      }
     } catch (e) { SAY(`run.json could not be written: ${e.message}`); }
   };
   try {
     const hooks = {
-      onRoute: (s) => SAY(`model route: ${s.provider}/${s.model}`),
-      onSeat: (m, agent) => SAY(`seated ${m.id} (${m.prefix}${m.bench ? ', bench' : ''}) — session ${String(agent?.session?.id ?? agent?.id ?? '?').slice(0, 20)}…`),
+      onRoute: (s) => { runStarted = true; SAY(`model route: ${s.provider}/${s.model}`); },
+      onSeat: (m, agent) => { runStarted = true; SAY(`seated ${m.id} (${m.prefix}${m.bench ? ', bench' : ''}) — session ${String(agent?.session?.id ?? agent?.id ?? '?').slice(0, 20)}…`); },
       onTurn: (m) => { line(`  → ${m.id} takes a turn`); publishSafe({ type: 'turn', member: m.id, bench: m.bench === true }); },
       onTurnDone: (m, turns) => { SAY(`  ← ${m.id} turn ${turns} done (flushed to its chain)`); publishSafe({ type: 'turn-done', member: m.id, turns }); },
       onBenchWake: (m, c) => { line(`  ⚖ bench ${m.id} woken for ${c.id}`); publishSafe({ type: 'bench-wake', member: m.id, caseId: c.id }); },
@@ -581,6 +618,8 @@ async function main() {
     if (releases) line(`releases host received ${releases.uploads.length} upload(s)${releases.uploads.length ? ': ' + releases.uploads.map((u) => `${u.path} (${u.bytes}b)`).join(', ') : ''}`);
     line('');
     line(`scratch kept at ${scratch} (records, chains, approvals, annex, keyring)`);
+    line(`to continue: node tools/community-live.mjs --charter ${shellPath(charterPath)} --out ${shellPath(scratch)}`);
+    line('  (same members and forum; budgets are fresh — a new run segment, not the old cap reopened)');
     line(`morning-after: node auditor/audit.mjs <session-log> --chain <chain> --roll ${join(keyringDir, 'roll.json')} --keyring ${join(keyringDir, 'keyring.json')}`);
     out('DONE — machinery exercised live, standing none (rehearsal keyring; the benches are practice declarations — the human seat is Phase D, #219)');
   } catch (error) {
@@ -598,6 +637,23 @@ async function main() {
     await observatory?.close?.().catch?.(() => {});
     await releases?.close().catch(() => {});
     await ctx.fiber.dispose().catch(() => {});
+    // the publication pack: generated after the runtime is down so its
+    // reading boot cannot write into this run's sessions. The child gets
+    // the route settings by path, not this runtime's archive env.
+    if (publish && runTag) {
+      const settingsPath = join(scratch, 'state', 'settings.yaml');
+      const args = [join(ROOT, 'tools', 'community-artifacts.mjs'), scratch, '--out', publishDir];
+      if (existsSync(settingsPath)) args.push('--settings', settingsPath);
+      const env = { ...process.env };
+      for (const key of Object.keys(env)) {
+        if (key.startsWith('COMPACT_') || key.startsWith('DSH_')) delete env[key];
+      }
+      SAY(`publish pack: writing REPORT.md, BRIEF.md and READING.md to ${publishDir}`);
+      const pack = spawnSync(process.execPath, args, { stdio: 'inherit', env });
+      if (pack.error) SAY(`publish pack FAILED: ${pack.error.message} — the run record is at ${scratch}`);
+      else if (pack.status !== 0) SAY(`publish pack finished with exit ${pack.status} — inspect ${publishDir}`);
+      else SAY(`publish pack ready: ${publishDir}`);
+    }
   }
   process.exitCode = exitCode;
 }

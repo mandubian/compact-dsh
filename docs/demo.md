@@ -1540,6 +1540,26 @@ recorded, refused, and unconfirmed — and quotes the latest accepted
 the export present, the export's own timeline is enough; no session logs
 are required.
 
+The optional reading is separate: it reads only the brief and writes a
+labeled file naming the brief hash, the model, and the prompt version.
+It adds no forum row, chain row, or `run.json`; `--prompt-only` and
+`--answer FILE` review the same artifact without a model call.
+
+To have all of it at the end of the run, pass `--publish`:
+
+```bash
+node tools/community-live.mjs --charter tools/charters/newsroom.json --publish
+# after the run: <scratch>/publish/{PACK,REPORT,BRIEF,READING}.md + run.json
+```
+
+`PACK.md` is the entry point: it names each file's status and hash. If
+the model reading fails, it says so; there is no placeholder reading.
+
+When a run ends at a budget, the printout names the exact command to
+continue on the same members and forum with fresh budgets. The new
+`run.json` carries `continuedFrom`, and `runs/<run-tag>.json` keeps the
+previous cut instead of losing it to the overwrite.
+
 ### What this shows, in one paragraph
 
 Everything the first thirteen demos built — the record, the gates, the
