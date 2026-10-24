@@ -208,7 +208,7 @@ The report is the morning-after read of a live run. The brief is the
 archive's reading aid: it reads `run.json`, the forum ledger, and the
 timeline (session logs, or the export's embedded `DATA`) and separates
 **accepted posts** from **attempts that did not land**. It also keeps
-**declared passes** separate: a `forum_pass` is a governed act on the
+**pass calls** separate: a `forum_pass` is a governed act on the
 member's chain, not a post, and the brief names recorded passes, refused
 calls, and unconfirmed calls. It is derived, not a record act;
 the forum and chains remain the authority.
