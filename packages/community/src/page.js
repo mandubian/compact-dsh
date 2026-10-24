@@ -181,6 +181,9 @@ es.onmessage = (m) => {
     case 'forum-post':
       post('forum-list', at + '<span class="who">' + esc(e.by ?? '?') + '</span> on ' + esc(e.topic) + ':\\n' + esc(e.text));
       break;
+    case 'forum-pass':
+      post('acts-list', at + '<span class="who">' + esc(e.by ?? '?') + '</span> passed — not a post: ' + esc(e.reason));
+      break;
     case 'turn':
       post('acts-list', at + '<span class="who">' + esc(e.member) + '</span> takes a turn' + (e.bench ? ' (bench)' : ''));
       break;
@@ -283,6 +286,9 @@ export function replayPageHtml({ charterName, data }) {
   li .who { color: #7fd1ff; }
   li .at { color: #666; font-size: 11px; }
   li.act { color: #bbb; font-size: 12px; }
+  li.pass { color: #b8e986; font-size: 12px; }
+  li.pass-call { color: #8e9b8e; font-size: 12px; }
+  li.pass-refused { color: #ff9e9e; font-size: 12px; }
   li.notice { color: #ffb46b; font-size: 12px; }
   li.empty { color: #666; font-style: italic; }
   table { font-size: 12px; margin: 8px 10px; border-collapse: collapse; }
@@ -330,7 +336,7 @@ if (!DATA.forum.length) $('forum-list').innerHTML = '<li class="empty">the forum
 
 for (const t of DATA.timeline) {
   const li = document.createElement('li');
-  li.className = t.type === 'notice' ? 'notice' : (t.type === 'act' ? 'act' : '');
+  li.className = { notice: 'notice', pass: 'pass', 'pass-call': 'pass-call', 'pass-refused': 'pass-refused', act: 'act' }[t.type] ?? '';
   li.innerHTML = '<span class="at">' + esc(String(t.at ?? '').slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
   $('acts-list').appendChild(li);
 }

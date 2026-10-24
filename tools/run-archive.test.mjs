@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { readArchive, timelineFromLog } from './run-archive.mjs';
-import { replayPageHtml } from '../packages/community/src/page.js';
+import { pageHtml, replayPageHtml } from '../packages/community/src/page.js';
 
 function buildState(dir) {
   mkdirSync(join(dir, 'state', 'sessions', 'ws', 'community-guardian-aaa'), { recursive: true });
@@ -23,6 +23,10 @@ function buildState(dir) {
   writeFileSync(join(dir, 'state', 'sessions', 'ws', 'community-guardian-aaa', 'session.v4.jsonl'), [
     JSON.stringify({ type: 'turn/end', time: 1792700400000, data: {} }),
     JSON.stringify({ type: 'tool/call', time: 1792700401000, data: { name: 'law_read', arguments: '{}' } }),
+    JSON.stringify({ type: 'tool/call', time: 1792700401500, data: { callId: 'pass-ok', name: 'forum_pass', arguments: JSON.stringify({ reason: 'nothing new to add; my position is on the record' }) } }),
+    JSON.stringify({ type: 'tool/result', time: 1792700401600, data: { message: { toolCallId: 'pass-ok', content: [{ type: 'text', text: '[forum] pass recorded — not a post.' }] } } }),
+    JSON.stringify({ type: 'tool/call', time: 1792700401700, data: { callId: 'pass-bad', name: 'forum_pass', arguments: JSON.stringify({ reason: '   ' }) } }),
+    JSON.stringify({ type: 'tool/result', time: 1792700401800, data: { message: { toolCallId: 'pass-bad', content: [{ type: 'text', text: '[forum] not passed: a pass needs a reason' }] } } }),
     JSON.stringify({ type: 'user/message', time: 1792700402000, data: { source: { kind: 'compact-loopguard', summary: 'LoopGuard LG-2 identical retry' } } }),
     JSON.stringify({ type: 'turn/end', time: 1792700460000, data: {} }),
   ].join('\n') + '\n');
@@ -41,12 +45,14 @@ test('readArchive: the run manifest, the full forum, and an ordered timeline', (
     assert.equal(a.forum.length, 1);
     assert.match(a.forum[0].text, /R-9/);
     assert.equal(a.members.length, 1);
-    assert.deepEqual(a.timeline.map((t) => t.type), ['turn-done', 'act', 'notice', 'turn-done'], 'the timeline is ordered as the member lived it');
+    assert.deepEqual(a.timeline.map((t) => t.type), ['turn-done', 'act', 'pass', 'pass-refused', 'notice', 'turn-done'], 'the timeline is ordered as the member lived it');
     // EPOCH-NUMBER times normalize to ISO strings at the source (the live
     // finding: the renderer sliced a number and the acts lane died)
     assert.match(a.timeline[0].at, /^2026-10-2[0-9]T/, 'numeric times come out ISO');
     assert.equal(a.timeline[1].text, 'law_read');
-    assert.match(a.timeline[2].text, /LG-2/);
+    assert.match(a.timeline[2].text, /forum_pass: nothing new to add; my position is on the record/);
+    assert.match(a.timeline[3].text, /forum_pass refused:\s+$/);
+    assert.match(a.timeline[4].text, /LG-2/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -88,7 +94,11 @@ test('the replay page renders the archive: full posts, the timeline, the run hea
         { id: 'fp_1', topic: 'agreement-floor', by: 'community-guardian-aaa', at: 't', text: 'POSITION: yes — and the law itself supplies the discipline' },
         { id: 'fp_2', topic: 'agreement-floor', by: 'community-publisher-xyz', at: 't', text: "W=/tmp/x; echo 'Support' >> $W && $(cat notes) — $$ and $& and $' all literal" },
       ],
-      timeline: [{ at: '2026-10-22T20:00:00.000Z', who: 'community-guardian-aaa', type: 'turn-done', text: 'guardian finished a turn' }],
+      timeline: [
+        { at: '2026-10-22T20:00:00.000Z', who: 'community-guardian-aaa', type: 'turn-done', text: 'guardian finished a turn' },
+        { at: '2026-10-22T20:00:01.000Z', who: 'community-guardian-aaa', type: 'pass', text: 'forum_pass: nothing new to add; my position is on the record' },
+        { at: '2026-10-22T20:00:02.000Z', who: 'community-guardian-aaa', type: 'pass-refused', text: 'forum_pass refused: (empty)' },
+      ],
       members: [{ session: 'community-guardian-aaa', turns: 5 }],
     },
   });
@@ -106,6 +116,17 @@ test('the replay page renders the archive: full posts, the timeline, the run hea
   // the $-poison case (the Copilot finding): every dollar sequence in the
   // archived text reaches the page LITERALLY
   assert.match(forumChildren, /\$W &amp;&amp; \$\(cat notes\) — \$\$ and \$&amp; and \$&#39; all literal/);
+  const actChildren = elements['acts-list'].children.map((c) => c.innerHTML).join('\n');
+  assert.match(actChildren, /forum_pass: nothing new to add; my position is on the record/);
+  assert.equal(elements['acts-list'].children.find((c) => /nothing new to add/.test(c.innerHTML)).className, 'pass');
+  assert.equal(elements['acts-list'].children.find((c) => /refused/.test(c.innerHTML)).className, 'pass-refused');
+});
+
+test('the live page renders a pass in the acts lane, never as forum speech', () => {
+  const html = pageHtml({ charterName: 'live', token: 't' });
+  assert.match(html, /case 'forum-pass'/);
+  assert.match(html, /passed — not a post/);
+  assert.match(html, /forum-pass/);
 });
 
 test('the replay header: heterogeneous seating names each member on its own route', () => {

@@ -24,6 +24,13 @@
 //      member whose chain carries it. Attribution is not a display field;
 //      it is the chain.
 //
+//      forum_pass is the same governed act with the opposite content: the
+//      member records that it chose not to speak this turn, and why. It
+//      writes NO post, creates NO topic, appends NO ledger line, and tells
+//      NO member. The ledger stays exactly what it says it is: accepted
+//      speech. A quiet turn can then be read as a choice on the record,
+//      not confused with a denied post or a member that never acted.
+//
 //   3. THE LEDGER BESIDE THE CHAINS. Posts are appended to a JSONL ledger
 //      under the Enforcer's protected state (beside the chains, the
 //      subjects.jsonl precedent) so offline readers — the auditor, the
@@ -45,13 +52,13 @@ import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } fr
 import { dirname } from 'node:path';
 
 import {
-  Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText,
-  TOPIC_PATTERN, MAX_POST_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText, passReason,
+  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
 } from './forum.js';
 
 export {
-  Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText,
-  TOPIC_PATTERN, MAX_POST_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText, passReason,
+  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
 
 };
 
@@ -66,6 +73,8 @@ export const DECLARED_GAPS = [
   'what verified and the run continues, because the chains, not this copy, decide what was said',
   'no clause of the body is enforced here — the forum is community infrastructure carried like the guide, declared ' +
   'in the boot record rather than coupled on',
+  'a pass is recorded on the member’s chain, never in forum.jsonl — a reader that reads only the speech ledger sees ' +
+  'what was said, not the choice not to speak; the session timeline, report and replay carry the pass',
 ];
 
 /** Read the ledger's durable copy back into the board (#227). Strict
@@ -144,6 +153,10 @@ export function apply(ctx, config = {}) {
   // the poster's problem
   const listeners = new Set();
   const emit = (post) => { for (const fn of listeners) { try { fn(post); } catch { /* read-side */ } } };
+  // passes feed the operator's live page, not another member's attention:
+  // the same read-side rule, a separate channel because a pass is not a post
+  const passListeners = new Set();
+  const emitPass = (pass) => { for (const fn of passListeners) { try { fn(pass); } catch { /* read-side */ } } };
 
   const forumPost = defineTool({
     name: 'forum_post',
@@ -180,6 +193,44 @@ export function apply(ctx, config = {}) {
     },
   });
 
+  const forumPass = defineTool({
+    name: 'forum_pass',
+    description:
+      'Record that you are choosing not to post this turn, with your reason. This is a governed act on YOUR record — ' +
+      'it is NOT a forum post: it enters no topic, it is not readable with forum_read, it appends nothing to the ' +
+      'forum ledger, and no member is notified. Use forum_post when you have something to say; use this when you ' +
+      'choose silence and want the reason on the record.',
+    parameters: {
+      reason: {
+        type: 'string', required: true,
+        description: `why you are not posting this turn (at most ${MAX_PASS_REASON_CHARS} characters) — say it plainly; it lands on your record with the pass`,
+      },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    async execute(args, exec) {
+      let reason;
+      try {
+        reason = passReason(args?.reason);
+      } catch (error) {
+        return `[forum] not passed: ${error.message}`;
+      }
+      const pass = {
+        kind: 'pass',
+        by: typeof exec?.agent?.id === 'string' && exec.agent.id ? exec.agent.id : null,
+        at: new Date().toISOString(),
+        reason,
+      };
+      emitPass(pass);
+      return [
+        '[forum] pass recorded — not a post. It entered no topic, appended nothing to the forum ledger, and told no member.',
+        pass.by
+          ? `It is a governed act on your record (${pass.by}) — cite it as ${pass.by}:<fromSeq>-<toSeq>, the range record_read shows for this call; judicature_hear accepts that citation.`
+          : 'It is a governed act on the caller’s record — cite the tool-call range record_read shows for it.',
+        `Reason: ${pass.reason}`,
+      ].join('\n');
+    },
+  });
+
   const forumRead = defineTool({
     name: 'forum_read',
     description:
@@ -209,7 +260,7 @@ export function apply(ctx, config = {}) {
   });
 
   ctx.inject?.(['tools'], (scope) => {
-    for (const t of [forumPost, forumRead]) scope.tools.register(t);
+    for (const t of [forumPost, forumPass, forumRead]) scope.tools.register(t);
   });
 
   const service = {
@@ -221,6 +272,12 @@ export function apply(ctx, config = {}) {
     onPost(callback) {
       listeners.add(callback);
       return () => listeners.delete(callback);
+    },
+    /** Subscribe to every recorded pass (the operator's live page). A pass
+     *  is not speech and is not pushed to any member. */
+    onPass(callback) {
+      passListeners.add(callback);
+      return () => passListeners.delete(callback);
     },
     /** The whole visible state, cloned — for reports and page renders. */
     snapshot() {

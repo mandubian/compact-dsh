@@ -3,8 +3,9 @@
 // single HTML page over SSE, plus the intervention endpoints that answer
 // ONLY what is pending on the human seat.
 //
-// WHAT THE PAGE SHOWS: the forum as it happens (forum.onPost), the
-// community's turns and bench wakes (the driver's engine hooks), every
+// WHAT THE PAGE SHOWS: the forum as it happens (forum.onPost), the passes
+// members record (forum.onPass — an act in the acts lane, never a post),
+// the community's turns and bench wakes (the driver's engine hooks), every
 // approval ask the human seat sees (claimed, passed to the watch, or
 // decided), and the notices members receive (watch verdicts, loopguard —
 // read off session events, the same shapes watch-report reads).

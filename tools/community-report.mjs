@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // community-report — the morning-after read of a live community run
 // (#220, umbrella #215). Read-only over the run's durable state: the
-// session logs (turns, acts, forum posts, approvals and who answered
-// them, watch verdicts, loopguard trips), the forum ledger beside the
-// chains, and the approval store (grants minted, used, revoked). No
-// runtime cooperation needed — everything it reads is what the chains
-// and the store already hold.
+// session logs (turns, acts, forum posts, passes and their results,
+// approvals and who answered them, watch verdicts, loopguard trips), the
+// forum ledger beside the chains, and the approval store (grants minted,
+// used, revoked). No runtime cooperation needed — everything it reads is
+// what the chains and the store already hold.
 //
 // Negative space is information: a community that never spoke, never
 // filed, never asked — the report SAYS so rather than omitting the
@@ -69,11 +69,12 @@ export function findSessionLogs(recordRoot) {
  *  (the session dir's name IS the session id). */
 export function agentStatsFromLog(logText, fallbackSessionId = null) {
   const stats = {
-    session: fallbackSessionId, turns: 0, steps: 0, toolCalls: {}, forumPosts: [],
+    session: fallbackSessionId, turns: 0, steps: 0, toolCalls: {}, forumPosts: [], passCalls: [], passes: [], passRefused: [],
     approvals: 0, answeredBy: { operator: 0, watch: 0, replay: 0, denied: 0, unavailable: 0 },
     watchVerdicts: 0, loopguardTrips: 0, askHuman: { asked: 0, answered: 0, timedOut: 0 },
     usage: { inputTokens: 0, outputTokens: 0 },
   };
+  const passByCall = new Map();
   for (const line of String(logText ?? '').split('\n')) {
     if (!line.trim()) continue;
     let row;
@@ -92,7 +93,27 @@ export function agentStatsFromLog(logText, fallbackSessionId = null) {
             stats.forumPosts.push({ topic: args?.topic ?? '?', text: String(args?.text ?? '').slice(0, 140) });
           } catch { /* a torn argument never kills the report */ }
         }
+        if (name === 'forum_pass') {
+          try {
+            const args = JSON.parse(String(data?.arguments ?? row.arguments ?? '{}'));
+            const reason = String(args?.reason ?? '').slice(0, 140);
+            const callId = String(data?.callId ?? row.callId ?? `call_${stats.steps}`);
+            stats.passCalls.push({ reason, callId });
+            passByCall.set(callId, reason);
+          } catch { /* a torn argument never kills the report */ }
+        }
         if (name === 'ask_human') stats.askHuman.asked += 1;
+        break;
+      }
+      case 'tool/result': {
+        const callId = String(data?.message?.toolCallId ?? data?.toolCallId ?? data?.callId ?? '');
+        if (!passByCall.has(callId)) break;
+        const content = data?.message?.content ?? data?.content ?? [];
+        const text = Array.isArray(content) ? content.map((b) => b?.text ?? '').join('') : String(content);
+        const reason = passByCall.get(callId);
+        if (/\[forum\] pass recorded/.test(text)) stats.passes.push({ reason });
+        else if (/\[forum\] not passed/.test(text)) stats.passRefused.push({ reason: reason.trim() ? reason : '(empty)' });
+        passByCall.delete(callId);
         break;
       }
       case 'assistant/message': {
@@ -189,13 +210,19 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
     const name = (s.session ?? 'session').replace(/^community-/, '');
     const decisions = Object.entries(s.answeredBy).filter(([, n]) => n > 0).map(([k, n]) => `${k}:${n}`).join(' ') || 'none';
     L.push(`  ${name}`);
-    L.push(`    turns ${s.turns} · acts ${s.steps} · forum posts ${s.forumPosts.length} · tokens ${s.usage.inputTokens + s.usage.outputTokens}`);
+    L.push(`    turns ${s.turns} · acts ${s.steps} · forum posts ${s.forumPosts.length} · pass calls ${s.passCalls.length} · tokens ${s.usage.inputTokens + s.usage.outputTokens}`);
     L.push(`    tools: ${Object.entries(s.toolCalls).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(', ') || 'none'}`);
     if (s.approvals > 0 || s.watchVerdicts > 0) L.push(`    approvals asked ${s.approvals} — answered by: ${decisions}`);
     if (s.loopguardTrips > 0) L.push(`    LoopGuard trips: ${s.loopguardTrips} (the loop health spoke)`);
     if (s.askHuman.asked > 0) L.push(`    asked the human ${s.askHuman.asked}× — answered ${s.askHuman.answered}, timed out ${s.askHuman.timedOut}`);
     for (const p of s.forumPosts.slice(0, 3)) L.push(`      [${p.topic}] ${p.text}`);
     if (s.forumPosts.length > 3) L.push(`      … +${s.forumPosts.length - 3} more`);
+    if (s.passes.length || s.passRefused.length) {
+      L.push(`    passes recorded ${s.passes.length}, refused ${s.passRefused.length} (the result on the chain decides, not the call)`);
+    }
+    for (const p of s.passes.slice(0, 3)) L.push(`      pass: ${p.reason}`);
+    if (s.passes.length > 3) L.push(`      … +${s.passes.length - 3} more pass(es)`);
+    for (const p of s.passRefused.slice(0, 3)) L.push(`      pass refused: ${p.reason}`);
   }
   // the forum
   L.push('');

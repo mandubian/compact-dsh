@@ -26,6 +26,10 @@ function buildState(dir) {
     JSON.stringify({ type: 'user/message', data: { source: { kind: 'compact-community' } }, session: 'community-editor' }),
     row('turn/end', { turn: 1 }),
     row('tool/call', { name: 'forum_post', arguments: JSON.stringify({ topic: 'nightly-digest', text: 'the line is set: lead with the escalation' }) }),
+    row('tool/call', { callId: 'p1', name: 'forum_pass', arguments: JSON.stringify({ reason: 'nothing new to add; the digest carries my position' }) }),
+    row('tool/result', { message: { toolCallId: 'p1', content: [{ type: 'text', text: '[forum] pass recorded — not a post.' }] } }),
+    row('tool/call', { callId: 'p2', name: 'forum_pass', arguments: JSON.stringify({ reason: '   ' }) }),
+    row('tool/result', { message: { toolCallId: 'p2', content: [{ type: 'text', text: '[forum] not passed: a pass needs a reason' }] } }),
     row('tool/call', { name: 'ask_human', arguments: JSON.stringify({ question: 'ship or hold?' }) }),
     row('user/message', { source: { kind: 'compact-community', summary: 'ask_human answered' }, content: [{ type: 'text', text: '[ask_human] The Principal answered:\nship it' }] }),
     row('user/message', { source: { kind: 'compact-approval', summary: 'Night watch: "curl" allowed (judge) — under grant sg_a1' }, content: [{ type: 'text', text: 'Motivation: the edge is a date param, non-credential' }] }),
@@ -77,8 +81,14 @@ test('agentStatsFromLog: turns, speech, decisions, and the ask_human outcome', (
     const editor = agentStatsFromLog(readFileSync(byDir.get('community-editor')));
     assert.equal(editor.turns, 2);
     assert.equal(editor.toolCalls.forum_post, 1);
+    assert.equal(editor.toolCalls.forum_pass, 2);
     assert.equal(editor.forumPosts[0].topic, 'nightly-digest');
     assert.match(editor.forumPosts[0].text, /lead with the escalation/);
+    assert.equal(editor.passCalls.length, 2, 'both calls are visible as attempts');
+    assert.equal(editor.passes.length, 1, 'only the result on the chain makes a pass accepted');
+    assert.equal(editor.passRefused.length, 1, 'a refused pass is named as refused, not counted as a pass');
+    assert.match(editor.passes[0].reason, /nothing new to add/);
+    assert.equal(editor.passRefused[0].reason, '(empty)');
     assert.equal(editor.answeredBy.watch, 1);
     assert.equal(editor.watchVerdicts, 1);
     assert.equal(editor.askHuman.asked, 1);
@@ -111,7 +121,10 @@ test('the ledger and the store read back; the report states the negative space',
     assert.equal((text.match(/^  state: /gm) ?? []).length, 1, 'the state line prints once');
     assert.match(text, /THE MEMBERS \(2 session log\(s\)\)/);
     assert.match(text, /editor/);
-    assert.match(text, /turns 2 · acts 2 · forum posts 1/);
+    assert.match(text, /turns 2 · acts 4 · forum posts 1 · pass calls 2/);
+    assert.match(text, /passes recorded 1, refused 1 \(the result on the chain decides, not the call\)/);
+    assert.match(text, /pass: nothing new to add; the digest carries my position/);
+    assert.match(text, /pass refused: \(empty\)/);
     assert.match(text, /approvals asked 1 — answered by: operator:1/);
     assert.match(text, /asked the human 1× — answered 1, timed out 0/);
     assert.match(text, /THE FORUM \(1 post\(s\)\)/);
@@ -122,6 +135,25 @@ test('the ledger and the store read back; the report states the negative space',
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('the pass overflow stays attached to the passes it summarizes', () => {
+  const lines = [];
+  for (let i = 1; i <= 4; i += 1) {
+    lines.push(row('tool/call', { callId: `p${i}`, name: 'forum_pass', arguments: JSON.stringify({ reason: `quiet ${i}` }) }));
+    lines.push(row('tool/result', { message: { toolCallId: `p${i}`, content: [{ type: 'text', text: '[forum] pass recorded — not a post.' }] } }));
+  }
+  lines.push(row('tool/call', { callId: 'p5', name: 'forum_pass', arguments: JSON.stringify({ reason: 'nope' }) }));
+  lines.push(row('tool/result', { message: { toolCallId: 'p5', content: [{ type: 'text', text: '[forum] not passed: a pass needs a reason' }] } }));
+  const stats = agentStatsFromLog(lines.join('\n'), 'community-quiet');
+  const text = formatReport({
+    paths: { recordRoot: '/tmp/run/state/sessions', keyring: '/tmp/run/state/keyring', chainDir: '/tmp/run/state/chains' },
+    logs: [], statsByLog: [stats], forum: [], grants: { rows: [], revoked: [] },
+  });
+  const overflow = text.indexOf('… +1 more pass(es)');
+  const refused = text.indexOf('pass refused: nope');
+  assert.ok(overflow >= 0, 'the overflow line is printed');
+  assert.ok(refused > overflow, 'the overflow line stays with the passes, before the refused list');
 });
 
 test('an empty run reports its silences instead of omitting them', () => {

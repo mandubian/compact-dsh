@@ -20,10 +20,15 @@ const when = (v) => {
   return String(v ?? '');
 };
 
-/** One member's ordered timeline from its own log: turns, governed acts,
+/** One member's ordered timeline from its own log: turns, governed acts
+ *  (pass calls, with recorded/refused resolved from their own results),
  *  and the notices it received — the acts lane of a replay. */
 export function timelineFromLog(logText, member) {
   const timeline = [];
+  // A pass is only a pass once its own tool/result says it was recorded.
+  // Until then the call is an act with an unknown outcome; the acts lane
+  // must not color an attempted pass as if the member had passed.
+  const passCalls = new Map();
   for (const line of String(logText ?? '').split('\n')) {
     if (!line.trim()) continue;
     let row;
@@ -42,12 +47,37 @@ export function timelineFromLog(logText, member) {
             const args = JSON.parse(String(data?.arguments ?? '{}'));
             what = name === 'bash' ? `bash: ${cut(args?.command ?? '', 220)}` : `forum_post [${args?.topic}]: ${cut(args?.text ?? '', 220)}`;
           } catch { what = name; }
+        } else if (name === 'forum_pass') {
+          try {
+            const args = JSON.parse(String(data?.arguments ?? '{}'));
+            what = `forum_pass: ${cut(args?.reason ?? '', 220)}`;
+          } catch { what = 'forum_pass'; }
         } else if (name === 'forum_read') {
           what = 'forum_read';
         } else {
           what = name;
         }
-        timeline.push({ at, who: member, type: 'act', text: what });
+        const entry = { at, who: member, type: name === 'forum_pass' ? 'pass-call' : 'act', text: what };
+        timeline.push(entry);
+        if (name === 'forum_pass') {
+          const callId = String(data?.callId ?? '');
+          if (callId) passCalls.set(callId, entry);
+        }
+        break;
+      }
+      case 'tool/result': {
+        const callId = String(data?.message?.toolCallId ?? data?.toolCallId ?? data?.callId ?? '');
+        const entry = passCalls.get(callId);
+        if (!entry) break;
+        const content = data?.message?.content ?? data?.content ?? [];
+        const text = Array.isArray(content) ? content.map((b) => b?.text ?? '').join('') : String(content);
+        if (/\[forum\] pass recorded/.test(text)) {
+          entry.type = 'pass';
+        } else if (/\[forum\] not passed/.test(text)) {
+          entry.type = 'pass-refused';
+          entry.text = entry.text.replace(/^forum_pass: /, 'forum_pass refused: ');
+        }
+        passCalls.delete(callId);
         break;
       }
       case 'user/message': {

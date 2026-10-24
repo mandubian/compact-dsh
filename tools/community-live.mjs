@@ -450,10 +450,12 @@ async function main() {
       port: Number(flag('port') ?? 3090),
       charterName: charter.name,
     });
-    // the page's feed: forum posts as they land, and the notices members
-    // receive (watch verdicts, loopguard) read off session events — the
-    // same shapes the after-run report reads
+    // the page's feed: forum posts as they land, passes as the members
+    // record them (a pass is not speech and never reaches another member),
+    // and the notices members receive (watch verdicts, loopguard) read off
+    // session events — the same shapes the after-run report reads
     ctx.get('compact-forum')?.onPost?.((post) => publishSafe({ type: 'forum-post', id: post.id, topic: post.topic, by: post.by, text: post.text }));
+    ctx.get('compact-forum')?.onPass?.((pass) => publishSafe({ type: 'forum-pass', by: pass.by, reason: pass.reason }));
     SAY(`observatory (loopback, boot-token): ${observatory.url} — the forum live, the acts as they happen, and what waits for you`);
   }
 
