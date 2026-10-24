@@ -6,9 +6,16 @@
 // per-topic counter: `since` reads stay a single monotonic number per member
 // regardless of how many topics they follow, and the ledger beside the
 // chains is one append-only file in posting order.
+//
+// A PASS is not a post. It is a member's declared choice not to speak this
+// turn: it enters no topic, has no fp_ number, never appears in forum_read,
+// and is never appended to the speech ledger. Its record is the tool
+// call/result pair on the member's own chain — the same place every other
+// governed act lives.
 
 export const TOPIC_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 export const MAX_POST_CHARS = 8000;
+export const MAX_PASS_REASON_CHARS = 2000;
 export const DEFAULT_READ_LIMIT = 50;
 export const MAX_READ_LIMIT = 200;
 
@@ -105,6 +112,19 @@ export function postText(text) {
     throw new Error(`a post is at most ${MAX_POST_CHARS} characters (got ${text.length}) — split it, or say it once and cite the record`);
   }
   return text;
+}
+
+/** A pass is a choice, not an absence: the reason is required, and it is
+ *  bounded so a pass does not become an essay by another route. The caller
+ *  renders the rule; nothing is silently repaired. */
+export function passReason(reason) {
+  if (typeof reason !== 'string' || !reason.trim()) {
+    throw new Error('a pass needs a reason — say why you are not posting this turn');
+  }
+  if (reason.length > MAX_PASS_REASON_CHARS) {
+    throw new Error(`a pass reason is at most ${MAX_PASS_REASON_CHARS} characters (got ${reason.length}) — say it once, plainly`);
+  }
+  return reason;
 }
 
 export function renderPost(post) {

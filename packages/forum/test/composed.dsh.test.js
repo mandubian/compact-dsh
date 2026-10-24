@@ -3,7 +3,7 @@
 // names the citation coordinates judicature accepts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -54,10 +54,11 @@ const call = (tools, name, args, agent) => tools.execute({
 });
 const text = (r) => String(r?.value ?? r ?? '');
 
-test('composed: both tools are registered in the real tool registry, ungated', async () => {
+test('composed: all three tools are registered in the real tool registry, ungated', async () => {
   const { tools } = await boot();
-  for (const n of ['forum_post', 'forum_read']) assert.ok(tools.get(n), `${n} is reachable`);
+  for (const n of ['forum_post', 'forum_pass', 'forum_read']) assert.ok(tools.get(n), `${n} is reachable`);
   assert.match(tools.get('forum_post').description, /lands on YOUR record/i);
+  assert.match(tools.get('forum_pass').description, /NOT a forum post/i);
 });
 
 test('composed: two members post to one topic and each reads the other', async () => {
@@ -82,6 +83,50 @@ test('composed: two members post to one topic and each reads the other', async (
   assert.match(since, /fp_2 ·/);
 });
 
+test('composed: a pass is a governed act, not a post — no topic, no ledger, no attention', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'forum-ledger-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const ledgerPath = join(dir, 'forum.jsonl');
+  const { tools, agents, service } = await boot({ ledgerPath });
+  const quiet = agents.add('session-quiet');
+  const other = agents.add('session-other');
+  const seen = [];
+  service.onPass((p) => seen.push(p));
+  service.onPass(() => { throw new Error('reader crashed'); });
+  const out = text(await call(tools, 'forum_pass', { reason: 'nothing new to add; my position is on the record' }, quiet));
+  assert.match(out, /\[forum\] pass recorded — not a post/);
+  assert.match(out, /entered no topic/);
+  assert.match(out, /governed act on your record \(session-quiet\)/);
+  assert.match(out, /cite it as session-quiet:<fromSeq>-<toSeq>/);
+  assert.match(out, /Reason: nothing new to add; my position is on the record/);
+  assert.equal(service.forum.posts.length, 0, 'a pass is not a post');
+  assert.deepEqual(service.forum.stats(), { topics: 0, posts: 0 }, 'a pass creates no topic');
+  assert.equal(service.snapshot().stats.posts, 0);
+  assert.equal(seen.length, 1, 'the live reader saw exactly one pass');
+  assert.equal(seen[0].kind, 'pass');
+  assert.equal(seen[0].by, 'session-quiet');
+  assert.equal(seen[0].reason, 'nothing new to add; my position is on the record');
+  assert.equal(quiet.injected.length, 0, 'the passer is not notified');
+  assert.equal(other.injected.length, 0, 'no member’s attention is touched');
+  assert.equal(existsSync(ledgerPath), false, 'a pass writes no forum ledger line');
+  const board = text(await call(tools, 'forum_read', {}, other));
+  assert.match(board, /no topics yet/);
+});
+
+test('composed: a pass without a reason is refused with the rule and records nothing', async () => {
+  const { tools, agents, service } = await boot();
+  const seen = [];
+  service.onPass((p) => seen.push(p));
+  const m = agents.add('session-quiet');
+  const empty = text(await call(tools, 'forum_pass', { reason: '   ' }, m));
+  assert.match(empty, /\[forum\] not passed: a pass needs a reason/);
+  const long = text(await call(tools, 'forum_pass', { reason: 'x'.repeat(2001) }, m));
+  assert.match(long, /\[forum\] not passed: a pass reason is at most 2000 characters/);
+  assert.equal(seen.length, 0, 'a refused pass never reaches the live reader');
+  assert.equal(service.forum.posts.length, 0);
+  assert.equal(service.snapshot().stats.posts, 0);
+});
+
 test('composed: the citation coordinates the post names are the shape judicature parses', async () => {
   const { tools, agents } = await boot();
   const m = agents.add('session-gamma');
@@ -102,9 +147,10 @@ test('composed: the ledger beside the chains gets one JSONL line per post', asyn
   const m1 = agents.add('s1');
   const m2 = agents.add('s2');
   await call(tools, 'forum_post', { topic: 'a', text: 'one' }, m1);
+  await call(tools, 'forum_pass', { reason: 'nothing to add between the two posts' }, m1);
   await call(tools, 'forum_post', { topic: 'b', text: 'two' }, m2);
   const lines = readFileSync(ledgerPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
-  assert.equal(lines.length, 2);
+  assert.equal(lines.length, 2, 'the pass is not a ledger row');
   assert.equal(lines[0].id, 'fp_1');
   assert.equal(lines[0].by, 's1');
   assert.equal(lines[1].topic, 'b');

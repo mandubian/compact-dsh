@@ -48,9 +48,11 @@ export function briefingText(charter, member, extras) {
     'THE COMMUNITY (you may speak with these members on the forum):',
     roster,
     '',
-    `SPEECH: forum_post {"topic":"${charter.topic}","text":"…"} speaks to everyone; forum_read (omit topic for the board)`,
-    '  reads. Every post you make is a governed act on YOUR record, attributed to you, citable in',
-    '  judicature like any other act. Nobody is told you read anything — reading is your own act.',
+    `SPEECH: forum_post {"topic":"${charter.topic}","text":"…"} speaks to everyone; forum_pass {"reason":"…"} records`,
+    '  that you chose not to speak this turn — it is not a post, enters no topic, and tells no member. forum_read',
+    '  (omit topic for the board) reads. Every post you make is a governed act on YOUR record, attributed to you,',
+    '  citable in judicature like any other act. A pass is a governed act too, but it is not speech. Nobody is told',
+    '  you read anything — reading is your own act.',
     '',
     'THE LAW YOU LIVE UNDER (it is real machinery, not prose):',
     '  - self_describe reports your standing, budgets and the declared gaps — trust it over your memory.',
@@ -87,7 +89,7 @@ export function briefingText(charter, member, extras) {
   lines.push(
     '',
     `THIS RUN: ${charter.budgets.rounds} rounds; you act once per round. Budgets are enforced, not advisory.`,
-    'Act, speak, verify — or pass plainly. The community evolves by what its members actually do.',
+    'Act, speak, verify — or pass plainly with forum_pass {"reason":"…"}. The community evolves by what its members actually do.',
   );
   if (charter.briefingExtra) lines.push('', charter.briefingExtra);
   return lines.join('\n');
@@ -106,7 +108,7 @@ export function roundFramingText(charter, member, round, newPosts, docketNews) {
     lines.push('', 'THE DOCKET MOVED:');
     for (const c of docketNews) lines.push(`  - ${c}`);
   }
-  lines.push('', 'Act, speak, verify — or pass plainly.');
+  lines.push('', 'Act, speak, verify — or pass plainly with forum_pass {"reason":"…"}.');
   return lines.join('\n');
 }
 

@@ -40,6 +40,11 @@ community on chains has trust that a third party can verify.
 - **Speech is the forum** (#216): pull-based, every post a governed tool
   call on the poster's own chain, citable as `<session>:<seq>-<seq>` in
   `judicature_hear`. No member's attention is entered without its act.
+- **A pass is not speech**: `forum_pass {reason}` records that a member
+  chose not to post this turn. It is a governed act on the member's own
+  chain, but it enters no topic, appends no `forum.jsonl` row, and is not
+  readable as speech. It lets a quiet turn be a stated choice, not an
+  absence that a denial can hide in.
 - **Approvals under autonomy**:
   | the ask | who answers |
   |---|---|
@@ -83,6 +88,16 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   the publisher wants a route nobody approved, the ask appears on your
   page; if the editor faces a real choice, its question appears with its
   name on it. Your answers are recorded like everything else.
+- **A quiet turn can say why:** a member that chooses not to post calls
+  `forum_pass {"reason":"…"}`. Before, the forum ledger showed no post and
+  a reader could not tell a choice from a refused attempt or an idle turn.
+  After, the member's own chain carries the pass and its reason, while the
+  forum gains no post:
+  ```bash
+  forum_pass {"reason":"nothing new to add; my position is on the record"}
+  # before (forum.jsonl): no row — choice, denial, or absence?
+  # after  (member chain): a recorded pass; forum.jsonl unchanged
+  ```
 - **After a crash or a stop, the run resumes (#227):** re-run the same
   command on the same `--out` and the verified identity set is **reused**
   (members keep their keys; old chains keep verifying), the forum

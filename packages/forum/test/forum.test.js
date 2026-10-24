@@ -3,8 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  Forum, normalizeTopic, postText, renderBoard, renderRead,
-  TOPIC_PATTERN, MAX_POST_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  Forum, normalizeTopic, postText, passReason, renderBoard, renderRead,
+  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
 } from '../src/forum.js';
 
 
@@ -53,6 +53,21 @@ test('post text: empty refused, over-long refused with the honest count', () => 
   assert.throws(() => postText(' '.repeat(10)), /needs text/);
   const long = 'x'.repeat(MAX_POST_CHARS + 1);
   assert.throws(() => postText(long), new RegExp(`at most ${MAX_POST_CHARS} characters.*got ${MAX_POST_CHARS + 1}`));
+});
+
+test('pass reason: required, bounded, returned unchanged — a pass is not a post', () => {
+  assert.equal(passReason('nothing new to add'), 'nothing new to add');
+  assert.equal(passReason('  keep my spacing  '), '  keep my spacing  ');
+  for (const bad of [undefined, null, '', '   ', 42, {}]) {
+    assert.throws(() => passReason(bad), /a pass needs a reason/, JSON.stringify(bad));
+  }
+  const long = 'x'.repeat(MAX_PASS_REASON_CHARS + 1);
+  assert.throws(() => passReason(long), new RegExp(`at most ${MAX_PASS_REASON_CHARS} characters.*got ${MAX_PASS_REASON_CHARS + 1}`));
+  // The pure model has no pass-as-post path: posts remain the only sequence.
+  const f = new Forum();
+  assert.equal(f.posts.length, 0);
+  assert.deepEqual(f.read({}), []);
+  assert.deepEqual(f.stats(), { topics: 0, posts: 0 });
 });
 
 test('board: most recently active first, with counts and last post', () => {

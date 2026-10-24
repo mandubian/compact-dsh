@@ -102,6 +102,9 @@ test('the briefing names the member, the goal verbatim, the forum topic, and the
   assert.match(text, /THE GOAL \(the community's own, verbatim\):/);
   assert.match(text, /Produce and publish the nightly digest/);
   assert.match(text, /forum_post \{"topic":"newsroom-floor"/);
+  assert.match(text, /forum_pass \{"reason":"…"\} records/);
+  assert.match(text, /it is not a post, enters no topic, and tells no member/);
+  assert.match(text, /pass plainly with forum_pass \{"reason":"…"\}/);
   assert.match(text, /self_describe reports your standing/);
   assert.match(text, /judicature_hear files a case/);
   assert.match(text, /tamper-evident record attributed to you/);
