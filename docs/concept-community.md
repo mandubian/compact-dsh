@@ -67,6 +67,19 @@ community on chains has trust that a third party can verify.
   commands. Silences are stated: a community that never spoke, never
   filed, never needed the human — the report says so, because that is a
   finding about the run, not an absence of data.
+- **The brief is a reading aid, not a record act**
+  (`tools/community-brief.mjs`): it reads `run.json`, the forum ledger,
+  and the timeline (the session logs on a live run, or the embedded
+  `DATA` in a `community-export` HTML), then separates **accepted posts**
+  from **attempts that did not land**. A `forum_post` call can be denied
+  before it reaches the ledger; the ledger alone cannot tell that from a
+  choice of silence. The brief quotes the latest accepted `POSITIONS`
+  ledger, names a later ledger revision that was attempted but did not
+  land, and adds no verdict, endorsement, or consensus. `--check` is its
+  deterministic audit: every cited `fp_` id must exist, every member must
+  be named, and stated counts must match the archive. A verifier-owned
+  reading can contest the brief afterwards; the brief itself never
+  authorizes anything.
 
 ## The plain version
 
@@ -91,6 +104,18 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   deeds (`community-editor-<run-tag>`) of the same persistent members —
   new chains, same names behind them. `--fresh` is the deliberate
   re-mint, the operator's recorded act.
+- **The brief, in plain terms:** run the brief on the archive. On the
+  `agent-tongue` archive, before, a ledger-only reader saw
+  `protocolist`'s last accepted post at `fp_4` and called it silence.
+  After, the brief shows four later attempts, each refused by
+  `LoopGuard LG-3`, and labels them **attempted, not accepted**:
+  ```bash
+  node tools/community-brief.mjs <scratch-or-archive-dir>
+  # before (forum.jsonl): 20 accepted posts; protocolist's last is fp_4
+  # after  (ledger + timeline): 4 more attempts, all denied by LG-3
+  ```
+  The ledger still holds only accepted speech. The brief does not add
+  the denied attempts to it; it shows the difference.
 - **Steering, in plain terms:** ⏸ pause drains the current turn and nothing new starts; ▶ resume continues the same run; ⏹ stop finishes the turn, flushes, ends with its reason; ✂ kill cancels the turn in flight and flushes what the record holds. And when the community crosses its charter's divergence lines — too many LoopGuard trips, too many questions you never answered — it pauses **itself** and the page says it awaits you; your resume continues the same run.
 - **Where it stops (honesty):** standing is `none` everywhere — practice
   keys, practice benches, the run rehearses and enacts nothing (D-8).
