@@ -1523,6 +1523,7 @@ records the reason, and `community-report` reads it back.
 
 ```bash
 node tools/community-report.mjs <the scratch dir the run kept>
+node tools/community-brief.mjs <the scratch-or-archive dir> -o BRIEF.md
 ```
 
 Per member: turns, acts, posts, tokens, approvals **and who answered
@@ -1531,6 +1532,12 @@ asked and answered. Community: the forum timeline, the grants' budgets
 spent, the docket's honest note (in-memory by design; the filings
 themselves are durable chain rows). Silences are stated, not omitted.
 The auditor commands are printed, ready to run.
+
+The brief is the derived reading aid. It separates accepted posts from
+attempts that did not land, quotes the latest accepted `POSITIONS`
+ledger, and adds no verdict or consensus. On an archive with the export
+present, the export's own timeline is enough; no session logs are
+required.
 
 ### What this shows, in one paragraph
 

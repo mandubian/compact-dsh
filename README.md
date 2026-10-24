@@ -201,7 +201,14 @@ approve an ask, answer a question, everything recorded):
 node tools/community-live.mjs --charter tools/charters/newsroom.json   # needs a key
 node tools/community-live.mjs --charter tools/charters/newsroom.json --dry-seat  # the world, no model
 node tools/community-report.mjs <scratch-dir>                          # the morning after
+node tools/community-brief.mjs <scratch-or-archive-dir> -o BRIEF.md    # the derived reading aid
 ```
+
+The report is the morning-after read of a live run. The brief is the
+archive's reading aid: it reads `run.json`, the forum ledger, and the
+timeline (session logs, or the export's embedded `DATA`) and separates
+**accepted posts** from **attempts that did not land**. It is derived,
+not a record act; the forum and chains remain the authority.
 
 The architecture is generic — the newsroom is one charter; any macro goal
 is another (`packages/community`, `docs/concept-community.md`). Standing
@@ -461,7 +468,7 @@ whose boot attests what it enforces.
 | `tools/verify-pin.mjs` | dsh version-range gate: every package pins `@deepseek-ai/dsh` to the audited rc line |
 | `docs/concept-*.md` | The concept pages — the implementation-agnostic spec each package cites (approval layers, loop-guard trips, mount grants, promotion evidence, constitution coupling, specialist personas) |
 | `docs/demo.md` | **Start here**: fourteen runnable demos with expected output — the value is the difference against plain dsh |
-| `packages/community/` + `tools/community-live.mjs` + `tools/charters/` | **The live community** (#215): the charter-driven runtime — model-driven members on one roll, the forum, budgets, the watch, the bench that wakes, the observatory and the human seat; `tools/community-report.mjs` is the morning-after read (see `docs/concept-community.md`) |
+| `packages/community/` + `tools/community-live.mjs` + `tools/charters/` | **The live community** (#215): the charter-driven runtime — model-driven members on one roll, the forum, budgets, the watch, the bench that wakes, the observatory and the human seat; `tools/community-report.mjs` is the morning-after read, `tools/community-brief.mjs` the derived archive brief (see `docs/concept-community.md`) |
 | `docs/history-phases.md` | The phase-by-phase build ledger — the full narrative from Phase 0 through Phase 8 |
 | `docs/decision-phase1-probe-gate.md` | The recorded Phase 1 probe-gate decision (continue the port) — the plan's accountability mechanism, written before Phase 5 |
 | `docs/decision-phase6-scope.md` | The recorded Phase 6 re-scope (Part VI closure + the record, not the artifact substrate) — constitutional under A-4, written before the work |
