@@ -10,7 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  resolveBriefPaths, parseEmbeddedArchive, readBriefSources, renderBrief, auditBrief,
+  resolveBriefPaths, readBriefSources, renderBrief, auditBrief,
 } from './community-brief.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
