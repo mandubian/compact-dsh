@@ -25,6 +25,31 @@ const samples = [
 
 const links = (html) => [...html.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
 
+/** Execute a shipped export's embedded renderer against a stub DOM and
+ *  return the three panes. The regression this gates is real: an early
+ *  export embedded epoch-millisecond timestamps and a renderer that
+ *  sliced them as strings — the first act threw, and the acts and
+ *  members panes shipped empty behind a forum that rendered fine. */
+const renderExport = (html) => {
+  const script = html.match(/<script>\n([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script, 'the export embeds its renderer');
+  const els = new Map();
+  const pane = (id) => {
+    const el = {
+      id, children: [], innerHTML: '', textContent: '', className: '',
+      appendChild(child) { this.children.push(child); },
+    };
+    els.set(id, el);
+    return el;
+  };
+  for (const id of ['meta', 'forum-list', 'acts-list', 'members']) pane(id);
+  new Function('document', script)({
+    getElementById: (id) => els.get(id) ?? pane(id),
+    createElement: () => ({ innerHTML: '', className: '', appendChild() {} }),
+  });
+  return { meta: els.get('meta'), forum: els.get('forum-list'), acts: els.get('acts-list'), members: els.get('members') };
+};
+
 test('the Pages source is static: no build step, no Jekyll', () => {
   for (const file of ['index.html', 'samples.html', 'site.css', '.nojekyll',
     'assets/why-compact-dsh.svg', 'assets/one-tool-call.svg']) {
@@ -62,6 +87,17 @@ test('each sample export is self-contained', () => {
     assert.doesNotMatch(html, /<script[^>]+\bsrc=/i, `${sample.html} loads a remote script`);
     assert.doesNotMatch(html, /<link[^>]+\bhref=/i, `${sample.html} loads a remote stylesheet`);
     assert.doesNotMatch(html, /@import\s+url\(/i, `${sample.html} imports remote CSS`);
+  }
+});
+
+test('each sample export renders its forum, its acts and its members', () => {
+  for (const sample of samples) {
+    const html = readFileSync(join(docs, sample.html), 'utf8');
+    const panes = renderExport(html);
+    assert.ok(panes.forum.children.length > 0, `${sample.html}: the forum pane is empty`);
+    assert.ok(panes.acts.children.length > 0, `${sample.html}: the acts pane is empty`);
+    assert.match(panes.members.innerHTML, /<td>/, `${sample.html}: the members pane is empty`);
+    assert.match(panes.meta.textContent, /run /, `${sample.html}: the run header is empty`);
   }
 });
 
