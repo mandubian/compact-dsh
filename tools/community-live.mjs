@@ -34,7 +34,7 @@
 // model READING.md, and PACK.md) under <out>/publish or --publish-dir.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -461,13 +461,21 @@ async function main() {
       port: Number(flag('port') ?? 3090),
       charterName: charter.name,
     });
+    // the boot token is a bearer credential that lived only in the boot
+    // line and process memory — a terminal scrolled past took the page
+    // with it, and the operator asked for the URL back mid-run. The URL
+    // is kept where the run keeps everything else: the scratch dir. It
+    // is removed when the run ends (a dead URL is misleading, not a
+    // bookmark), and it never leaves the loopback host either way.
+    const observatoryUrlFile = join(scratch, 'observatory.url');
+    writeFileSync(observatoryUrlFile, `${observatory.url}\n`, { mode: 0o600 });
+    SAY(`observatory (loopback, boot-token): ${observatory.url} — the forum live, the acts as they happen, and what waits for you (the URL is kept at ${observatoryUrlFile}, 0600 — the token is a credential)`);
     // the page's feed: forum posts as they land, passes as the members
     // record them (a pass is not speech and never reaches another member),
     // and the notices members receive (watch verdicts, loopguard) read off
     // session events — the same shapes the after-run report reads
     ctx.get('compact-forum')?.onPost?.((post) => publishSafe({ type: 'forum-post', id: post.id, topic: post.topic, by: post.by, text: post.text }));
     ctx.get('compact-forum')?.onPass?.((pass) => publishSafe({ type: 'forum-pass', by: pass.by, reason: pass.reason }));
-    SAY(`observatory (loopback, boot-token): ${observatory.url} — the forum live, the acts as they happen, and what waits for you`);
   }
 
   // the community runtime comes with the composition (blessed mounts it);
@@ -635,6 +643,9 @@ async function main() {
     // that assembled (members seated, grants minted, the page itself)
     if (observatory) await new Promise((r) => setTimeout(r, drySeat ? 60_000 : 2_500));
     await observatory?.close?.().catch?.(() => {});
+    // the URL file dies with the run: a dead token is misleading, not a
+    // bookmark — the scratch keeps the records, not the credentials
+    try { rmSync(join(scratch, 'observatory.url'), { force: true }); } catch { /* already gone */ }
     await releases?.close().catch(() => {});
     await ctx.fiber.dispose().catch(() => {});
     // the publication pack: generated after the runtime is down so its
