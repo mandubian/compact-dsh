@@ -538,6 +538,12 @@ async function main() {
       const continuedFrom = continuationOf(previousRun, runTag);
       const manifest = {
         charter: charter.name, runTag, resumed,
+        // the archive must say WHAT was debated, not just that it was: the
+        // goal verbatim, the topic, and the seats with their routes — a
+        // reader who has only this file knows the question (the operator's
+        // finding: the exports showed the debate but never the charter)
+        goal: charter.goal, topic: charter.topic,
+        seats: charter.members.map((m) => ({ id: m.id, model: m.model ? `${m.model.provider}/${m.model.model}` : null, bench: m.bench === true, persona: m.persona })),
         endedAt: new Date().toISOString(),
         endReason: runStats?.endReason ?? (exitCode ? 'failed' : 'unknown'),
         rounds: runStats?.rounds ?? 0, turns: runStats?.turns ?? 0,

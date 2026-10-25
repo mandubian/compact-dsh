@@ -18,7 +18,7 @@ const stubDocument = () => {
     els.set(id, el);
     return el;
   };
-  for (const id of ['meta', 'forum-list', 'acts-list', 'members']) make(id);
+  for (const id of ['meta', 'charter', 'forum-list', 'acts-list', 'members']) make(id);
   return {
     els,
     getElementById: (id) => els.get(id) ?? make(id),
@@ -97,6 +97,39 @@ test('empty lanes say so instead of rendering nothing', () => {
   const doc = render(html);
   assert.match(doc.els.get('forum-list').innerHTML, /the forum never spoke/);
   assert.match(doc.els.get('acts-list').innerHTML, /no acts recorded/);
+});
+
+test('the charter rides with the archive: the goal renders, legacy archives render no block', () => {
+  // the operator's finding: the exports showed the debate but never the
+  // question — a reader needed the repo's charter JSON. Newer manifests
+  // carry goal/topic/seats and the replay renders them; the old ones stay
+  // silent (an absence, honestly stated, never a fake).
+  const withGoal = replayPageHtml({
+    charterName: 'page-test',
+    data: {
+      run: {
+        charter: 'page-test', runTag: 'g1', endReason: 'rounds complete',
+        goal: "Deliberate this question: 'what is debated?'",
+        seats: [
+          { id: 'frugal', model: 'zai/glm-5.3-flash', bench: false, persona: 'the cheap many' },
+          { id: 'bench-1', model: 'zai/glm-5.3', bench: true, persona: 'the heavy seat' },
+        ],
+      },
+      forum: [], timeline: [], members: [],
+    },
+  });
+  const doc = render(withGoal);
+  const charter = doc.els.get('charter');
+  assert.match(charter.innerHTML, /THE CHARTER — the goal, verbatim/);
+  assert.match(charter.innerHTML, /what is debated\?/);
+  assert.match(charter.innerHTML, /<b>frugal<\/b> \(zai\/glm-5\.3-flash\) — the cheap many/);
+  assert.match(charter.innerHTML, /<b>bench-1<\/b> \(zai\/glm-5\.3\) · bench — the heavy seat/);
+  assert.match(charter.innerHTML, /what each member is FOR/, 'the seats line says the roles are shown');
+  assert.doesNotMatch(charter.innerHTML, /operator's charter file/, 'a manifest goal is labeled as the manifest record');
+
+  const legacy = replayPageHtml({ charterName: 'page-test', data: archive });
+  const docLegacy = render(legacy);
+  assert.equal(docLegacy.els.get('charter').innerHTML, '', 'a legacy archive renders no charter block');
 });
 
 test('member hues out-specify the generic who rule — the colors actually render', () => {
