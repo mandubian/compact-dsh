@@ -18,7 +18,7 @@ const stubDocument = () => {
     els.set(id, el);
     return el;
   };
-  for (const id of ['meta', 'charter', 'forum-list', 'acts-list', 'members']) make(id);
+  for (const id of ['meta', 'prov', 'charter', 'forum-list', 'acts-list', 'members']) make(id);
   return {
     els,
     getElementById: (id) => els.get(id) ?? make(id),
@@ -130,6 +130,37 @@ test('the charter rides with the archive: the goal renders, legacy archives rend
   const legacy = replayPageHtml({ charterName: 'page-test', data: archive });
   const docLegacy = render(legacy);
   assert.equal(docLegacy.els.get('charter').innerHTML, '', 'a legacy archive renders no charter block');
+});
+
+test('the code the community ran on is named: commit, repo, dirty — or the honest absence', () => {
+  // outputs never repeat (the nature of LLMs), but runs stay comparable
+  // when the tree that produced each is named. A checkout git cannot
+  // name says so; legacy archives say nothing at all.
+  const mk = (code) => replayPageHtml({
+    charterName: 'page-test',
+    data: {
+      run: {
+        charter: 'page-test', runTag: 'p1', endReason: 'rounds complete',
+        code,
+        runtime: { node: 'v22.19.0', image: 'dsh-tools:basic', imageDigest: 'sha256:abcd0123', law: '27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95' },
+      },
+      forum: [], timeline: [], members: [],
+    },
+  });
+  const clean = render(mk({ repo: 'git@github.com:mandubian/compact-dsh.git', ref: 'main', commit: '6954957aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }));
+  assert.match(clean.els.get('prov').textContent, /code: github\.com\/mandubian\/compact-dsh @ 6954957aaaa/);
+  assert.match(clean.els.get('prov').textContent, /law 27bb7078fe9a…/);
+  assert.match(clean.els.get('prov').textContent, /dsh-tools:basic · node v22\.19\.0/);
+  assert.doesNotMatch(clean.els.get('prov').textContent, /DIRTY/);
+
+  const dirty = render(mk({ commit: 'deadbeefdead', dirty: true }));
+  assert.match(dirty.els.get('prov').textContent, /deadbeefdead \(DIRTY TREE\)/);
+
+  const notGit = render(mk({ note: 'not a git checkout (or git absent) — the code state is not named' }));
+  assert.match(notGit.els.get('prov').textContent, /not a git checkout/);
+
+  const legacy = render(replayPageHtml({ charterName: 'page-test', data: archive }));
+  assert.equal(legacy.els.get('prov').textContent, '', 'a legacy archive renders no provenance line');
 });
 
 test('member hues out-specify the generic who rule — the colors actually render', () => {
