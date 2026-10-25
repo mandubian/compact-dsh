@@ -42,7 +42,7 @@ const renderExport = (html) => {
     els.set(id, el);
     return el;
   };
-  for (const id of ['meta', 'forum-list', 'acts-list', 'members']) pane(id);
+  for (const id of ['meta', 'charter', 'forum-list', 'acts-list', 'members']) pane(id);
   new Function('document', script)({
     getElementById: (id) => els.get(id) ?? pane(id),
     createElement: () => ({ innerHTML: '', className: '', appendChild() {} }),

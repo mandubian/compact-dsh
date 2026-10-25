@@ -325,6 +325,11 @@ export function replayPageHtml({ charterName, data }) {
   header b { color: #7fd1ff; }
   header .meta { color: #9ab; font-size: 12px; }
   header .muted { color: #666; font-size: 11.5px; }
+  .charter { margin-top: 6px; padding: 6px 10px; border-left: 3px solid #39424e; background: #161b21; font-size: 12px; color: #cdd6e0; white-space: pre-wrap; word-break: break-word; }
+  .charter .lbl { color: #9ab; font-weight: bold; letter-spacing: 0.06em; font-size: 11px; }
+  .charter .seats { margin-top: 6px; color: #9ab; font-size: 11.5px; }
+  .charter .seat { display: block; margin-top: 2px; color: #b8c2ce; }
+  .charter .seats b, .charter .seat b { color: #7fd1ff; }
   main { display: grid; grid-template-columns: 1.9fr 1fr; gap: 10px; padding: 10px; height: calc(100vh - 74px); box-sizing: border-box; }
   section { border: 1px solid #333; background: #161616; min-height: 0; display: flex; flex-direction: column; }
   h2 { font-size: 13px; margin: 0; padding: 8px 10px; background: #202020; border-bottom: 1px solid #333; text-transform: uppercase; letter-spacing: 0.08em; color: #9ab; }
@@ -366,6 +371,7 @@ export function replayPageHtml({ charterName, data }) {
 <header>
   community replay — <b>${safeName}</b>
   <div class="meta" id="meta"></div>
+  <div class="charter" id="charter"></div>
   <div class="muted">read-only replay from the durable artifacts — the chains remain the record of authority</div>
 </header>
 <main>
@@ -399,6 +405,23 @@ const modelTxt = !mod.model ? '' : ' · model ' + (new Set(routes).size > 1
 $('meta').textContent = (r.charter || '${safeName}') + ' · run ' + (r.runTag ?? '—') + (r.resumed ? ' (resumed)' : '') +
   ' · ended ' + (r.endedAt ?? '?') + ' · reason: ' + (r.endReason ?? '?') +
   ' · rounds ' + (r.rounds ?? 0) + ' · turns ' + (r.turns ?? 0) + ' · tokens ' + (r.tokens ?? 0) + modelTxt;
+
+// THE CHARTER — what was debated, carried in the archive itself (the
+// operator's finding: the exports showed the debate but never the
+// question, and a reader needed the repo's JSON to know it). Archives
+// from before the field render nothing here — the absence is honest.
+if (r.goal) {
+  // a seat is named, routed, and ROLED: the persona is what the member is
+  // FOR — without it a reader sees five names arguing and no idea which
+  // conviction each carries (the operator's second finding, same day)
+  const seats = (r.seats || []).map((s) =>
+    '<span class="seat"><b>' + esc(bare(s.id)) + '</b>' + (s.model ? ' (' + esc(s.model) + ')' : '') + (s.bench ? ' · bench' : '') +
+    (s.persona ? ' — ' + esc(s.persona) : '') + '</span>').join('');
+  $('charter').innerHTML = '<span class="lbl">THE CHARTER — the goal, verbatim' +
+    (r.charterSource === 'operator-file' ? ' (embedded from the operator\\'s charter file at export time)' : ' (as the run\\'s manifest recorded it)') + ':</span>\\n' +
+    esc(r.goal) +
+    (seats ? '<span class="seats">seats — what each member is FOR (the charter\\'s personas, verbatim):</span>' + seats : '');
+}
 
 // the forum's reading aids: a member keeps one color (hash of its name)
 // and a session id shows its member name — the run tag is per-run

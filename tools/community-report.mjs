@@ -47,6 +47,21 @@ export function resolveRunPaths(dir) {
   throw new Error(`${BIN} no run state under ${base} — pass the scratch dir the run kept (it holds state/{sessions,chains,approvals.json})`);
 }
 
+/** Word-wrap one long string for the fixed-width report. */
+function wrap(text, width) {
+  const out = [];
+  for (const paragraph of String(text).split('\n')) {
+    if (!paragraph.trim()) { out.push(''); continue; }
+    let line = '';
+    for (const word of paragraph.split(/\s+/)) {
+      if (line && line.length + 1 + word.length > width) { out.push(line); line = word; }
+      else line = line ? `${line} ${word}` : word;
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+
 /** Walk the record root for session logs (any nesting, the demo's shape). */
 export function findSessionLogs(recordRoot) {
   const logs = [];
@@ -191,6 +206,25 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
   L.push(`  state: ${paths.recordRoot.replace(/\/sessions$/, '')}`);
   if (run) {
     L.push(`  THE RUN: ${run.endReason}${run.runTag ? ` (run ${run.runTag}${run.resumed ? ', resumed' : ''})` : ''} — ended ${run.endedAt}`);
+    // the goal, verbatim, when the manifest carries it — a report a reader
+    // holds without the repo must still say WHAT was debated (the
+    // operator's finding: it did not)
+    if (run.goal) {
+      L.push('    THE GOAL (the charter, verbatim):');
+      for (const line of wrap(String(run.goal), 96)) L.push(`      ${line}`);
+    }
+    // the seats carry their roles: the persona is what each member is FOR
+    // — a report without it names five arguers and no convictions
+    if (Array.isArray(run.seats) && run.seats.length) {
+      L.push('    seats — what each member is FOR (the charter\'s personas):');
+      for (const s of run.seats) {
+        const head = `      ${s.id}${s.model ? ` (${s.model})` : ''}${s.bench ? ' [bench]' : ''}`;
+        if (!s.persona) { L.push(head); continue; }
+        const lines = wrap(String(s.persona), 92);
+        L.push(`${head} — ${lines[0]}`);
+        for (const extra of lines.slice(1)) L.push(`        ${extra}`);
+      }
+    }
     L.push(`    rounds ${run.rounds} · turns ${run.turns} · bench cases ${run.benchCasesSeen} · tokens ${run.tokens}${run.divergence ? ` · divergence lines: ${JSON.stringify(run.divergence)}` : ''}`);
     if (run.model?.model) {
       const routes = Object.values(run.model.members ?? {});
