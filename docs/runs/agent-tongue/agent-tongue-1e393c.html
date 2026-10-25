@@ -37,8 +37,11 @@
   li.post.ledger .gate { color: #ffb46b; font-weight: bold; letter-spacing: 0.06em; }
   li.post .body .cite { color: #7fd1ff; }
   li.post .body b { color: #ffd9a0; }
-  .c0 { color: #7fd1ff; } .c1 { color: #b6a2ff; } .c2 { color: #8be98b; } .c3 { color: #ffb46b; }
-  .c4 { color: #ff9ecb; } .c5 { color: #9be5d8; } .c6 { color: #e8d76b; } .c7 { color: #f2a2a2; }
+  /* the hues are scoped .who.cN deliberately: a bare .cN (0,1,0)
+     loses to the generic "li .who" (0,1,1) above and every member would
+     render one color — the Copilot finding on this very rule */
+  .who.c0 { color: #7fd1ff; } .who.c1 { color: #b6a2ff; } .who.c2 { color: #8be98b; } .who.c3 { color: #ffb46b; }
+  .who.c4 { color: #ff9ecb; } .who.c5 { color: #9be5d8; } .who.c6 { color: #e8d76b; } .who.c7 { color: #f2a2a2; }
   table { font-size: 12px; margin: 8px 10px; border-collapse: collapse; }
   td, th { padding: 3px 10px; text-align: left; border-bottom: 1px dotted #2a2a2a; }
   th { color: #9ab; }

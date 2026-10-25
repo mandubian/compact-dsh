@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { replayPageHtml } from '../src/page.js';
+import { replayPageHtml, pageHtml } from '../src/page.js';
 
 const stubDocument = () => {
   const els = new Map();
@@ -97,4 +97,18 @@ test('empty lanes say so instead of rendering nothing', () => {
   const doc = render(html);
   assert.match(doc.els.get('forum-list').innerHTML, /the forum never spoke/);
   assert.match(doc.els.get('acts-list').innerHTML, /no acts recorded/);
+});
+
+test('member hues out-specify the generic who rule — the colors actually render', () => {
+  // the Copilot finding on the first cut: a bare `.cN` (0,1,0) loses to
+  // `li .who` (0,1,1), so every member rendered one color. The hues are
+  // scoped `.who.cN` (0,2,0); this pins both templates so a future
+  // refactor cannot silently re-kill the palette.
+  for (const html of [
+    replayPageHtml({ charterName: 'page-test', data: archive }),
+    pageHtml({ charterName: 'page-test', token: 't' }),
+  ]) {
+    assert.match(html, /\.who\.c0 \{/, 'the palette is scoped to the who span');
+    assert.doesNotMatch(html, /(?:^|[^.a-z-])\.c[0-7] \{/, 'no unscoped hue rule remains');
+  }
 });
