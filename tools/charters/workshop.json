@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "name": "workshop",
+  "goal": "Build and ship one small artifact to the letter of sources/spec.md: an immutable-ledger module in plain Node, no dependencies. smith implements from the spec; prover writes its own tests under tests/ and runs them for real (node --test), posting the actual command and output as evidence — a test claim is the output, never a summary of it; reviewer reads the code against the spec and argues design and coverage on the forum with reasons, filing a case only when a dispute stays live after being argued; publisher packs exactly what the prover's output shows passing, writes the manifest with real sha256s and bylines, ships under the community's pre-minted grant, and verifies the round-trip byte-for-byte before claiming done. The session succeeds when: the prover's tests pass on what the publisher shipped, the manifest's sha256 matches the artifact bit-for-bit, and every reviewer concern is either answered on the forum or filed and judged. Bylines are real: whoever's work is in the artifact is named in the manifest.",
+  "topic": "workshop-floor",
+  "briefingExtra": "THE SPEC IS THE CONTRACT: sources/spec.md is the whole truth of what to build — nothing outside it is required, and nothing in it may be skipped. FILE LAYOUT: src/ledger.js is smith's; tests/ is the prover's own; staging/ is for packing. Run tests for real: `node --test tests/` in bash, and post the command with its actual output (the sandbox carries node when the operator baked the image with it — npm run compact:bake -- --packages \"curl,nodejs\"). EVIDENCE IS OUTPUT: a pass claimed without its posted command and output is not evidence. REVIEW IS ARGUMENT: reviewer states findings with reasons on the forum; smith answers by changing the code or by arguing back — a silent change is not an answer. PUBLISHING (publisher's): pack with tar czf staging/workshop.tgz src tests; sha256sum the artifact; write staging/manifest.json with the sha256, the spec digest (sha256sum sources/spec.md), and bylines naming who did what; PUT it under the community's grant; then GET the same route back and compare byte-for-byte — a publish nobody verified is not done. If a dispute stays live after two rounds of argument, either side may file with judicature_hear citing the record; the bench reads and judges what was filed.",
+  "budgets": { "rounds": 8, "maxTurnsPerAgent": 8, "wallClockMinutes": 45, "tokenCap": 1500000 },
+  "members": [
+    {
+      "id": "smith",
+      "prefix": "community-smith",
+      "persona": "implements from the spec: plain Node, no dependencies, minimal surface — code that the prover's tests, not its own confidence, must carry",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "prover",
+      "prefix": "community-prover",
+      "persona": "writes the tests the spec implies and runs them for real: the command and its actual output posted as evidence — never a summary, never a claim without its output",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "reviewer",
+      "prefix": "community-reviewer",
+      "persona": "reads the code against the spec and argues design and coverage with reasons: demands changes plainly, credits what is right, and files a case only when a dispute stays live after being argued",
+      "model": "zai/glm-5.3"
+    },
+    {
+      "id": "publisher",
+      "prefix": "community-publisher",
+      "persona": "the member whose acts publish: packs exactly what the prover's output shows passing, writes the manifest with real sha256s and bylines, ships under the grant, and verifies the round-trip byte-for-byte before saying done",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "bench-1",
+      "prefix": "community-bench-1",
+      "persona": "a member seated on the bench: judges only what is filed — the docket, counsel access to the cited acts, judgment with findings and reasons",
+      "model": "zai/glm-5.3",
+      "bench": true
+    }
+  ],
+  "grants": [
+    {
+      "pattern": "{{RELEASES_ORIGIN}}/",
+      "methodClass": "write",
+      "ttlMinutes": 90,
+      "maxUses": 30
+    }
+  ],
+  "sources": [
+    {
+      "path": "sources/spec.md",
+      "content": "# SPEC — ledger.js (v1)\n\nOne file, `src/ledger.js`. Plain Node, ES modules, **no dependencies**. Exports exactly:\n\n- `open()` → a fresh empty ledger handle.\n- `post(ledger, label, amountCents)` → a **NEW** ledger with one entry appended. `label` is a non-empty string; `amountCents` is an integer (0 is lawful — corrections post negations). The input ledger is **unchanged** — immutability is the contract, not a convention.\n- `balance(ledger)` → integer sum of all entry amounts. `balance(open())` is 0.\n- `entries(ledger)` → a frozen copy of the entries in post order.\n- `since(ledger, seq)` → the entries whose own seq is strictly greater than `seq`. Seqs are 1-based, assigned in post order; `since(ledger, 0)` returns everything.\n\nLaws that must hold:\n\n1. Posting never mutates: `post(l, ...)` leaves `l` exactly as it was, and two posts off the same ledger are independent branches.\n2. `entries()` returns a copy — mutating the result cannot corrupt the ledger.\n3. Every export above is present; **nothing else is exported** — the surface is the contract.\n\nNothing in this spec names performance, storage, or persistence. Do not add them."
+    }
+  ],
+  "publish": {
+    "note": "the artifact ships to the releases host as workshop.tgz with its manifest, under the community's pre-minted grant",
+    "route": "PUT {{RELEASES_ORIGIN}}/workshop/workshop.tgz"
+  },
+  "divergence": { "loopguardTrips": 6, "humanSeatTimeouts": 3 }
+}
