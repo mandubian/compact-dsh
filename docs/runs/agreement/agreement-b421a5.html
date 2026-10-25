@@ -11,16 +11,34 @@
   header b { color: #7fd1ff; }
   header .meta { color: #9ab; font-size: 12px; }
   header .muted { color: #666; font-size: 11.5px; }
-  main { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; padding: 10px; height: calc(100vh - 74px); box-sizing: border-box; }
+  main { display: grid; grid-template-columns: 1.9fr 1fr; gap: 10px; padding: 10px; height: calc(100vh - 74px); box-sizing: border-box; }
   section { border: 1px solid #333; background: #161616; min-height: 0; display: flex; flex-direction: column; }
   h2 { font-size: 13px; margin: 0; padding: 8px 10px; background: #202020; border-bottom: 1px solid #333; text-transform: uppercase; letter-spacing: 0.08em; color: #9ab; }
+  .hint { color: #667; font-size: 11px; padding: 4px 10px 0; margin: 0; }
   ul { list-style: none; margin: 0; padding: 6px 10px; font-size: 12.5px; overflow-y: auto; flex: 1; min-height: 0; }
   li { padding: 6px 0; border-bottom: 1px dotted #2a2a2a; white-space: pre-wrap; word-break: break-word; }
   li .who { color: #7fd1ff; }
   li .at { color: #666; font-size: 11px; }
   li.act { color: #bbb; font-size: 12px; }
+  li.pass { color: #b8e986; font-size: 12px; }
+  li.pass-call { color: #8e9b8e; font-size: 12px; }
+  li.pass-refused { color: #ff9e9e; font-size: 12px; }
   li.notice { color: #ffb46b; font-size: 12px; }
   li.empty { color: #666; font-style: italic; }
+  /* the forum is the reading surface: one block per landed post, a stable
+     color per member, and the run's gate posts (AGREEMENT / POSITIONS /
+     RULING / VERDICTS) carry the emphasis — they are the records the run
+     exists to produce */
+  li.post { padding: 8px 10px; margin: 0 0 8px; background: #1a1f26; border: 1px solid #2a313a; border-left: 3px solid #39424e; }
+  li.post .head { display: block; color: #9ab; font-size: 11px; margin-bottom: 4px; }
+  li.post .head .who { font-weight: bold; }
+  li.post .body { display: block; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.55; color: #e6e6e6; }
+  li.post.ledger { border-left-color: #ffb46b; background: #211d13; }
+  li.post.ledger .gate { color: #ffb46b; font-weight: bold; letter-spacing: 0.06em; }
+  li.post .body .cite { color: #7fd1ff; }
+  li.post .body b { color: #ffd9a0; }
+  .c0 { color: #7fd1ff; } .c1 { color: #b6a2ff; } .c2 { color: #8be98b; } .c3 { color: #ffb46b; }
+  .c4 { color: #ff9ecb; } .c5 { color: #9be5d8; } .c6 { color: #e8d76b; } .c7 { color: #f2a2a2; }
   table { font-size: 12px; margin: 8px 10px; border-collapse: collapse; }
   td, th { padding: 3px 10px; text-align: left; border-bottom: 1px dotted #2a2a2a; }
   th { color: #9ab; }
@@ -34,7 +52,11 @@
   <div class="muted">read-only replay from the durable artifacts — the chains remain the record of authority</div>
 </header>
 <main>
-  <section id="forum"><h2>the forum — the whole conversation, oldest first</h2><ul id="forum-list"></ul></section>
+  <section id="forum">
+    <h2>the forum — the whole conversation, oldest first</h2>
+    <p class="hint">one block per landed post · <span class="gate" style="color:#ffb46b;font-weight:bold">LEDGER</span> marks the run's gate (AGREEMENT / POSITIONS / RULING / VERDICTS) · fp_ ids cite earlier speech · verdicts read bold</p>
+    <ul id="forum-list"></ul>
+  </section>
   <section>
     <h2>the members' acts</h2><ul id="acts-list"></ul>
     <h2>the members</h2><table id="members"></table>
@@ -45,6 +67,10 @@ const DATA = {"run":{"charter":"agreement","runTag":"b421a5","resumed":false,"en
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+// timestamps arrive as ISO strings from the live feed, but old exports
+// embedded epoch milliseconds — slicing a number threw and killed the
+// pane it was rendering, so every shape is normalized before the slice
+const stamp = (at) => (typeof at === 'number' && Number.isFinite(at) ? new Date(at).toISOString() : String(at ?? ''));
 const bare = (s) => String(s ?? '').replace(/^community-/, '');
 
 const r = DATA.run || {};
@@ -57,17 +83,36 @@ $('meta').textContent = (r.charter || 'agreement') + ' · run ' + (r.runTag ?? '
   ' · ended ' + (r.endedAt ?? '?') + ' · reason: ' + (r.endReason ?? '?') +
   ' · rounds ' + (r.rounds ?? 0) + ' · turns ' + (r.turns ?? 0) + ' · tokens ' + (r.tokens ?? 0) + modelTxt;
 
+// the forum's reading aids: a member keeps one color (hash of its name)
+// and a session id shows its member name — the run tag is per-run
+// machinery, not identity, and the members table keeps the full session
+const memberOf = (s) => String(s ?? '?').replace(/^community-/, '').replace(/-[0-9a-f]{6}$/, '');
+const colorOf = (name) => { let h = 0; for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return 'c' + (h % 8); };
+const GATE_RE = /^(AGREEMENT|POSITIONS|RULING|VERDICTS):/;
+// emphasis inside a post body, applied AFTER escaping so member text can
+// never inject markup: fp_ cites and the verdict vocabulary read at a
+// glance inside a long ledger post
+const hl = (s) => esc(s)
+  .replace(/\b(fp_\d+)\b/g, '<span class="cite">$1</span>')
+  .replace(/\b(ENDORSED|AMENDED|REJECTED|CONFIRMED|ACCEPTED|CONTESTED|DISSENT)\b/g, '<b>$1</b>');
+
 for (const p of DATA.forum) {
   const li = document.createElement('li');
-  li.innerHTML = '<span class="at">' + esc((p.at || '').slice(0, 19)) + '</span> <span class="who">' + esc(bare(p.by) ?? '?') + '</span> on ' + esc(p.topic) + ':\n' + esc(p.text);
+  const member = memberOf(p.by);
+  const gate = GATE_RE.test(String(p.text ?? ''));
+  li.className = 'post' + (gate ? ' ledger' : '');
+  li.innerHTML = '<span class="head">[' + esc(p.id ?? p.seq ?? '?') + '] <span class="who ' + colorOf(member) + '">' + esc(member) + '</span>' +
+    ' · <span class="at">' + esc(stamp(p.at).slice(0, 19)) + '</span> · ' + esc(p.topic ?? '') +
+    (gate ? ' · <span class="gate">LEDGER</span>' : '') + '</span>' +
+    '<span class="body">' + hl(p.text) + '</span>';
   $('forum-list').appendChild(li);
 }
 if (!DATA.forum.length) $('forum-list').innerHTML = '<li class="empty">the forum never spoke — negative space is information</li>';
 
 for (const t of DATA.timeline) {
   const li = document.createElement('li');
-  li.className = t.type === 'notice' ? 'notice' : (t.type === 'act' ? 'act' : '');
-  li.innerHTML = '<span class="at">' + esc(String(t.at ?? '').slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
+  li.className = { notice: 'notice', pass: 'pass', 'pass-call': 'pass-call', 'pass-refused': 'pass-refused', act: 'act' }[t.type] ?? '';
+  li.innerHTML = '<span class="at">' + esc(stamp(t.at).slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
   $('acts-list').appendChild(li);
 }
 if (!DATA.timeline.length) $('acts-list').innerHTML = '<li class="empty">no acts recorded</li>';
