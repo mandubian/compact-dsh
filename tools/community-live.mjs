@@ -33,7 +33,7 @@
 // --publish writes the end-of-run pack (REPORT.md, BRIEF.md, the optional
 // model READING.md, and PACK.md) under <out>/publish or --publish-dir.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
