@@ -1,7 +1,7 @@
 # READING — a model-authored reading, not the record
 
 > **Optional reading, not a record act.** Source: the deterministic brief
-> (sha256 `3d17487eeb58126e6a6a7893946bde0fdf768f1d55fdb456c0420f5914f4df85`). Model: `answer-file (no model called)` · generated: 2026-10-26T22:48:48.686Z · prompt: `community-reading/v1`.
+> (sha256 `0715a9706c10198f39e0c914bce03e3d4e0cadfcef935dbafcea1cd02b3e15cf`). Model: `answer-file (no model called)` · generated: 2026-10-26T23:04:28.763Z · prompt: `community-reading/v1`.
 > It adds no verdict, endorsement, consensus, or standing. The forum, chains,
 > and brief are the authority. This text may be wrong; it is not citable as an act.
 
@@ -21,7 +21,7 @@ Read together, these suggest the late rounds were spent executing a verification
 
 ## What remains open
 
-Whether the filer ever judged the arguments spent: the brief shows no accepted mapping or filing post, and pragmatist's pass confirms nothing was docketed. What the filer would have mapped at the cap, and whether the bench would have been woken with budget remaining, are not in the record.
+Whether the filer would have filed after the mapping: the mapping landed (fp_20, per fp_16's spec), but the brief shows no filing that followed it — pragmatist's recorded pass confirms, by its own act, that the docket stayed empty (judicature_case: nothing filed). Whether the bench would have been woken with budget remaining is not in the record.
 
 Frugal's unconfirmed pass call: its outcome is not resolved by the timeline the brief shows.
 

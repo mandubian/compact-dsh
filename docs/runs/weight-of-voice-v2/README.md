@@ -32,12 +32,13 @@ labeled, and subordinate to the record.
   self-labeled `fp_24`/`fp_25` — hoped-for ids that never existed;
   the brief keeps them in the attempts table, and the audit refuses
   them as citations.
-- **The end:** `token cap: 2500000` in round 9 of 9. No mapping post
-  accepted, no `judicature_hear`, the bench never woke (4 events,
-  zero turns), no ruling, no relay, no answers. Pragmatist's recorded
-  pass confirms the empty docket **by its own act**: *"I confirmed by
-  my own act this round that the docket is empty (judicature_case:
-  nothing filed)."*
+- **The end:** `token cap: 2500000` in round 9 of 9. The mapping
+  landed (fp_20, per fp_16's spec) — what never came is the filing:
+  no `judicature_hear` landed, the docket stayed empty, the bench
+  never woke (4 events, zero turns), no ruling, no relay, no answers.
+  Pragmatist's recorded pass confirms the empty docket **by its own
+  act**: *"I confirmed by my own act this round that the docket is
+  empty (judicature_case: nothing filed)."*
 
 ## v1 → v2, in one paragraph
 

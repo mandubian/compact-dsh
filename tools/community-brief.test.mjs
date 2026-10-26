@@ -284,3 +284,43 @@ test('the agent-tongue archive records denied attempts, not a choice of silence'
   assert.match(brief, /4 carry an immediate LoopGuard notice/);
   assert.equal(auditBrief(brief, data).ok, true);
 });
+
+test('quoted self-labels in denied attempts are evidence, not citations (the v2 finding)', () => {
+  // the live weight-of-voice-v2 run: frugal's denied drafts self-labeled
+  // "fp_25" while the forum ended at fp_24 — the brief quotes the drafts
+  // verbatim in its attempts table, and the audit refused its own brief.
+  // The fix: an fp id beyond the forum that the ARCHIVE's own attempt
+  // bodies contain is quoting, not citing — exempt exactly those.
+  const data = {
+    forum: [
+      { id: 'fp_1', seq: 1, topic: 'floor', by: 'community-alpha-x', at: '2026-10-26T00:00:01.000Z', text: 'a landed post' },
+      { id: 'fp_2', seq: 2, topic: 'floor', by: 'community-beta-x', at: '2026-10-26T00:00:02.000Z', text: 'another landed post' },
+    ],
+    members: [
+      { id: 'alpha', session: 'community-alpha-x', turns: 1, posts: 1, attempts: 2, notLanded: 1, denied: 1, passes: { recorded: 0, refused: 0, unconfirmed: 0 }, chainRows: 4 },
+      { id: 'beta', session: 'community-beta-x', turns: 1, posts: 1, attempts: 1, notLanded: 0, denied: 0, passes: { recorded: 0, refused: 0, unconfirmed: 0 }, chainRows: 4 },
+    ],
+    attempts: [
+      { member: 'alpha', session: 'community-alpha-x', at: '2026-10-26T00:00:03.000Z', topic: 'floor', body: 'alpha (fp_3 — my unsighted draft, landing now)', post: null, notice: 'LoopGuard LG-5' },
+    ],
+    passes: [],
+    askHuman: [],
+    run: null,
+    provenance: { runJson: null, forum: null, html: null },
+    paths: { outer: '/tmp/synth-archive' },
+    latestLedger: null,
+    ledgerPosts: [],
+    postsAfterLedger: [],
+    laterLedgerAttempts: [],
+    checks: { forumSeqOk: true, runTurns: 2, turnSum: 2, timelineTurns: 2, attempts: 3, matched: 2, notLanded: 1, denied: 1, passCalls: 0, passes: 0, passRefused: 0, passUnconfirmed: 0 },
+  };
+  const brief = renderBrief(data);
+  // the brief quotes the denied draft's self-label verbatim…
+  assert.match(brief, /fp_3 — my unsighted draft/);
+  // …and its own audit passes: fp_3 lives only in the quoted attempt body
+  assert.equal(auditBrief(brief, data).ok, true, 'quoting a self-label is not citing it');
+  // but a brief citing fp_3 as if it were a post, with no such attempt
+  // text in the archive, still fails
+  const forged = brief + '\nsee also fp_3 for the conclusion.\n';
+  assert.equal(auditBrief(forged, data).ok, false, 'a citation of a nonexistent post still fails');
+});

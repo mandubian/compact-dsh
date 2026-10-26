@@ -16,7 +16,7 @@
 | pass calls visible | 4 (0 refused, 1 unconfirmed) |
 | latest accepted ledger | none |
 | posts after it | none |
-| timeline source | 5 session log(s) |
+| timeline source | weight-of-voice-v2-a980e1.html |
 | model | frugal=zai/glm-5.3-flash elitist=zai/glm-5.3-flash pragmatist=zai/glm-5.3-flash filer=zai/glm-5.3-flash bench-1=zai/glm-5.3 |
 | divergence | {"loopguardTrips":10,"humanSeatTimeouts":3} |
 
@@ -77,7 +77,7 @@ None on the forum. The brief does not invent one.
 
 - **run manifest:** present
 - **forum ledger:** 24 post(s); sequence contiguous
-- **timeline:** 5 session log(s)
+- **timeline:** weight-of-voice-v2-a980e1.html
 - **turns:** run.json 33; member sum 33; timeline turn-done 33 (match)
 - **attempt reconciliation:** 29 attempt(s), 24 landed, 5 did not, 5 with an immediate LoopGuard notice
 - **pass calls:** 4 visible; 3 recorded, 0 refused, 1 unconfirmed
@@ -98,6 +98,6 @@ This is the deterministic audit. It checks citations and counts; it does not rea
 ## Verify
 
 ```bash
-node tools/community-replay.mjs /home/PVoitot/community-runs/weight-of-voice-v2
-node tools/community-brief.mjs /home/PVoitot/community-runs/weight-of-voice-v2 --check <this-brief.md>
+node tools/community-replay.mjs docs/runs/weight-of-voice-v2
+node tools/community-brief.mjs docs/runs/weight-of-voice-v2 --check <this-brief.md>
 ```
