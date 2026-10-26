@@ -616,20 +616,19 @@ export function auditBrief(brief, data) {
   const text = String(brief ?? '');
   const max = data.forum.length;
   // quoted evidence is not citation: the attempts table quotes denied
-  // drafts verbatim, and members sometimes self-label a hoped-for fp id
-  // inside a draft that never landed (the v2 finding: frugal's denied
-  // drafts said "fp_25"; the forum ended at fp_24). An id beyond the
-  // forum that the ARCHIVE's own attempt texts contain is the brief
-  // quoting, not citing — exempt exactly those, nothing else.
-  const quotedIds = new Set();
+  // drafts verbatim (cut to length), and members sometimes self-label a
+  // hoped-for fp id inside a draft that never landed (the v2 finding:
+  // frugal's denied drafts said "fp_25"; the forum ended at fp_24). The
+  // exemption is OCCURRENCE-granular — each attempt's rendered fragment
+  // is stripped from the text before scanning, so the same id cited
+  // outside the quote still fails (the forged-citation negative).
+  let auditable = text;
   for (const a of data.attempts ?? []) {
-    for (const m of String(a.body ?? a.text ?? '').matchAll(/\bfp_(\d+)\b/g)) {
-      if (Number(m[1]) > max) quotedIds.add(Number(m[1]));
-    }
+    const fragment = cell(String(a.body ?? ''), 100);
+    if (fragment) auditable = auditable.split(fragment).join(' ');
   }
-  const cited = [...text.matchAll(/\bfp_(\d+)\b/g)].map((m) => Number(m[1]));
+  const cited = [...auditable.matchAll(/\bfp_(\d+)\b/g)].map((m) => Number(m[1]));
   for (const n of new Set(cited)) {
-    if (quotedIds.has(n)) continue;
     if (!Number.isInteger(n) || n < 1 || n > max) failures.push(`fp_${n} is cited but the forum has only fp_1..fp_${max}`);
   }
   for (const m of data.members) {
