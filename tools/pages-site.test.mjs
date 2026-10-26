@@ -24,6 +24,7 @@ const samples = [
   { html: 'runs/weight-of-voice/weight-of-voice-34ea9c.html', account: 'runs/weight-of-voice/README.md' },
   { html: 'runs/bug-court/bug-court-8e68c3.html', account: 'runs/bug-court/README.md' },
   { html: 'runs/workshop/workshop-2914fd.html', account: 'runs/workshop/README.md' },
+  { html: 'runs/weight-of-voice-v2/weight-of-voice-v2-a980e1.html', account: 'runs/weight-of-voice-v2/README.md' },
 ];
 
 const links = (html) => [...html.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
