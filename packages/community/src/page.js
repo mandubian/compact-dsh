@@ -20,7 +20,7 @@ function charterBlockHtml(charter) {
 
 function provenanceLineHtml(provenance) {
   if (!provenance) return '';
-  if (!provenance.commit) return `<div class="prov muted">${escHtml(provenance.note ?? '')}</div>`;
+  if (!provenance.commit) return `<div class="prov muted">code: ${escHtml(provenance.note ?? '')}</div>`;
   const repo = provenance.repo ? String(provenance.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '';
   return `<div class="prov muted">code: ${escHtml(repo)}${escHtml(provenance.commit.slice(0, 12))}${provenance.dirty ? ' (DIRTY TREE)' : ''}${provenance.ref ? ` [${escHtml(provenance.ref)}]` : ''}</div>`;
 }
