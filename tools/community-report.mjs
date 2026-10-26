@@ -206,6 +206,19 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
   L.push(`  state: ${paths.recordRoot.replace(/\/sessions$/, '')}`);
   if (run) {
     L.push(`  THE RUN: ${run.endReason}${run.runTag ? ` (run ${run.runTag}${run.resumed ? ', resumed' : ''})` : ''} — ended ${run.endedAt}`);
+    // the code the community ran on: outputs never repeat, but runs stay
+    // comparable when the tree that produced each is named
+    if (run.code?.commit) {
+      L.push(`    code: ${(run.code.repo ? String(run.code.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '')}${run.code.commit}${run.code.dirty ? ' (DIRTY TREE — uncommitted changes present)' : ''}${run.code.ref ? ` [${run.code.ref}]` : ''}`);
+    } else if (run.code?.note) {
+      L.push(`    code: ${run.code.note}`);
+    }
+    if (run.runtime) {
+      L.push(`    runtime: law ${String(run.runtime.law ?? '?').slice(0, 16)}… · ${run.runtime.image ?? '?'} ${String(run.runtime.imageDigest ?? '').slice(0, 19)}… · node ${run.runtime.node ?? '?'}`);
+    }
+    if (run.charterFile?.name) {
+      L.push(`    charter file: ${run.charterFile.name}${run.charterFile.sha256 ? ` (sha256 ${String(run.charterFile.sha256).slice(0, 16)}…)` : ''}`);
+    }
     // the goal, verbatim, when the manifest carries it — a report a reader
     // holds without the repo must still say WHAT was debated (the
     // operator's finding: it did not)

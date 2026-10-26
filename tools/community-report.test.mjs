@@ -199,6 +199,36 @@ test('the run manifest (#229): the report says WHY the run ended, not only what 
       run: { endReason: 'rounds complete', model: { provider: 'zai', model: 'glm-5.3-flash', members: { editor: 'zai/glm-5.3-flash', publisher: 'deepseek/chat' } } },
     });
     assert.match(het, /model: editor=zai\/glm-5\.3-flash publisher=deepseek\/chat/);
+    // the provenance axis (#262): the code the run rode is named — clean,
+    // dirty, not-git, and legacy each say exactly what they were, the way
+    // the page's dedicated test pins its own rendering
+    const prov = (code, runtime, charterFile) => formatReport({
+      paths: { ...paths, runJson: null }, logs: [], statsByLog: [], forum: [], grants: { rows: [], revoked: [] },
+      run: {
+        endReason: 'rounds complete',
+        ...(code ? { code } : {}),
+        ...(runtime ? { runtime } : {}),
+        ...(charterFile ? { charterFile } : {}),
+      },
+    });
+    const clean = prov(
+      { repo: 'git@github.com:mandubian/compact-dsh.git', ref: 'main', commit: '6954957aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      { node: 'v22.23.2', image: 'dsh-tools:basic', imageDigest: 'sha256:f3ab0123', law: '27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95' },
+      { name: 'newsroom.json', sha256: '9c1e0123aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    );
+    assert.match(clean, /code: github\.com\/mandubian\/compact-dsh @ 6954957aaaa.*\[main\]/, 'the commit is named with its origin');
+    assert.match(clean, /runtime: law 27bb7078fe9aea50… · dsh-tools:basic sha256:f3ab0123… · node v22\.23\.2/);
+    assert.match(clean, /charter file: newsroom\.json \(sha256 9c1e0123aaaaaaaa…\)/);
+    assert.doesNotMatch(clean, /DIRTY/);
+    const dirty = prov({ commit: 'deadbeefdead', dirty: true }, null, null);
+    assert.match(dirty, /deadbeefdead \(DIRTY TREE — uncommitted changes present\)/);
+    const notGit = prov({ note: 'not a git checkout (or git absent) — the code state is not named' }, null, null);
+    assert.match(notGit, /code: not a git checkout \(or git absent\)/);
+    // the legacy manifest (pre-#262) renders no provenance lines at all
+    const legacy = prov(null, null, null);
+    assert.doesNotMatch(legacy, /code: /);
+    assert.doesNotMatch(legacy, /runtime: /);
+    assert.doesNotMatch(legacy, /charter file: /);
     // a pre-#229 run (no manifest) says so instead of guessing
     const noManifest = formatReport({ paths: { ...paths, runJson: null }, logs: [], statsByLog: [], forum: [], grants: { rows: [], revoked: [] } });
     assert.match(noManifest, /no run\.json — this run predates #229/);

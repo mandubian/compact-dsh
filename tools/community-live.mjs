@@ -36,7 +36,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { sha256Hex, signAnnex, annexDigestOf, verifyAnnex } from 'compact-dsh-seals';
@@ -56,6 +56,26 @@ const IMAGE = 'dsh-tools:basic';
 
 const out = (title) => process.stdout.write(`\n\x1b[1m${title}\x1b[0m\n`);
 const line = (s = '') => process.stdout.write(`${s}\n`);
+
+/** The code the community runs on, as git sees it — the provenance axis
+ *  LLM runs can never have (outputs never repeat) but code runs can
+ *  (the same tree, named). Honest absence when git is not there: a null
+ *  commit is stated as such, never guessed. */
+function codeProvenance(root) {
+  const git = (...args) => {
+    const r = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', timeout: 5_000 });
+    return r.status === 0 ? r.stdout.trim() : null;
+  };
+  const commit = git('rev-parse', 'HEAD');
+  const dirty = commit == null ? null : (git('status', '--porcelain') ?? '').length > 0;
+  return {
+    repo: git('remote', 'get-url', 'origin'),
+    ref: git('rev-parse', '--abbrev-ref', 'HEAD'),
+    commit,
+    ...(dirty ? { dirty: true } : {}),
+    ...(commit == null ? { note: 'not a git checkout (or git absent) — the code state is not named' } : {}),
+  };
+}
 
 // ── the world: scratch, keyring with the charter's members, the annex ──
 
@@ -224,7 +244,7 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedK
     host.on('session/event', onSessionEvent);
   }, pathToFileURL(join(ROOT, 'package.json')).href);
   if (ctx.get('compact-ready')?.ready !== true) throw new Error(`${BIN} the composition never became compact-ready`);
-  return { ctx, env, tokenMeter: () => tokensUsed, setNoticeSink: (fn) => { noticeSink = fn; } };
+  return { ctx, env, tokenMeter: () => tokensUsed, setNoticeSink: (fn) => { noticeSink = fn; }, imageDigest: digest };
 }
 
 /** Pre-mint the charter's grants — the operator's act, before any member
@@ -326,6 +346,14 @@ async function main() {
   // resumed run on the same --out can name the previous manifest in the new
   // one. A malformed old manifest never blocks a continuation.
   const previousRun = readPreviousRun(scratch);
+  // the code state, named once at launch — before any turn runs, so the
+  // manifest cannot claim a tree the run did not ride
+  const provenance = codeProvenance(ROOT);
+  if (provenance.commit) {
+    SAY(`code provenance: ${provenance.commit.slice(0, 12)}${provenance.dirty ? ' (DIRTY TREE — uncommitted changes present, named as such in the manifest)' : ''} on ${provenance.ref} of ${provenance.repo ?? 'no origin'}`);
+  } else {
+    SAY(`code provenance: NOT A GIT CHECKOUT — the manifest will say so rather than guess`);
+  }
   preservePreviousRun(scratch, previousRun);
   const workspace = join(scratch, 'workspace');
   mkdirSync(workspace, { recursive: true });
@@ -387,7 +415,7 @@ async function main() {
     ? communityAnnex(keyringDir, keyring, charter, benchDigests)
     : { annexPath: join(keyringDir, 'enforcer.annex.json') };
 
-  const { ctx, env, tokenMeter, setNoticeSink } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
+  const { ctx, env, tokenMeter, setNoticeSink, imageDigest } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
   // a charter with no grants and no publish section is a FORUM-ONLY
@@ -543,6 +571,21 @@ async function main() {
         // reader who has only this file knows the question (the operator's
         // finding: the exports showed the debate but never the charter)
         goal: charter.goal, topic: charter.topic,
+        // THE CODE THE COMMUNITY RAN ON — outputs never repeat (the nature
+        // of LLMs), but runs stay COMPARABLE across bug fixes and features
+        // when the tree that produced each is named. Honest absence: a
+        // checkout git cannot name says so, never guesses.
+        code: provenance,
+        runtime: {
+          node: process.version,
+          image: IMAGE,
+          imageDigest,
+          law: COMPACT_DIGEST,
+        },
+        charterFile: {
+          name: basename(charterPath),
+          sha256: sha256Hex(readFileSync(resolve(charterPath))),
+        },
         seats: charter.members.map((m) => ({ id: m.id, model: m.model ? `${m.model.provider}/${m.model.model}` : null, bench: m.bench === true, persona: m.persona })),
         endedAt: new Date().toISOString(),
         endReason: runStats?.endReason ?? (exitCode ? 'failed' : 'unknown'),

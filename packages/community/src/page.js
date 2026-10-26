@@ -371,6 +371,7 @@ export function replayPageHtml({ charterName, data }) {
 <header>
   community replay — <b>${safeName}</b>
   <div class="meta" id="meta"></div>
+  <div class="prov muted" id="prov"></div>
   <div class="charter" id="charter"></div>
   <div class="muted">read-only replay from the durable artifacts — the chains remain the record of authority</div>
 </header>
@@ -405,6 +406,17 @@ const modelTxt = !mod.model ? '' : ' · model ' + (new Set(routes).size > 1
 $('meta').textContent = (r.charter || '${safeName}') + ' · run ' + (r.runTag ?? '—') + (r.resumed ? ' (resumed)' : '') +
   ' · ended ' + (r.endedAt ?? '?') + ' · reason: ' + (r.endReason ?? '?') +
   ' · rounds ' + (r.rounds ?? 0) + ' · turns ' + (r.turns ?? 0) + ' · tokens ' + (r.tokens ?? 0) + modelTxt;
+
+// THE CODE THE COMMUNITY RAN ON — outputs never repeat (the nature of
+// LLMs) but runs stay comparable when the tree that produced each is
+// named. Archives from before the field render nothing here.
+if (r.code && r.code.commit) {
+  $('prov').textContent = 'code: ' + (r.code.repo ? String(r.code.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '') +
+    String(r.code.commit).slice(0, 12) + (r.code.dirty ? ' (DIRTY TREE)' : '') +
+    (r.runtime ? ' · law ' + String(r.runtime.law ?? '').slice(0, 12) + '… · ' + String(r.runtime.image ?? '') + ' · node ' + String(r.runtime.node ?? '') : '');
+} else if (r.code && r.code.note) {
+  $('prov').textContent = 'code: ' + r.code.note;
+}
 
 // THE CHARTER — what was debated, carried in the archive itself (the
 // operator's finding: the exports showed the debate but never the
