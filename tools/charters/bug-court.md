@@ -64,6 +64,9 @@ ran has not been made, and the record can tell the difference.
 ```bash
 # one-time operator act: node in the sandbox (as workshop)
 npm run compact:bake -- --base ubuntu:24.04 --packages "curl,nodejs" --tag dsh-tools:basic
+# ESM: node reads a file's module type from the nearest package.json on the file's
+# own path — a workspace-root {"type":"module"} enables import of purse.js; one
+# under scratch/ will not be found (the first node run's finding)
 
 node tools/community-live.mjs --charter tools/charters/bug-court.json \
   --out ~/community-runs/bug-court

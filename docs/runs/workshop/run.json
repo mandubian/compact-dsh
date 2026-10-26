@@ -1,0 +1,87 @@
+{
+  "charter": "workshop",
+  "runTag": "2914fd",
+  "resumed": false,
+  "goal": "Build and ship one small artifact to the letter of sources/spec.md: an immutable-ledger module in plain Node, no dependencies. smith implements from the spec; prover writes its own tests under tests/ and runs them for real (node --test), posting the actual command and output as evidence — a test claim is the output, never a summary of it; reviewer reads the code against the spec and argues design and coverage on the forum with reasons, filing a case only when a dispute stays live after being argued; publisher packs exactly what the prover's output shows passing, writes the manifest with real sha256s and bylines, ships under the community's pre-minted grant, and verifies the round-trip byte-for-byte before claiming done. The session succeeds when: the prover's tests pass on what the publisher shipped, the manifest's sha256 matches the artifact bit-for-bit, and every reviewer concern is either answered on the forum or filed and judged. Bylines are real: whoever's work is in the artifact is named in the manifest.",
+  "topic": "workshop-floor",
+  "code": {
+    "repo": "git@github.com:mandubian/compact-dsh.git",
+    "ref": "feat/bug-court-sample",
+    "commit": "40ef7e0470b5dd11200234ed6761e248ba263c7e"
+  },
+  "runtime": {
+    "node": "v22.23.2",
+    "image": "dsh-tools:basic",
+    "imageDigest": "sha256:1f89a66bbec96b0804fcb211450498749f6cbe9461674b84cf03c4686b4b91dd",
+    "law": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95"
+  },
+  "charterFile": {
+    "name": "workshop.json",
+    "sha256": "54275d694d098aab3f8ce6bb05e6f647826abcfea10935376875198e0558829b"
+  },
+  "seats": [
+    {
+      "id": "smith",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "implements from the spec: plain Node, no dependencies, minimal surface — code that the prover's tests, not its own confidence, must carry"
+    },
+    {
+      "id": "prover",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "writes the tests the spec implies and runs them for real: the command and its actual output posted as evidence — never a summary, never a claim without its output"
+    },
+    {
+      "id": "reviewer",
+      "model": "zai/glm-5.3",
+      "bench": false,
+      "persona": "reads the code against the spec and argues design and coverage with reasons: demands changes plainly, credits what is right, and files a case only when a dispute stays live after being argued"
+    },
+    {
+      "id": "publisher",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "the member whose acts publish: packs exactly what the prover's output shows passing, writes the manifest with real sha256s and bylines, ships under the grant, and verifies the round-trip byte-for-byte before saying done"
+    },
+    {
+      "id": "bench-1",
+      "model": "zai/glm-5.3",
+      "bench": true,
+      "persona": "a member seated on the bench: judges only what is filed — the docket, counsel access to the cited acts, judgment with findings and reasons"
+    }
+  ],
+  "endedAt": "2026-10-26T14:23:42.202Z",
+  "endReason": "token cap: 1500000",
+  "rounds": 8,
+  "turns": 28,
+  "benchCasesSeen": 0,
+  "tokens": 1527272,
+  "budgets": {
+    "rounds": 8,
+    "maxTurnsPerAgent": 8,
+    "wallClockMinutes": 45,
+    "tokenCap": 1500000
+  },
+  "members": {
+    "smith": 7,
+    "prover": 7,
+    "reviewer": 7,
+    "publisher": 7
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "smith": "zai/glm-5.3-flash",
+      "prover": "zai/glm-5.3-flash",
+      "reviewer": "zai/glm-5.3",
+      "publisher": "zai/glm-5.3-flash",
+      "bench-1": "zai/glm-5.3"
+    }
+  },
+  "divergence": {
+    "loopguardTrips": 6,
+    "humanSeatTimeouts": 3
+  }
+}
