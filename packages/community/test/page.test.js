@@ -120,7 +120,8 @@ test('a gate post may open with its author\'s name — the bug-court finding', (
   assert.equal(classes[1], 'post', 'a mid-sentence mention is not a gate');
 });
 
-test('the charter rides with the archive: the goal renders, legacy archives render no block', () => {  // the operator's finding: the exports showed the debate but never the
+test('the charter rides with the archive: the goal renders, legacy archives render no block', () => {
+  // the operator's finding: the exports showed the debate but never the
   // question — a reader needed the repo's charter JSON. Newer manifests
   // carry goal/topic/seats and the replay renders them; the old ones stay
   // silent (an absence, honestly stated, never a fake).
