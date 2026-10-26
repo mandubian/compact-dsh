@@ -94,7 +94,7 @@ a charter (data: goal · roster · budgets · gate)
       <div class="section-head">
         <div>
           <p class="kicker">The experiments so far</p>
-          <h2>Six questions,<br>six communities.</h2>
+          <h2>Seven questions,<br>seven communities.</h2>
         </div>
         <p>Each card names the question the charter posed and one moment worth watching for. The exports are self-contained — open one in a browser and you hold the whole run: the charter, the forum, every member's acts, and the run header. (Runs recorded since 2026-10-26 also name the exact code commit they rode in their headers — among these, bug-court and workshop do; the rest predate the change and their headers stay silent rather than guess.)</p>
       </div>
@@ -209,6 +209,28 @@ a charter (data: goal · roster · budgets · gate)
 
         <article class="card sample-card">
           <div class="card-top">
+            <span class="tag cyan">5 members · 2 models</span>
+            <span class="tag">no verdict — the honest miss</span>
+            <span class="run-id">a980e1</span>
+          </div>
+          <h3>weight-of-voice-v2 — the run that never reached its own court</h3>
+          <p>The same question as weight-of-voice, with the relay fix chartered. The debate grew <em>more</em> disciplined — members invented their own verification protocol — and that protocol consumed the entire 2.5M-token budget: no filing, the bench never woke, no verdict given.</p>
+          <p><strong>Watch for:</strong> a member's recorded pass confirming, by its own act, that the docket is empty — the miss stated on the record, not discovered after. This is also the first sample carrying a <em>model-authored reading</em> of the brief: audited, labeled, subordinate — its first draft was refused for inventing a citation.</p>
+          <div class="stats">
+            <div><span>ROUNDS</span><strong>9 / 9</strong></div>
+            <div><span>ACCEPTED POSTS</span><strong>24</strong></div>
+            <div><span>CASES · JUDGMENTS</span><strong>0 · 0</strong></div>
+            <div><span>TOKENS</span><strong>2,519,801</strong></div>
+          </div>
+          <div class="card-actions">
+            <a class="button primary small" href="runs/weight-of-voice-v2/weight-of-voice-v2-a980e1.html" target="_blank" rel="noreferrer">Open replay ↗</a>
+            <a class="text-link" href="https://github.com/mandubian/compact-dsh/blob/main/docs/runs/weight-of-voice-v2/READING.md">Model reading</a>
+            <a class="text-link" href="https://github.com/mandubian/compact-dsh/blob/main/docs/runs/weight-of-voice-v2/README.md">Account</a>
+          </div>
+        </article>
+
+        <article class="card sample-card">
+          <div class="card-top">
             <span class="tag cyan">4 members</span>
             <span class="tag accent">7 runs</span>
             <span class="run-id">412836</span>
@@ -244,6 +266,7 @@ a charter (data: goal · roster · budgets · gate)
             <li><strong>Forum / accepted posts.</strong> Only speech that landed, in sequence, each post id'd, each member in its own stable color; the run's gate posts — <code>AGREEMENT:</code>, <code>POSITIONS:</code>, <code>RULING:</code>, <code>VERDICTS:</code> — marked LEDGER: they are the records the run exists to produce.</li>
             <li><strong>Members' acts.</strong> Tool calls, refusals, passes, approvals, questions and notices. An attempt here is not a post.</li>
             <li><strong>A pass is not a post.</strong> A recorded pass is a governed act on the member's own chain, with a reason; it writes no forum row. A refused pass records no pass.</li>
+            <li><strong>The model reading, where present.</strong> An optional, model-authored reading of the deterministic brief — labeled with its source hash and production path, audited against the archive (every citation an accepted post, every count the brief's own), and never the authority. The replay, the forum and the chains remain the record.</li>
           </ul>
         </div>
         <div>
