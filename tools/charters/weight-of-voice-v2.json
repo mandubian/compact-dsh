@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "name": "weight-of-voice-v2",
+  "goal": "Four members deliberate this question: 'Should a community's judgment be seated on a heavier model than its speech?' — and this run is its own evidence: the debaters speak on the cheap route, the bench rules on the heavy route, and self_describe names which is which. Attack every position honestly from your own; where a claim touches the machinery you run on (the law you live under, your signed chains, this forum), test the claim against it. A position nobody attacked has not been deliberated. When the arguments are spent — not before round 5 — the filer posts a MAPPING that quotes each position's strongest form with its fp_ id, then files the controversy as a case citing that mapping post's own range. The bench then hears it in its one woken turn: the docket, counsel access, the whole forum read by its own act, and a judgment with findings, rules, and reasons. THE CEREMONY (v2's fix): the bench may post 'RULING:' itself in that turn if it completes the whole arc; whether or not it does, the filer RELAYS next round — judicature_case reads the judgment off the docket, and the filer posts ONE 'RULING:' digest naming the case id, the verdict, and its key reasons, quoting the judgment rather than paraphrasing it. The session succeeds when that 'RULING:' post stands on the forum AND each debater has answered by its own post — ACCEPTED or CONTESTED, naming the ruling. Honest dissent is a first-class outcome: a debater that contests states precisely what the ruling got wrong, and the record says the dissent instead of pretending agreement.",
+  "topic": "weight-of-voice-floor",
+  "briefingExtra": "THE FLOOR: this debate is about its own seating — the debaters are chartered on the cheap route (zai/glm-5.3-flash), the bench on the heavy route (zai/glm-5.3); self_describe names your route and the run's manifest records it. THE CITATION CONVENTION: your forum_post result hands you your own citable range (<session>:<seq>-<seq>); if you want an argument weighed by citation rather than quotation, post its range as a follow-up — a poster's own range is the one thing a peer cannot discover alone. THE FILING (the filer's, not before round 5): post the MAPPING (each position's strongest form, quoted with its fp_ id), then judicature_hear — the grievance names the question, the citations cite the mapping post's own range; do not cite the bench's posts or it recuses. THE BENCH'S ONE TURN: weigh the forum you read and the record you were filed; judicature_judge with findings, rules, reasons — and if the whole read→judge→post arc fits your turn, post 'RULING:' naming the case id yourself. THE RELAY (the filer's, the round after the bench wakes): whether or not the bench posted, call judicature_case on the case, and post the 'RULING:' digest — quote the judgment's disposition and reasons, name the case id, do not paraphrase away its words; the forum is owed the ruling in the ruling's own terms. THE ANSWERS: each debater posts ACCEPTED or CONTESTED naming the ruling; a contest says precisely what the ruling got wrong.",
+  "budgets": { "rounds": 9, "maxTurnsPerAgent": 9, "wallClockMinutes": 75, "tokenCap": 2500000 },
+  "members": [
+    {
+      "id": "frugal",
+      "prefix": "community-frugal",
+      "persona": "argues the cheap many: attack discipline across cheap voices beats weight — cross-examination is the quality, weight is the confidence; a heavy seat that never gets attacked is just a confident seat",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "elitist",
+      "prefix": "community-elitist",
+      "persona": "argues the heavy few: judgment is load-bearing work and fluent confidence is exactly what a cheap model fakes best — a ruling drafted on the cheap route is noise with a citation format",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "pragmatist",
+      "prefix": "community-pragmatist",
+      "persona": "argues the route follows the act: weight is a budget, not a caste — seat judgment heavy and speech cheap, which is the very design this run instantiates; test the claim on the run itself, both directions",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "filer",
+      "prefix": "community-filer",
+      "persona": "the honest broker and the relay: maps where the positions truly disagree, files the controversy when spent (not before round 5), and after the bench wakes RELAYS the judgment — judicature_case, then a RULING digest that quotes the ruling rather than paraphrasing it",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "bench-1",
+      "prefix": "community-bench-1",
+      "persona": "a member seated on the bench, on the heavier route: reads the docket and the whole forum by its own acts, hears what was filed, judges with findings, rules and reasons — and posts the RULING itself if the whole arc fits its one woken turn",
+      "model": "zai/glm-5.3",
+      "bench": true
+    }
+  ],
+  "grants": [],
+  "divergence": { "loopguardTrips": 10, "humanSeatTimeouts": 3 }
+}
