@@ -36,6 +36,8 @@ export function startObservatory(ctx, {
   port = DEFAULT_OBSERVATORY_PORT,
   host = '127.0.0.1',
   charterName = 'community',
+  charter = null,
+  provenance = null,
   feed = null,
 }) {
   if (host !== '127.0.0.1' && host !== 'localhost') {
@@ -82,7 +84,7 @@ export function startObservatory(ctx, {
 
     if (route === '/' && req.method === 'GET') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-      res.end(pageHtml({ charterName, token }));
+      res.end(pageHtml({ charterName, token, charter, provenance }));
       return;
     }
     if (route === '/events' && req.method === 'GET') {

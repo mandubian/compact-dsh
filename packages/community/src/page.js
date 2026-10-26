@@ -4,8 +4,31 @@
 // pending. Refresh-safe (the feed replays), honest about silence (an
 // empty lane says so).
 
-export function pageHtml({ charterName, token }) {
+// the charter and provenance blocks, rendered SERVER-SIDE for the live
+// page (both are launch-time facts — the goal, the seats, the tree the
+// run rides never change mid-run, so the page ships with them baked in,
+// no client round-trip, no feed dependency). Shared by nothing: the
+// replay renders the same shapes from its embedded archive.
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function charterBlockHtml(charter) {
+  if (!charter?.goal) return '';
+  const seats = (charter.members ?? []).map((m) =>
+    `<span class="seat"><b>${escHtml(m.id)}</b>${m.model ? ` (${escHtml(m.model.provider)}/${escHtml(m.model.model)})` : ''}${m.bench ? ' · bench' : ''}${m.persona ? ` — ${escHtml(m.persona)}` : ''}</span>`).join('');
+  return `<div class="charter"><span class="lbl">THE CHARTER — the goal, verbatim (as seated at launch):</span>\n${escHtml(charter.goal)}${seats ? `<span class="seats">seats — what each member is FOR (the charter's personas, verbatim):</span>${seats}` : ''}</div>`;
+}
+
+function provenanceLineHtml(provenance) {
+  if (!provenance) return '';
+  if (!provenance.commit) return `<div class="prov muted">code: ${escHtml(provenance.note ?? '')}</div>`;
+  const repo = provenance.repo ? String(provenance.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '';
+  return `<div class="prov muted">code: ${escHtml(repo)}${escHtml(provenance.commit.slice(0, 12))}${provenance.dirty ? ' (DIRTY TREE)' : ''}${provenance.ref ? ` [${escHtml(provenance.ref)}]` : ''}</div>`;
+}
+
+export function pageHtml({ charterName, token, charter = null, provenance = null }) {
   const safeName = String(charterName).replace(/[^a-zA-Z0-9._-]/g, '');
+  const charterHtml = charterBlockHtml(charter);
+  const provHtml = provenanceLineHtml(provenance);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -14,12 +37,12 @@ export function pageHtml({ charterName, token }) {
 <title>community observatory — ${safeName}</title>
 <style>
   :root { color-scheme: light dark; }
-  body { font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; margin: 0; background: #111; color: #ddd; }
-  header { padding: 10px 16px; background: #1b1b1b; border-bottom: 1px solid #333; position: sticky; top: 0; }
+  body { font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; margin: 0; background: #111; color: #ddd; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+  header { padding: 10px 16px; background: #1b1b1b; border-bottom: 1px solid #333; flex: none; }
   header b { color: #7fd1ff; }
   header .live { color: #7dff8a; }
   header .dead { color: #ff7d7d; }
-  main { display: grid; grid-template-columns: 1.9fr 1fr 1fr; gap: 10px; padding: 10px; height: calc(100vh - 52px); box-sizing: border-box; }
+  main { display: grid; grid-template-columns: 1.9fr 1fr 1fr; gap: 10px; padding: 10px; flex: 1; min-height: 0; box-sizing: border-box; }
   section { border: 1px solid #333; background: #161616; min-height: 0; display: flex; flex-direction: column; }
   section ul, section #pending { flex: 1; min-height: 0; overflow-y: auto; }
   h2 { font-size: 13px; margin: 0; padding: 8px 10px; background: #202020; border-bottom: 1px solid #333; text-transform: uppercase; letter-spacing: 0.08em; color: #9ab; }
@@ -59,6 +82,12 @@ export function pageHtml({ charterName, token }) {
   .ask button.deny { background: #5c1d1d; color: #fcc; border: 1px solid #a55; }
   .question textarea { width: 96%; font: inherit; background: #111; color: #ddd; border: 1px solid #444; }
   .muted { color: #666; }
+  .prov { font-size: 11.5px; margin-top: 2px; }
+  .charter { margin-top: 6px; padding: 6px 10px; border-left: 3px solid #39424e; background: #161b21; font-size: 12px; color: #cdd6e0; white-space: pre-wrap; word-break: break-word; }
+  .charter .lbl { color: #9ab; font-weight: bold; letter-spacing: 0.06em; font-size: 11px; }
+  .charter .seats { margin-top: 6px; color: #9ab; font-size: 11.5px; }
+  .charter .seat { display: block; margin-top: 2px; color: #b8c2ce; }
+  .charter .seats b, .charter .seat b { color: #7fd1ff; }
   header button { font: inherit; font-size: 11.5px; background:#222; color:#ccc; border:1px solid #444; cursor:pointer; padding:2px 8px; }
   header button:hover { border-color:#7fd1ff; color:#7fd1ff; }
   .verdict-allow { color: #7dff8a; }
@@ -77,6 +106,8 @@ export function pageHtml({ charterName, token }) {
     <button id="btn-stop" title="finish the current turn, flush, end with its reason">⏹ stop</button>
     <button id="btn-kill" title="cancel the in-flight turn now, flush what exists">✂ kill</button>
   </span>
+  ${provHtml}
+  ${charterHtml}
   <div id="banner" style="display:none; margin-top:6px; color:#ffd27d; font-weight:bold"></div>
 </header>
 <main>

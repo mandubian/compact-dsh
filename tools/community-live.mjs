@@ -488,6 +488,12 @@ async function main() {
       controls,
       port: Number(flag('port') ?? 3090),
       charterName: charter.name,
+      // the live page meets the charter too (#261's parity, at launch
+      // time): the goal, the seats with their roles and routes, and the
+      // code the run rides — baked in server-side, the same shapes the
+      // replay renders from its archive
+      charter,
+      provenance,
     });
     // the boot token is a bearer credential that lived only in the boot
     // line and process memory — a terminal scrolled past took the page
