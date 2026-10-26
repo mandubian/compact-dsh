@@ -344,3 +344,38 @@ test('the page never fights the human: the 4s poll skips unchanged renders and c
   assert.match(script, /div\.dataset\.id = a\.id;/);
   assert.match(script, /div\.dataset\.id = q\.id;/);
 });
+
+test('the live page meets the charter: goal, seats with roles, and the code it rides (#261/#262 parity)', async () => {
+  const { pageHtml } = await import('../src/page.js');
+  const html = pageHtml({
+    charterName: 'weight-of-voice',
+    token: 'tkn',
+    charter: {
+      goal: "Four members deliberate this question: 'should judgment be heavy?'",
+      members: [
+        { id: 'frugal', persona: 'argues the cheap many', model: { provider: 'zai', model: 'glm-5.3-flash' } },
+        { id: 'bench-1', persona: 'the heavy seat', model: { provider: 'zai', model: 'glm-5.3' }, bench: true },
+      ],
+    },
+    provenance: { repo: 'git@github.com:mandubian/compact-dsh.git', ref: 'main', commit: 'e212aea1234567890123456789012345678901234' },
+  });
+  // the blocks are server-side: present in the served HTML itself, no
+  // client round-trip, no feed dependency — launch-time facts, baked in
+  assert.match(html, /THE CHARTER — the goal, verbatim \(as seated at launch\)/);
+  assert.match(html, /should judgment be heavy\?/);
+  assert.match(html, /<b>frugal<\/b> \(zai\/glm-5\.3-flash\) — argues the cheap many/);
+  assert.match(html, /<b>bench-1<\/b> \(zai\/glm-5\.3\) · bench — the heavy seat/);
+  assert.match(html, /code: github\.com\/mandubian\/compact-dsh @ e212aea12345 \[main\]/);
+  assert.doesNotMatch(html, /DIRTY TREE/);
+  // and the page escapes member text — a persona with markup cannot inject
+  const hostile = pageHtml({
+    charterName: 'x', token: 'tkn',
+    charter: { goal: 'g', members: [{ id: 'm', persona: '<script>x</script>' }] },
+  });
+  assert.match(hostile, /&lt;script&gt;/);
+  assert.doesNotMatch(hostile, /<script>x<\/script>/);
+  // absent charter/provenance (a bare observatory) renders neither block
+  const bare = pageHtml({ charterName: 'x', token: 'tkn' });
+  assert.doesNotMatch(bare, /THE CHARTER/);
+  assert.doesNotMatch(bare, /code: /);
+});
