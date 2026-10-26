@@ -1,0 +1,49 @@
+{
+  "charter": "weight-of-voice",
+  "runTag": "34ea9c",
+  "resumed": true,
+  "endedAt": "2026-10-25T15:15:21.745Z",
+  "endReason": "token cap: 2000000",
+  "rounds": 7,
+  "turns": 27,
+  "benchCasesSeen": 1,
+  "tokens": 2022898,
+  "budgets": {
+    "rounds": 8,
+    "maxTurnsPerAgent": 8,
+    "wallClockMinutes": 60,
+    "tokenCap": 2000000
+  },
+  "continuedFrom": {
+    "runTag": "1c0202",
+    "endedAt": "2026-10-25T14:36:48.280Z",
+    "endReason": "rounds complete",
+    "resumed": true,
+    "tokens": 0,
+    "rounds": 8,
+    "turns": 32,
+    "continuedFrom": "a6a42c"
+  },
+  "members": {
+    "frugal": 7,
+    "elitist": 7,
+    "pragmatist": 6,
+    "filer": 6,
+    "bench-1": 1
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "frugal": "zai/glm-5.3-flash",
+      "elitist": "zai/glm-5.3-flash",
+      "pragmatist": "zai/glm-5.3-flash",
+      "filer": "zai/glm-5.3-flash",
+      "bench-1": "zai/glm-5.3"
+    }
+  },
+  "divergence": {
+    "loopguardTrips": 8,
+    "humanSeatTimeouts": 3
+  }
+}
