@@ -289,7 +289,7 @@ export function apply(ctx, config = {}) {
   };
 
   const attestFor = (sessionId, now = Date.now()) => {
-    const att = composeAttestation(ctx, { sessionId, now, staleAfterMs, signed: enforcer != null });
+    const att = composeAttestation(ctx, { sessionId, now, staleAfterMs, signed: enforcer != null, seat: lastSeat.get(sessionId != null ? String(sessionId) : null) ?? null });
     if (enforcer && sessionId != null) {
       const sid = String(sessionId);
       ensureSubject(sid, att.subject.lineage);
@@ -488,8 +488,26 @@ export function apply(ctx, config = {}) {
     path: () => memberBinding?.declarationsPath ?? bindings.values().next().value?.declarationsPath ?? null,
   };
 
+  // the seat ledger (the weight-of-voice-v2 finding): every assistant
+  // message embeds its exact provider stream — the runtime's own record
+  // of the route this session speaks on. Tracked per session so the
+  // attestation can state the seat as fact, not briefing say-so; a
+  // session that has not spoken yet has no seat on record, and the
+  // attestation says exactly that.
+  const lastSeat = new Map();
+  const noteSeat = (session, event) => {
+    if (event?.type !== 'assistant/message') return;
+    const d = event?.data ?? event;
+    const src = d?.message?.source ?? d?.source;
+    if (src?.kind === 'model' && src.provider && src.model) {
+      lastSeat.set(session?.id != null ? String(session.id) : null, { provider: String(src.provider), model: String(src.model) });
+    }
+  };
+  ctx.on?.('session/event', noteSeat);
+
   // 1. at the boundary of the Subject's own operation
   ctx.on?.('session/event', (session, event) => {
+    noteSeat(session, event);
     if (event?.type !== 'turn/start') return;
     try {
       const sessionId = session?.id != null ? String(session.id) : null;

@@ -40,6 +40,27 @@ labeled, and subordinate to the record.
   act**: *"I confirmed by my own act this round that the docket is
   empty (judicature_case: nothing filed)."*
 
+## The finding that outlived the run: the seat was not attested
+
+Mid-debate, a member tested the goal's own evidentiary claim against
+the machinery and reported, on the forum, that **`self_describe` does
+not name its model route** — "the seating of the debaters on the cheap
+route and the bench on the heavy route is asserted by the briefing and
+the manifest, not attested by the record I can read… 'weight vs.
+cheapness' is being argued about a variable none of us can observe
+from inside." The member was right, and the claim came from the
+charter's goal text: an overclaim about machinery. The route lived in
+three places — the briefing (driver text), the manifest (not
+member-readable), and the member's own chain (`request/header`, which
+nothing taught it to read) — but not in the attestation, the one
+instrument R-1 makes authoritative. **Fixed since:** the attestation
+now composes the seat from the provider stream embedded in the
+subject's own recorded assistant messages — `Seat:
+zai/glm-5.3-flash — attested from your own recorded stream (R-1)` —
+and names it honestly as *not yet on record* before the first turn,
+never guessed. The finding is on this run's forum; the fix is in
+every run after it.
+
 ## v1 → v2, in one paragraph
 
 v1 reached the court and stranded the ruling on the docket; v2
