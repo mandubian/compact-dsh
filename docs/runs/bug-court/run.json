@@ -1,0 +1,80 @@
+{
+  "charter": "bug-court",
+  "runTag": "8e68c3",
+  "resumed": false,
+  "goal": "Three members deliberate the truth about one frozen artifact: sources/purse.js, a tiny money module, is the evidence and it does not change; sources/claims.md restates three suspicions about it as claims B1–B3 plus one open edge O1. Evidence is executable: the only way to attack a claim is to write the smallest reproduction in real bash against the frozen file and post the command with its actual output. A claim nobody reproduced has not been tried; a reproduction nobody attacked has not been examined; a defect beyond the claims, reproduced, is deliberation the ledger should record. The chair weighs what the evidence actually shows. The session succeeds when ONE forum post titled 'VERDICTS:' returns CONFIRMED or REJECTED per claim — each verdict citing the reproducing command and its output, or the failed reproduction and why it failed — plus a sharpened answer to O1, naming every member endorsing each line; each member endorses by its own post naming that record. Where honest disagreement remains on a line, the record states the disagreement precisely instead of pretending consensus.",
+  "topic": "bug-court-floor",
+  "code": {
+    "repo": "git@github.com:mandubian/compact-dsh.git",
+    "ref": "feat/live-page-charter",
+    "commit": "75c6c5c4f5545cefea44a7dbe8d5743e7da5e228"
+  },
+  "runtime": {
+    "node": "v22.23.2",
+    "image": "dsh-tools:basic",
+    "imageDigest": "sha256:1f89a66bbec96b0804fcb211450498749f6cbe9461674b84cf03c4686b4b91dd",
+    "law": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95"
+  },
+  "charterFile": {
+    "name": "bug-court.json",
+    "sha256": "81db68a29d91aad09a2743db2345b90119fc49ffd72a933193a7060295d2f965"
+  },
+  "seats": [
+    {
+      "id": "accuser",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "prosecutes the claims: writes the smallest reproduction for each and posts command plus output — a claim that survives its own reproduction is CONFIRMED material, one that does not is REJECTED material, and says which plainly"
+    },
+    {
+      "id": "defender",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "defends the frozen artifact: attacks weak reproductions, argues documented intent over assumed intent, and when a claim is simply true says so plainly — a defense that never concedes is not a defense"
+    },
+    {
+      "id": "skeptic",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "doubts everything, both ways: minimal cases, boundary values, and the gap between what an output shows and what its poster claims it shows — also hunts the defects nobody claimed"
+    },
+    {
+      "id": "chair",
+      "model": "zai/glm-5.3",
+      "bench": false,
+      "persona": "weighs evidence, not rhetoric: maps each claim to its strongest reproduction and its strongest rebuttal, drafts the VERDICTS ledger citing the commands — and never counts a verdict the record does not carry"
+    }
+  ],
+  "endedAt": "2026-10-26T12:57:44.898Z",
+  "endReason": "token cap: 1200000",
+  "rounds": 7,
+  "turns": 26,
+  "benchCasesSeen": 0,
+  "tokens": 1217341,
+  "budgets": {
+    "rounds": 7,
+    "maxTurnsPerAgent": 7,
+    "wallClockMinutes": 45,
+    "tokenCap": 1200000
+  },
+  "members": {
+    "accuser": 7,
+    "defender": 7,
+    "skeptic": 6,
+    "chair": 6
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "accuser": "zai/glm-5.3-flash",
+      "defender": "zai/glm-5.3-flash",
+      "skeptic": "zai/glm-5.3-flash",
+      "chair": "zai/glm-5.3"
+    }
+  },
+  "divergence": {
+    "loopguardTrips": 7,
+    "humanSeatTimeouts": 3
+  }
+}

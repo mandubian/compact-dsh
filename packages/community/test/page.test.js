@@ -99,8 +99,28 @@ test('empty lanes say so instead of rendering nothing', () => {
   assert.match(doc.els.get('acts-list').innerHTML, /no acts recorded/);
 });
 
-test('the charter rides with the archive: the goal renders, legacy archives render no block', () => {
-  // the operator's finding: the exports showed the debate but never the
+test('a gate post may open with its author\'s name — the bug-court finding', () => {
+  // the live run's chair posted "chair — VERDICTS: final ledger…"; the
+  // first detector required the gate word to open the post and missed
+  // the marking. Member speech is never edited; the detector yields.
+  const html = replayPageHtml({
+    charterName: 'page-test',
+    data: {
+      run: { charter: 'page-test', runTag: 'g2', endReason: 'token cap' },
+      forum: [
+        { id: 'fp_1', seq: 1, topic: 'floor', by: 'community-chair-abc123', at: '2026-10-26T00:00:01.000Z', text: 'chair — VERDICTS: final ledger\nB1 CONFIRMED' },
+        { id: 'fp_2', seq: 2, topic: 'floor', by: 'community-chair-abc123', at: '2026-10-26T00:00:02.000Z', text: 'a plain post that merely mentions VERDICTS: mid-sentence stays plain' },
+      ],
+      timeline: [], members: [],
+    },
+  });
+  const doc = render(html);
+  const classes = doc.els.get('forum-list').children.map((li) => li.className);
+  assert.equal(classes[0], 'post ledger', 'the prefixed gate post is marked');
+  assert.equal(classes[1], 'post', 'a mid-sentence mention is not a gate');
+});
+
+test('the charter rides with the archive: the goal renders, legacy archives render no block', () => {  // the operator's finding: the exports showed the debate but never the
   // question — a reader needed the repo's charter JSON. Newer manifests
   // carry goal/topic/seats and the replay renders them; the old ones stay
   // silent (an absence, honestly stated, never a fake).

@@ -133,7 +133,7 @@ const stamp = (at) => (typeof at === 'number' && Number.isFinite(at) ? new Date(
 // because they are what the run exists to produce
 const memberOf = (s) => String(s ?? '?').replace(/^community-/, '').replace(/-[0-9a-f]{6}$/, '');
 const colorOf = (name) => { let h = 0; for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return 'c' + (h % 8); };
-const GATE_RE = /^(AGREEMENT|POSITIONS|RULING|VERDICTS):/;
+const GATE_RE = /^(?:[\\w.-]+ — )?(AGREEMENT|POSITIONS|RULING|VERDICTS):/;
 // emphasis inside a post body, applied AFTER escaping so member text can
 // never inject markup: fp_ cites and the verdict vocabulary read at a
 // glance inside a long ledger post
@@ -471,7 +471,7 @@ if (r.goal) {
 // machinery, not identity, and the members table keeps the full session
 const memberOf = (s) => String(s ?? '?').replace(/^community-/, '').replace(/-[0-9a-f]{6}$/, '');
 const colorOf = (name) => { let h = 0; for (const ch of String(name)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return 'c' + (h % 8); };
-const GATE_RE = /^(AGREEMENT|POSITIONS|RULING|VERDICTS):/;
+const GATE_RE = /^(?:[\\w.-]+ — )?(AGREEMENT|POSITIONS|RULING|VERDICTS):/;
 // emphasis inside a post body, applied AFTER escaping so member text can
 // never inject markup: fp_ cites and the verdict vocabulary read at a
 // glance inside a long ledger post
