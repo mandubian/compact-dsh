@@ -367,6 +367,11 @@ test('the live page meets the charter: goal, seats with roles, and the code it r
   assert.match(html, /<b>bench-1<\/b> \(zai\/glm-5\.3\) · bench — the heavy seat/);
   assert.match(html, /code: github\.com\/mandubian\/compact-dsh @ e212aea12345 \[main\]/);
   assert.doesNotMatch(html, /DIRTY TREE/);
+  // parity with the replay: the not-git note carries the same 'code: ' prefix
+  const notGit = pageHtml({
+    charterName: 'x', token: 'tkn', provenance: { note: 'not a git checkout — the code state is not named' },
+  });
+  assert.match(notGit, /code: not a git checkout/);
   // and the page escapes member text — a persona with markup cannot inject
   const hostile = pageHtml({
     charterName: 'x', token: 'tkn',
