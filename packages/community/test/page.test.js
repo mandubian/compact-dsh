@@ -253,7 +253,10 @@ test('clause citations resolve in place when the law is embedded (R-6, sliced ve
   const mk = (law) => replayPageHtml({
     charterName: 'page-test',
     data: {
-      run: { charter: 'page-test', runTag: 'l1', endReason: 'rounds complete' },
+      run: {
+        charter: 'page-test', runTag: 'l1', endReason: 'rounds complete',
+        ...(law ? { runtime: { law: law.digest } } : {}),
+      },
       forum: [
         { id: 'fp_1', seq: 1, topic: 'floor', by: 'community-alpha-x', at: '2026-10-27T00:00:01.000Z', text: 'refusing address is R-9, and LG-3 is a guard code, not law' },
       ],
@@ -261,15 +264,20 @@ test('clause citations resolve in place when the law is embedded (R-6, sliced ve
       ...(law ? { law } : {}),
     },
   });
-  const doc = render(mk({ digest: '27bb7078fe9aea50', clauses: { 'R-9': 'R-9 — the refusal carries its rule, verbatim.' } }));
+  const doc = render(mk({ digest: '27bb7078fe9aea50', basis: 'run', clauses: { 'R-9': 'R-9 — the refusal carries its rule, verbatim.' } }));
   const body = doc.els.get('forum-list').children[0].innerHTML;
   assert.match(body, /<span class="law" data-c="R-9"[^>]*>/, 'the clause id is a click');
   assert.match(body, /title="R-9 — the refusal carries[^"]*/, 'the hover preview carries the clause text');
   assert.doesNotMatch(body, /data-c="LG-3"/, 'an enforcement code is not law and is not wrapped');
   assert.ok(doc.els.get('lawpane'), 'the pane element exists');
 
+  // the pre-provenance basis: embedded, and the pane never claims to be
+  // the run's law (the review's overclaim finding)
+  const current = render(mk({ digest: '27bb7078fe9aea50', basis: 'current', clauses: { 'R-9': 'R-9 — text.' } }));
+  assert.match(current.els.get('forum-list').children[0].innerHTML, /data-c="R-9"/, 'still resolvable');
+
+  // and a legacy archive with no embedded law wraps nothing — absence
   const legacy = render(mk(null));
-  const legacyBody = doc2 => legacy;
-  assert.doesNotMatch(render(mk(null)).els.get('forum-list').children[0].innerHTML, /class="law"/,
+  assert.doesNotMatch(legacy.els.get('forum-list').children[0].innerHTML, /class="law"/,
     'a legacy archive (no embedded law) wraps nothing — absence, not error');
 });

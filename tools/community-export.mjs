@@ -22,14 +22,23 @@ import { validateCharter } from '../packages/community/src/charter.js';
 import { clauseIds, clauseText, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { replayPageHtml } from '../packages/community/src/page.js';
 
-/** The law, embedded for the replay's citation resolution: every clause
- *  id mapped to its text SLICED FROM THE BODY (R-6 — never restated), with
- *  the digest named so a reader knows exactly which law this is. ~40KB,
- *  the cost of a citation a reader can actually resolve. */
-function lawForEmbedding() {
+/** The law, embedded for the replay's citation resolution — but only as
+ *  much as the archive itself can vouch for (the review's finding):
+ *  - the run's manifest records its law digest AND it matches the current
+ *    body → embed, basis 'run' (the pane says: the law this run ran
+ *    under, recorded in its own manifest);
+ *  - the run predates law provenance (no runtime.law) → embed the current
+ *    body, basis 'current' (the pane says so plainly — it does NOT claim
+ *    to be the run's law);
+ *  - the run records a DIFFERENT digest → embed nothing at all: resolving
+ *    citations against the wrong law is worse than not resolving them.
+ *  Clause text is SLICED FROM THE BODY (R-6 — never restated). */
+function lawForEmbedding(archive) {
+  const runLaw = archive?.run?.runtime?.law ?? null;
+  if (runLaw != null && runLaw !== COMPACT_DIGEST) return null;
   const clauses = {};
   for (const id of clauseIds()) clauses[id] = clauseText(id);
-  return { digest: COMPACT_DIGEST, clauses };
+  return { digest: COMPACT_DIGEST, basis: runLaw === COMPACT_DIGEST ? 'run' : 'current', clauses };
 }
 
 
@@ -80,10 +89,12 @@ function main() {
     }
   }
   const charterName = archive.run?.charter ?? 'community';
-  // the law rides with the archive: citations in posts resolve to clause
-  // text inside the page, offline, self-contained (R-6: sliced from the
-  // body, never restated; the digest names which law this is)
-  archive.law = archive.law ?? lawForEmbedding();
+  // the law rides with the archive — only as much as the archive can
+  // vouch for (see lawForEmbedding): basis 'run' when the manifest's own
+  // digest matches, 'current' when the run predates law provenance,
+  // nothing at all when the run ran under a different body
+  archive.law = lawForEmbedding(archive);
+  if (archive.law == null) console.error('community-export: the run recorded a DIFFERENT law digest — no law embedded; citations will not resolve against the wrong body');
   const html = replayPageHtml({ charterName, data: archive });
   writeFileSync(out, html, { mode: 0o644 });
   console.log(`community-export: ${charterName} archived to ${out} (${Math.round(html.length / 1024)}kB, self-contained — commit it, serve it, or open it)`);

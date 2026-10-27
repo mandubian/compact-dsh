@@ -392,7 +392,7 @@ export function replayPageHtml({ charterName, data }) {
      text in the pane (sliced from the body, R-6); hover carries a short
      preview. Ids the body does not carry stay plain: a tooltip pretending
      an enforcement code is law would be the false answer, named. */
-  li.post .body .law, li.act .law { color: #b6a2ff; border-bottom: 1px dotted #b6a2ff; cursor: pointer; }
+  li.post .body .law { color: #b6a2ff; border-bottom: 1px dotted #b6a2ff; cursor: pointer; }
   .lawpane { display: none; position: fixed; right: 12px; bottom: 12px; width: min(640px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; background: #161b21; border: 1px solid #b6a2ff; padding: 10px 12px; font-size: 12px; z-index: 40; }
   .lawpane .lawhead { color: #9ab; margin-bottom: 6px; }
   .lawpane .lawhead b { color: #b6a2ff; }
@@ -517,18 +517,26 @@ const hl = (s) => esc(s)
 
 // the law, resolvable in place: a clause id the embedded law carries
 // becomes a click that opens the clause's own text in the pane (sliced
-// from the body, R-6); hover carries a short preview. Ids the body does
-// not carry (enforcement codes: LG-5, AG, RA…) stay plain — a tooltip
-// that pretended they were law would be the false answer, named.
+// from the body, R-6); hover carries a short preview. The id grammar
+// matches the body's own ([A-Z]{1,4}, the HEADER_RE shape) so a future
+// four-letter prefix resolves the day it exists. Ids the body does not
+// carry (enforcement codes: LG-5, AG, RA…) stay plain — a tooltip that
+// pretended they were law would be the false answer, named.
 const LAW = DATA.law ?? null;
 const lawHl = (s) => LAW
-  ? hl(s).replace(/\\b([A-Z]{1,3}-\\d+(?:\\/DYN)?)\\b/g, (m, id) =>
-      LAW.clauses[id] != null ? '<span class="law" data-c="' + id + '" onclick="showLaw(\\'' + id + '\\')" title="' + esc(LAW.clauses[id]).slice(0, 160).replace(/"/g, '&quot;') + '…">' + id + '</span>' : m)
+  ? hl(s).replace(/\\b([A-Z]{1,4}-\\d+(?:\\/DYN)?)\\b/g, (m, id) =>
+      LAW.clauses[id] != null ? '<span class="law" data-c="' + id + '" onclick="showLaw(\\'' + id + '\\')" title="' + esc(String(LAW.clauses[id]).slice(0, 160)) + '…">' + id + '</span>' : m)
   : hl(s);
 const showLaw = (id) => {
   const pane = $('lawpane');
   if (!pane || !LAW || LAW.clauses[id] == null) return;
-  pane.innerHTML = '<div class="lawhead"><b>' + id + '</b> — the law as this run ran under it (draft body, digest ' + String(LAW.digest).slice(0, 12) + '…; sliced verbatim, R-6)' +
+  const basis = LAW.basis === 'run'
+    ? 'the law this run ran under, recorded in its own manifest (digest '
+    : 'the current draft body (digest ';
+  const tail = LAW.basis === 'run'
+    ? ') — sliced verbatim, R-6'
+    : ') — this run predates law provenance, so its own law digest is not recorded; citations resolve against the current draft. Sliced verbatim, R-6';
+  pane.innerHTML = '<div class="lawhead"><b>' + id + '</b> — ' + basis + String(LAW.digest).slice(0, 12) + '…' + tail +
     '<button onclick="$(\\'lawpane\\').style.display=\\'none\\'">close</button></div><pre>' + esc(LAW.clauses[id]) + '</pre>';
   pane.style.display = 'block';
 };
