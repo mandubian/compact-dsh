@@ -19,6 +19,7 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { watchVerdictsFromLog } from './watch-report.mjs';
+import { classifyResult, resultCallId } from './act-outcome.mjs';
 
 const BIN = 'community-report:';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -78,6 +79,17 @@ export function findSessionLogs(recordRoot) {
   return logs.sort();
 }
 
+/** Tokens one assistant row spent, counted the way the live launcher's
+ *  meter counts them for the cap: input, output, and both cache sides.
+ *  A per-member figure that drops the cache reads disagrees with the
+ *  manifest's total by an order of magnitude (the v2 archive: ~0.19M
+ *  summed against 2.52M metered) — one formula, everywhere. */
+export function meteredTokens(usage) {
+  const u = usage ?? {};
+  return (Number(u.inputTokens) || 0) + (Number(u.outputTokens) || 0)
+    + (Number(u.cacheReadTokens) || 0) + (Number(u.cacheWriteTokens) || 0);
+}
+
 /** One member's story from its own log: turns, acts, speech, and every
  *  decision that touched it. Pure: log text in, counts out. The session
  *  id prefers a row that names it and falls back to the DIRECTORY rule
@@ -87,9 +99,15 @@ export function agentStatsFromLog(logText, fallbackSessionId = null) {
     session: fallbackSessionId, turns: 0, steps: 0, toolCalls: {}, forumPosts: [], passCalls: [], passes: [], passRefused: [],
     approvals: 0, answeredBy: { operator: 0, watch: 0, replay: 0, denied: 0, unavailable: 0 },
     watchVerdicts: 0, loopguardTrips: 0, askHuman: { asked: 0, answered: 0, timedOut: 0 },
-    usage: { inputTokens: 0, outputTokens: 0 },
+    usage: { inputTokens: 0, outputTokens: 0, metered: 0 },
+    // a call is an attempt; its own result says whether it landed (the
+    // v2 finding: two refused filings were counted as two filings)
+    refused: [], errors: [], unresolved: 0,
+    docket: { hear: { attempted: 0, landed: 0 }, judge: { attempted: 0, landed: 0 } },
   };
   const passByCall = new Map();
+  const postByCall = new Map();
+  const callName = new Map();
   for (const line of String(logText ?? '').split('\n')) {
     if (!line.trim()) continue;
     let row;
@@ -102,10 +120,16 @@ export function agentStatsFromLog(logText, fallbackSessionId = null) {
         stats.steps += 1;
         const name = String(data?.name ?? row.name ?? '?');
         stats.toolCalls[name] = (stats.toolCalls[name] ?? 0) + 1;
+        const anyCallId = String(data?.callId ?? row.callId ?? '');
+        if (anyCallId) callName.set(anyCallId, name);
+        if (name === 'judicature_hear') stats.docket.hear.attempted += 1;
+        if (name === 'judicature_judge') stats.docket.judge.attempted += 1;
         if (name === 'forum_post') {
           try {
             const args = JSON.parse(String(data?.arguments ?? row.arguments ?? '{}'));
-            stats.forumPosts.push({ topic: args?.topic ?? '?', text: String(args?.text ?? '').slice(0, 140) });
+            const post = { topic: args?.topic ?? '?', text: String(args?.text ?? '').slice(0, 140), landed: null };
+            stats.forumPosts.push(post);
+            if (anyCallId) postByCall.set(anyCallId, post);
           } catch { /* a torn argument never kills the report */ }
         }
         if (name === 'forum_pass') {
@@ -121,13 +145,25 @@ export function agentStatsFromLog(logText, fallbackSessionId = null) {
         break;
       }
       case 'tool/result': {
-        const callId = String(data?.message?.toolCallId ?? data?.toolCallId ?? data?.callId ?? '');
+        const callId = resultCallId(data);
+        const name = callName.get(callId);
+        if (!name) break;
+        callName.delete(callId);
+        const verdict = classifyResult(data, name);
+        if (verdict.outcome === 'refused') stats.refused.push({ tool: name, rule: verdict.rule, result: verdict.result });
+        else if (verdict.outcome === 'error') stats.errors.push({ tool: name, result: verdict.result });
+        else if (name === 'judicature_hear') stats.docket.hear.landed += 1;
+        else if (name === 'judicature_judge') stats.docket.judge.landed += 1;
+        const post = postByCall.get(callId);
+        if (post) { post.landed = verdict.outcome === 'ok'; postByCall.delete(callId); }
         if (!passByCall.has(callId)) break;
         const content = data?.message?.content ?? data?.content ?? [];
         const text = Array.isArray(content) ? content.map((b) => b?.text ?? '').join('') : String(content);
         const reason = passByCall.get(callId);
         if (/\[forum\] pass recorded/.test(text)) stats.passes.push({ reason });
-        else if (/\[forum\] not passed/.test(text)) stats.passRefused.push({ reason: reason.trim() ? reason : '(empty)' });
+        else if (/\[forum\] not passed/.test(text) || verdict.outcome === 'refused') {
+          stats.passRefused.push({ reason: reason.trim() ? reason : '(empty)', rule: verdict.rule });
+        }
         passByCall.delete(callId);
         break;
       }
@@ -135,6 +171,7 @@ export function agentStatsFromLog(logText, fallbackSessionId = null) {
         const u = data?.usage ?? {};
         stats.usage.inputTokens += u.inputTokens ?? 0;
         stats.usage.outputTokens += u.outputTokens ?? 0;
+        stats.usage.metered += meteredTokens(u);
         break;
       }
       case 'approval/asked': stats.approvals += 1; break;
@@ -162,8 +199,16 @@ export function agentStatsFromLog(logText, fallbackSessionId = null) {
       default: break;
     }
   }
+  stats.unresolved = callName.size;
   return stats;
 }
+
+/** "LG/LG-3×2, JG/judgment-refused×1" — the rules that refused, counted. */
+const ruleTally = (rows) => {
+  const by = new Map();
+  for (const r of rows) by.set(r.rule ?? '?', (by.get(r.rule ?? '?') ?? 0) + 1);
+  return [...by].map(([rule, n]) => `${rule}×${n}`).join(', ');
+};
 
 /** The forum ledger beside the chains — the readable copy of the speech. */
 export function forumFromLedger(ledgerPath) {
@@ -239,6 +284,17 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
       }
     }
     L.push(`    rounds ${run.rounds} · turns ${run.turns} · bench cases ${run.benchCasesSeen} · tokens ${run.tokens}${run.divergence ? ` · divergence lines: ${JSON.stringify(run.divergence)}` : ''}`);
+    // the fields a manifest carries since the act-outcome change: older
+    // manifests say nothing here rather than guess
+    const lasted = Date.parse(run.endedAt) - Date.parse(run.startedAt);
+    if (Number.isFinite(lasted) && lasted >= 0) L.push(`    started ${run.startedAt} — lasted ${Math.round(lasted / 60000)} min`);
+    if (run.divergenceObserved) L.push(`    divergence observed: ${JSON.stringify(run.divergenceObserved)} (against the charter's lines above)`);
+    if (Array.isArray(run.gatePosts)) {
+      L.push(`    gate posts: ${run.gatePosts.length ? run.gatePosts.map((g) => `${g.id} ${g.gate} (${g.by})`).join(' · ') : 'none — no post of this run opens with AGREEMENT:, POSITIONS:, RULING: or VERDICTS:'}`);
+    }
+    if (run.tokensBySeat && Object.keys(run.tokensBySeat).length) {
+      L.push(`    tokens by seat: ${Object.entries(run.tokensBySeat).map(([id, n]) => `${id}=${n}`).join(' ')}`);
+    }
     if (run.model?.model) {
       const routes = Object.values(run.model.members ?? {});
       const seatedOn = new Set(routes).size > 1
@@ -257,8 +313,17 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
     const name = (s.session ?? 'session').replace(/^community-/, '');
     const decisions = Object.entries(s.answeredBy).filter(([, n]) => n > 0).map(([k, n]) => `${k}:${n}`).join(' ') || 'none';
     L.push(`  ${name}`);
-    L.push(`    turns ${s.turns} · acts ${s.steps} · forum posts ${s.forumPosts.length} · pass calls ${s.passCalls.length} · tokens ${s.usage.inputTokens + s.usage.outputTokens}`);
+    const landed = s.forumPosts.filter((p) => p.landed === true).length;
+    const resolved = s.forumPosts.some((p) => p.landed !== null);
+    const speech = resolved ? `forum posts ${landed} landed of ${s.forumPosts.length} attempted` : `forum_post calls ${s.forumPosts.length}`;
+    L.push(`    turns ${s.turns} · acts ${s.steps} · ${speech} · pass calls ${s.passCalls.length} · tokens ${s.usage.metered} (metered as the cap counts them)`);
     L.push(`    tools: ${Object.entries(s.toolCalls).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(', ') || 'none'}`);
+    if (s.refused.length) {
+      const byTool = new Map();
+      for (const r of s.refused) byTool.set(r.tool, (byTool.get(r.tool) ?? 0) + 1);
+      L.push(`    REFUSED ${s.refused.length} act(s): ${[...byTool].map(([k, n]) => `${k}×${n}`).join(', ')} — by ${ruleTally(s.refused)}`);
+    }
+    if (s.errors.length) L.push(`    errored ${s.errors.length} act(s) without naming a rule: ${s.errors.slice(0, 2).map((e) => `${e.tool}: ${e.result}`).join(' | ')}`);
     if (s.approvals > 0 || s.watchVerdicts > 0) L.push(`    approvals asked ${s.approvals} — answered by: ${decisions}`);
     if (s.loopguardTrips > 0) L.push(`    LoopGuard trips: ${s.loopguardTrips} (the loop health spoke)`);
     if (s.askHuman.asked > 0) L.push(`    asked the human ${s.askHuman.asked}× — answered ${s.askHuman.answered}, timed out ${s.askHuman.timedOut}`);
@@ -269,7 +334,7 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
     }
     for (const p of s.passes.slice(0, 3)) L.push(`      pass: ${p.reason}`);
     if (s.passes.length > 3) L.push(`      … +${s.passes.length - 3} more pass(es)`);
-    for (const p of s.passRefused.slice(0, 3)) L.push(`      pass refused: ${p.reason}`);
+    for (const p of s.passRefused.slice(0, 3)) L.push(`      pass refused${p.rule ? ` (${p.rule})` : ''}: ${p.reason}`);
   }
   // the forum
   L.push('');
@@ -289,8 +354,22 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
   L.push('');
   L.push('THE DOCKET');
   L.push('  the docket is in-memory by design: it lived as long as the run process. The filings');
-  L.push('  themselves are durable — every judicature_hear is a tool call on a member\'s chain;');
-  L.push(`  this run's logs show ${statsByLog.reduce((n, s) => n + (s.toolCalls.judicature_hear ?? 0), 0)} filing(s) and ${statsByLog.reduce((n, s) => n + (s.toolCalls.judicature_judge ?? 0), 0)} judgment(s).`);
+  L.push('  themselves are durable — every judicature_hear is a tool call on a member\'s chain,');
+  L.push('  and its result on the same log says whether it landed:');
+  const docketLine = (label, key, tool) => {
+    const attempted = statsByLog.reduce((n, s) => n + s.docket[key].attempted, 0);
+    const landed = statsByLog.reduce((n, s) => n + s.docket[key].landed, 0);
+    const refused = statsByLog.flatMap((s) => s.refused.filter((r) => r.tool === tool));
+    const errored = statsByLog.reduce((n, s) => n + s.errors.filter((e) => e.tool === tool).length, 0);
+    const silent = attempted - landed - refused.length - errored;
+    const parts = [`${landed} landed`];
+    if (refused.length) parts.push(`${refused.length} refused (${ruleTally(refused)})`);
+    if (errored) parts.push(`${errored} errored`);
+    if (silent > 0) parts.push(`${silent} with no result in the log`);
+    return `  ${label}: ${attempted} attempt(s) — ${parts.join(', ')}`;
+  };
+  L.push(docketLine('filings (judicature_hear)', 'hear', 'judicature_hear'));
+  L.push(docketLine('judgments (judicature_judge)', 'judge', 'judicature_judge'));
   // the morning-after pointer
   L.push('');
   L.push('VERIFY IT OFFLINE (the record proves itself; this report is a read, not a proof)');

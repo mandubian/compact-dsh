@@ -60,8 +60,54 @@ test('the replay page renders all three panes from mixed timestamp shapes', () =
   const doc = render(html);
   assert.equal(doc.els.get('forum-list').children.length, 2);
   assert.equal(doc.els.get('acts-list').children.length, 3);
-  assert.match(doc.els.get('members').innerHTML, /<td>recorder-abc123<\/td><td>4<\/td>/);
-  assert.match(doc.els.get('members').innerHTML, /<td>verifier-abc123<\/td><td>5<\/td>/);
+  assert.match(doc.els.get('members').innerHTML, /recorder-abc123<\/span><\/td><td><\/td><td class="num">4<\/td>/);
+  assert.match(doc.els.get('members').innerHTML, /verifier-abc123<\/span><\/td><td><\/td><td class="num">5<\/td>/);
+});
+
+test('an act is an attempt until its result says it landed — the replay marks refusals (the v2 finding)', () => {
+  const run = { ...archive.run, model: { provider: 'zai', model: 'glm-5.3-flash', members: { filer: 'zai/glm-5.3-flash' } } };
+  const data = {
+    run,
+    actOutcomes: true,
+    forum: [
+      { id: 'fp_1', seq: 1, topic: 'floor', by: 'community-filer-abc123', at: '2026-10-26T15:00:00.000Z', text: 'MAPPING: the positions' },
+      { id: 'fp_2', seq: 2, topic: 'floor', by: 'community-filer-abc123', at: '2026-10-26T15:01:00.000Z', text: 'filer — RULING: per fp_1, and not fp_9' },
+    ],
+    timeline: [
+      { at: '2026-10-26T15:00:00.000Z', who: 'community-filer-abc123', type: 'act', text: 'forum_post [floor]: MAPPING: the positions', outcome: 'ok', post: 'fp_1' },
+      { at: '2026-10-26T15:06:17.977Z', who: 'community-filer-abc123', type: 'act', text: 'judicature_hear', outcome: 'refused', rule: 'LG/LG-3', result: '[LG/LG-3] loop guard trip (RotatingPollingPattern): 16 calls cycled' },
+      { at: '2026-10-26T15:06:18.000Z', who: 'community-filer-abc123', type: 'pass-refused', text: 'forum_pass refused: nothing new', rule: 'LG/LG-5' },
+      { at: '2026-10-26T15:07:00.000Z', who: 'community-filer-abc123', type: 'act', text: 'ask_human', outcome: 'error', result: 'tool "ask_human" requires approval, but no approval channel is available' },
+      { at: '2026-10-26T15:08:00.000Z', who: 'community-filer-abc123', type: 'turn-done', text: 'filer finished a turn' },
+    ],
+    members: [{ session: 'community-filer-abc123', turns: 1, tokens: { metered: 664937 } }],
+  };
+  const html = replayPageHtml({ charterName: 'page-test', data });
+  assert.match(html, /<ul id="acts-list" class="hide-turns">/, 'turn ends start hidden — they are most of the lane');
+  const doc = render(html);
+  const posts = doc.els.get('forum-list').children;
+  assert.equal(posts[0].id, 'fp_1', 'a post is addressable: #fp_1 lands on it');
+  assert.match(posts[1].innerHTML, /<a class="cite" href="#fp_1">fp_1<\/a>/, 'a cite of an accepted post is a link');
+  assert.match(posts[1].innerHTML, /<span class="cite dead"[^>]*>fp_9<\/span>/, 'an id no accepted post carries is not a link');
+  const acts = doc.els.get('acts-list').children;
+  assert.match(acts[0].innerHTML, /<a class="landed" href="#fp_1">→ fp_1<\/a>/, 'a landed post links to its fp id');
+  assert.equal(acts[1].className, 'act refused');
+  assert.match(acts[1].innerHTML, /judicature_hear <span class="verdict">— REFUSED \[LG\/LG-3\]<\/span> loop guard trip \(RotatingPollingPattern\)/);
+  assert.match(acts[2].innerHTML, /\[LG\/LG-5\]/, 'a refused pass names its rule');
+  assert.equal(acts[3].className, 'act error');
+  assert.match(acts[3].innerHTML, /— ERROR<\/span> tool &quot;ask_human&quot; requires approval/);
+  assert.equal(acts[4].className, 'turn-done');
+  assert.match(doc.els.get('gates').innerHTML, /gate posts: <a href="#fp_2">fp_2<\/a> RULING \(filer\)/);
+  assert.match(doc.els.get('outcomes').textContent, /^act outcomes recorded/);
+  const members = doc.els.get('members').innerHTML;
+  assert.match(members, /<td>zai\/glm-5\.3-flash<\/td><td class="num">1<\/td><td class="num">2<\/td><td class="num">3<\/td>/, 'route, turns, posts, refused (act + pass + error)');
+  assert.match(members, /<td class="num">664,937<\/td>/, 'metered tokens per seat');
+
+  // a legacy archive (no actOutcomes) says what it cannot know
+  const legacy = render(replayPageHtml({ charterName: 'page-test', data: archive }));
+  assert.match(legacy.els.get('outcomes').textContent, /predates recorded act outcomes: an act below is an attempt/);
+  assert.match(legacy.els.get('gates').innerHTML, /gate posts: none/);
+  assert.match(legacy.els.get('members').innerHTML, /<td class="num">—<\/td>/, 'unknown is not zero');
 });
 
 test('epoch-millisecond timestamps render as clock time, not a crash or digits', () => {

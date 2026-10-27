@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { readPreviousRun, continuationOf, preservePreviousRun, shellPath } from './run-manifest.mjs';
+import { readPreviousRun, continuationOf, preservePreviousRun, shellPath, gatePostsOf, tokensBySeatOf } from './run-manifest.mjs';
 
 test('a previous cut is named, with its budget and end reason', () => {
   const prev = { runTag: 'abc123', endedAt: '2026-10-24T00:00:00.000Z', endReason: 'token cap: 2000000', tokens: 2065950, rounds: 5, turns: 21, resumed: false };
@@ -49,4 +49,26 @@ test('the previous cut is copied before a new run boots, and a second copy does 
 test('ordinary paths stay readable; a path with a space is quoted', () => {
   assert.equal(shellPath('docs/runs/agent-tongue'), 'docs/runs/agent-tongue');
   assert.equal(shellPath('/tmp/a b'), "'/tmp/a b'");
+});
+
+test('the manifest names this run\'s gate posts — presence by id, never success', () => {
+  const forum = [
+    { id: 'fp_1', by: 'community-filer-old111', text: 'RULING: from the run before' },
+    { id: 'fp_2', by: 'community-filer-a980e1', text: 'MAPPING: the positions' },
+    { id: 'fp_3', by: 'community-chair-a980e1', text: 'chair — VERDICTS: B1 CONFIRMED' },
+    { id: 'fp_4', by: 'community-recorder-a980e1', text: '  AGREEMENT: we endorse' },
+    { id: 'fp_5', by: 'community-recorder-a980e1', text: 'not an AGREEMENT: mid-sentence' },
+  ];
+  assert.deepEqual(gatePostsOf(forum, 'a980e1'), [
+    { id: 'fp_3', gate: 'VERDICTS', by: 'chair' },
+    { id: 'fp_4', gate: 'AGREEMENT', by: 'recorder' },
+  ], 'a continued forum\'s older gate posts are not this run\'s');
+  assert.deepEqual(gatePostsOf([], 'a980e1'), [], 'no gate post is an empty list, stated');
+  assert.equal(gatePostsOf(forum).length, 3, 'without a tag every gate post counts');
+});
+
+test('tokens per seat are keyed by seat and sum to the metered total', () => {
+  const bySession = { 'community-frugal-a980e1': 100, 'community-bench-1-a980e1': 0, 'community-filer-a980e1': 50 };
+  assert.deepEqual(tokensBySeatOf(bySession, 'a980e1'), { frugal: 100, 'bench-1': 0, filer: 50 });
+  assert.equal(Object.values(tokensBySeatOf(bySession, 'a980e1')).reduce((a, b) => a + b, 0), 150);
 });

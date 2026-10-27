@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildReadingPrompt, renderReading, auditReading } from './community-reading.mjs';
+import { buildReadingPrompt, renderReading, auditReading, staleSource } from './community-reading.mjs';
 
 const data = {
   forum: [
@@ -78,4 +78,18 @@ test('verdict language not in the ledger fails', () => {
   const result = auditReading(`${good}\nThe member is guilty.`, data);
   assert.equal(result.ok, false);
   assert.match(result.failures.join('\n'), /guilty/);
+});
+
+test('a reading whose brief has since changed is named stale (the v2 finding)', () => {
+  // the v2 reading said "no filing" because its brief could not see two
+  // refused filings; once the brief can, the old reading must not pass
+  // as a reading of the brief the archive renders now
+  const brief = '# BRIEF — v2\nfilings: 0 attempted';
+  const reading = renderReading({ body: good, brief, model: 'answer-file (no model called)', generatedAt: 'T' });
+  assert.equal(staleSource(reading, brief), null, 'the bare brief it read');
+  assert.equal(staleSource(reading, `${brief}`), null);
+  const fileHashed = renderReading({ body: good, brief: `${brief}\n`, model: 'm', generatedAt: 'T' });
+  assert.equal(staleSource(fileHashed, brief), null, 'the written file, trailing newline included');
+  assert.match(staleSource(reading, '# BRIEF — v2\nfilings: 2 attempted, 0 landed, 2 refused'), /^STALE SOURCE: the reading was made from brief sha256 [0-9a-f]{12}…/);
+  assert.match(staleSource(good, brief), /names no source brief hash/);
 });

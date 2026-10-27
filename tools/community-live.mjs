@@ -44,7 +44,8 @@ import { parseAllowlistLikePattern, egressPatternFor } from 'compact-dsh-approva
 import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
-import { continuationOf, preservePreviousRun, readPreviousRun, shellPath } from './run-manifest.mjs';
+import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePostsOf, tokensBySeatOf } from './run-manifest.mjs';
+import { forumFromLedger, meteredTokens } from './community-report.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
 import { createReleasesHost } from './releases-host.mjs';
 import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters } from '../packages/community/src/index.js';
@@ -223,12 +224,21 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedK
   // The same listener feeds the observatory's notice lane: the attributed
   // user/message notices members receive (watch verdicts, approvals,
   // loopguard) — the shapes the after-run report reads, live.
+  // The per-session split rides the same formula, so the manifest's
+  // tokensBySeat sums to its tokens — the cost of each seat is the
+  // question the mixed-model charters ask, and the total cannot answer it.
   let tokensUsed = 0;
+  const tokensBySession = {};
   let noticeSink = null; // the observatory's notice lane, wired post-boot
   const onSessionEvent = (session, event) => {
     if (event?.type === 'assistant/message') {
       const u = event?.data?.usage ?? event?.usage;
-      if (u) tokensUsed += (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadTokens ?? 0) + (u.cacheWriteTokens ?? 0);
+      if (u) {
+        const n = meteredTokens(u);
+        tokensUsed += n;
+        const sid = String(session?.id ?? '?');
+        tokensBySession[sid] = (tokensBySession[sid] ?? 0) + n;
+      }
       return;
     }
     if (event?.type === 'user/message') {
@@ -244,7 +254,7 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedK
     host.on('session/event', onSessionEvent);
   }, pathToFileURL(join(ROOT, 'package.json')).href);
   if (ctx.get('compact-ready')?.ready !== true) throw new Error(`${BIN} the composition never became compact-ready`);
-  return { ctx, env, tokenMeter: () => tokensUsed, setNoticeSink: (fn) => { noticeSink = fn; }, imageDigest: digest };
+  return { ctx, env, tokenMeter: () => tokensUsed, tokensBySession: () => ({ ...tokensBySession }), setNoticeSink: (fn) => { noticeSink = fn; }, imageDigest: digest };
 }
 
 /** Pre-mint the charter's grants — the operator's act, before any member
@@ -415,7 +425,7 @@ async function main() {
     ? communityAnnex(keyringDir, keyring, charter, benchDigests)
     : { annexPath: join(keyringDir, 'enforcer.annex.json') };
 
-  const { ctx, env, tokenMeter, setNoticeSink, imageDigest } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
+  const { ctx, env, tokenMeter, tokensBySession, setNoticeSink, imageDigest } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
   // a charter with no grants and no publish section is a FORUM-ONLY
@@ -565,6 +575,7 @@ async function main() {
   process.on('SIGTERM', onSignal);
   let runStats = null;
   let runTag = null;
+  let startedAt = null; // when the community began, beside endedAt — a run's length is a fact
   let runStarted = false; // set when the community resolves a route or seats a member
   let runOver = false; // the finally sets it before the linger — the signal handler reads it
   const writeRunManifest = (extra = {}) => {
@@ -572,6 +583,7 @@ async function main() {
       const continuedFrom = continuationOf(previousRun, runTag);
       const manifest = {
         charter: charter.name, runTag, resumed,
+        ...(startedAt ? { startedAt } : {}),
         // the archive must say WHAT was debated, not just that it was: the
         // goal verbatim, the topic, and the seats with their routes — a
         // reader who has only this file knows the question (the operator's
@@ -598,11 +610,23 @@ async function main() {
         rounds: runStats?.rounds ?? 0, turns: runStats?.turns ?? 0,
         benchCasesSeen: runStats?.casesSeen ?? 0,
         tokens: tokenMeter(),
+        tokensBySeat: tokensBySeatOf(tokensBySession(), runTag),
         budgets: charter.budgets,
         ...(continuedFrom ? { continuedFrom } : {}),
         members: runStats?.members ?? {},
         model: runStats?.model ?? null,
+        // `divergence` is the charter's LINE (the thresholds); what the run
+        // actually crossed is `divergenceObserved` — a reader comparing the
+        // two needs both, and the old manifest carried only the line
         divergence: charter.divergence ?? null,
+        divergenceObserved: {
+          loopguardTrips: divergence.counters.loopguardTrips(),
+          humanSeatTimeouts: divergence.counters.humanSeatTimeouts(),
+        },
+        // the gate posts this run's sessions landed, by id — presence, not
+        // success: whether the charter's condition was met is read on the
+        // forum. An empty list is the honest "no gate post".
+        gatePosts: gatePostsOf(forumFromLedger(join(scratch, 'state', 'chains', 'forum.jsonl')), runTag),
         ...extra,
       };
       const text = `${JSON.stringify(manifest, null, 2)}\n`;
@@ -658,6 +682,7 @@ async function main() {
     // member binding's prefixes still claim the ids — the community
     // continues, the sessions are its per-run records
     runTag = randomBytes(3).toString('hex');
+    startedAt = new Date().toISOString();
     const stats = await community.runCommunity({
       charter, workspace, hooks, tokenMeter, releasesOrigin: releases ? releases.origin : null,
       sessionTag: runTag, resumed, controls,

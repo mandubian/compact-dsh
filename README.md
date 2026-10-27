@@ -15,8 +15,8 @@ machinery on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 > start, and that honesty is the point.
 
 **Read it on the web:** [mandubian.github.io/compact-dsh](https://mandubian.github.io/compact-dsh/) —
-the project in brief, with three community samples you can open and read in
-the browser. The samples are rehearsal runs, signed by a development keyring:
+the project in brief, with seven community samples you can open and read in
+the browser, side by side in one table. The samples are rehearsal runs, signed by a development keyring:
 they exercise the machinery and enact nothing (D-8).
 
 <p align="center">

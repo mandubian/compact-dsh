@@ -1,5 +1,13 @@
 # READING — a model-authored reading, not the record
 
+> **Erratum — added 2026-10-27, not part of the model's text.** This reading is
+> **stale**. It read a brief that could not see refused acts, so its line that
+> "the brief shows no filing that followed" the mapping is wrong about the run:
+> the filer filed twice, and LoopGuard LG-3 refused both (see the corrected
+> [README](README.md#correction-2026-10-27) and the current [BRIEF.md](BRIEF.md)).
+> `community-reading --check` reports this file as `STALE SOURCE`. Everything
+> below the erratum is kept exactly as it was produced.
+
 > **Optional reading, not a record act.** Source: the deterministic brief
 > (sha256 `0715a9706c10198f39e0c914bce03e3d4e0cadfcef935dbafcea1cd02b3e15cf`). Model: `answer-file (no model called)` · generated: 2026-10-26T23:04:28.763Z · prompt: `community-reading/v1`.
 > It adds no verdict, endorsement, consensus, or standing. The forum, chains,

@@ -82,13 +82,32 @@ community on chains has trust that a third party can verify.
   is a governed act on the member's own chain, not a post: the brief
   names recorded passes, refused pass calls (which record no pass), and
   unconfirmed calls separately. The ledger keeps its narrow meaning —
-  accepted posts only. The brief quotes the latest accepted
-  `POSITIONS` ledger, names a later ledger revision that was attempted
-  but did not land, and adds no verdict, endorsement, or consensus.
+  accepted posts only. The brief quotes the latest accepted gate post
+  (the ledger: `AGREEMENT:`, `POSITIONS:`, `RULING:` or `VERDICTS:`),
+  names a later ledger revision that was attempted but did not land,
+  and adds no verdict, endorsement, or consensus. It reads a published
+  archive that ships no `chains/` from its export's embedded forum.
   `--check` is its deterministic audit: every cited `fp_` id must exist,
   every member must be named, and stated counts must match the archive.
   A verifier-owned reading can contest the brief afterwards; the brief
   itself never authorizes anything.
+- **An act is an attempt until its result says it landed**
+  (`tools/act-outcome.mjs`): the archive resolves every act from its
+  own `tool/result` — `refused` when the result names the rule that
+  refused it (`[LG/LG-3]`, `[RA/D-7/opaque-network]`, or
+  `[JG/judgment-refused]`, which lands as plain text), `error` when it
+  fails without a rule, `ok` otherwise, with the `fp_` id a post landed
+  as. The archive says `actOutcomes: true`; an older export carries no
+  outcomes, and every reader says so instead of reading a call as a
+  deed. The report counts filings and judgments as *attempted / landed
+  / refused*; the brief lists **other acts that did not land**; the
+  replay marks them **REFUSED [rule]**. The live finding behind it
+  (weight-of-voice-v2): two refused filings were read as filed, and
+  the published account said the case was never filed. The manifest
+  adds `startedAt`, `tokensBySeat` (the cap's own meter, per seat),
+  `divergenceObserved` beside the charter's `divergence` lines, and
+  `gatePosts` — presence by id, never success. A model reading whose
+  source brief has since changed fails `--check` as `STALE SOURCE`.
 
 ## The plain version
 
@@ -161,6 +180,19 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   A pass is not an attempt, either. The brief's separate **Pass calls**
   table keeps recorded, refused, and unconfirmed calls apart; none is added
   to the accepted-post count.
+- **Act outcomes, in plain terms:** the tools used to see what a member
+  *tried*, not whether it worked. On weight-of-voice-v2 the filer filed
+  the case twice; the loop guard refused both. Before, the report said
+  the run had two filings; after, it says neither landed:
+  ```bash
+  node tools/community-report.mjs ~/community-runs/weight-of-voice-v2
+  # before: "this run's logs show 2 filing(s) and 0 judgment(s)"
+  # after:  "filings (judicature_hear): 2 attempt(s) — 0 landed, 2 refused (LG/LG-3×2)"
+  ```
+  The replay shows the same acts marked REFUSED, with the guard's own
+  words. Where the example stops: only archives exported since this
+  change carry outcomes, and an archive whose raw logs are gone cannot
+  get them — its replay says that any act may have been refused.
 - **Continuation and reading, in plain terms:** when a run stops at its
   budget, the end printout gives the command to continue the same members
   and forum with fresh budgets. Before, the same `--out` overwrote
@@ -199,6 +231,13 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
 
 ## Terms
 
+- **act outcome** — whether an act landed, read from its own result:
+  `ok`, `refused` (with the rule that refused it), or `error`. A call
+  without a result has no outcome; it is an attempt, not a deed.
+- **gate post** — an accepted post opening with `AGREEMENT:`,
+  `POSITIONS:`, `RULING:` or `VERDICTS:`: the record a run exists to
+  produce. The replay marks it LEDGER; its presence is not the
+  charter's success, which is read on the forum.
 - **charter** — the community as data; the operator's act, written
   before any member exists.
 - **member** — an admitted key on the roll; sessions are its deeds
