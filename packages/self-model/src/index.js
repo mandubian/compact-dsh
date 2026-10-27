@@ -512,9 +512,12 @@ export function apply(ctx, config = {}) {
       const sessionId = session?.id != null ? String(session.id) : null;
       const agent = ctx.get?.('agents')?.get?.(sessionId);
       if (typeof agent?.inject !== 'function') return;
+      const att = attestFor(sessionId);
       agent.inject(createUserMessage({
-        content: [{ type: 'text', text: renderAttestation(attestFor(sessionId)) }],
-        source: SOURCE,
+        content: [{ type: 'text', text: renderAttestation(att) }],
+        // the code digest rides the event itself, structured, so the chained
+        // record carries it where the offline auditor reads it (--code --repo)
+        source: att.code?.digest ? { ...SOURCE, code: { digest: att.code.digest, commit: att.code.commit } } : SOURCE,
       }));
     } catch { /* a failed attestation must never break the turn */ }
   });

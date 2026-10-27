@@ -45,6 +45,7 @@ import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST, clauseIds, clauseText } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
 import { foreignPackages } from './package-provenance.mjs';
+import { computeCodeDigest } from './code-digest.mjs';
 import { proxyEnvNotice } from './proxy-env.mjs';
 import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePostsOf, tokensBySeatOf } from './run-manifest.mjs';
 import { forumFromLedger, meteredTokens } from './community-report.mjs';
@@ -152,7 +153,7 @@ function communityAnnex(keyringDir, keyring, charter, benchDigests) {
 
 // ── the runtime ──
 
-async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedKeyringDigest, egressNetwork, bindings }) {
+async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedKeyringDigest, egressNetwork, bindings, codeDigestFile = null }) {
   const digest = execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', IMAGE], { encoding: 'utf8', timeout: 10_000 }).trim();
   if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error(`${BIN} cannot inspect ${IMAGE} (docker pull / npm run compact:bake first)`);
 
@@ -196,6 +197,9 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedK
     COMPACT_MEMBER_ROLL: join(keyringDir, 'roll.json'),
     COMPACT_MEMBER_KEYRING: manifestPath,
     COMPACT_MEMBER_BINDINGS: JSON.stringify(bindings),
+    // the code by content (CF-2): the self-model's attestation carries the
+    // digest onto the chain at every turn; the detail stays beside it
+    ...(codeDigestFile ? { COMPACT_CODE_DIGEST_FILE: codeDigestFile } : {}),
     COMPACT_SANDBOX_IMAGE: IMAGE,
     COMPACT_SANDBOX_IMAGE_DIGEST: digest,
     COMPACT_SANDBOX_RECORDED_BY: 'community-live driver (the operator seat)',
@@ -374,6 +378,20 @@ async function main() {
   if (provenance.foreignPackages?.length) {
     SAY(`WARNING: ${provenance.foreignPackages.length} workspace package(s) load from OUTSIDE this checkout — the commit above does not name their code: ${provenance.foreignPackages.map((f) => `${f.name} → ${f.path}`).join(', ')}. Run \`npm ci\` in this checkout for a run whose provenance holds; the manifest records them either way.`);
   }
+  // THE CODE BY CONTENT: the workspace packages, the lockfile and the
+  // installed tree, digested from the files that will load — the top
+  // digest rides every attestation onto the chain; the detail rides the
+  // manifest (code.digests), checkable offline: auditor --code --repo
+  const codeDetail = provenance.commit ? computeCodeDigest(ROOT, { commit: provenance.commit }) : null;
+  let codeDigestFile = null;
+  if (codeDetail) {
+    mkdirSync(join(scratch, 'state'), { recursive: true });
+    codeDigestFile = join(scratch, 'state', 'code-digest.json');
+    writeFileSync(codeDigestFile, `${JSON.stringify(codeDetail, null, 2)}\n`);
+    provenance.digest = codeDetail.digest;
+    provenance.digests = codeDetail;
+    SAY(`code digest: ${codeDetail.digest.slice(0, 16)}… over ${codeDetail.packages.length} workspace package(s), the lockfile and ${codeDetail.nodeModules?.files ?? 0} installed file(s) — chained in every attestation; verify offline with auditor --code <run.json> --repo ${ROOT}`);
+  }
   const proxyNotice = proxyEnvNotice();
   if (proxyNotice) SAY(`WARNING: ${proxyNotice}`);
   preservePreviousRun(scratch, previousRun);
@@ -437,7 +455,7 @@ async function main() {
     ? communityAnnex(keyringDir, keyring, charter, benchDigests)
     : { annexPath: join(keyringDir, 'enforcer.annex.json') };
 
-  const { ctx, env, tokenMeter, tokensBySession, setNoticeSink, imageDigest } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings });
+  const { ctx, env, tokenMeter, tokensBySession, setNoticeSink, imageDigest } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings, codeDigestFile });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
   // a charter with no grants and no publish section is a FORUM-ONLY

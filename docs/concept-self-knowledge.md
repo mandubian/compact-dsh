@@ -31,6 +31,7 @@ is precisely what the clause forbids.
 | lineage | the Subject's durable session header — the record that survives a restart |
 | standing (F-8) | `none`, with the reason: unratified law, draft annex |
 | the law's digest | the constitution service |
+| the code's digest | the **launcher**, at boot — the one field not from a running service: the file it names in `COMPACT_CODE_DIGEST_FILE`, written before the runtime boots. Absent when the launcher computed none, and the attestation says so ([supply-chain honesty](concept-supply-chain.md#the-code-itself-cf-2-applied-to-the-code)) |
 | declared [O] gaps | every service that declared one, plus the boot attestation |
 
 An attestation assembled from anything the Subject *said* would be the

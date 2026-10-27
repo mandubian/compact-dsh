@@ -254,7 +254,7 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
     // the code the community ran on: outputs never repeat, but runs stay
     // comparable when the tree that produced each is named
     if (run.code?.commit) {
-      L.push(`    code: ${(run.code.repo ? String(run.code.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '')}${run.code.commit}${run.code.dirty ? ' (DIRTY TREE — uncommitted changes present)' : ''}${run.code.foreignPackages?.length ? ` (FOREIGN PACKAGES ×${run.code.foreignPackages.length} — loaded from outside the checkout; the commit does not name them: ${run.code.foreignPackages.map((f) => f.name).join(', ')})` : ''}${run.code.ref ? ` [${run.code.ref}]` : ''}`);
+      L.push(`    code: ${(run.code.repo ? String(run.code.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '')}${run.code.commit}${run.code.dirty ? ' (DIRTY TREE — uncommitted changes present)' : ''}${run.code.digest ? ` · code digest ${String(run.code.digest).slice(0, 16)}…` : ''}${run.code.foreignPackages?.length ? ` (FOREIGN PACKAGES ×${run.code.foreignPackages.length} — loaded from outside the checkout; the commit does not name them: ${run.code.foreignPackages.map((f) => f.name).join(', ')})` : ''}${run.code.ref ? ` [${run.code.ref}]` : ''}`);
     } else if (run.code?.note) {
       L.push(`    code: ${run.code.note}`);
     }
@@ -379,7 +379,7 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
   const sessionIdOfLog = (logPath) => logPath.split('/').slice(-2)[0];
   for (const log of logs.slice(0, 3)) {
     const sid = sessionIdOfLog(log);
-    L.push(`  node ${join(ROOT, 'auditor', 'audit.mjs')} ${log} --chain ${join(paths.chainDir, `${sid}.chain`)}${roll && keyringManifest ? ` --roll ${roll} --keyring ${keyringManifest}` : ''}`);
+    L.push(`  node ${join(ROOT, 'auditor', 'audit.mjs')} ${log} --chain ${join(paths.chainDir, `${sid}.chain`)}${roll && keyringManifest ? ` --roll ${roll} --keyring ${keyringManifest}` : ''}${run?.code?.digest && paths.runJson ? ` --code ${paths.runJson} --repo ${ROOT}` : ''}`);
   }
   if (logs.length > 3) L.push(`  … +${logs.length - 3} more session(s)`);
   return L.join('\n');
