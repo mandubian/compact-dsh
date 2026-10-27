@@ -134,3 +134,50 @@ test('composed: a deterministic trip (LG-7) denies all and never resumes', async
   const r2 = await run(tools, agent, 'bash_probe', { command: 'try again after the user' });
   assert.ok(JSON.stringify(r2).includes('[LG/LG-7'), 'no auto-resume — the user signal cannot clear it');
 });
+
+// the floor, composed: a tool named like the community's escalation door
+let escalated = 0;
+const askProbe = defineTool({
+  name: 'ask_human',
+  description: 'ask the Principal (loopguard composed test — the floor)',
+  parameters: { question: { type: 'string' } },
+  output: { schema: { type: 'string' }, render: (v) => [{ type: 'text', text: String(v) }] },
+  async execute(args) { escalated += 1; return `asked: ${args.question}`; },
+});
+
+test('composed: the floor passes the latch and the halt — escalation runs while work is denied (R-9)', async () => {
+  const { tools } = await boot({ limits: { REDUNDANT_ROSTER_POLLING: 3 } });
+  tools.register(probe);
+  tools.register(terminalProbe);
+  tools.register(askProbe);
+  executed = 0;
+  escalated = 0;
+  const agent = makeAgent('sess-lg-floor');
+  for (let i = 0; i < 3; i++) await run(tools, agent, 'bash_probe', { command: 'ls -la' });
+  const work = await run(tools, agent, 'bash_probe', { command: 'something new' });
+  assert.ok(JSON.stringify(work).includes('[LG/LG-5'), 'work is latched');
+  // the live finding: the latch refused the ask_human its envelope named
+  assert.ok(JSON.stringify(work).includes('escalation, petition and exit are never latched'), 'the envelope says the floor is open');
+  const ask = await run(tools, agent, 'ask_human', { question: 'the guard has me latched — may I file?' });
+  assert.equal(escalated, 1, 'the escalation ran under the latch');
+  assert.ok(!JSON.stringify(ask).includes('[LG/'), 'no loopguard denial on the floor');
+  // a halt (deterministic trip) denies all work, never the floor
+  await run(tools, agent, 'workflow_probe', {});
+  agent.session.append('turn/end', { turn: 1 });
+  agent.session.append('turn/start', { turn: 2 });
+  await new Promise(r => setImmediate(r));
+  await run(tools, agent, 'ask_human', { question: 'the workflow is terminal — what now?' });
+  assert.equal(escalated, 2, 'the escalation ran under the halt');
+});
+
+test('composed: the guard\'s own denials never feed its failure budgets', async () => {
+  const { ctx, tools } = await boot({ limits: { REDUNDANT_ROSTER_POLLING: 3 } });
+  tools.register(probe);
+  executed = 0;
+  const agent = makeAgent('sess-lg-own');
+  for (let i = 0; i < 3; i++) await run(tools, agent, 'bash_probe', { command: 'ls -la' });
+  for (let i = 0; i < 4; i++) await run(tools, agent, 'bash_probe', { command: `denied ${i}` });
+  const g = ctx.get('compact-loopguard').guardFor('sess-lg-own');
+  assert.equal(g.failuresByTool.get('bash_probe') ?? 0, 0, 'the latch\'s denials are not bash_probe failures');
+  assert.equal(g.errorSignatures.size, 0, 'and feed no recurring-error signature (LG-8)');
+});

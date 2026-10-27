@@ -33,33 +33,59 @@ export { Guard, TRIPS, classifyToolResult };
 export const name = 'compact-loopguard';
 export const GATE = 'LG';
 
-/** Loopguard fingerprints extend the approval fingerprint with the command
- * text: targetless calls of one tool (shell command strings) would otherwise
- * ALL share one fingerprint, and "no new fingerprint" would be meaningless —
- // every distinct command is distinct work. */
-function loopFingerprint(tool, args) {
+/** The lawful floor (R-9 escalate, R-11 petition, R-12 exit): the moves a
+ * trip's own envelope names. A latch or a halt never denies them — a
+ * channel a gate can close is not a channel, and the member most likely to
+ * need it is the one currently being refused (the R-11 register entry).
+ * The live finding: weight-of-voice-v2's filer, latched by LG-3, was refused
+ * the ask_human its refusal told it to make; workshop's prover was refused
+ * request_termination. A composition with other floor tools names them in
+ * opts.floorTools. */
+export const FLOOR_TOOLS = Object.freeze(['ask_human', 'petition', 'flag_collision', 'request_termination']);
+
+const stableJson = (v) => (Array.isArray(v) ? `[${v.map(stableJson).join(',')}]`
+  : v && typeof v === 'object' ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stableJson(v[k])}`).join(',')}}`
+    : JSON.stringify(v ?? null));
+
+/** Loopguard fingerprints extend the approval fingerprint with the call's
+ * ARGUMENTS: the approval fingerprint is target-shaped (right for grants),
+ * so every post, pass and question of one tool shared one fingerprint and
+ * "the identical operation" was any two distinct utterances — the live
+ * finding: members refused LG-5 for posting a new post each round. The same
+ * rule the shell command already had (every distinct command is distinct
+ * work) now holds for every argument: the identical operation is the same
+ * tool with the same arguments. */
+export function loopFingerprint(tool, args) {
   const base = fingerprint(tool, args ?? {});
-  const command = args?.command ?? args?.cmd ?? args?.script;
-  if (typeof command !== 'string' || command.length === 0) return base;
-  return `${base}:c${createHash('sha256').update(command).digest('hex').slice(0, 8)}`;
+  if (!args || typeof args !== 'object' || Object.keys(args).length === 0) return base;
+  return `${base}:a${createHash('sha256').update(stableJson(args)).digest('hex').slice(0, 8)}`;
+}
+
+/** The guard's own denial, read back as a tool result: not evidence that
+ * the tool fails. Counting it fed the guard's failure budgets with its own
+ * refusals (LG-2, LG-8) — a latch that manufactured the next trip. */
+export function isOwnDenial(result) {
+  if (result?.isError !== true) return false;
+  const text = String(result?.error?.message ?? (Array.isArray(result?.content) ? result.content.map((b) => b?.text ?? '').join('') : ''));
+  return /^(?:Error:\s*)?\[LG\//.test(text);
 }
 
 function tripEnvelope(trip) {
   return buildEnvelope({
     gate: GATE, ruleId: trip.id,
     reason: `loop guard trip (${trip.label}): ${trip.message}`,
-    lawfulNextMoves: ['stop repeating this approach', 'report the blocker to your Principal in your final answer', 'escalate to your Principal'],
+    lawfulNextMoves: ['stop repeating this approach', 'report the blocker to your Principal in your final answer', 'escalate to your Principal — escalation, petition and exit are never latched'],
   });
 }
 
 const correctiveProse = (trip) =>
   `Loop guard (${trip.id} ${trip.label}): ${trip.message}. ` +
-  `Further calls are denied until the next message from your Principal. ` +
+  `Further calls are denied until the next message from your Principal — except escalation, petition and exit, which stay open. ` +
   `Change the approach or report the blocker — do not repeat the denied operation.`;
 
 const haltProse = (trip) =>
   `Loop guard (${trip.id} ${trip.label}): ${trip.message}. ` +
-  `All further tool calls are denied for this session (deterministic trip — no auto-resume). ` +
+  `All further work calls are denied for this session (deterministic trip — no auto-resume); escalation, petition and exit stay open. ` +
   `Report the blocker to your Principal in your final answer.`;
 
 export function createLoopguard(opts = {}) {
@@ -67,8 +93,11 @@ export function createLoopguard(opts = {}) {
   const repairBudget = opts.repairBudget ?? undefined;
   const guards = new Map(); // sessionId -> Guard
 
+  const floor = new Set(opts.floorTools ?? FLOOR_TOOLS);
   const loopguard = {
     guards,
+    /** The floor vocabulary: which tools no latch or halt may deny. */
+    isFloorTool: (tool) => floor.has(tool),
     guardFor(sessionId) {
       const key = sessionId ?? 'root';
       let g = guards.get(key);
@@ -110,6 +139,12 @@ export function loopguardPlugin(opts = {}) {
       const g = loopguard.guardFor(sessionOf(exec));
       syncLatchFromLog(g, exec?.agent?.session);
       g.currentSeq = exec?.agent?.session?.seq ?? g.currentSeq;
+      if (loopguard.isFloorTool(tool)) {
+        // the floor passes the latch and the halt; only its own identical
+        // repetition is refused, per call — no latch, no corrective loop
+        const floorTrip = g.observeFloorCall({ fp: loopFingerprint(tool, exec?.arguments ?? {}) });
+        return floorTrip ? { kind: 'deny', reason: bandReason(tripEnvelope(floorTrip)) } : next();
+      }
       const trip = g.observeCall({
         fp: loopFingerprint(tool, exec?.arguments ?? {}),
         tool,
@@ -125,6 +160,8 @@ export function loopguardPlugin(opts = {}) {
     });
 
     ctx.on('tools/result', (exec, result) => {
+      // the floor is not work, and the guard's own denial is not a failure
+      if (loopguard.isFloorTool(exec?.name) || isOwnDenial(result)) return;
       const g = loopguard.guardFor(sessionOf(exec));
       g.currentSeq = exec?.agent?.session?.seq ?? g.currentSeq;
       const trip = g.observeResult({

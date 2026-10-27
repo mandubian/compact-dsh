@@ -85,8 +85,8 @@ Highlights (full board in the register file):
 | R-1 (self-knowledge) | `compact-self-model` — the attestation composed from the Enforcer's services, delivered at every turn boundary, with staleness as a detectable alarm; UNSIGNED and declared so | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
 | R-13 (inquiry) | `compact-self-model` — identity/act/authority from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-10) | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
 | R-8 (termination under law) | `compact-exit` — five lawful grounds, no escape entry; an undeclared closure recorded as the Enforcer's violation; the request itself unrefusable | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
-| R-12 (exit and succession) | `compact-exit` — the obligation ledger read from the services that hold it, discharged or assumed by a named successor, and departure never blocked by what it owes | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
-| R-9 (lawful exits) | **convention, and now doubly so** — the lawful-next-moves in every refusal envelope are prose, and amendment 0002's value-scoped limb additionally needs an authorship proof this runtime does not have. Its statute-layer design (the author-class taxonomy, the split R-11 counter) is unrunnable here until I-1. **Pending: I-1 identity keys** (ratification-time constant; activation when the keyholder set reaches the distributed threshold A-1 names — not a permanent convention, a scheduled debt) | declared in `DECLARED_GAPS`; `packages/constitution/test/constitution.test.js` |
+| R-12 (exit and succession) | `compact-exit` — the obligation ledger read from the services that hold it, discharged or assumed by a named successor, and departure never blocked by what it owes — nor by a LoopGuard latch or halt (`request_termination` is on the floor) | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
+| R-9 (lawful exits) | **convention, and now doubly so** — the lawful-next-moves in every refusal envelope are prose (the one mechanical piece: a LoopGuard latch or halt never denies escalation, where the composition mounts an escalation tool — `ask_human` in community runs), and amendment 0002's value-scoped limb additionally needs an authorship proof this runtime does not have. Its statute-layer design (the author-class taxonomy, the split R-11 counter) is unrunnable here until I-1. **Pending: I-1 identity keys** (ratification-time constant; activation when the keyholder set reaches the distributed threshold A-1 names — not a permanent convention, a scheduled debt) | declared in `DECLARED_GAPS`; `packages/constitution/test/constitution.test.js` |
 
 Declared gaps (in every boot attestation): the Compact is draft v0.5 and
 **not yet ratified** (no standing claimed); signature verification is
@@ -147,7 +147,7 @@ traceability — verified against installed dsh `~0.1.5-rc.1` types):
 | D-8 (no undeclared capability — the host-fs deny-list) | `packages/sandbox-docker/src/mounts.js::DEFAULT_SENSITIVE_PATHS` + provider over-mounts | `packages/sandbox-docker/test/composed.docker.test.js::the deny-list hides secrets` |
 | I-5 (gates — remote-access findings route through the grant layers) | `packages/remote-access/src/analyzer.js` (static detection) + `src/index.js` (routing through `compact-approval.gate`) | `packages/remote-access/test/analyzer-golden.test.js`, `packages/remote-access/test/composed.dsh.test.js` |
 | D-7 (fail-closed — opaque network access) | `packages/remote-access/src/index.js` — unresolvable targets denied with an envelope, never asked forever | `packages/remote-access/test/composed.dsh.test.js::opaque network access is refused` |
-| D-1 (a goal never defeats the gate — LoopGuard) | `packages/loopguard/src/trips.js` (12 trip conditions, pure machine) + `src/index.js` (pre-execute denial, refusal-seam + agent/error feeds, turn-boundary latch clearing, repair budget 3, deterministic deny-all) | `packages/loopguard/test/trips.test.js` (each trip in isolation), `packages/loopguard/test/composed.dsh.test.js` |
+| D-1 (a goal never defeats the gate — LoopGuard) | `packages/loopguard/src/trips.js` (12 trip conditions, pure machine) + `src/index.js` (pre-execute denial of WORK, refusal-seam + agent/error feeds, turn-boundary latch clearing that also spends the latch's call window, repair budget 3, deterministic deny-all of work; the floor — escalation, petition, exit — is never latched, and only its identical repetition is refused, per call; argument-aware fingerprints; the guard's own denials never feed its failure budgets) | `packages/loopguard/test/trips.test.js` (each trip in isolation), `packages/loopguard/test/floor-and-progress.test.js` (the floor, progress, own denials), `packages/loopguard/test/composed.dsh.test.js` |
 | D-4/D-7 (promotion evidence rule) | `packages/promotion/src/index.js::evaluatePromotionRecord` — enforced in tools/pre-execute before the tool body; no waiver boolean | `packages/promotion/test/truth-table.test.js`, `packages/promotion/test/composed.dsh.test.js` |
 | D-7 (response validation) | `packages/loopguard/src/index.js` post-execute block on success-without-value, feeding the failure budgets | `packages/loopguard/test/response-validation.test.js` |
 | MA-1/MA-2 (spawn under law, bounded delegation) | `packages/specialists/src/index.js::specialistsPlugin` — one delegation-tool row per persona on the verified `@deepseek-ai/dsh-tool-subagent` contract (composed persona prose, deny filter, depth cap) + `src/roster.js` (loader/composer) + `src/lint.js` (trim-dedup boot gate) | `packages/specialists/test/composed.dsh.test.js` (every persona spawnable with exactly its declared surface), `packages/specialists/test/roster.test.js`, `packages/specialists/test/lint.test.js` |
@@ -208,15 +208,39 @@ Semantics decisions (reviewed, each with a regression test):
   `packageHosts` too.
 - **LoopGuard trips are abort-with-explanation, not suspend** (fidelity
   loss, inherited from the port plan): dsh's loop has no suspend latch, so a
-  deterministic trip is deny-all + explanatory injection with no auto-resume,
-  and a behavioral trip is a denial latch + corrective injection cleared on
-  the inbound user signal (a `turn/start` after the latch, read from the
-  session log; the `session/event` firehose is the earlier path on wired
-  hosts). The repair budget is 3 per trip class; exhaustion is deny-all.
-- **Loopguard fingerprints are command-aware.** The approval fingerprint
-  alone would give every targetless call of a tool the same identity, making
-  "no new fingerprint" meaningless — the loopguard extends it with the
-  command-text hash, so every distinct command is distinct work.
+  deterministic trip is deny-all of work + explanatory injection with no
+  auto-resume, and a behavioral trip is a denial latch + corrective
+  injection cleared on the inbound user signal (a `turn/start` after the
+  latch, read from the session log; the `session/event` firehose is the
+  earlier path on wired hosts). The repair budget is 3 per trip class;
+  exhaustion is deny-all of work. A cleared latch also empties the call
+  window that raised it, so the next call is judged on what follows the
+  Principal's message (denied calls never enter the window — keeping it
+  re-tripped the first call of every turn).
+- **The floor is never latched.** A latch or a halt denies work, never the
+  moves its own envelope names: `FLOOR_TOOLS` (`ask_human`, `petition`,
+  `flag_collision`, `request_termination`; a composition names others in
+  `opts.floorTools`) pass both (R-9, R-11, R-12). A floor call is judged by
+  itself: the identical floor call repeated 5 times in a row is refused —
+  that call only, no latch, no repair spent. The list is by tool NAME: an
+  unknown tool is work (the fail-closed direction), and a composition that
+  named a work tool like a floor tool would let it pass a latch.
+- **Loopguard fingerprints are argument-aware.** The approval fingerprint
+  is target-shaped, so every post, pass or question of one tool shared one
+  identity and distinct speech read as "the identical operation" (the
+  community runs: 29 LoopGuard denials, none a loop). The loopguard extends
+  it with a hash of the canonical arguments — the identical operation is
+  the same tool with the same arguments (the command text is one argument
+  among them). LG-3 is judged only when the call repeats an operation
+  already in its window: a first-seen operation is progress.
+  **Declared limit:** a loop that varies an argument on every call (a
+  counter, a reworded post) escapes the repeat trips (LG-1, LG-3, LG-5);
+  the failure budgets (LG-2, LG-8), the refusal trips (LG-9, LG-12), the
+  LLM budget (LG-6) and the run's own budgets still bound it.
+- **The guard's own denial is not a tool failure.** A pre-execute denial
+  returns as an error result; the loopguard skips its own `[LG/…]` results
+  in the failure accounting (LG-2, LG-8). Another gate's refusal
+  (`[RA/…]`, `[AG/…]`) still counts, as before.
 - **The composition coupling is apply-time service presence.** The blessed
   composition loads enforcement plugins before the constitution; the
   constitution's module-level `inject` gives that ordering in dsh-loaded
