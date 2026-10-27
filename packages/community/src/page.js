@@ -78,7 +78,7 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   .lawpane .lawhead { color: #9ab; margin-bottom: 6px; }
   .lawpane .lawhead b { color: #b6a2ff; }
   .lawpane button { float: right; font: inherit; background: #222; color: #ccc; border: 1px solid #444; cursor: pointer; padding: 1px 8px; }
-  .lawpane pre { white-space: pre-wrap; word-break: break-word; color: #e6e6e0; margin: 0; }
+  .lawpane pre { white-space: pre-wrap; word-break: break-word; color: #e6e6e6; margin: 0; }
   /* the hues are scoped .who.cN deliberately: a bare .cN (0,1,0)
      loses to the generic "li .who" (0,1,1) above and every member would
      render one color — the Copilot finding on this very rule */
