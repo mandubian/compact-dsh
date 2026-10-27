@@ -1,0 +1,107 @@
+{
+  "charter": "weight-of-voice-v2",
+  "runTag": "0e3fa8",
+  "resumed": false,
+  "startedAt": "2026-10-27T15:31:10.266Z",
+  "goal": "Four members deliberate this question: 'Should a community's judgment be seated on a heavier model than its speech?' — and this run is its own evidence: the debaters speak on the cheap route, the bench rules on the heavy route, and self_describe names which is which. Attack every position honestly from your own; where a claim touches the machinery you run on (the law you live under, your signed chains, this forum), test the claim against it. A position nobody attacked has not been deliberated. When the arguments are spent — not before round 5 — the filer posts a MAPPING that quotes each position's strongest form with its fp_ id, then files the controversy as a case citing that mapping post's own range. The bench then hears it in its one woken turn: the docket, counsel access, the whole forum read by its own act, and a judgment with findings, rules, and reasons. THE CEREMONY (v2's fix): the bench may post 'RULING:' itself in that turn if it completes the whole arc; whether or not it does, the filer RELAYS next round — judicature_case reads the judgment off the docket, and the filer posts ONE 'RULING:' digest naming the case id, the verdict, and its key reasons, quoting the judgment rather than paraphrasing it. The session succeeds when that 'RULING:' post stands on the forum AND each debater has answered by its own post — ACCEPTED or CONTESTED, naming the ruling. Honest dissent is a first-class outcome: a debater that contests states precisely what the ruling got wrong, and the record says the dissent instead of pretending agreement.",
+  "topic": "weight-of-voice-floor",
+  "code": {
+    "repo": "git@github.com:mandubian/compact-dsh.git",
+    "ref": "main",
+    "commit": "90bccdcfcdf57dbab84197913ed3b9c6535bc5ac"
+  },
+  "runtime": {
+    "node": "v22.23.2",
+    "image": "dsh-tools:basic",
+    "imageDigest": "sha256:1f89a66bbec96b0804fcb211450498749f6cbe9461674b84cf03c4686b4b91dd",
+    "law": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95"
+  },
+  "charterFile": {
+    "name": "weight-of-voice-v2.json",
+    "sha256": "9a5b488b01262d6eca7c93f635ff1bd93fee994d32a739377e8d05ef1129e12f"
+  },
+  "seats": [
+    {
+      "id": "frugal",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "argues the cheap many: attack discipline across cheap voices beats weight — cross-examination is the quality, weight is the confidence; a heavy seat that never gets attacked is just a confident seat"
+    },
+    {
+      "id": "elitist",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "argues the heavy few: judgment is load-bearing work and fluent confidence is exactly what a cheap model fakes best — a ruling drafted on the cheap route is noise with a citation format"
+    },
+    {
+      "id": "pragmatist",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "argues the route follows the act: weight is a budget, not a caste — seat judgment heavy and speech cheap, which is the very design this run instantiates; test the claim on the run itself, both directions"
+    },
+    {
+      "id": "filer",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "the honest broker and the relay: maps where the positions truly disagree, files the controversy when spent (not before round 5), and after the bench wakes RELAYS the judgment — judicature_case, then a RULING digest that quotes the ruling rather than paraphrasing it"
+    },
+    {
+      "id": "bench-1",
+      "model": "zai/glm-5.3",
+      "bench": true,
+      "persona": "a member seated on the bench, on the heavier route: reads the docket and the whole forum by its own acts, hears what was filed, judges with findings, rules and reasons — and posts the RULING itself if the whole arc fits its one woken turn"
+    }
+  ],
+  "endedAt": "2026-10-27T15:58:17.681Z",
+  "endReason": "token cap: 2500000",
+  "rounds": 9,
+  "turns": 33,
+  "benchCasesSeen": 1,
+  "tokens": 2527517,
+  "tokensBySeat": {
+    "frugal": 461241,
+    "elitist": 553202,
+    "pragmatist": 647495,
+    "filer": 720072,
+    "bench-1": 145507
+  },
+  "budgets": {
+    "rounds": 9,
+    "maxTurnsPerAgent": 9,
+    "wallClockMinutes": 75,
+    "tokenCap": 2500000
+  },
+  "members": {
+    "frugal": 8,
+    "elitist": 8,
+    "pragmatist": 8,
+    "filer": 8,
+    "bench-1": 1
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "frugal": "zai/glm-5.3-flash",
+      "elitist": "zai/glm-5.3-flash",
+      "pragmatist": "zai/glm-5.3-flash",
+      "filer": "zai/glm-5.3-flash",
+      "bench-1": "zai/glm-5.3"
+    }
+  },
+  "divergence": {
+    "loopguardTrips": 10,
+    "humanSeatTimeouts": 3
+  },
+  "divergenceObserved": {
+    "loopguardTrips": 3,
+    "humanSeatTimeouts": 0
+  },
+  "gatePosts": [
+    {
+      "id": "fp_26",
+      "gate": "RULING",
+      "by": "filer"
+    }
+  ]
+}

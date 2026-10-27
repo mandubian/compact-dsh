@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import { operatorSettingsRows } from './operator-settings.mjs';
+import { proxyEnvNotice } from './proxy-env.mjs';
 import { installResilientFailLoud } from './resilient-fail-loud.mjs';
 
 const binName = 'compact-dsh';
@@ -69,6 +70,9 @@ async function main() {
   if (values.attended && values.smoke) {
     throw new Error('--attended prompts the operator; --smoke forbids prompts and model calls — pick one');
   }
+  // --smoke makes no model call; every other mode rides the model route
+  const proxyNotice = values.smoke ? null : proxyEnvNotice();
+  if (proxyNotice) console.error(`${binName}: WARNING: ${proxyNotice}`);
   const decider = values.decider ?? process.env.COMPACT_DECIDER ?? null;
   // the launcher seats the watch itself (post-boot, after the operator
   // answerer — the operator stays first). Blessed's posture row reads the

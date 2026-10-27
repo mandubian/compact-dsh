@@ -11,6 +11,12 @@
 // card that said "no filing" about a run whose filings were refused.
 // Numbers a reader compares across runs come from the data, not prose.
 //
+// Curation is not record: a run's optional `sample.json` beside its archive
+// says how the site presents it — `label` (a display name), `archived`
+// (`{ supersededBy, why }`: kept, listed, no longer featured), and
+// `provenance` (a correction the manifest cannot carry, because the
+// manifest is the record and is never edited).
+//
 //   node tools/samples-table.mjs            rewrite the block in place
 //   node tools/samples-table.mjs --check    exit 1 when the block is stale
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -41,10 +47,14 @@ export function samplesRows(docsDir = join(ROOT, 'docs')) {
     const seats = Array.isArray(run.seats) && run.seats.length ? run.seats.map((s) => s.model) : Object.values(run.model?.members ?? {});
     const hears = data.timeline.filter((e) => e.type === 'act' && e.text === 'judicature_hear');
     const chainsDir = join(dir, 'chains');
+    const curation = existsSync(join(dir, 'sample.json')) ? JSON.parse(readFileSync(join(dir, 'sample.json'), 'utf8')) : {};
     rows.push({
       name,
       href: `runs/${name}/${html}`,
       charter: run.charter ?? name,
+      label: curation.label ?? run.charter ?? name,
+      archived: curation.archived ?? null,
+      provenanceNote: curation.provenance ?? null,
       runTag: run.runTag ?? '',
       endedAt: run.endedAt ?? '',
       seats: seats.length,
@@ -94,10 +104,10 @@ export function renderSamplesTable(rows) {
     const ships = [
       r.actOutcomes ? 'act outcomes' : '<span class="muted">no act outcomes</span>',
       r.chains ? `${r.chains} signed chains` : '<span class="muted">no chains</span>',
-      r.code ? `code <code>${esc(r.code.commit)}</code>${r.code.dirty ? ' <span class="warn">dirty</span>' : ''}${r.code.foreign ? ` <span class="warn">${r.code.foreign} foreign</span>` : ''}` : '<span class="muted">no code commit</span>',
+      r.code ? `code <code>${esc(r.code.commit)}</code>${r.code.dirty ? ' <span class="warn">dirty</span>' : ''}${r.code.foreign ? ` <span class="warn">${r.code.foreign} foreign</span>` : ''}${r.provenanceNote ? ` <span class="warn" title="${esc(r.provenanceNote)}">misrecorded</span>` : ''}` : '<span class="muted">no code commit</span>',
     ].join('<br>');
     L.push('<tr>' +
-      `<td><a href="${esc(r.href)}" target="_blank" rel="noreferrer">${esc(r.charter)}</a><br><small>${esc(String(r.endedAt).slice(0, 10))} · <span class="run-id">${esc(r.runTag)}</span></small></td>` +
+      `<td><a href="${esc(r.href)}" target="_blank" rel="noreferrer">${esc(r.label)}</a><br><small>${esc(String(r.endedAt).slice(0, 10))} · <span class="run-id">${esc(r.runTag)}</span>${r.archived ? ' · archived' : ''}</small></td>` +
       `<td class="num">${r.seats}${r.routes > 1 ? `<br><small>${r.routes} routes</small>` : ''}</td>` +
       `<td class="num">${num(r.rounds)}${r.roundBudget != null ? `<br><small>of ${num(r.roundBudget)}</small>` : ''}</td>` +
       `<td class="num">${num(r.tokens)}${r.tokenCap != null ? `<br><small>cap ${num(r.tokenCap)}</small>` : ''}</td>` +

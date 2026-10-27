@@ -42,9 +42,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sha256Hex, signAnnex, annexDigestOf, verifyAnnex } from 'compact-dsh-seals';
 import { parseAllowlistLikePattern, egressPatternFor } from 'compact-dsh-approval';
 import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
-import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
+import { COMPACT_DIGEST, clauseIds, clauseText } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
 import { foreignPackages } from './package-provenance.mjs';
+import { proxyEnvNotice } from './proxy-env.mjs';
 import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePostsOf, tokensBySeatOf } from './run-manifest.mjs';
 import { forumFromLedger, meteredTokens } from './community-report.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
@@ -373,6 +374,8 @@ async function main() {
   if (provenance.foreignPackages?.length) {
     SAY(`WARNING: ${provenance.foreignPackages.length} workspace package(s) load from OUTSIDE this checkout — the commit above does not name their code: ${provenance.foreignPackages.map((f) => `${f.name} → ${f.path}`).join(', ')}. Run \`npm ci\` in this checkout for a run whose provenance holds; the manifest records them either way.`);
   }
+  const proxyNotice = proxyEnvNotice();
+  if (proxyNotice) SAY(`WARNING: ${proxyNotice}`);
   preservePreviousRun(scratch, previousRun);
   const workspace = join(scratch, 'workspace');
   mkdirSync(workspace, { recursive: true });
@@ -513,6 +516,13 @@ async function main() {
       // replay renders from its archive
       charter,
       provenance,
+      // the law in force THIS boot — the same body law_read serves,
+      // sliced verbatim (R-6) — so a live post citing R-9 is clickable
+      // on the page watching it happen
+      law: {
+        digest: COMPACT_DIGEST,
+        clauses: Object.fromEntries([...clauseIds()].map((id) => [id, clauseText(id)])),
+      },
     });
     // the boot token is a bearer credential that lived only in the boot
     // line and process memory — a terminal scrolled past took the page

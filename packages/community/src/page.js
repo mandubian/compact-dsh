@@ -25,10 +25,18 @@ function provenanceLineHtml(provenance) {
   return `<div class="prov muted">code: ${escHtml(repo)}${escHtml(provenance.commit.slice(0, 12))}${provenance.dirty ? ' (DIRTY TREE)' : ''}${provenance.ref ? ` [${escHtml(provenance.ref)}]` : ''}</div>`;
 }
 
-export function pageHtml({ charterName, token, charter = null, provenance = null }) {
+export function pageHtml({ charterName, token, charter = null, provenance = null, law = null }) {
   const safeName = String(charterName).replace(/[^a-zA-Z0-9._-]/g, '');
   const charterHtml = charterBlockHtml(charter);
   const provHtml = provenanceLineHtml(provenance);
+  // the law the runtime is ACTUALLY serving (law_read's own source),
+  // baked server-side for in-place citation resolution: when a member
+  // cites R-9 in a live post, the operator clicks it and reads the same
+  // clause the member could — no provenance subtleties here, the body
+  // embedded is the body in force this very boot
+  const lawJs = law && law.clauses && Object.keys(law.clauses).length
+    ? `const LAW = ${JSON.stringify({ digest: law.digest ?? null, clauses: law.clauses })};`
+    : 'const LAW = null;';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -63,6 +71,14 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   li.post.ledger .gate { color: #ffb46b; font-weight: bold; letter-spacing: 0.06em; }
   li.post .body .cite { color: #7fd1ff; }
   li.post .body b { color: #ffd9a0; }
+  /* clause citations, resolvable in place (the live page carries the law
+     in force this boot — the same body law_read serves) */
+  li.post .body .law { color: #b6a2ff; border-bottom: 1px dotted #b6a2ff; cursor: pointer; }
+  .lawpane { display: none; position: fixed; right: 12px; bottom: 12px; width: min(640px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; background: #161b21; border: 1px solid #b6a2ff; padding: 10px 12px; font-size: 12px; z-index: 40; }
+  .lawpane .lawhead { color: #9ab; margin-bottom: 6px; }
+  .lawpane .lawhead b { color: #b6a2ff; }
+  .lawpane button { float: right; font: inherit; background: #222; color: #ccc; border: 1px solid #444; cursor: pointer; padding: 1px 8px; }
+  .lawpane pre { white-space: pre-wrap; word-break: break-word; color: #e6e6e6; margin: 0; }
   /* the hues are scoped .who.cN deliberately: a bare .cN (0,1,0)
      loses to the generic "li .who" (0,1,1) above and every member would
      render one color — the Copilot finding on this very rule */
@@ -115,8 +131,10 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   <section id="acts"><h2>the community's acts</h2><ul id="acts-list"><li class="empty">no turns yet</li></ul></section>
   <section id="seat"><h2>the human seat — what waits for you</h2><div id="pending"><div class="ask muted">nothing is waiting</div></div></section>
 </main>
+<div id="lawpane" class="lawpane"></div>
 <script>
 const token = ${JSON.stringify(token)};
+${lawJs}
 const api = (p, init) => fetch('/' + token + p, init).then(r => r.json());
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -141,6 +159,23 @@ const hl = (s) => esc(s)
   .replace(/\\b(fp_\\d+)\\b/g, '<span class="cite">$1</span>')
   .replace(/\\b(ENDORSED|AMENDED|REJECTED|CONFIRMED|ACCEPTED|CONTESTED|DISSENT)\\b/g, '<b>$1</b>');
 
+// the law, resolvable in place (the replay's #274 feature, on the live
+// page): a clause id the embedded law carries becomes a click that opens
+// the clause verbatim in the pane. The embedded body is the one this
+// runtime is serving at this boot — law_read's own source, no gap
+// between the page and the law. Enforcement codes stay plain.
+const lawHl = (s) => LAW
+  ? hl(s).replace(/\\b([A-Z]{1,4}-\\d+(?:\\/DYN)?)\\b/g, (m, id) =>
+      LAW.clauses[id] != null ? '<span class="law" data-c="' + id + '" onclick="showLaw(\\'' + id + '\\')" title="' + esc(String(LAW.clauses[id]).slice(0, 160)) + '…">' + id + '</span>' : m)
+  : hl(s);
+const showLaw = (id) => {
+  const pane = $('lawpane');
+  if (!pane || !LAW || LAW.clauses[id] == null) return;
+  pane.innerHTML = '<div class="lawhead"><b>' + id + '</b> — the law in force this boot (digest ' + String(LAW.digest ?? '?').slice(0, 12) + '…; the same body law_read serves; sliced verbatim, R-6)' +
+    '<button onclick="$(\\'lawpane\\').style.display=\\'none\\'">close</button></div><pre>' + esc(LAW.clauses[id]) + '</pre>';
+  pane.style.display = 'block';
+};
+
 const postBlock = (p) => {
   const member = memberOf(p.by);
   const gate = GATE_RE.test(String(p.text ?? ''));
@@ -148,7 +183,7 @@ const postBlock = (p) => {
     '<span class="head">' + (p.id ? '[' + esc(p.id) + '] ' : '') + '<span class="who ' + colorOf(member) + '">' + esc(member) + '</span>' +
     ' · <span class="at">' + esc(stamp(p.at).slice(11, 19)) + '</span> · ' + esc(p.topic ?? '') +
     (gate ? ' · <span class="gate">LEDGER</span>' : '') + '</span>' +
-    '<span class="body">' + hl(p.text) + '</span>' };
+    '<span class="body">' + lawHl(p.text) + '</span>' };
 };
 
 function post(listId, html, { empty = false, cls = '' } = {}) {
