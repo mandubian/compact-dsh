@@ -88,6 +88,17 @@ on evidence its own latch had already spent.
   not refused would have acted differently after. That real loops still
   trip is pinned by tests, not by these runs (they contained none):
   `packages/loopguard/test/floor-and-progress.test.js`.
+- **The cost, declared** (the annex carries it too — an amendment of
+  conduct, A-4):
+  - a loop that varies an argument on every call (a counter, a reworded
+    post) escapes the repeat trips (LG-1, LG-3, LG-5); the failure budgets
+    (LG-2, LG-8), the refusal trips (LG-9, LG-12), the LLM budget (LG-6)
+    and the run's own budgets still bound it;
+  - after a latch clears, a loop gets a fresh window (up to 16 calls for
+    LG-3, 10 for LG-1, 5 for LG-5) before it re-trips; the repair budget
+    still ends the session on the fourth trip of a class;
+  - the floor is a list of tool NAMES: an unknown tool is work, and a work
+    tool named like a floor tool would pass a latch.
 
 ### The plain version
 
