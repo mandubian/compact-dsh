@@ -35,13 +35,14 @@
 // keyring — conveys no standing"; refusals are named. Nothing given, nothing
 // implied: signature checks default to `not checked`.
 //
-// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <file>] [--annex <file>] [--anchors <file>] [--identities <file>] [--roll <roll.json> --keyring <manifest>] [--declarations <file> --roll <roll.json>] [--keyring <file> --seal <file> --body <file>] [--quiet]
+// Usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--code <run.json> [--repo <git checkout>]] [--chain <file>] [--annex <file>] [--anchors <file>] [--identities <file>] [--roll <roll.json> --keyring <manifest>] [--declarations <file> --roll <roll.json>] [--keyring <file> --seal <file> --body <file>] [--quiet]
 // Exit 0 with a per-session attestation on stdout, exit 1 with findings.
 import { readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { genesisHash, verifySlice, RecordIntegrityError, extendChain, readAnchors } from '../packages/record/src/index.js';
 import { verifyAnchorChain } from '../packages/record/src/anchors.js';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
+import { verifyCodeDigest } from '../tools/code-digest.mjs';
 import { parseManifest, parseSeal, verifySeal, verifyAnnex, verifySubjectCert, verifyRoll, verifyPriorDeclaration, certUnsignedBytes, canonicalBytes, withoutField, sha256Hex, SealError } from '../packages/seals/src/index.js';
 
 const DEV_BASIS_PHRASE = 'VALID under DEV keyring — conveys no standing';
@@ -74,6 +75,7 @@ export function splitPreamble(lines) {
 export function audit(events, chainFile, headerLines = 0, extras = {}) {
   const chain = chainFile ? checkChain(chainFile, events) : null;
   const signatures = checkSignatures(events, extras);
+  const code = checkCode(events, extras);
   const findings = [];
   const askedIds = new Map();   // approval id -> seq
   const openTurns = [];
@@ -146,6 +148,7 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
 
   if (chain?.finding) findings.push(chain.finding);
   for (const f of signatures.findings) findings.push(f);
+  for (const f of code.findings) findings.push(f);
 
   const errors = findings.filter(f => f.severity === 'error');
   const anchorsChecked = signatures.anchors ? (signatures.anchors.ok ? 'verified' : 'BROKEN') : 'not checked';
@@ -160,7 +163,9 @@ export function audit(events, chainFile, headerLines = 0, extras = {}) {
       events: events.length, asks: askedIds.size, headerLines: headerLines ?? 0,
       chain: chain ? (chain.ok ? 'verified' : 'BROKEN') : 'not checked',
       annex: annexChecked, anchors: anchorsChecked, bodySeal: bodySealChecked, identities: identitiesChecked, roll: rollChecked, declarations: declarationsChecked,
+      code: code.status,
     },
+    ...(code.summary ? { code: code.summary } : {}),
     ...(chain?.ok ? { chainHead: chain.head } : {}),
     ...(signatures.annex?.ok ? { enforcer: signatures.annex } : {}),
     ...(signatures.anchors?.ok ? { authorship: signatures.anchors } : {}),
@@ -359,6 +364,51 @@ function checkIdentities(file, annex, roll = null, now = Date.now()) {
 }
 
 /**
+ * The code digest (CF-2's "identity is content", applied to the code): the
+ * self-model's attestation event carries the launcher's boot digest in
+ * `source.code`, so the hash chain holds it. Given the detail (`--code`:
+ * the run's run.json, or its state/code-digest.json) the auditor checks
+ * the detail hashes to that chained digest; given a repository (`--repo`)
+ * it checks each workspace package and the lockfile against the commit's
+ * own tree. The installed third-party tree is reported, never verified —
+ * it is not in git. A log with no digest says so and implies nothing.
+ */
+function checkCode(events, { codeFile, repoDir } = {}) {
+  const findings = [];
+  const recorded = [];
+  for (const e of events) {
+    const src = (e?.data ?? e)?.source;
+    if (e?.type === 'user/message' && src?.kind === 'compact-self-model' && typeof src?.code?.digest === 'string') {
+      recorded.push({ seq: e.seq ?? null, digest: src.code.digest, commit: src.code.commit ?? null });
+    }
+  }
+  if (recorded.length === 0) {
+    if (codeFile) findings.push({ seq: null, type: 'code', severity: 'error', rule: 'CF-2', detail: '--code was given, but no attestation in this log carries a code digest — there is nothing to verify the detail against' });
+    return { status: 'not recorded', findings };
+  }
+  const digests = new Set(recorded.map((r) => r.digest));
+  if (digests.size > 1) {
+    findings.push({ seq: recorded.find((r) => r.digest !== recorded[0].digest).seq, type: 'code', severity: 'error', rule: 'CF-2', detail: `the code digest changed within the session (${[...digests].map((d) => d.slice(0, 12)).join(' → ')}) — one session, one code` });
+  }
+  const summary = { recorded: recorded[0].digest, commit: recorded[0].commit, attestations: recorded.length };
+  if (!codeFile) return { status: 'recorded, not verified (pass --code and --repo)', summary, findings };
+  let detail;
+  try {
+    const parsed = JSON.parse(readFileSync(codeFile, 'utf8'));
+    detail = parsed?.code?.digests ?? parsed;
+  } catch (err) {
+    findings.push({ seq: null, type: 'code', severity: 'error', rule: 'CF-2', detail: `cannot read the code detail ${codeFile}: ${err.message}` });
+    return { status: 'BROKEN', summary, findings };
+  }
+  const verdict = verifyCodeDigest({ detail, recorded: recorded[0].digest, repo: repoDir ?? null });
+  for (const failure of verdict.failures) findings.push({ seq: null, type: 'code', severity: 'error', rule: 'CF-2', detail: failure });
+  summary.checks = verdict.checks;
+  if (verdict.unverified) summary.unverified = verdict.unverified;
+  const status = !verdict.ok ? 'BROKEN' : repoDir ? 'verified against the commit' : 'detail matches the record (no --repo)';
+  return { status, summary, findings };
+}
+
+/**
  * Verify the rehearsal signatures, given optional inputs. Every refusal is a
  * named ERROR finding: a broken declared seal is not a warning (D-7). Absent
  * inputs are `not checked` and imply nothing.
@@ -546,9 +596,11 @@ function main() {
   const bodyFile = opt('--body');
   const rollFile = opt('--roll');
   const declarationsFile = opt('--declarations');
+  const codeFile = opt('--code');
+  const repoDir = opt('--repo');
   const has = (name) => process.argv.includes(name);
-  if (!file || (has('--chain') && !chainFile) || (has('--annex') && !annexFile) || (has('--anchors') && !anchorsFile) || (has('--identities') && !identitiesFile) || (has('--roll') && !rollFile) || (has('--declarations') && !declarationsFile)) {
-    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--annex <enforcer.annex.json>] [--anchors <id>.chain.sigs.jsonl] [--identities <subjects.jsonl>] [--roll <roll.json> --keyring <manifest>] [--declarations <declarations.jsonl> --roll <roll.json>] [--keyring <manifest> --seal <sig.json> --body <compact.md>] [--quiet]');
+  if (!file || (has('--chain') && !chainFile) || (has('--annex') && !annexFile) || (has('--anchors') && !anchorsFile) || (has('--identities') && !identitiesFile) || (has('--roll') && !rollFile) || (has('--declarations') && !declarationsFile) || (has('--code') && !codeFile) || (has('--repo') && !repoDir)) {
+    console.error('usage: node auditor/audit.mjs <session-log.{json|jsonl}> [--chain <id>.chain] [--annex <enforcer.annex.json>] [--anchors <id>.chain.sigs.jsonl] [--identities <subjects.jsonl>] [--roll <roll.json> --keyring <manifest>] [--declarations <declarations.jsonl> --roll <roll.json>] [--keyring <manifest> --seal <sig.json> --body <compact.md>] [--code <run.json|code-digest.json> [--repo <git checkout>]] [--quiet]');
     process.exit(2);
   }
   let parsed;
@@ -559,7 +611,7 @@ function main() {
     process.exit(2);
   }
   const { events, headerLines } = splitPreamble(parsed);
-  const attestation = { session: file, ...audit(events, chainFile, headerLines, { annexFile, anchorsFile, identitiesFile, rollFile, declarationsFile, keyringFile, sealFile, bodyFile }) };
+  const attestation = { session: file, ...audit(events, chainFile, headerLines, { annexFile, anchorsFile, identitiesFile, rollFile, declarationsFile, keyringFile, sealFile, bodyFile, codeFile, repoDir }) };
   if (!quiet) console.log(JSON.stringify(attestation, null, 2));
   const errors = attestation.findings.filter(f => f.severity === 'error');
   if (errors.length > 0) {

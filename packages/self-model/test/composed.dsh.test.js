@@ -652,3 +652,48 @@ test('composed: the many-member binding refuses its own malformed shapes loudly 
   t.after(() => ctx3.fiber.dispose?.());
   assert.throws(() => selfModel.apply(ctx3, { memberBinding: { ...domain.binding, members: [] } }), /members is empty/);
 });
+
+// the code by content (CF-2): the launcher's boot digest rides the
+// attestation onto the chain — as text the Subject reads and as a
+// structured field on the event the offline auditor reads
+test('composed: the attestation carries the code digest — rendered, and structured on the event', async () => {
+  const { writeFileSync, mkdtempSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'self-model-code-'));
+  const file = join(dir, 'code-digest.json');
+  const digest = 'c'.repeat(64);
+  writeFileSync(file, JSON.stringify({
+    version: 'compact-code-digest/v1', digest, commit: 'deadbeef'.repeat(5),
+    packages: [{ name: 'compact-dsh-loopguard', digest: 'd'.repeat(64), foreign: true }, { name: 'compact-dsh-approval', digest: 'e'.repeat(64), foreign: false }],
+  }));
+  const before = process.env.COMPACT_CODE_DIGEST_FILE;
+  process.env.COMPACT_CODE_DIGEST_FILE = file;
+  try {
+    const { ctx, agents } = await boot();
+    const agent = agents.add('s-code');
+    ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+    const event = agent.injected.at(-1);
+    assert.match(event.content[0].text, /Code: digest cccccccccccccccc over 2 workspace package\(s\) at commit deadbeefdead — 1 loaded from OUTSIDE the checkout/);
+    assert.deepEqual(event.source.code, { digest, commit: 'deadbeef'.repeat(5) }, 'the chained event carries the digest, structured');
+    assert.equal(event.source.plugin, 'compact-self-model', 'still the self-model\'s own source');
+  } finally {
+    if (before === undefined) delete process.env.COMPACT_CODE_DIGEST_FILE; else process.env.COMPACT_CODE_DIGEST_FILE = before;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('composed: no digest computed — the attestation says so, the event carries nothing to verify', async () => {
+  const before = process.env.COMPACT_CODE_DIGEST_FILE;
+  delete process.env.COMPACT_CODE_DIGEST_FILE;
+  try {
+    const { ctx, agents } = await boot();
+    const agent = agents.add('s-nocode');
+    ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+    const event = agent.injected.at(-1);
+    assert.match(event.content[0].text, /Code: not digested at boot — this launcher computes no code digest; the commit alone names it/);
+    assert.equal(event.source.code, undefined);
+  } finally {
+    if (before !== undefined) process.env.COMPACT_CODE_DIGEST_FILE = before;
+  }
+});
