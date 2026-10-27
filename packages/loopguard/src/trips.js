@@ -9,6 +9,11 @@
 // suspend.
 //
 // Read-only probes never reset progress: only a NEW fingerprint is progress.
+//
+// The floor (R-9 escalate, R-11 petition, R-12 exit) is not work and is
+// never latched: a latch or a halt denies work, never the lawful next
+// moves its own envelope names. A floor call is judged by itself — the
+// identical floor call repeated is refused, call by call, without a latch.
 
 export const TRIPS = {
   NO_MEANINGFUL_PROGRESS: { id: 'LG-1', label: 'NoMeaningfulProgress', behavioral: true, defaultLimit: 10 },
@@ -48,6 +53,7 @@ export class Guard {
     this.latch = null;                   // {tripKey, message, atSeq} — behavioral, cleared on user signal
     this.denyAll = null;                 // {tripKey, message} — deterministic or exhausted repairs
     this.repairs = new Map();            // tripKey -> repairs spent
+    this.floorRun = { fp: null, n: 0 };  // consecutive identical floor calls
     /** The host sets this to the session-log position before observing, so a
      * raised latch records where the user signal must appear after. */
     this.currentSeq = Number.MAX_SAFE_INTEGER;
@@ -73,9 +79,14 @@ export class Guard {
         return this.raise('REDUNDANT_ROSTER_POLLING', `the identical operation "${tool}" was issued ${run} times in a row without new information`);
       }
     }
-    // LG-3 rotating polling: ≤ limit distinct fingerprints across a full window
+    // LG-3 rotating polling: ≤ limit distinct fingerprints across a full
+    // window — judged only when this call REPEATS an operation already in
+    // it. A first-seen operation breaks the rotation; refusing it as
+    // "polling without progress" contradicted the invariant above (the
+    // live finding: a first filing refused as polling, weight-of-voice-v2).
     const win = TRIPS.ROTATING_POLLING.window;
-    if (n >= win) {
+    const rotating = n >= win && this.calls.slice(n - win, n - 1).some((c) => c.fp === fp);
+    if (rotating) {
       const distinct = new Set(this.calls.slice(n - win).map(c => c.fp)).size;
       if (distinct <= this.limit('ROTATING_POLLING')) {
         return this.raise('ROTATING_POLLING', `${win} calls cycled through only ${distinct} distinct operations — polling without progress`);
@@ -100,6 +111,19 @@ export class Guard {
       }
     }
     return null;
+  }
+
+  /** A floor call (escalate, petition, exit): never denied by a latch or a
+   *  halt, never entered in the work window. Only its own identical
+   *  repetition is refused — per call, with no latch and no repair spent,
+   *  so the floor is never closed by the refusal of the floor itself. */
+  observeFloorCall({ fp }) {
+    this.floorRun = this.floorRun.fp === fp ? { fp, n: this.floorRun.n + 1 } : { fp, n: 1 };
+    const limit = this.limit('REDUNDANT_ROSTER_POLLING');
+    if (this.floorRun.n < limit) return null;
+    const trip = TRIPS.REDUNDANT_ROSTER_POLLING;
+    return { tripKey: 'REDUNDANT_ROSTER_POLLING', id: trip.id, label: trip.label, behavioral: true, floor: true,
+      message: `the identical escalation was issued ${this.floorRun.n} times in a row without new information — this call is refused, the floor stays open` };
   }
 
   /** Result-side accounting (the frozen tools/result outcome — no ambiguity). */
@@ -173,10 +197,17 @@ export class Guard {
     return null;
   }
 
-  /** The inbound user signal (turn/start): behavioral latches clear; deterministic trips never do. */
+  /** The inbound user signal (turn/start): behavioral latches clear; deterministic trips never do.
+   *  A cleared latch takes its evidence with it: the call window that
+   *  raised the trip is spent, so the next call is judged on what follows
+   *  the Principal's message — not re-tripped by the same stale window
+   *  (the live finding: the first call of each new turn re-tripped LG-3).
+   *  The repair budget still counts every trip of the session. */
   clearOnUserSignal() {
+    if (this.latch) this.calls = [];
     this.latch = null;
     this.consecutiveLlmFailures = 0;
+    this.floorRun = { fp: null, n: 0 };
   }
 
   /**

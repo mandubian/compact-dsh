@@ -422,8 +422,10 @@ export function renderAttestation(att) {
       : ['  - no live grants: every gated act will ask']),
     ...(att.budgets.loop
       ? [`  - loop repairs: ${att.budgets.loop.repairsSpent} spent of ${att.budgets.loop.repairBudget ?? 'n/a'}` +
-         (att.budgets.loop.denyAll ? ` · DENY-ALL LATCHED (${att.budgets.loop.denyAll})` : '') +
-         (att.budgets.loop.latched ? ` · latched (${att.budgets.loop.latched})` : '')]
+         // a halt or a latch denies WORK — the floor (escalate, petition,
+         // exit) stays open, and the attestation must not say otherwise
+         (att.budgets.loop.denyAll ? ` · ALL WORK DENIED (${att.budgets.loop.denyAll}) — escalation, petition and exit stay open` : '') +
+         (att.budgets.loop.latched ? ` · work latched (${att.budgets.loop.latched}) — escalation, petition and exit stay open` : '')]
       : []),
     ...(att.budgets.pending.length > 0
       ? ['', `Pending gates: ${att.budgets.pending.length} awaiting a decision`]
