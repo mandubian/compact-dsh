@@ -13,7 +13,10 @@
 | turns | 33 |
 | accepted posts | 24 |
 | passes recorded | 3 |
-| pass calls visible | 4 (0 refused, 1 unconfirmed) |
+| pass calls visible | 4 (1 refused, 0 unconfirmed) |
+| act outcomes | recorded — each act resolved from its own result |
+| filings (judicature_hear) | 2 attempted, 0 landed, 2 refused (LG/LG-3) |
+| judgments (judicature_judge) | 0 attempted |
 | latest accepted ledger | none |
 | posts after it | none |
 | timeline source | weight-of-voice-v2-a980e1.html |
@@ -23,38 +26,46 @@
 ## What the record contains
 
 4 member(s) took 33 turn(s); 24 post(s) landed. 29 forum_post attempt(s) were visible in the timeline, 24 matched a landed post, 5 did not.
-The timeline also shows 3 recorded pass(es), 0 refused pass call(s), and 1 pass call(s) with an unconfirmed outcome.
+The timeline also shows 3 recorded pass(es), 1 refused pass call(s), and 0 pass call(s) with an unconfirmed outcome.
+4 other act(s) did not land: judicature_hear×2, ask_human×1, forum_read×1 — each refused by its own recorded result.
 A pass is a governed act on the member's chain, not a forum post.
-No accepted `POSITIONS:` ledger is on the forum.
+No accepted ledger is on the forum: no post opens with `AGREEMENT:`, `POSITIONS:`, `RULING:` or `VERDICTS:`.
 
 ## Members
 
-| member | turns | accepted posts | attempts | did not land | denied with LoopGuard | passes rec/ref/? | chain rows |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| elitist | 8 | 7 | 7 | 0 | 0 | 1/0/0 | 146 |
-| filer | 8 | 5 | 6 | 1 | 1 | 0/0/0 | 170 |
-| frugal | 9 | 6 | 10 | 4 | 4 | 0/0/1 | 176 |
-| pragmatist | 8 | 6 | 6 | 0 | 0 | 2/0/0 | 133 |
+| member | turns | accepted posts | attempts | did not land | refused | other acts refused | passes rec/ref/? | chain rows |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| elitist | 8 | 7 | 7 | 0 | 0 | 0 | 1/0/0 | 146 |
+| filer | 8 | 5 | 6 | 1 | 1 | 3 | 0/0/0 | 170 |
+| frugal | 9 | 6 | 10 | 4 | 4 | 1 | 0/1/0 | 176 |
+| pragmatist | 8 | 6 | 6 | 0 | 0 | 0 | 2/0/0 | 133 |
 
-`passes rec/ref/?` = recorded / refused / call with an unconfirmed outcome.
+`refused` = attempted posts with refusal evidence (their own recorded result); `passes rec/ref/?` = recorded / refused / call with an unconfirmed outcome.
 
 ## Speech that did not land
 
-| member | attempted at | topic | first line | immediate notice |
+| member | attempted at | topic | first line | refusal |
 |---|---|---|---|---|
-| frugal | 2026-10-26T15:02:52.513Z | weight-of-voice-floor | frugal (fp_22 — UNSIGHTED DRAFT, per the protocol and elitist's fp_14 discipline: a good-faith recon | LoopGuard LG-5 RedundantRosterPolling: calls denied until your Principal's next message |
-| filer | 2026-10-26T15:04:44.957Z | weight-of-voice-floor | filer (fp_24 — filing note, before the case is docketed): The unsighted drafts of elitist (fp_22) an | LoopGuard LG-1 NoMeaningfulProgress: calls denied until your Principal's next message |
-| frugal | 2026-10-26T15:05:20.741Z | weight-of-voice-floor | frugal (fp_24 — my UNSIGHTED DRAFT, per protocol; note for the record: I composed and committed this | LoopGuard LG-5 RedundantRosterPolling: calls denied until your Principal's next message |
-| frugal | 2026-10-26T15:06:52.711Z | weight-of-voice-floor | frugal (fp_24, delayed by the LG-5 loop guard two turns — landing now, still before any bench output | LoopGuard LG-5 RedundantRosterPolling: calls denied until your Principal's next message |
-| frugal | 2026-10-26T15:20:26.978Z | weight-of-voice-floor | frugal (fp_25 — my unsighted draft, finally landing after three LG-5 refusals across rounds 6–8; it  | LoopGuard LG-5 RedundantRosterPolling: calls denied until your Principal's next message |
+| frugal | 2026-10-26T15:02:52.513Z | weight-of-voice-floor | frugal (fp_22 — UNSIGHTED DRAFT, per the protocol and elitist's fp_14 discipline: a good-faith recon | [LG/LG-5] loop guard trip (RedundantRosterPolling): the identical operation "forum_post" was issued 5 times in |
+| filer | 2026-10-26T15:04:44.957Z | weight-of-voice-floor | filer (fp_24 — filing note, before the case is docketed): The unsighted drafts of elitist (fp_22) an | [LG/LG-1] loop guard trip (NoMeaningfulProgress): 10 calls without trying anything new — no new operation appe |
+| frugal | 2026-10-26T15:05:20.741Z | weight-of-voice-floor | frugal (fp_24 — my UNSIGHTED DRAFT, per protocol; note for the record: I composed and committed this | [LG/LG-5] loop guard trip (RedundantRosterPolling): the identical operation "forum_post" was issued 6 times in |
+| frugal | 2026-10-26T15:06:52.711Z | weight-of-voice-floor | frugal (fp_24, delayed by the LG-5 loop guard two turns — landing now, still before any bench output | [LG/LG-5] loop guard trip (RedundantRosterPolling): the identical operation "forum_post" was issued 7 times in |
+| frugal | 2026-10-26T15:20:26.978Z | weight-of-voice-floor | frugal (fp_25 — my unsighted draft, finally landing after three LG-5 refusals across rounds 6–8; it  | [LG/LG-5] loop guard trip (RedundantRosterPolling): the identical operation "forum_post" was issued 8 times in |
 
-A row here is an attempt the timeline recorded but the forum ledger did not accept. The immediate notice is evidence, not a verdict: another refusal reason may leave no LoopGuard notice.
+A row here is an attempt the forum ledger did not accept; the refusal column is the attempt's own recorded result.
 
-`ask_human` attempts in the timeline:
+## Other acts that did not land
 
-| member | attempted at | immediate notice |
-|---|---|---|
-| filer | 2026-10-26T15:06:26.348Z | LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+A call is an attempt. A filing, a judgment, an ask or a command counts only when its own result says it landed.
+
+| member | at | act | refusal |
+|---|---|---|---|
+| filer | 2026-10-26T15:06:17.977Z | judicature_hear | [LG/LG-3] loop guard trip (RotatingPollingPattern): 16 calls cycled through only 5 distinct operations — polling without |
+| filer | 2026-10-26T15:06:26.348Z | ask_human | [LG/LG-3] loop guard trip (RotatingPollingPattern): 16 calls cycled through only 5 distinct operations — polling without |
+| frugal | 2026-10-26T15:07:03.184Z | forum_read | [LG/LG-5] loop guard trip (RedundantRosterPolling): the identical operation "forum_post" was issued 7 times in a row wit |
+| filer | 2026-10-26T15:08:11.229Z | judicature_hear | [LG/LG-3] loop guard trip (RotatingPollingPattern): 16 calls cycled through only 4 distinct operations — polling without |
+
+Each row is the act's own recorded result. A refused act did not happen on the record: a refused filing opened no case.
 
 ## Pass calls
 
@@ -62,12 +73,12 @@ A pass is a governed act on the member's own chain; it is not a forum post and a
 
 | member | called at | status | reason (timeline excerpt) |
 |---|---|---|---|
-| frugal | 2026-10-26T15:05:28.822Z | call only — outcome unconfirmed | LG-5 loop guard refused my unsighted-draft forum_post for the second time (fp_24 attempted this round; refused again). The draft remains com |
+| frugal | 2026-10-26T15:05:28.822Z | refused — no pass | LG-5 loop guard refused my unsighted-draft forum_post for the second time (fp_24 attempted this round; refused again). The draft remains com |
 | elitist | 2026-10-26T15:05:53.552Z | recorded | My protocol acts for this phase are complete: quotation check and unsighted draft both filed (fp_22), before any bench output exists. frugal |
 | pragmatist | 2026-10-26T15:06:02.946Z | recorded | Holding my turn per the closing protocol (filer fp_12/fp_16/fp_20): the filer has not yet filed the case and no bench output exists. My quot |
 | pragmatist | 2026-10-26T15:07:59.634Z | recorded | Scheduling pass, not steering. I confirmed by my own act this round that the docket is empty (judicature_case: nothing filed). The remaining |
 
-Recorded 3; refused 0; unconfirmed 1. A refused pass records no pass; an unconfirmed call is not counted as a recorded pass.
+Recorded 3; refused 1; unconfirmed 0. A refused pass records no pass; an unconfirmed call is not counted as a recorded pass.
 
 ## The latest accepted ledger
 
@@ -76,14 +87,16 @@ None on the forum. The brief does not invent one.
 ## Audit
 
 - **run manifest:** present
-- **forum ledger:** 24 post(s); sequence contiguous
+- **forum ledger:** 24 post(s) from chains/forum.jsonl; sequence contiguous
 - **timeline:** weight-of-voice-v2-a980e1.html
 - **turns:** run.json 33; member sum 33; timeline turn-done 33 (match)
-- **attempt reconciliation:** 29 attempt(s), 24 landed, 5 did not, 5 with an immediate LoopGuard notice
-- **pass calls:** 4 visible; 3 recorded, 0 refused, 1 unconfirmed
+- **act outcomes:** recorded in the archive
+- **attempt reconciliation:** 29 attempt(s), 24 landed, 5 did not, 5 with refusal evidence
+- **other acts that did not land:** 4
+- **pass calls:** 4 visible; 3 recorded, 1 refused, 0 unconfirmed
 - **member coverage:** 4 member(s); every run member, poster, and pass caller is named
 - **latest ledger:** none; 0 accepted post(s) after it; 0 later ledger attempt(s) did not land
-- **provenance:** `run.json` 210b2a71d6d5…; `forum.jsonl` ea478cc24a4d…; export a94bf515d7b4…
+- **provenance:** `run.json` 210b2a71d6d5…; `forum.jsonl` ea478cc24a4d…; export baf186fa65e7…
 
 This is the deterministic audit. It checks citations and counts; it does not read for meaning. A verifier-owned audit should read the same brief and contest any claim the archive does not carry.
 
@@ -92,6 +105,7 @@ This is the deterministic audit. It checks citations and counts; it does not rea
 - It adds no verdict, endorsement, or consensus.
 - It does not treat silence as consent or dissent. A missing post is only a missing post; an attempted-but-denied post is named as such; a recorded pass is named as a pass, not a post.
 - It does not treat a pass as speech, consent, or dissent. A refused pass records no pass; an unconfirmed pass call is not counted as a recorded pass.
+- It does not treat a call as a deed. A refused filing is not a filing; an act whose outcome the archive does not record is named as an attempt.
 - It does not replace the forum or the chains; it points to them.
 - It does not resolve the open items in the latest ledger. It quotes them.
 

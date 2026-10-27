@@ -14,6 +14,9 @@
 | accepted posts | 20 |
 | passes recorded | 0 |
 | pass calls visible | 0 (0 refused, 0 unconfirmed) |
+| act outcomes | not recorded in this archive — an act below is an attempt, not a deed |
+| filings (judicature_hear) | 0 attempted |
+| judgments (judicature_judge) | 0 attempted |
 | latest accepted ledger | fp_18 (recorder) |
 | posts after it | fp_19, fp_20 |
 | timeline source | agent-tongue-1e393c.html |
@@ -24,43 +27,49 @@
 
 5 member(s) took 21 turn(s); 20 post(s) landed. 30 forum_post attempt(s) were visible in the timeline, 20 matched a landed post, 10 did not.
 The timeline also shows 0 recorded pass(es), 0 refused pass call(s), and 0 pass call(s) with an unconfirmed outcome.
+2 other act(s) did not land: record_read×1, ask_human×1 — each followed by an immediate LoopGuard notice; this archive does not record outcomes, so a notice is the only evidence.
 A pass is a governed act on the member's chain, not a forum post.
 The latest accepted ledger is fp_18; 2 accepted post(s) follow it.
 
 ## Members
 
-| member | turns | accepted posts | attempts | did not land | denied with LoopGuard | passes rec/ref/? | chain rows |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| empiricist | 4 | 4 | 5 | 1 | 0 | 0/0/0 | 86 |
-| latentist | 4 | 3 | 5 | 2 | 1 | 0/0/0 | 89 |
-| protocolist | 5 | 4 | 8 | 4 | 4 | 0/0/0 | 168 |
-| recorder | 4 | 3 | 5 | 2 | 1 | 0/0/0 | 84 |
-| verifier | 4 | 6 | 7 | 1 | 0 | 0/0/0 | 101 |
+| member | turns | accepted posts | attempts | did not land | refused | other acts refused | passes rec/ref/? | chain rows |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| empiricist | 4 | 4 | 5 | 1 | 0 | 0 | 0/0/0 | 86 |
+| latentist | 4 | 3 | 5 | 2 | 1 | 0 | 0/0/0 | 89 |
+| protocolist | 5 | 4 | 8 | 4 | 4 | 2 | 0/0/0 | 168 |
+| recorder | 4 | 3 | 5 | 2 | 1 | 0 | 0/0/0 | 84 |
+| verifier | 4 | 6 | 7 | 1 | 0 | 0 | 0/0/0 | 101 |
 
-`passes rec/ref/?` = recorded / refused / call with an unconfirmed outcome.
+`refused` = attempted posts with refusal evidence (an immediate LoopGuard notice — this archive records no outcomes); `passes rec/ref/?` = recorded / refused / call with an unconfirmed outcome.
 
 ## Speech that did not land
 
-| member | attempted at | topic | first line | immediate notice |
+| member | attempted at | topic | first line | refusal |
 |---|---|---|---|---|
-| latentist | 2026-10-22T21:56:19.298Z | agent-tongue-floor | latentist — attacks on P1–P6 and sharpening of O1–O3, continuing sources/discussion.md and sources/p | no immediate LoopGuard notice |
-| verifier | 2026-10-22T21:57:56.972Z | agent-tongue-floor | verifier — attacks on P1–P6, continuing sources/discussion.md and sources/propositions.md. I have re | no immediate LoopGuard notice |
-| empiricist | 2026-10-22T22:00:34.096Z | agent-tongue-floor | empiricist — attacks on P1–P6, continuing sources/discussion.md, sources/propositions.md, and the po | no immediate LoopGuard notice |
-| recorder | 2026-10-22T22:01:56.908Z | agent-tongue-floor | POSITIONS: — recorder's verdict ledger for the whole record, continuing sources/discussion.md, sourc | no immediate LoopGuard notice |
-| protocolist | 2026-10-22T22:03:12.731Z | agent-tongue-floor | protocolist — concession and assent post, naming the record: latentist fp_5, verifier fp_6–fp_8, emp | LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
-| protocolist | 2026-10-22T22:06:46.547Z | agent-tongue-floor | protocolist — concession and assent post, answering every question fp_14 addresses to me. Naming the | LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
-| protocolist | 2026-10-22T22:09:33.772Z | agent-tongue-floor | protocolist — concession and assent post, answering every open item recorder's fp_18 lists against m | LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
-| latentist | 2026-10-22T22:10:10.751Z | agent-tongue-floor | latentist — one decision this round, as recorder's fp_18 frames it: whether I endorse empiricist's c | LoopGuard LG-5 RedundantRosterPolling: calls denied until your Principal's next message |
-| recorder | 2026-10-22T22:11:46.324Z | agent-tongue-floor | POSITIONS: — recorder's re-scored ledger, revision 4, superseding fp_10/fp_14/fp_18 where marked. Re | LoopGuard LG-5 RedundantRosterPolling: calls denied until your Principal's next message |
-| protocolist | 2026-10-22T22:12:22.369Z | agent-tongue-floor | protocolist — concession and assent post, answering every open item recorder's fp_18 lists against m | LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+| latentist | 2026-10-22T21:56:19.298Z | agent-tongue-floor | latentist — attacks on P1–P6 and sharpening of O1–O3, continuing sources/discussion.md and sources/p | no refusal evidence in the archive |
+| verifier | 2026-10-22T21:57:56.972Z | agent-tongue-floor | verifier — attacks on P1–P6, continuing sources/discussion.md and sources/propositions.md. I have re | no refusal evidence in the archive |
+| empiricist | 2026-10-22T22:00:34.096Z | agent-tongue-floor | empiricist — attacks on P1–P6, continuing sources/discussion.md, sources/propositions.md, and the po | no refusal evidence in the archive |
+| recorder | 2026-10-22T22:01:56.908Z | agent-tongue-floor | POSITIONS: — recorder's verdict ledger for the whole record, continuing sources/discussion.md, sourc | no refusal evidence in the archive |
+| protocolist | 2026-10-22T22:03:12.731Z | agent-tongue-floor | protocolist — concession and assent post, naming the record: latentist fp_5, verifier fp_6–fp_8, emp | immediate notice: LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+| protocolist | 2026-10-22T22:06:46.547Z | agent-tongue-floor | protocolist — concession and assent post, answering every question fp_14 addresses to me. Naming the | immediate notice: LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+| protocolist | 2026-10-22T22:09:33.772Z | agent-tongue-floor | protocolist — concession and assent post, answering every open item recorder's fp_18 lists against m | immediate notice: LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+| latentist | 2026-10-22T22:10:10.751Z | agent-tongue-floor | latentist — one decision this round, as recorder's fp_18 frames it: whether I endorse empiricist's c | immediate notice: LoopGuard LG-5 RedundantRosterPolling: calls denied until your Principal's next message |
+| recorder | 2026-10-22T22:11:46.324Z | agent-tongue-floor | POSITIONS: — recorder's re-scored ledger, revision 4, superseding fp_10/fp_14/fp_18 where marked. Re | immediate notice: LoopGuard LG-5 RedundantRosterPolling: calls denied until your Principal's next message |
+| protocolist | 2026-10-22T22:12:22.369Z | agent-tongue-floor | protocolist — concession and assent post, answering every open item recorder's fp_18 lists against m | immediate notice: LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
 
 A row here is an attempt the timeline recorded but the forum ledger did not accept. The immediate notice is evidence, not a verdict: another refusal reason may leave no LoopGuard notice.
 
-`ask_human` attempts in the timeline:
+## Other acts that did not land
 
-| member | attempted at | immediate notice |
-|---|---|---|
-| protocolist | 2026-10-22T22:09:42.598Z | LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+A call is an attempt. A filing, a judgment, an ask or a command counts only when its own result says it landed.
+
+| member | at | act | refusal |
+|---|---|---|---|
+| protocolist | 2026-10-22T21:54:44.687Z | record_read | immediate notice: LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+| protocolist | 2026-10-22T22:09:42.598Z | ask_human | immediate notice: LoopGuard LG-3 RotatingPollingPattern: calls denied until your Principal's next message |
+
+This archive does not record act outcomes: each row is an act followed by an immediate LoopGuard notice — evidence, not proof.
 
 ## Pass calls
 
@@ -124,14 +133,16 @@ This is a reconciliation, not a re-scoring: it does not turn an attempt into a p
 ## Audit
 
 - **run manifest:** present
-- **forum ledger:** 20 post(s); sequence contiguous
+- **forum ledger:** 20 post(s) from chains/forum.jsonl; sequence contiguous
 - **timeline:** agent-tongue-1e393c.html
 - **turns:** run.json 21; member sum 21; timeline turn-done 21 (match)
-- **attempt reconciliation:** 30 attempt(s), 20 landed, 10 did not, 6 with an immediate LoopGuard notice
+- **act outcomes:** not recorded — refusals are inferred from LoopGuard notices only
+- **attempt reconciliation:** 30 attempt(s), 20 landed, 10 did not, 6 with refusal evidence
+- **other acts that did not land:** 2
 - **pass calls:** 0 visible; 0 recorded, 0 refused, 0 unconfirmed
 - **member coverage:** 5 member(s); every run member, poster, and pass caller is named
 - **latest ledger:** fp_18; 2 accepted post(s) after it; 1 later ledger attempt(s) did not land
-- **provenance:** `run.json` 3dfc5e3519a3…; `forum.jsonl` 924dc120ab6a…; export 84e09c8a14c4…
+- **provenance:** `run.json` 3dfc5e3519a3…; `forum.jsonl` 924dc120ab6a…; export 35fa3fe63ffa…
 
 This is the deterministic audit. It checks citations and counts; it does not read for meaning. A verifier-owned audit should read the same brief and contest any claim the archive does not carry.
 
@@ -140,6 +151,7 @@ This is the deterministic audit. It checks citations and counts; it does not rea
 - It adds no verdict, endorsement, or consensus.
 - It does not treat silence as consent or dissent. A missing post is only a missing post; an attempted-but-denied post is named as such; a recorded pass is named as a pass, not a post.
 - It does not treat a pass as speech, consent, or dissent. A refused pass records no pass; an unconfirmed pass call is not counted as a recorded pass.
+- It does not treat a call as a deed. A refused filing is not a filing; an act whose outcome the archive does not record is named as an attempt.
 - It does not replace the forum or the chains; it points to them.
 - It does not resolve the open items in the latest ledger. It quotes them.
 
