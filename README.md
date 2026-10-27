@@ -186,7 +186,8 @@ agent-default-model:
 
 Behind a corporate proxy? Node's fetch ignores `https_proxy` by default —
 prefix runs with `NODE_USE_ENV_PROXY=1` (direct egress that times out is
-the symptom).
+the symptom; the launchers print a WARNING when they see a proxy variable
+without it).
 
 Then take the full tour: **[docs/demo.md](docs/demo.md)** — fourteen runnable
 demos, each ending in something you can *see*: the tamper-catching audit, the

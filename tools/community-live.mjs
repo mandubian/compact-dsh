@@ -44,6 +44,7 @@ import { parseAllowlistLikePattern, egressPatternFor } from 'compact-dsh-approva
 import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
+import { proxyEnvNotice } from './proxy-env.mjs';
 import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePostsOf, tokensBySeatOf } from './run-manifest.mjs';
 import { forumFromLedger, meteredTokens } from './community-report.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
@@ -364,6 +365,8 @@ async function main() {
   } else {
     SAY(`code provenance: NOT A GIT CHECKOUT — the manifest will say so rather than guess`);
   }
+  const proxyNotice = proxyEnvNotice();
+  if (proxyNotice) SAY(`WARNING: ${proxyNotice}`);
   preservePreviousRun(scratch, previousRun);
   const workspace = join(scratch, 'workspace');
   mkdirSync(workspace, { recursive: true });

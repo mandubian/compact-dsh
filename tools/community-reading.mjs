@@ -24,6 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { readBriefSources, renderBrief } from './community-brief.mjs';
+import { proxyEnvNotice } from './proxy-env.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PROMPT_VERSION = 'community-reading/v1';
@@ -283,6 +284,9 @@ async function main() {
   }
   const answerPath = argValue(argv, 'answer');
   const maxTokens = Number(argValue(argv, 'max-tokens') ?? 1800);
+  // an answer file makes no model call; generating one rides the route
+  const proxyNotice = answerPath ? null : proxyEnvNotice();
+  if (proxyNotice) process.stderr.write(`community-reading: WARNING: ${proxyNotice}\n`);
   const { text: reading, audit: result } = await generateReading({
     brief, data,
     answerPath: answerPath ? resolve(answerPath) : null,
