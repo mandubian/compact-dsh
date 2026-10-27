@@ -13,6 +13,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
+import { parseEmbeddedArchive } from './community-brief.mjs';
+import { samplesRows, renderSamplesTable, syncSamplesTable } from './samples-table.mjs';
+
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const docs = join(root, 'docs');
 const pages = ['index.html', 'samples.html'];
@@ -78,10 +81,12 @@ test('every local link and image on the site resolves', () => {
   }
 });
 
-test('the three community samples are published with their accounts', () => {
+test('every community sample is published with its account and its brief', () => {
   for (const sample of samples) {
     assert.ok(existsSync(join(docs, sample.html)), `sample ${sample.html} is missing`);
     assert.ok(existsSync(join(docs, sample.account)), `account ${sample.account} is missing`);
+    const brief = join(dirname(join(docs, sample.html)), 'BRIEF.md');
+    assert.ok(existsSync(brief), `${brief} is missing — every archive gets its deterministic brief`);
   }
 });
 
@@ -121,4 +126,73 @@ test('the deploy workflow publishes docs/ on main with Actions', () => {
   assert.match(workflow, /actions\/deploy-pages@/);
   assert.match(workflow, /pages: write/);
   assert.match(workflow, /id-token: write/);
+});
+
+// The page's words against the archives' data. Each test below is a
+// drift the site actually shipped: "four complete runs" beside seven
+// cards, a provenance list that missed a run, and a card that said "no
+// filing" about a run whose two filings were refused.
+
+const samplesPage = () => readFileSync(join(docs, 'samples.html'), 'utf8');
+const archiveOf = (runTag) => {
+  for (const sample of samples) {
+    const dir = dirname(join(docs, sample.html));
+    const run = JSON.parse(readFileSync(join(dir, 'run.json'), 'utf8'));
+    if (run.runTag === runTag) return { run, data: parseEmbeddedArchive(readFileSync(join(docs, sample.html), 'utf8')) };
+  }
+  return null;
+};
+
+test('the side-by-side table is generated from the archives, not typed', () => {
+  const page = samplesPage();
+  const rows = samplesRows(docs);
+  assert.equal(rows.length, samples.length, 'one row per published sample');
+  assert.equal(syncSamplesTable(page, renderSamplesTable(rows)), page,
+    'docs/samples.html is stale against docs/runs — run node tools/samples-table.mjs');
+});
+
+test('every card\'s numbers are its archive\'s numbers', () => {
+  const cards = [...samplesPage().matchAll(/<article class="card sample-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
+  assert.equal(cards.length, samples.length, 'one card per published sample');
+  for (const card of cards) {
+    const tag = /<span class="run-id">(\w+)<\/span>/.exec(card)?.[1];
+    const archive = archiveOf(tag);
+    assert.ok(archive, `card ${tag} names no published archive`);
+    const { run, data } = archive;
+    const stats = Object.fromEntries([...card.matchAll(/<div><span>([^<]+)<\/span><strong>([^<]+)<\/strong><\/div>/g)].map((m) => [m[1], m[2]]));
+    const lead = (v) => Number(/^(\d[\d,]*)/.exec(v)?.[1].replace(/,/g, ''));
+    if (stats.TOKENS) assert.equal(stats.TOKENS, run.tokens.toLocaleString('en-US'), `${tag}: TOKENS`);
+    if (stats.ROUNDS) {
+      assert.equal(lead(stats.ROUNDS), run.rounds, `${tag}: ROUNDS`);
+      // the budget is the manifest's; a manifest that predates `budgets`
+      // (agent-tongue) is checked against the shipped charter file instead
+      // — the operator's file, not the record, and named as such here
+      const budget = /\/ (\d+)/.exec(stats.ROUNDS)?.[1];
+      const charterFile = join(root, 'tools', 'charters', `${run.charter}.json`);
+      const charterBudget = existsSync(charterFile) ? JSON.parse(readFileSync(charterFile, 'utf8')).budgets?.rounds : undefined;
+      if (budget) assert.equal(Number(budget), run.budgets?.rounds ?? charterBudget, `${tag}: the round budget (manifest, else the charter file)`);
+    }
+    if (stats.TURNS) assert.equal(lead(stats.TURNS), run.turns, `${tag}: TURNS`);
+    if (stats['ACCEPTED POSTS']) assert.equal(lead(stats['ACCEPTED POSTS']), data.forum.length, `${tag}: ACCEPTED POSTS`);
+    if (stats['CASES · JUDGMENTS'] && data.actOutcomes) {
+      const landed = (tool) => data.timeline.filter((e) => e.text === tool && e.outcome === 'ok').length;
+      assert.equal(stats['CASES · JUDGMENTS'], `${landed('judicature_hear')} · ${landed('judicature_judge')}`, `${tag}: cases and judgments that LANDED`);
+    }
+  }
+});
+
+test('the prose counts the runs the page actually carries', () => {
+  const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+  const page = samplesPage();
+  const claims = [...page.matchAll(/\b(\w+) (?:complete (?:runs|archives)|charters behind this page)\b/gi)].map((m) => m[1].toLowerCase());
+  assert.ok(claims.length > 0, 'the page states its count somewhere');
+  for (const word of claims) assert.equal(word, words[samples.length], `the page says "${word}" — it carries ${samples.length} runs`);
+});
+
+test('the v2 replay shows the refused filings (the 2026-10-27 correction)', () => {
+  const html = readFileSync(join(docs, 'runs/weight-of-voice-v2/weight-of-voice-v2-a980e1.html'), 'utf8');
+  const panes = renderExport(html);
+  const refused = panes.acts.children.filter((c) => /judicature_hear <span class="verdict">— REFUSED \[LG\/LG-3\]/.test(c.innerHTML));
+  assert.equal(refused.length, 2, 'both filings are marked refused, with their rule');
+  assert.doesNotMatch(samplesPage(), /no filing, the bench never woke/, 'the uncorrected card text is gone');
 });
