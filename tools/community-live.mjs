@@ -44,6 +44,7 @@ import { parseAllowlistLikePattern, egressPatternFor } from 'compact-dsh-approva
 import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
 import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
+import { foreignPackages } from './package-provenance.mjs';
 import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePostsOf, tokensBySeatOf } from './run-manifest.mjs';
 import { forumFromLedger, meteredTokens } from './community-report.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
@@ -69,11 +70,16 @@ function codeProvenance(root) {
   };
   const commit = git('rev-parse', 'HEAD');
   const dirty = commit == null ? null : (git('status', '--porcelain') ?? '').length > 0;
+  // the half git cannot see: packages loaded BY NAME that resolve outside
+  // this checkout (a linked node_modules) run code the commit does not
+  // name — recorded beside it, never folded into it (the 0e3fa8 finding)
+  const foreign = foreignPackages(root);
   return {
     repo: git('remote', 'get-url', 'origin'),
     ref: git('rev-parse', '--abbrev-ref', 'HEAD'),
     commit,
     ...(dirty ? { dirty: true } : {}),
+    ...(foreign.length ? { foreignPackages: foreign } : {}),
     ...(commit == null ? { note: 'not a git checkout (or git absent) — the code state is not named' } : {}),
   };
 }
@@ -363,6 +369,9 @@ async function main() {
     SAY(`code provenance: ${provenance.commit.slice(0, 12)}${provenance.dirty ? ' (DIRTY TREE — uncommitted changes present, named as such in the manifest)' : ''} on ${provenance.ref} of ${provenance.repo ?? 'no origin'}`);
   } else {
     SAY(`code provenance: NOT A GIT CHECKOUT — the manifest will say so rather than guess`);
+  }
+  if (provenance.foreignPackages?.length) {
+    SAY(`WARNING: ${provenance.foreignPackages.length} workspace package(s) load from OUTSIDE this checkout — the commit above does not name their code: ${provenance.foreignPackages.map((f) => `${f.name} → ${f.path}`).join(', ')}. Run \`npm ci\` in this checkout for a run whose provenance holds; the manifest records them either way.`);
   }
   preservePreviousRun(scratch, previousRun);
   const workspace = join(scratch, 'workspace');
