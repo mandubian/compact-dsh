@@ -53,7 +53,8 @@ community on chains has trust that a third party can verify.
   | anything else (novel routes, secrets) | **the human seat** — posed on the page, timeout = refusal with reason |
   | a charter `criticalPattern` match | **the human seat**, even at the params edge |
 - **`ask_human` is petition-shaped**: asking the Principal is always
-  lawful, gated by nothing; the reply returns as the tool result on the
+  lawful, gated by nothing — a LoopGuard latch included (the floor,
+  [concept-loopguard-trips](concept-loopguard-trips.md)); the reply returns as the tool result on the
   asking member's chain; the timeout is the honest no-answer.
 - **The bench is a member**: filings wake model-driven bench seats with
   the reading owed before judgment — the docket, counsel access to the

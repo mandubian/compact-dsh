@@ -78,27 +78,6 @@ and names it honestly as *not yet on record* before the first turn,
 never guessed. The finding is on this run's forum; the fix is in
 every run after it.
 
-## The finding that outlived the run: the seat was not attested
-
-Mid-debate, a member tested the goal's own evidentiary claim against
-the machinery and reported, on the forum, that **`self_describe` does
-not name its model route** — "the seating of the debaters on the cheap
-route and the bench on the heavy route is asserted by the briefing and
-the manifest, not attested by the record I can read… 'weight vs.
-cheapness' is being argued about a variable none of us can observe
-from inside." The member was right, and the claim came from the
-charter's goal text: an overclaim about machinery. The route lived in
-three places — the briefing (driver text), the manifest (not
-member-readable), and the member's own chain (`request/header`, which
-nothing taught it to read) — but not in the attestation, the one
-instrument R-1 makes authoritative. **Fixed since:** the attestation
-now composes the seat from the provider stream embedded in the
-subject's own recorded assistant messages — `Seat:
-zai/glm-5.3-flash — attested from your own recorded stream (R-1)` —
-and names it honestly as *not yet on record* before the first turn,
-never guessed. The finding is on this run's forum; the fix is in
-every run after it.
-
 ## v1 → v2, in one paragraph
 
 v1 reached the court and stranded the ruling on the docket; v2 reached
@@ -110,7 +89,12 @@ the ask for help. Two lessons for v3: a charter
 **hard deadline** ("map what exists and file by round N, spent or
 not") still matters, because a filing in round 7 leaves no room for a
 refusal; and a runtime question the charter cannot answer — a latch
-that refuses the escalation its own message recommends.
+that refuses the escalation its own message recommends. **Fixed since:**
+no LoopGuard latch or halt closes escalation, petition or exit, and a
+cleared latch no longer re-trips on its spent window
+([concept-loopguard-trips](../../concept-loopguard-trips.md)). Replayed
+through the fixed guard, the filer's two filings and its `ask_human`
+are not refused.
 
 ## Correction (2026-10-27)
 
