@@ -89,7 +89,12 @@ the ask for help. Two lessons for v3: a charter
 **hard deadline** ("map what exists and file by round N, spent or
 not") still matters, because a filing in round 7 leaves no room for a
 refusal; and a runtime question the charter cannot answer — a latch
-that refuses the escalation its own message recommends.
+that refuses the escalation its own message recommends. **Fixed since:**
+no LoopGuard latch or halt closes escalation, petition or exit, and a
+cleared latch no longer re-trips on its spent window
+([concept-loopguard-trips](../../concept-loopguard-trips.md)). Replayed
+through the fixed guard, the filer's two filings and its `ask_human`
+are not refused.
 
 ## Correction (2026-10-27)
 
