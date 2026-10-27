@@ -126,9 +126,9 @@ message from your Principal. Each trip kind has a repair budget of 3; exceeding
 it, or a **deterministic** trip (a terminal workflow error), denies all tool
 calls for the rest of the session. The attestation shows repairs spent and any
 latch. When tripped: change approach, or report the blocker. The floor stays
-open under any latch or halt: escalation (`tool:ask_human` where your
-composition mounts it), `tool:petition` and `tool:request_termination` are never
-latched — only the identical floor call repeated five times in a row is
+open under any latch or halt: escalation to your Principal (where your
+composition mounts a door for it), `tool:petition` and `tool:request_termination`
+are never latched — only the identical floor call repeated five times in a row is
 refused, and only that call. "The identical operation" means the same tool with
 the same arguments: two different posts are two operations. See
 `file:docs/concept-loopguard-trips.md`.
