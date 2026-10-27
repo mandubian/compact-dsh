@@ -28,6 +28,7 @@ const samples = [
   { html: 'runs/bug-court/bug-court-8e68c3.html', account: 'runs/bug-court/README.md' },
   { html: 'runs/workshop/workshop-2914fd.html', account: 'runs/workshop/README.md' },
   { html: 'runs/weight-of-voice-v2/weight-of-voice-v2-a980e1.html', account: 'runs/weight-of-voice-v2/README.md' },
+  { html: 'runs/weight-of-voice-v2-rerun/weight-of-voice-v2-0e3fa8.html', account: 'runs/weight-of-voice-v2-rerun/README.md' },
 ];
 
 const links = (html) => [...html.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
@@ -151,9 +152,36 @@ test('the side-by-side table is generated from the archives, not typed', () => {
     'docs/samples.html is stale against docs/runs — run node tools/samples-table.mjs');
 });
 
+// curation beside each archive (sample.json): archived samples keep a card,
+// marked as such, in the samples page's archive — never in the featured grid
+const curationOf = (sample) => {
+  const p = join(dirname(join(docs, sample.html)), 'sample.json');
+  return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : {};
+};
+const cardsOf = (html) => [...html.matchAll(/<article class="card sample-card( archived)?">([\s\S]*?)<\/article>/g)]
+  .map((m) => ({ archived: Boolean(m[1]), body: m[2], tag: /<span class="run-id">(\w+)<\/span>/.exec(m[2])?.[1] }));
+const tagOf = (sample) => JSON.parse(readFileSync(join(dirname(join(docs, sample.html)), 'run.json'), 'utf8')).runTag;
+
+test('archived samples are shown as archived, featured ones as featured — on both pages', () => {
+  const archivedTags = new Set(samples.filter((s) => curationOf(s).archived).map(tagOf));
+  const samplesCards = cardsOf(samplesPage());
+  assert.equal(samplesCards.length, samples.length, 'the samples page carries one card per published sample');
+  for (const c of samplesCards) {
+    assert.equal(c.archived, archivedTags.has(c.tag), `${c.tag}: ${archivedTags.has(c.tag) ? 'archived (sample.json) but featured' : 'featured but carded as archived'}`);
+  }
+  for (const s of samples.filter((x) => curationOf(x).archived)) {
+    const by = curationOf(s).archived.supersededBy;
+    assert.ok(existsSync(join(docs, 'runs', by)), `${s.html}: supersededBy names no archive (${by})`);
+  }
+  const landing = cardsOf(readFileSync(join(docs, 'index.html'), 'utf8'));
+  assert.equal(landing.filter((c) => c.archived).length, 0, 'the landing page features, it does not archive');
+  assert.deepEqual(new Set(landing.map((c) => c.tag)), new Set(samples.filter((s) => !curationOf(s).archived).map(tagOf)),
+    'the landing page features exactly the featured samples');
+});
+
 test('every card\'s numbers are its archive\'s numbers', () => {
-  const cards = [...samplesPage().matchAll(/<article class="card sample-card">([\s\S]*?)<\/article>/g)].map((m) => m[1]);
-  assert.equal(cards.length, samples.length, 'one card per published sample');
+  const cards = [...cardsOf(samplesPage()), ...cardsOf(readFileSync(join(docs, 'index.html'), 'utf8'))].map((c) => c.body);
+  assert.ok(cards.length >= samples.length, 'cards on both pages are checked');
   for (const card of cards) {
     const tag = /<span class="run-id">(\w+)<\/span>/.exec(card)?.[1];
     const archive = archiveOf(tag);
@@ -184,9 +212,19 @@ test('every card\'s numbers are its archive\'s numbers', () => {
 test('the prose counts the runs the page actually carries', () => {
   const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
   const page = samplesPage();
-  const claims = [...page.matchAll(/\b(\w+) (?:complete (?:runs|archives)|charters behind this page)\b/gi)].map((m) => m[1].toLowerCase());
-  assert.ok(claims.length > 0, 'the page states its count somewhere');
-  for (const word of claims) assert.equal(word, words[samples.length], `the page says "${word}" — it carries ${samples.length} runs`);
+  const runs = [...page.matchAll(/\b(\w+) complete (?:runs|archives)\b/gi)].map((m) => m[1].toLowerCase());
+  assert.ok(runs.length > 0, 'the page states its count somewhere');
+  for (const word of runs) assert.equal(word, words[samples.length], `the page says "${word}" — it carries ${samples.length} runs`);
+  // a re-run shares its charter: the charters count is the distinct charters
+  const charters = new Set(samples.map((s) => JSON.parse(readFileSync(join(dirname(join(docs, s.html)), 'run.json'), 'utf8')).charter)).size;
+  for (const m of page.matchAll(/\b(\w+) charters behind this page\b/gi)) {
+    assert.equal(m[1].toLowerCase(), words[charters], `the page says "${m[1]}" charters — the samples ride ${charters}`);
+  }
+  const featured = samples.filter((s) => !curationOf(s).archived).length;
+  for (const m of page.matchAll(/\b(\w+) featured\b/gi)) assert.equal(m[1].toLowerCase(), words[featured], 'the featured count');
+  for (const m of page.matchAll(/\b(\w+) archived\b/gi)) {
+    if (words.includes(m[1].toLowerCase())) assert.equal(m[1].toLowerCase(), words[samples.length - featured], 'the archived count');
+  }
 });
 
 test('the v2 replay shows the refused filings (the 2026-10-27 correction)', () => {
