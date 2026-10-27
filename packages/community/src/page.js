@@ -395,6 +395,25 @@ export function replayPageHtml({ charterName, data }) {
   table { font-size: 12px; margin: 8px 10px; border-collapse: collapse; }
   td, th { padding: 3px 10px; text-align: left; border-bottom: 1px dotted #2a2a2a; }
   th { color: #9ab; }
+  td.num, th.num { text-align: right; }
+  /* an act is an attempt until its own result says it landed: a refused
+     act carries the rule that refused it (the v2 finding — two refused
+     filings read as filed when the lane showed only the call) */
+  li.act.refused, li.act.error { color: #ff9e9e; }
+  li.act .verdict { font-weight: bold; letter-spacing: 0.04em; }
+  li.act.error .verdict { color: #ffb46b; }
+  li.act a.landed { color: #8be98b; text-decoration: none; }
+  #acts-list.hide-turns li.turn-done { display: none; }
+  h2 label { float: right; text-transform: none; letter-spacing: 0; font-weight: normal; color: #778; cursor: pointer; }
+  /* a cite is a link only when it names an accepted post; a self-labeled
+     id that never landed stays text (the v2 drafts said "fp_25") */
+  a.cite { color: #7fd1ff; text-decoration: none; }
+  a.cite:hover { text-decoration: underline; }
+  span.cite.dead { color: #889; text-decoration: line-through dotted; }
+  li.post:target { outline: 2px solid #7fd1ff; outline-offset: -2px; }
+  #forum-list { position: relative; }
+  header .gates a { color: #ffb46b; }
+  header .outcomes { color: #889; font-size: 11.5px; }
   @media (max-width: 980px) { main { grid-template-columns: 1fr; height: auto; } section { height: 70vh; } }
 </style>
 </head>
@@ -403,6 +422,8 @@ export function replayPageHtml({ charterName, data }) {
   community replay — <b>${safeName}</b>
   <div class="meta" id="meta"></div>
   <div class="prov muted" id="prov"></div>
+  <div class="meta gates" id="gates"></div>
+  <div class="outcomes" id="outcomes"></div>
   <div class="charter" id="charter"></div>
   <div class="muted">read-only replay from the durable artifacts — the chains remain the record of authority</div>
 </header>
@@ -413,7 +434,7 @@ export function replayPageHtml({ charterName, data }) {
     <ul id="forum-list"></ul>
   </section>
   <section>
-    <h2>the members' acts</h2><ul id="acts-list"></ul>
+    <h2>the members' acts <label><input type="checkbox" id="show-turns"> show turn ends</label></h2><ul id="acts-list" class="hide-turns"></ul>
     <h2>the members</h2><table id="members"></table>
   </section>
 </main>
@@ -475,8 +496,11 @@ const GATE_RE = /^(?:[\\w.-]+ — )?(AGREEMENT|POSITIONS|RULING|VERDICTS):/;
 // emphasis inside a post body, applied AFTER escaping so member text can
 // never inject markup: fp_ cites and the verdict vocabulary read at a
 // glance inside a long ledger post
+const POSTS = new Set(DATA.forum.map((p) => String(p.id ?? '')));
 const hl = (s) => esc(s)
-  .replace(/\\b(fp_\\d+)\\b/g, '<span class="cite">$1</span>')
+  .replace(/\\b(fp_\\d+)\\b/g, (m) => POSTS.has(m)
+    ? '<a class="cite" href="#' + m + '">' + m + '</a>'
+    : '<span class="cite dead" title="no accepted post carries this id">' + m + '</span>')
   .replace(/\\b(ENDORSED|AMENDED|REJECTED|CONFIRMED|ACCEPTED|CONTESTED|DISSENT)\\b/g, '<b>$1</b>');
 
 for (const p of DATA.forum) {
@@ -484,6 +508,7 @@ for (const p of DATA.forum) {
   const member = memberOf(p.by);
   const gate = GATE_RE.test(String(p.text ?? ''));
   li.className = 'post' + (gate ? ' ledger' : '');
+  if (/^fp_\\d+$/.test(String(p.id ?? ''))) li.id = p.id;
   li.innerHTML = '<span class="head">[' + esc(p.id ?? p.seq ?? '?') + '] <span class="who ' + colorOf(member) + '">' + esc(member) + '</span>' +
     ' · <span class="at">' + esc(stamp(p.at).slice(0, 19)) + '</span> · ' + esc(p.topic ?? '') +
     (gate ? ' · <span class="gate">LEDGER</span>' : '') + '</span>' +
@@ -492,17 +517,74 @@ for (const p of DATA.forum) {
 }
 if (!DATA.forum.length) $('forum-list').innerHTML = '<li class="empty">the forum never spoke — negative space is information</li>';
 
+// THE GATE POSTS — what the run exists to produce, named at the top: a
+// post that opens with its gate marker, or the honest absence. Presence
+// is not success; the charter's condition is read on the forum itself.
+const gates = DATA.forum.filter((p) => GATE_RE.test(String(p.text ?? '')));
+$('gates').innerHTML = gates.length
+  ? 'gate posts: ' + gates.map((p) => '<a href="#' + esc(p.id) + '">' + esc(p.id) + '</a> ' +
+      esc(GATE_RE.exec(String(p.text))[1]) + ' (' + esc(memberOf(p.by)) + ')').join(' · ')
+  : 'gate posts: none — no accepted post opens with AGREEMENT:, POSITIONS:, RULING: or VERDICTS:';
+
+// what the acts lane can and cannot say about each act
+$('outcomes').textContent = DATA.actOutcomes
+  ? 'act outcomes recorded: each act was resolved from its own result — a refused act is marked REFUSED with the rule that refused it'
+  : 'this archive predates recorded act outcomes: an act below is an attempt, and it may have been refused — a LoopGuard notice beside it is the only evidence';
+
 for (const t of DATA.timeline) {
   const li = document.createElement('li');
-  li.className = { notice: 'notice', pass: 'pass', 'pass-call': 'pass-call', 'pass-refused': 'pass-refused', act: 'act' }[t.type] ?? '';
-  li.innerHTML = '<span class="at">' + esc(stamp(t.at).slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text);
+  const kind = { notice: 'notice', pass: 'pass', 'pass-call': 'pass-call', 'pass-refused': 'pass-refused', act: 'act', 'turn-done': 'turn-done' }[t.type] ?? '';
+  li.className = kind + (t.type === 'act' && (t.outcome === 'refused' || t.outcome === 'error') ? ' ' + t.outcome : '');
+  let tail = '';
+  if (t.type === 'act' && t.outcome === 'refused') tail = ' <span class="verdict">— REFUSED' + (t.rule ? ' [' + esc(t.rule) + ']' : '') + '</span>' + (t.result ? ' ' + esc(String(t.result).replace(/^\\[[^\\]]+\\]\\s*/, '')) : '');
+  else if (t.type === 'act' && t.outcome === 'error') tail = ' <span class="verdict">— ERROR</span>' + (t.result ? ' ' + esc(t.result) : '');
+  else if (t.type === 'act' && t.post && POSTS.has(t.post)) tail = ' <a class="landed" href="#' + esc(t.post) + '">→ ' + esc(t.post) + '</a>';
+  else if (t.type === 'pass-refused' && t.rule) tail = ' <span class="verdict">[' + esc(t.rule) + ']</span>';
+  li.innerHTML = '<span class="at">' + esc(stamp(t.at).slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text) + tail;
   $('acts-list').appendChild(li);
 }
+const showTurns = $('show-turns');
+if (showTurns) showTurns.onchange = () => { $('acts-list').className = showTurns.checked ? '' : 'hide-turns'; };
 if (!DATA.timeline.length) $('acts-list').innerHTML = '<li class="empty">no acts recorded</li>';
 
+// THE MEMBERS — derived from the archive itself: what each seat said,
+// what did not land, what it cost. Outcome columns read "—" on an
+// archive that predates recorded outcomes: unknown is not zero.
+const seatRoutes = (r.model && r.model.members) || {};
+const rowsBy = (who, pred) => DATA.timeline.filter((t) => t.who === who && pred(t)).length;
+const fmt = (n) => Number(n).toLocaleString('en-US');
 const tbl = $('members');
-tbl.innerHTML = '<tr><th>member</th><th>turns</th></tr>' +
-  (DATA.members || []).map((m) => '<tr><td>' + esc(bare(m.session)) + '</td><td>' + esc(m.turns) + '</td></tr>').join('');
+tbl.innerHTML = '<tr><th>member</th><th>route</th><th class="num">turns</th><th class="num">posts</th><th class="num">refused</th><th class="num">passes</th><th class="num">LoopGuard</th><th class="num">tokens</th></tr>' +
+  (DATA.members || []).map((m) => {
+    const who = m.session;
+    const name = memberOf(who);
+    const posts = DATA.forum.filter((p) => p.by === who).length;
+    const refused = DATA.actOutcomes ? fmt(rowsBy(who, (t) => (t.type === 'act' && (t.outcome === 'refused' || t.outcome === 'error')) || t.type === 'pass-refused')) : '—';
+    const tokens = m.tokens && Number.isFinite(m.tokens.metered) ? fmt(m.tokens.metered) : '—';
+    return '<tr><td><span class="who ' + colorOf(name) + '">' + esc(bare(who)) + '</span></td><td>' + esc(seatRoutes[name] ?? '') + '</td>' +
+      '<td class="num">' + esc(m.turns) + '</td><td class="num">' + posts + '</td><td class="num">' + refused + '</td>' +
+      '<td class="num">' + rowsBy(who, (t) => t.type === 'pass') + '</td><td class="num">' + rowsBy(who, (t) => t.type === 'notice' && /LoopGuard/.test(String(t.text))) + '</td>' +
+      '<td class="num">' + tokens + '</td></tr>';
+  }).join('');
+
+// a link to a post (#fp_17) lands on it: the forum pane scrolls to the
+// post and the panes come into view. Only the pane scrolls — a plain
+// scrollIntoView also dragged the page and hid the header — and it runs
+// on load (after the browser's own fragment scroll) and on every hash
+// change, so a cite clicked inside a post lands the same way.
+const landOnPost = () => {
+  if (!/^#fp_\\d+$/.test(location.hash)) return;
+  const target = document.getElementById(location.hash.slice(1));
+  const list = $('forum-list');
+  if (!target || !list) return;
+  list.scrollTop = Math.max(0, target.offsetTop - 6);
+  const panes = document.querySelector('main');
+  if (panes) window.scrollTo(0, panes.offsetTop);
+};
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('load', landOnPost);
+  window.addEventListener('hashchange', landOnPost);
+}
 </script>
 </body>
 </html>

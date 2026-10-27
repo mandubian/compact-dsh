@@ -108,6 +108,21 @@ export function auditReading(reading, data) {
   return { ok: failures.length === 0, failures, citations: citations.length };
 }
 
+/** A reading names the brief it read by hash. When the archive's brief
+ *  no longer renders to that hash, the reading may contradict what the
+ *  brief now says — the v2 finding: the reading said "no filing" because
+ *  its brief could not see two refused filings. Returns null when the
+ *  source still matches (with or without the file's trailing newline —
+ *  the CLI hashes the bare brief, the pack hashes the written file). */
+export function staleSource(reading, brief) {
+  const declared = /sha256 `([0-9a-f]{64})`/.exec(String(reading ?? ''))?.[1] ?? null;
+  if (!declared) return 'the reading names no source brief hash — it cannot be checked against the brief';
+  const hash = (text) => createHash('sha256').update(text).digest('hex');
+  const now = [hash(String(brief)), hash(`${brief}\n`)];
+  if (now.includes(declared)) return null;
+  return `STALE SOURCE: the reading was made from brief sha256 ${declared.slice(0, 12)}…, but the archive's brief now renders as ${now[0].slice(0, 12)}… — the brief changed since, and the reading may contradict it`;
+}
+
 export function renderReading({ body, brief, model, generatedAt = new Date().toISOString() }) {
   const hash = createHash('sha256').update(brief).digest('hex');
   return [
@@ -250,6 +265,8 @@ async function main() {
   if (checkPath) {
     const reading = readFileSync(resolve(checkPath), 'utf8');
     const result = auditReading(reading, data);
+    const stale = staleSource(reading, brief);
+    if (stale) { result.failures.push(stale); result.ok = false; }
     if (result.ok) {
       process.stdout.write(`community-reading: AUDIT PASS — ${result.citations} citation(s), ${data.forum.length} post(s), ${data.members.length} member(s)\n`);
     } else {
