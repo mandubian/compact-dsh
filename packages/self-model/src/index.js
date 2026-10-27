@@ -507,7 +507,6 @@ export function apply(ctx, config = {}) {
 
   // 1. at the boundary of the Subject's own operation
   ctx.on?.('session/event', (session, event) => {
-    noteSeat(session, event);
     if (event?.type !== 'turn/start') return;
     try {
       const sessionId = session?.id != null ? String(session.id) : null;
