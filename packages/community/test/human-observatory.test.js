@@ -384,3 +384,19 @@ test('the live page meets the charter: goal, seats with roles, and the code it r
   assert.doesNotMatch(bare, /THE CHARTER/);
   assert.doesNotMatch(bare, /code: /);
 });
+
+test('the live page resolves clause citations in place — the law in force this boot (#274 on the live surface)', async () => {
+  const { pageHtml } = await import('../src/page.js');
+  const law = { digest: '27bb7078fe9aea50'.padEnd(64, '0'), clauses: { 'R-9': 'R-9 — the refusal carries its rule, names the lawful next moves.' } };
+  const html = pageHtml({ charterName: 'x', token: 'tkn', law });
+  // the law is baked server-side, the pane exists, and the renderer
+  // wraps resolvable ids only (enforcement codes stay plain)
+  assert.match(html, /const LAW = \{"digest"/, 'the clause map is embedded');
+  assert.match(html, /id="lawpane"/, 'the pane element exists');
+  assert.match(html, /the law in force this boot/, 'the pane names its basis honestly');
+  assert.match(html, /const lawHl/, 'posts render through the law resolver');
+  // and a page with no law embedded stays clean — absence, not error
+  const bare = pageHtml({ charterName: 'x', token: 'tkn' });
+  assert.doesNotMatch(bare, /const LAW = \{/);
+  assert.match(bare, /const LAW = null/, 'no law passed: the constant is an honest null');
+});

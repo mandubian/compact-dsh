@@ -42,7 +42,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sha256Hex, signAnnex, annexDigestOf, verifyAnnex } from 'compact-dsh-seals';
 import { parseAllowlistLikePattern, egressPatternFor } from 'compact-dsh-approval';
 import { nightWatchAnswerer, judgeFromContext } from 'compact-dsh-night-watch';
-import { COMPACT_DIGEST } from '../packages/constitution/src/body.js';
+import { COMPACT_DIGEST, clauseIds, clauseText } from '../packages/constitution/src/body.js';
 import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
 import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePostsOf, tokensBySeatOf } from './run-manifest.mjs';
 import { forumFromLedger, meteredTokens } from './community-report.mjs';
@@ -504,6 +504,13 @@ async function main() {
       // replay renders from its archive
       charter,
       provenance,
+      // the law in force THIS boot — the same body law_read serves,
+      // sliced verbatim (R-6) — so a live post citing R-9 is clickable
+      // on the page watching it happen
+      law: {
+        digest: COMPACT_DIGEST,
+        clauses: Object.fromEntries([...clauseIds()].map((id) => [id, clauseText(id)])),
+      },
     });
     // the boot token is a bearer credential that lived only in the boot
     // line and process memory — a terminal scrolled past took the page
