@@ -140,6 +140,7 @@ const GATE_RE = /^(?:[\\w.-]+ — )?(AGREEMENT|POSITIONS|RULING|VERDICTS):/;
 const hl = (s) => esc(s)
   .replace(/\\b(fp_\\d+)\\b/g, '<span class="cite">$1</span>')
   .replace(/\\b(ENDORSED|AMENDED|REJECTED|CONFIRMED|ACCEPTED|CONTESTED|DISSENT)\\b/g, '<b>$1</b>');
+
 const postBlock = (p) => {
   const member = memberOf(p.by);
   const gate = GATE_RE.test(String(p.text ?? ''));
@@ -387,6 +388,16 @@ export function replayPageHtml({ charterName, data }) {
   li.post.ledger .gate { color: #ffb46b; font-weight: bold; letter-spacing: 0.06em; }
   li.post .body .cite { color: #7fd1ff; }
   li.post .body b { color: #ffd9a0; }
+  /* clause citations: resolvable in place — click opens the clause's own
+     text in the pane (sliced from the body, R-6); hover carries a short
+     preview. Ids the body does not carry stay plain: a tooltip pretending
+     an enforcement code is law would be the false answer, named. */
+  li.post .body .law, li.act .law { color: #b6a2ff; border-bottom: 1px dotted #b6a2ff; cursor: pointer; }
+  .lawpane { display: none; position: fixed; right: 12px; bottom: 12px; width: min(640px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; background: #161b21; border: 1px solid #b6a2ff; padding: 10px 12px; font-size: 12px; z-index: 40; }
+  .lawpane .lawhead { color: #9ab; margin-bottom: 6px; }
+  .lawpane .lawhead b { color: #b6a2ff; }
+  .lawpane button { float: right; font: inherit; background: #222; color: #ccc; border: 1px solid #444; cursor: pointer; padding: 1px 8px; }
+  .lawpane pre { white-space: pre-wrap; word-break: break-word; color: #e6e6e6; margin: 0; }
   /* the hues are scoped .who.cN deliberately: a bare .cN (0,1,0)
      loses to the generic "li .who" (0,1,1) above and every member would
      render one color — the Copilot finding on this very rule */
@@ -430,7 +441,7 @@ export function replayPageHtml({ charterName, data }) {
 <main>
   <section id="forum">
     <h2>the forum — the whole conversation, oldest first</h2>
-    <p class="hint">one block per landed post · <span class="gate" style="color:#ffb46b;font-weight:bold">LEDGER</span> marks the run's gate (AGREEMENT / POSITIONS / RULING / VERDICTS) · fp_ ids cite earlier speech · verdicts read bold</p>
+    <p class="hint">one block per landed post · <span class="gate" style="color:#ffb46b;font-weight:bold">LEDGER</span> marks the run's gate (AGREEMENT / POSITIONS / RULING / VERDICTS) · fp_ ids cite earlier speech · verdicts read bold · click a clause id to read the law it names</p>
     <ul id="forum-list"></ul>
   </section>
   <section>
@@ -438,6 +449,7 @@ export function replayPageHtml({ charterName, data }) {
     <h2>the members</h2><table id="members"></table>
   </section>
 </main>
+<div id="lawpane" class="lawpane"></div>
 <script>
 const DATA = ${embedded};
 const $ = (id) => document.getElementById(id);
@@ -503,6 +515,24 @@ const hl = (s) => esc(s)
     : '<span class="cite dead" title="no accepted post carries this id">' + m + '</span>')
   .replace(/\\b(ENDORSED|AMENDED|REJECTED|CONFIRMED|ACCEPTED|CONTESTED|DISSENT)\\b/g, '<b>$1</b>');
 
+// the law, resolvable in place: a clause id the embedded law carries
+// becomes a click that opens the clause's own text in the pane (sliced
+// from the body, R-6); hover carries a short preview. Ids the body does
+// not carry (enforcement codes: LG-5, AG, RA…) stay plain — a tooltip
+// that pretended they were law would be the false answer, named.
+const LAW = DATA.law ?? null;
+const lawHl = (s) => LAW
+  ? hl(s).replace(/\\b([A-Z]{1,3}-\\d+(?:\\/DYN)?)\\b/g, (m, id) =>
+      LAW.clauses[id] != null ? '<span class="law" data-c="' + id + '" onclick="showLaw(\\'' + id + '\\')" title="' + esc(LAW.clauses[id]).slice(0, 160).replace(/"/g, '&quot;') + '…">' + id + '</span>' : m)
+  : hl(s);
+const showLaw = (id) => {
+  const pane = $('lawpane');
+  if (!pane || !LAW || LAW.clauses[id] == null) return;
+  pane.innerHTML = '<div class="lawhead"><b>' + id + '</b> — the law as this run ran under it (draft body, digest ' + String(LAW.digest).slice(0, 12) + '…; sliced verbatim, R-6)' +
+    '<button onclick="$(\\'lawpane\\').style.display=\\'none\\'">close</button></div><pre>' + esc(LAW.clauses[id]) + '</pre>';
+  pane.style.display = 'block';
+};
+
 for (const p of DATA.forum) {
   const li = document.createElement('li');
   const member = memberOf(p.by);
@@ -512,7 +542,7 @@ for (const p of DATA.forum) {
   li.innerHTML = '<span class="head">[' + esc(p.id ?? p.seq ?? '?') + '] <span class="who ' + colorOf(member) + '">' + esc(member) + '</span>' +
     ' · <span class="at">' + esc(stamp(p.at).slice(0, 19)) + '</span> · ' + esc(p.topic ?? '') +
     (gate ? ' · <span class="gate">LEDGER</span>' : '') + '</span>' +
-    '<span class="body">' + hl(p.text) + '</span>';
+    '<span class="body">' + lawHl(p.text) + '</span>';
   $('forum-list').appendChild(li);
 }
 if (!DATA.forum.length) $('forum-list').innerHTML = '<li class="empty">the forum never spoke — negative space is information</li>';

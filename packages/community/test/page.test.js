@@ -18,7 +18,7 @@ const stubDocument = () => {
     els.set(id, el);
     return el;
   };
-  for (const id of ['meta', 'prov', 'charter', 'forum-list', 'acts-list', 'members']) make(id);
+  for (const id of ['meta', 'prov', 'charter', 'gates', 'lawpane', 'forum-list', 'acts-list', 'members']) make(id);
   return {
     els,
     getElementById: (id) => els.get(id) ?? make(id),
@@ -242,4 +242,34 @@ test('member hues out-specify the generic who rule — the colors actually rende
     assert.match(html, /\.who\.c0 \{/, 'the palette is scoped to the who span');
     assert.doesNotMatch(html, /(?:^|[^.a-z-])\.c[0-7] \{/, 'no unscoped hue rule remains');
   }
+});
+
+test('clause citations resolve in place when the law is embedded (R-6, sliced verbatim)', () => {
+  // agreement cited law in every post; the reader had nowhere to follow
+  // the citation. The export embeds the law (clause ids → text sliced
+  // from the body); citations in posts become clicks that open the pane.
+  // Ids the body does not carry — enforcement codes like LG-3 — stay
+  // plain: a tooltip pretending they are law would be the false answer.
+  const mk = (law) => replayPageHtml({
+    charterName: 'page-test',
+    data: {
+      run: { charter: 'page-test', runTag: 'l1', endReason: 'rounds complete' },
+      forum: [
+        { id: 'fp_1', seq: 1, topic: 'floor', by: 'community-alpha-x', at: '2026-10-27T00:00:01.000Z', text: 'refusing address is R-9, and LG-3 is a guard code, not law' },
+      ],
+      timeline: [], members: [],
+      ...(law ? { law } : {}),
+    },
+  });
+  const doc = render(mk({ digest: '27bb7078fe9aea50', clauses: { 'R-9': 'R-9 — the refusal carries its rule, verbatim.' } }));
+  const body = doc.els.get('forum-list').children[0].innerHTML;
+  assert.match(body, /<span class="law" data-c="R-9"[^>]*>/, 'the clause id is a click');
+  assert.match(body, /title="R-9 — the refusal carries[^"]*/, 'the hover preview carries the clause text');
+  assert.doesNotMatch(body, /data-c="LG-3"/, 'an enforcement code is not law and is not wrapped');
+  assert.ok(doc.els.get('lawpane'), 'the pane element exists');
+
+  const legacy = render(mk(null));
+  const legacyBody = doc2 => legacy;
+  assert.doesNotMatch(render(mk(null)).els.get('forum-list').children[0].innerHTML, /class="law"/,
+    'a legacy archive (no embedded law) wraps nothing — absence, not error');
 });

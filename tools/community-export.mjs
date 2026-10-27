@@ -19,7 +19,18 @@ import { join, resolve } from 'node:path';
 import { readArchive } from './run-archive.mjs';
 import { parseEmbeddedArchive } from './community-brief.mjs';
 import { validateCharter } from '../packages/community/src/charter.js';
+import { clauseIds, clauseText, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
 import { replayPageHtml } from '../packages/community/src/page.js';
+
+/** The law, embedded for the replay's citation resolution: every clause
+ *  id mapped to its text SLICED FROM THE BODY (R-6 — never restated), with
+ *  the digest named so a reader knows exactly which law this is. ~40KB,
+ *  the cost of a citation a reader can actually resolve. */
+function lawForEmbedding() {
+  const clauses = {};
+  for (const id of clauseIds()) clauses[id] = clauseText(id);
+  return { digest: COMPACT_DIGEST, clauses };
+}
 
 
 function main() {
@@ -69,6 +80,10 @@ function main() {
     }
   }
   const charterName = archive.run?.charter ?? 'community';
+  // the law rides with the archive: citations in posts resolve to clause
+  // text inside the page, offline, self-contained (R-6: sliced from the
+  // body, never restated; the digest names which law this is)
+  archive.law = archive.law ?? lawForEmbedding();
   const html = replayPageHtml({ charterName, data: archive });
   writeFileSync(out, html, { mode: 0o644 });
   console.log(`community-export: ${charterName} archived to ${out} (${Math.round(html.length / 1024)}kB, self-contained — commit it, serve it, or open it)`);
