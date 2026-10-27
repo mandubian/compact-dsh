@@ -876,3 +876,44 @@ test('#184: unappointed and unarmed render nothing — the silence is the honest
   assert.ok(!rendered.includes('Watch: appointed'), 'the unarmed attestation claims no watch');
   assert.ok(!rendered.includes('Clock:'), 'the unarmed attestation claims no clock');
 });
+
+// -- the seat: the route, attested from the subject's own recorded stream ----
+// (the live weight-of-voice-v2 finding: a member called self_describe and
+// found no field named its model route — "weight vs. cheapness argued about
+// a variable none of us can observe from inside." The seat is now composed
+// from the provider stream embedded in the session's assistant messages,
+// and named as not-yet-on-record before the first one, never guessed.)
+
+test('the attestation names the seat from the recorded provider stream', async () => {
+  const { ctx } = await boot({ withComposition: false });
+  const listeners = [];
+  ctx.on = (kind, fn) => { if (kind === 'session/event') listeners.push(fn); };
+  const { apply } = await import('../src/index.js');
+  await ctx.plugin({ apply });
+  const emit = (session, event) => { for (const fn of listeners) fn(session, event); };
+
+  // before the first assistant message: the seat is named as absent
+  emit({ id: 's1' }, { type: 'turn/start', turn: 1 });
+  const svc = ctx.get('compact-self-model');
+  const before = svc.attest('s1');
+  assert.equal(before.subject.seat.notYetOnRecord, true, 'no stream yet: not-yet, not a guess');
+  assert.match(renderAttestation(before), /Seat: not yet on your record \(no assistant message this session\) — unnamed, never guessed/);
+
+  // a recorded assistant message embeds its exact provider stream
+  emit({ id: 's1' }, {
+    type: 'assistant/message',
+    data: { message: { role: 'assistant', source: { kind: 'model', provider: 'zai', model: 'glm-5.3-flash' }, content: [] } },
+  });
+  const after = svc.attest('s1');
+  assert.equal(after.subject.seat.provider, 'zai');
+  assert.equal(after.subject.seat.model, 'glm-5.3-flash');
+  assert.match(renderAttestation(after), /Seat: zai\/glm-5\.3-flash — attested from your own recorded stream \(R-1\)/);
+
+  // and each session keeps its own seat — the whole point of mixed seating
+  emit({ id: 's2' }, {
+    type: 'assistant/message',
+    data: { message: { role: 'assistant', source: { kind: 'model', provider: 'zai', model: 'glm-5.3' }, content: [] } },
+  });
+  assert.equal(svc.attest('s2').subject.seat.model, 'glm-5.3');
+  assert.equal(svc.attest('s1').subject.seat.model, 'glm-5.3-flash');
+});

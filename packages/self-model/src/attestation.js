@@ -267,7 +267,7 @@ function namedParts(ctx, parts) {
 }
 
 /** Compose the attestation for one Subject, from the services that hold it. */
-export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfterMs = DEFAULT_STALE_AFTER_MS, signed = false } = {}) {
+export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfterMs = DEFAULT_STALE_AFTER_MS, signed = false, seat = null } = {}) {
   const constitution = svc(ctx, 'constitution');
   const capabilities = capabilitiesOf(ctx);
   return {
@@ -279,6 +279,16 @@ export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfte
       id: sessionId != null ? String(sessionId) : null,
       lineage: lineageOf(ctx, sessionId),
       standing: standingOf(ctx),
+      // THE SEAT (the live weight-of-voice-v2 finding): the Subject's
+      // model route is a fact about it the runtime already records — the
+      // provider stream embedded in its own assistant messages — and a
+      // member arguing about its own weight must be able to read it from
+      // the attestation, not from a briefing's say-so. Sourced from the
+      // session's own recorded stream; before the first assistant
+      // message, the seat is named as not-yet-on-record, never guessed.
+      ...(seat != null && seat.provider && seat.model
+        ? { seat: { provider: seat.provider, model: seat.model, basis: 'the provider stream of your own recorded assistant messages' } }
+        : { seat: { notYetOnRecord: true, basis: 'no assistant message on your record this session — the seat is unnamed until you speak, never guessed' } }),
     },
     law: {
       digest: constitution?.digest ?? null,
@@ -357,6 +367,11 @@ export function renderAttestation(att) {
         ? ` · ${att.subject.lineage.origin} · delegation depth ${att.subject.lineage.delegationDepth}` +
           (att.subject.lineage.parent ? ` · delegated by ${att.subject.lineage.parent}` : '')
         : ' · lineage not recorded'),
+    ...(att.subject.seat
+      ? [att.subject.seat.notYetOnRecord
+          ? `Seat: not yet on your record (no assistant message this session) — unnamed, never guessed`
+          : `Seat: ${att.subject.seat.provider}/${att.subject.seat.model} — attested from your own recorded stream (R-1)`]
+      : []),
     ...(att.subject.identity
       ? [`Session identity: certified by enforcer key ${att.subject.identity.enforcerKeyId} ` +
          `(cert ${att.subject.identity.certDigest.slice(0, 12)}…` +
