@@ -62,6 +62,7 @@ export function validateCharter(doc) {
   const ids = new Set();
   const prefixes = new Set();
   let workers = 0;
+  let humans = 0;
   for (const m of doc.members) {
     if (!m || typeof m !== 'object') throw bad('members[]', 'each member is an object');
     const id = asSlug(m.id, 'members[].id');
@@ -72,6 +73,23 @@ export function validateCharter(doc) {
     prefixes.add(prefix);
     if (typeof m.persona !== 'string' || m.persona.trim().length < 5) {
       throw bad(`members[${id}].persona`, 'every member carries a persona — what it is FOR, one honest sentence at least');
+    }
+    // a HUMAN member (#215's mixed community, made real): the Principal
+    // seated on the roll like any agent — no model route, because the page
+    // IS the model (the floor adapter turns the human's button press into
+    // this member's own governed act, on this member's own chain). The
+    // bounds are rehearsal discipline, not law: a human needs the page, a
+    // human bench seat would owe judicature tool use the floor does not
+    // speak (v1), and two humans are plenty for any charter this bound.
+    const human = m.human === true;
+    if (m.human !== undefined && typeof m.human !== 'boolean') {
+      throw bad(`members[${id}].human`, 'true or absent — the flag seats the Principal as this member');
+    }
+    if (human) {
+      if (m.model !== undefined) throw bad(`members[${id}].human`, 'a human member carries no model route — the page is the model (omit "model")');
+      if (m.bench === true) throw bad(`members[${id}].human`, 'a human bench seat is refused in v1 — bench framing owes judicature tool use, and the floor speaks forum only');
+      humans += 1;
+      if (humans > 2) throw bad('members', 'at most 2 human members per charter (a rehearsal bound, not a law)');
     }
     // an optional model route: a member may be seated on a model other
     // than the runtime default ("zai/glm-5.3-flash") — diversity is the
@@ -86,7 +104,7 @@ export function validateCharter(doc) {
     }
     const bench = m.bench === true;
     if (!bench) workers += 1;
-    members.push({ id, prefix, persona: m.persona.trim(), bench, ...(route ? { model: route } : {}) });
+    members.push({ id, prefix, persona: m.persona.trim(), bench, ...(human ? { human: true } : {}), ...(route ? { model: route } : {}) });
   }
   if (workers === 0) throw bad('members', 'at least one non-bench member — a bench with nobody to judge is theater');
 
@@ -155,9 +173,9 @@ export function validateCharter(doc) {
   // card the approval gate publishes), plus the seat's patience
   let escalation = null;
   if (doc.escalation !== undefined) {
-    if (!doc.escalation || typeof doc.escalation !== 'object') throw bad('escalation', 'an object {criticalPatterns, askTimeoutMs, questionTimeoutMs}');
+    if (!doc.escalation || typeof doc.escalation !== 'object') throw bad('escalation', 'an object {criticalPatterns, askTimeoutMs, questionTimeoutMs, floorTimeoutMs}');
     for (const key of Object.keys(doc.escalation)) {
-      if (!['criticalPatterns', 'askTimeoutMs', 'questionTimeoutMs'].includes(key)) throw bad(`escalation.${key}`, 'unknown key — {criticalPatterns, askTimeoutMs, questionTimeoutMs}');
+      if (!['criticalPatterns', 'askTimeoutMs', 'questionTimeoutMs', 'floorTimeoutMs'].includes(key)) throw bad(`escalation.${key}`, 'unknown key — {criticalPatterns, askTimeoutMs, questionTimeoutMs, floorTimeoutMs}');
     }
     const criticalPatterns = [];
     for (const p of doc.escalation.criticalPatterns ?? []) {
@@ -169,7 +187,7 @@ export function validateCharter(doc) {
       }
       criticalPatterns.push(p);
     }
-    for (const k of ['askTimeoutMs', 'questionTimeoutMs']) {
+    for (const k of ['askTimeoutMs', 'questionTimeoutMs', 'floorTimeoutMs']) {
       if (doc.escalation[k] !== undefined && (!Number.isInteger(doc.escalation[k]) || doc.escalation[k] < 1000)) {
         throw bad(`escalation.${k}`, 'an integer of milliseconds ≥ 1000 — a human needs at least a second');
       }
@@ -178,6 +196,7 @@ export function validateCharter(doc) {
       criticalPatterns,
       ...(doc.escalation.askTimeoutMs !== undefined ? { askTimeoutMs: doc.escalation.askTimeoutMs } : {}),
       ...(doc.escalation.questionTimeoutMs !== undefined ? { questionTimeoutMs: doc.escalation.questionTimeoutMs } : {}),
+      ...(doc.escalation.floorTimeoutMs !== undefined ? { floorTimeoutMs: doc.escalation.floorTimeoutMs } : {}),
     };
   }
 
