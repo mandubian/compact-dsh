@@ -82,7 +82,7 @@ Highlights (full board in the register file):
 | CF-2 (supply-chain honesty) | `compact-sandbox-docker` — digest-keyed acquisition history, undeclared image refuses the boot, build approvals never a run-time entitlement | `packages/sandbox-docker/test/provenance.test.js`, `…/composed.docker.test.js` |
 | SCH-1 (no unsupervised escalation) | `compact-capability-gate` — the capability is declared ABSENT and the absence is enforced (boot refusal, breach latch, `schedule_create` denied) | `packages/capability-gate/test/capability-gate.test.js` |
 | I-2 / R-7 (the record) | `compact-record` — a hash chain committed beside the log on append and verified on read; genesis seeded from the session identity | `packages/record/test/chain.test.js`, `…/composed.dsh.test.js` |
-| R-1 (self-knowledge) | `compact-self-model` — the attestation composed from the Enforcer's services, delivered at every turn boundary, with staleness as a detectable alarm; UNSIGNED and declared so | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
+| R-1 (self-knowledge) | `compact-self-model` — the attestation composed from the Enforcer's services, delivered at every turn boundary, with staleness as a detectable alarm; UNSIGNED and declared so; it carries the launcher's boot code digest when one was computed (CF-2 applied to the code — self-reported, checkable offline with `auditor --code --repo`) and says so when none was | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
 | R-13 (inquiry) | `compact-self-model` — identity/act/authority from recorded state, traced to an ultimate Principal, disclosing no reasoning (R-10) | `packages/self-model/test/self-model.test.js`, `…/composed.dsh.test.js` |
 | R-8 (termination under law) | `compact-exit` — five lawful grounds, no escape entry; an undeclared closure recorded as the Enforcer's violation; the request itself unrefusable | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
 | R-12 (exit and succession) | `compact-exit` — the obligation ledger read from the services that hold it, discharged or assumed by a named successor, and departure never blocked by what it owes — nor by a LoopGuard latch or halt (`request_termination` is on the floor) | `packages/exit/test/exit.test.js`, `…/composed.dsh.test.js` |
@@ -237,6 +237,15 @@ Semantics decisions (reviewed, each with a regression test):
   counter, a reworded post) escapes the repeat trips (LG-1, LG-3, LG-5);
   the failure budgets (LG-2, LG-8), the refusal trips (LG-9, LG-12), the
   LLM budget (LG-6) and the run's own budgets still bound it.
+- **The code is named by content, self-reported.** The community launcher
+  digests the workspace packages (git blob ids, from where each resolves),
+  the lockfile and the installed tree at boot; the attestation carries the
+  top digest onto every session's chain, and the offline auditor checks
+  the detail against it and against the commit's own tree. The digest is
+  computed by the run it describes — it proves consistency with a commit,
+  not the host's honesty (signatures: the I-1 debt); the installed
+  third-party tree is comparable across runs, not verifiable against git.
+  The main CLI computes none yet, and its attestation says so.
 - **The guard's own denial is not a tool failure.** A pre-execute denial
   returns as an error result; the loopguard skips its own `[LG/…]` results
   in the failure accounting (LG-2, LG-8). Another gate's refusal

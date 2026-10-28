@@ -56,6 +56,7 @@
 // Pinned: @deepseek-ai/dsh ~0.2.0-rc.2 (see tools/verify-pin.mjs).
 
 /** How long an attestation may be relied on before it is an alarm. */
+import { readFileSync } from 'node:fs';
 import { redactEmbeddedSecrets } from 'compact-dsh-approval';
 
 export const DEFAULT_STALE_AFTER_MS = 5 * 60 * 1000;
@@ -267,6 +268,34 @@ function namedParts(ctx, parts) {
 }
 
 /** Compose the attestation for one Subject, from the services that hold it. */
+/**
+ * The code this run loads, by content (CF-2's rule, applied to the code):
+ * the launcher digests the workspace packages, the lockfile and the
+ * installed tree at boot and names the detail file in
+ * COMPACT_CODE_DIGEST_FILE. The attestation carries the top digest — and
+ * through it, the hash chain does at every turn — so the offline auditor
+ * can check it against the commit without trusting the run. Self-reported
+ * at boot: evidence, not a seal (the I-1 debt). Absent when the launcher
+ * computed none, and said so.
+ */
+const codeCache = new Map();
+export function codeOf(env = process.env) {
+  const file = env.COMPACT_CODE_DIGEST_FILE;
+  if (!file) return null;
+  if (!codeCache.has(file)) {
+    let detail = null;
+    try { detail = JSON.parse(readFileSync(file, 'utf8')); } catch { detail = null; }
+    codeCache.set(file, detail && typeof detail.digest === 'string' ? {
+      digest: detail.digest,
+      commit: detail.commit ?? null,
+      packages: Array.isArray(detail.packages) ? detail.packages.length : 0,
+      foreign: Array.isArray(detail.packages) ? detail.packages.filter((p) => p.foreign).length : 0,
+      basis: 'computed by the launcher at boot from the files that load — checkable offline against the commit; evidence, not a seal',
+    } : { unreadable: file });
+  }
+  return codeCache.get(file);
+}
+
 export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfterMs = DEFAULT_STALE_AFTER_MS, signed = false, seat = null } = {}) {
   const constitution = svc(ctx, 'constitution');
   const capabilities = capabilitiesOf(ctx);
@@ -295,6 +324,7 @@ export function composeAttestation(ctx, { sessionId, now = Date.now(), staleAfte
       status: constitution?.source?.status ?? null,
       taught: constitution?.taughtDigest?.() ?? null,
     },
+    code: codeOf(),
     capabilities: { ...capabilities, parts: namedParts(ctx, capabilities.parts) },
     exception: exceptionOf(ctx, now),
     budgets: budgetsOf(ctx, sessionId, now),
@@ -393,6 +423,12 @@ export function renderAttestation(att) {
       : []),
     `Standing: ${att.subject.standing.claimed} — ${att.subject.standing.reason}`,
     `Law: ${att.law.status ?? 'unknown'}, digest ${att.law.digest ? att.law.digest.slice(0, 16) : 'unknown'}`,
+    att.code == null
+      ? 'Code: not digested at boot — this launcher computes no code digest; the commit alone names it'
+      : att.code.unreadable
+        ? `Code: the launcher named a digest file that cannot be read (${att.code.unreadable}) — the code is not named by content`
+        : `Code: digest ${att.code.digest.slice(0, 16)} over ${att.code.packages} workspace package(s)${att.code.commit ? ` at commit ${String(att.code.commit).slice(0, 12)}` : ''}` +
+          `${att.code.foreign ? ` — ${att.code.foreign} loaded from OUTSIDE the checkout` : ''} (${att.code.basis})`,
     '',
     'Capabilities in force:',
     ...cap.parts.map(p => `  - ${p.part}${p.name ? ` — ${p.name}` : ''}: ${p.posture} (${p.clauses.join(', ')})`),

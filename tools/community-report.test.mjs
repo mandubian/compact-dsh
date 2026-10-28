@@ -276,6 +276,9 @@ test('the run manifest (#229): the report says WHY the run ended, not only what 
     const foreign = prov({ commit: '90bccdcfcdf5', foreignPackages: [{ name: 'compact-dsh-loopguard', path: '/other/checkout/packages/loopguard/src/index.js' }] }, null, null);
     assert.match(foreign, /90bccdcfcdf5 \(FOREIGN PACKAGES ×1 — loaded from outside the checkout; the commit does not name them: compact-dsh-loopguard\)/);
     assert.doesNotMatch(clean, /FOREIGN/);
+    // the code by content: the chained digest is named beside the commit
+    const digested = prov({ commit: '90bccdcfcdf5', digest: 'f'.repeat(64) }, null, null);
+    assert.match(digested, /90bccdcfcdf5 · code digest ffffffffffffffff…/);
     const notGit = prov({ note: 'not a git checkout (or git absent) — the code state is not named' }, null, null);
     assert.match(notGit, /code: not a git checkout \(or git absent\)/);
     // the legacy manifest (pre-#262) renders no provenance lines at all

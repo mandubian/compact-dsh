@@ -51,6 +51,50 @@ inheritance"*, and it is testable as an absence: an image built with approval
 for `registry.npmjs.org` gets exactly the same refusal as one built with no
 approvals at all.
 
+## The code itself (CF-2 applied to the code)
+
+### The precise version
+
+**In one breath:** the image was named by content; the code was named by
+a commit. A commit names a tree — not the code that loaded, when a
+package resolves elsewhere or a byte changed. The community launcher now
+digests the code that loads, by content, and the hash chain carries it.
+
+- **What is digested, at boot** (`tools/code-digest.mjs`): every
+  workspace package, file by file, as git hashes files (blob ids), from
+  where it actually resolves; the lockfile; the installed `node_modules`
+  tree. One top-level digest covers the detail.
+- **Where it lands:** the self-model's attestation carries the top digest
+  — as a `Code:` line the Subject reads and as `source.code` on the
+  injected event — so every session's chain holds it. The detail rides the
+  manifest (`code.digests`) and the state dir (`code-digest.json`), and is
+  trusted only because it hashes to the chained digest.
+- **How it is checked:** `node auditor/audit.mjs <log> --code <run.json>
+  --repo <checkout>` recomputes each package's digest from the commit's own
+  tree (`git ls-tree`, no checkout) and the lockfile from the commit; a
+  mismatch is a `CF-2` finding naming the package. The installed tree is not
+  in git: it is reported, comparable across runs, never "verified".
+- **What it is not:** a seal. The digest is computed by the process it
+  describes; a host that lies can lie here. It turns "the record says
+  commit X" into "the record says these exact bytes, checkable against
+  commit X" — evidence, not prevention. Signatures wait on keys (I-1).
+
+### The plain version
+
+- **Before:** a run recorded which version of the code it used, by name.
+  If the code on disk differed from that version — a stray edit, or the
+  wrong copy loaded — nothing could tell afterwards.
+- **After:** the run records a fingerprint of the code's actual contents
+  in its tamper-evident record, and anyone with the repository can check,
+  offline, that the fingerprint matches the version the run names:
+  ```bash
+  node auditor/audit.mjs <session.v4.jsonl> --code run.json --repo .
+  # "code": "verified against the commit" — or a CF-2 finding per package that is not the commit's
+  ```
+- **Where this stops:** the fingerprint is taken by the run itself, so it
+  proves consistency, not honesty; and third-party code can be compared
+  between runs, not against the repository.
+
 ## The attestation basis is itself declared
 
 | Basis | Meaning |
