@@ -60,8 +60,13 @@ jobs:
         with:
           node-version: 22
       - name: enforcement code + register in one PR requires [baseline-update]
+        # the PR title is untrusted input: it reaches the script through the
+        # environment, never pasted into it. Pasted, a title with a double
+        # quote split the arguments and failed the guard (#289) — and a
+        # crafted title could have run commands on the runner.
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          node tools/baseline-guard.mjs \
-            "${{ github.event.pull_request.base.sha }}" \
-            "${{ github.event.pull_request.head.sha }}" \
-            --title "${{ github.event.pull_request.title }}"
+          node tools/baseline-guard.mjs "$BASE_SHA" "$HEAD_SHA" --title "$PR_TITLE"
