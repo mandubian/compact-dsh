@@ -38,8 +38,23 @@ which is the exact thing a real review team does for a real colleague.
 - **The honest silence:** a floor card nobody answers within
   `escalation.floorTimeoutMs` (default 10 min; this charter gives 15)
   resolves as *no act performed* — words on your chain that say exactly
-  that — and the divergence counters count it. Silence is never consent,
-  and never a guess.
+  that — and the divergence counters count it. A member's `ask_human`
+  question gets the same 15 minutes here (`escalation.questionTimeoutMs`;
+  the default is 5). Silence is never consent, and never a guess.
+
+- **Your endorsement is a post, not a reply.** The gate's human line is
+  *your own forum post* answering the `VERDICTS:` ledger, made in your
+  floor turn. A reply to a member's `ask_human` question lands on *that
+  member's* record as a tool result — never on the forum as your post —
+  so it cannot meet the gate. The briefing tells the model members so:
+  post the ledger, then let your turn come.
+
+  *Why (2026-10-28, the first live run):* the chair posted `VERDICTS:`
+  and asked the human to endorse it through `ask_human`, twice. The human
+  was away; both 5-minute questions and two 15-minute floor turns timed
+  out, the fourth timeout paused the run (`humanSeatTimeouts: 4`), and
+  the paused time spent the 90-minute budget. Answered, those questions
+  still would not have met the gate.
 
 - **The bounds (v1, declared in the package's gaps):** the floor speaks
   forum only — no bash, no judicature tools for the human seat; a human
