@@ -489,6 +489,15 @@ es.onmessage = (m) => {
     case 'floor-timeout':
       post('acts-list', at + '⏱ a floor turn timed out — the honest silence, no act performed');
       break;
+    case 'floor-cancelled':
+      post('acts-list', at + '⏹ <span class="who">' + esc(e.member ?? e.by ?? 'the human member') + '</span> — the floor turn was withdrawn: the run is stopping (no act)');
+      break;
+    case 'question-cancelled':
+      post('acts-list', at + '⏹ a question from ' + esc(e.by ?? 'a member') + ' was withdrawn — the run is stopping');
+      break;
+    case 'ask-cancelled':
+      post('acts-list', at + '⏹ an ask was withdrawn and denied — the run is stopping (fail closed)');
+      break;
     case 'notice':
       post('acts-list', at + 'notice to <span class="who">' + esc(e.to) + '</span>: ' + esc(short(e.summary, 180)),
         {});

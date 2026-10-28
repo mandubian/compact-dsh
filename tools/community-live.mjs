@@ -550,6 +550,10 @@ async function main() {
   // the operator's hand (#229): one controls object shared by the engine
   // loop, the page's buttons, and the terminal's signals
   const controls = createRunControls();
+  // an immediate stop (second Ctrl-C, the page's kill) withdraws what waits
+  // on the human: a pending approval, a member's question, a floor turn —
+  // no wait on the human may outlive the operator's stop
+  if (humanSeat) controls.onStopNow(() => { const n = humanSeat.cancelPending('the operator stopped the run'); if (n) SAY(`withdrew ${n} card(s) from the human seat — the run is stopping`); });
   if (observe) {
     observatory = await startObservatory(ctx, {
       humanSeat,
@@ -623,11 +627,21 @@ async function main() {
     signals += 1;
     if (signals === 1) {
       SAY(`${sig}: stopping GRACEFULLY — the current turn drains, the record flushes, the reason is recorded (press again to stop immediately)`);
+      // a graceful stop drains the turn in flight — when that turn is the
+      // human's, it waits for the human; say so instead of looking stuck
+      const waiting = humanSeat?.pending?.().filter((p) => p.kind === 'floor' || p.kind === 'question') ?? [];
+      if (waiting.length > 0) SAY(`${sig}: ${waiting.length} card(s) wait on the human seat — answer on the page to let the turn finish, or press Ctrl-C again to withdraw them and stop now`);
       controls.resume();
       controls.stop('graceful');
-    } else {
-      SAY(`${sig}: stopping IMMEDIATELY — the in-flight turn cancels, what the record holds is flushed`);
+    } else if (signals === 2) {
+      SAY(`${sig}: stopping IMMEDIATELY — the in-flight turn cancels, what waits on the human seat is withdrawn, what the record holds is flushed (a third Ctrl-C exits at once)`);
       controls.stopNow();
+    } else {
+      // the last resort: a stop that cannot finish must never trap the
+      // terminal. What earlier turns flushed is on the record; the turn in
+      // flight may not be.
+      SAY(`${sig}: exiting NOW — the record holds what earlier turns flushed; the turn in flight may not be on it`);
+      process.exit(130);
     }
   };
   // SIGCONT is the headless resume (#235 follow-up): a paused run with no
