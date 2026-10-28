@@ -36,13 +36,15 @@
 
 import { validateCharter, memberBindingsOf, CHARTER_VERSION, DEFAULT_BUDGETS } from './charter.js';
 import { runCommunity, currentSelectionOf, createRunControls, createDivergenceCounters, briefingText, roundFramingText, benchFramingText, DRIVER_SOURCE } from './engine.js';
-import { mountHumanSeat, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS } from './human.js';
+import { mountHumanSeat, seatOutcome, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS, DEFAULT_FLOOR_TIMEOUT_MS } from './human.js';
+import { humanMemberAdapter, HUMAN_ROUTE, HUMAN_PROVIDER, HUMAN_MODEL, memberOfFraming } from './human-member.js';
 import { startObservatory, DEFAULT_OBSERVATORY_PORT } from './observatory.js';
 
 export {
   validateCharter, memberBindingsOf, CHARTER_VERSION, DEFAULT_BUDGETS,
   runCommunity, currentSelectionOf, createRunControls, createDivergenceCounters, briefingText, roundFramingText, benchFramingText, DRIVER_SOURCE,
-  mountHumanSeat, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS,
+  mountHumanSeat, seatOutcome, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS, DEFAULT_FLOOR_TIMEOUT_MS,
+  humanMemberAdapter, HUMAN_ROUTE, HUMAN_PROVIDER, HUMAN_MODEL, memberOfFraming,
   startObservatory, DEFAULT_OBSERVATORY_PORT,
 };
 
@@ -53,6 +55,9 @@ export const DECLARED_GAPS = [
   'the human seat and the observatory are mounted by the DRIVER of a live run, not by the composition: ' +
   'a plain blessed boot has no page and no seat, and its novel asks fail closed as unavailable (the ' +
   'honest default — nobody is silently seated to answer for the operator)',
+  'a human member (charter "human": true) speaks FORUM ONLY through the page in v1 — post, pass, or ' +
+  'say; bash and judicature tools are not offered to the floor card, a human bench seat is refused at ' +
+  'the charter boundary, and a human member without the observatory (--no-observe) is refused at launch',
   'the judicature docket is in-memory: a case lives as long as the run process — the citing chains ' +
   'are durable, the docket itself is not',
   'members are practice keys under the development keyring: standing none, the benches are practice ' +

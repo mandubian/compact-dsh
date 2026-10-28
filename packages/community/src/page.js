@@ -198,6 +198,12 @@ function post(listId, html, { empty = false, cls = '' } = {}) {
 }
 
 let lastPendingSig = null;
+const showWhy = (div, reason) => {
+  let why = div.querySelector('.why');
+  if (!why) { why = document.createElement('div'); why.className = 'why head'; div.appendChild(why); }
+  why.dataset.reason = reason;
+  why.textContent = 'refused — ' + reason + ' (your words are kept: edit, then press again)';
+};
 function renderPending(p) {
   // the reconciler rule (#239 follow-up): the 4s poll must never fight the
   // human. If nothing changed, touch NOTHING — an expanded details and a
@@ -211,12 +217,15 @@ function renderPending(p) {
   box.querySelectorAll('[data-id]').forEach(el => {
     const d = el.querySelector('details');
     const ta = el.querySelector('textarea');
-    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null };
+    const ti = el.querySelector('input.topic');
+    const why = el.querySelector('.why');
+    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, ...(ti ? { topic: ti.value } : {}), ...(why ? { why: why.dataset.reason } : {}) };
   });
   const asks = p.filter(x => x.kind === 'ask');
   const questions = p.filter(x => x.kind === 'question');
+  const floors = p.filter(x => x.kind === 'floor');
   box.innerHTML = '';
-  if (!asks.length && !questions.length) {
+  if (!asks.length && !questions.length && !floors.length) {
     box.innerHTML = '<div class="ask muted">nothing is waiting</div>';
   }
   for (const a of asks) {
@@ -261,6 +270,49 @@ function renderPending(p) {
       const d = div.querySelector('details');
       if (d && wasQ.open) d.open = true;
       if (wasQ.text != null) ta.value = wasQ.text;
+    }
+  }
+  // the floor card: a HUMAN member's turn. The framing rides verbatim in a
+  // details (open by default — this IS the turn), the member's own last
+  // result beside it, one textarea for words, three buttons: POST publishes
+  // the words verbatim as forum_post on the topic; PASS records them as the
+  // reason for silence; SAY puts them on the member's chain and ends the
+  // turn. The buttons speak the member's act, not the operator's.
+  for (const f of floors) {
+    const div = document.createElement('div');
+    div.className = 'ask question floor';
+    div.dataset.id = f.id;
+    div.innerHTML =
+      '<div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div>' +
+      (f.lastResult ? '<pre class="command">' + esc(f.lastResult) + '</pre>' : '') +
+      '<details open><summary>the round, verbatim (what the community told you)</summary>' +
+      '<div class="detail">' + esc(f.framing || '(no framing)') + '</div></details>' +
+      '<textarea rows="4" placeholder="your words — POST publishes them verbatim on the topic · PASS records them as your reason for silence · SAY puts them on your chain and ends the turn"></textarea><br>' +
+      '<input class="topic" style="width:40%" value="' + esc(f.defaultTopic ?? '') + '" placeholder="topic (the charter floor)">' +
+      '<button class="approve">post</button><button class="deny">pass</button><button class="say">say</button>';
+    const ta = div.querySelector('textarea');
+    const ti = div.querySelector('input.topic');
+    const send = (act) => {
+      if (!ta.value.trim()) return;
+      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value }) }).then((r) => {
+        // a refusal (an oversized post, a bad topic) keeps the card and the
+        // words, and says why: the turn is still pending, and a card removed
+        // here never came back (the reconciler saw nothing change)
+        if (r && r.error) { showWhy(div, r.error); return; }
+        div.remove();
+      }).catch(() => {});
+    };
+    div.querySelector('.approve').onclick = () => send('post');
+    div.querySelector('.deny').onclick = () => send('pass');
+    div.querySelector('.say').onclick = () => send('say');
+    box.appendChild(div);
+    const wasF = saved[f.id];
+    if (wasF) {
+      const d = div.querySelector('details');
+      if (d && wasF.open === false) d.open = false;
+      if (wasF.text != null) ta.value = wasF.text;
+      if (wasF.topic != null) ti.value = wasF.topic;
+      if (wasF.why) showWhy(div, wasF.why);
     }
   }
 }
@@ -327,6 +379,16 @@ es.onmessage = (m) => {
       break;
     case 'question-timeout':
       post('acts-list', at + '⏱ a question timed out — the honest no-answer');
+      break;
+    case 'floor-posed':
+      post('acts-list', at + '🗣 <span class="who">' + esc(e.member ?? '?') + '</span> — a HUMAN member\'s turn waits on the floor card');
+      break;
+    case 'floor-acted':
+      post('acts-list', at + '✓ <span class="who">' + esc(e.member ?? e.by ?? 'the human member') + '</span> ' +
+        (e.act === 'post' ? 'POSTED on the floor' : e.act === 'pass' ? 'PASSED (recorded silence)' : 'SPOKE on its own chain'));
+      break;
+    case 'floor-timeout':
+      post('acts-list', at + '⏱ a floor turn timed out — the honest silence, no act performed');
       break;
     case 'notice':
       post('acts-list', at + 'notice to <span class="who">' + esc(e.to) + '</span>: ' + esc(short(e.summary, 180)),

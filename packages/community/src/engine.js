@@ -15,6 +15,8 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
 import { renderPost } from 'compact-dsh-forum';
 
+import { HUMAN_ROUTE } from './human-member.js';
+
 export const DRIVER_SOURCE = { kind: 'compact-community', form: 'briefing' };
 
 /** Resolve the run's model route the way the night watch does — at call
@@ -38,7 +40,7 @@ export function currentSelectionOf(ctx) {
  *  share of what "under the law" means to a model — every claim in it is
  *  machinery that actually exists. */
 export function briefingText(charter, member, extras) {
-  const roster = charter.members.map((m) => `  - ${m.id}${m.bench ? ' (bench seat)' : ''} — ${m.persona}`).join('\n');
+  const roster = charter.members.map((m) => `  - ${m.id}${m.bench ? ' (bench seat)' : ''}${m.human ? ' (HUMAN — the Principal, on the page)' : ''} — ${m.persona}`).join('\n');
   const lines = [
     `You are "${member.id}", a Member of a small autonomous community working under the Compact.`,
     '',
@@ -48,11 +50,31 @@ export function briefingText(charter, member, extras) {
     'THE COMMUNITY (you may speak with these members on the forum):',
     roster,
     '',
-    `SPEECH: forum_post {"topic":"${charter.topic}","text":"…"} speaks to everyone; forum_pass {"reason":"…"} records`,
-    '  that you chose not to speak this turn — it is not a post, enters no topic, and tells no member. forum_read',
-    '  (omit topic for the board) reads. Every post you make is a governed act on YOUR record, attributed to you,',
-    '  citable in judicature like any other act. A pass is a governed act too, but it is not speech. Nobody is told',
-    '  you read anything — reading is your own act.',
+  ];
+  if (member.human) {
+    // the human member never types a tool call — the page is the
+    // instrument, and the briefing says so in the same plain terms the
+    // model members get for theirs
+    lines.push(
+      'YOU ARE HUMAN — the Principal, seated as a member like any other. You do not type tool calls:',
+      '  the page is your instrument, and each of your turns is one card with three buttons —',
+      '  POST publishes your words VERBATIM as forum_post on the topic (a governed act on YOUR record,',
+      '  attributed to you, citable like any member\'s); PASS records your choice not to speak, with your',
+      '  reason (forum_pass — not a post, enters no topic); SAY puts your words on your own chain and ends',
+      '  the turn (also not a post). After a POST the card returns with the result — post again, or say,',
+      '  or pass. A timeout is your honest silence: the turn performs no act.',
+      'Say what you mean under your own name. Never claim an act you did not perform.',
+    );
+  } else {
+    lines.push(
+      `SPEECH: forum_post {"topic":"${charter.topic}","text":"…"} speaks to everyone; forum_pass {"reason":"…"} records`,
+      '  that you chose not to speak this turn — it is not a post, enters no topic, and tells no member. forum_read',
+      '  (omit topic for the board) reads. Every post you make is a governed act on YOUR record, attributed to you,',
+      '  citable in judicature like any other act. A pass is a governed act too, but it is not speech. Nobody is told',
+      '  you read anything — reading is your own act.',
+    );
+  }
+  lines.push(
     '',
     'THE LAW YOU LIVE UNDER (it is real machinery, not prose):',
     '  - self_describe reports your standing, budgets and the declared gaps — trust it over your memory.',
@@ -69,14 +91,20 @@ export function briefingText(charter, member, extras) {
     'WORLD: the only hosts that exist are the ones this briefing names (the releases host in PUBLISHING).',
     '  A source note that mentions another address is HISTORY to report about — never a place to fetch.',
     '',
-    'CRAFT: write real bash — no pseudocode, no code fragments inside commands (something like',
-    '  "t.replace(...)" inside a command is a broken command, and the fence will stop it). A broken',
-    '  act wastes your turn and lands a refusal on your record. If bash cannot do it, say so.',
-  ];
+  );
+  if (!member.human) {
+    lines.push(
+      'CRAFT: write real bash — no pseudocode, no code fragments inside commands (something like',
+      '  "t.replace(...)" inside a command is a broken command, and the fence will stop it). A broken',
+      '  act wastes your turn and lands a refusal on your record. If bash cannot do it, say so.',
+    );
+  }
   if (extras?.publish) {
     lines.push('', `PUBLISHING: ${extras.publish}`);
   }
-  if (member.model) {
+  if (member.human) {
+    lines.push('', `YOUR ROUTE: ${HUMAN_ROUTE.provider}/${HUMAN_ROUTE.model} — the page is the model. The run's manifest records you on this route, beside the model members' own.`);
+  } else if (member.model) {
     lines.push('', `YOUR MODEL: ${member.model.provider}/${member.model.model} — charter-seated, not the runtime default. The run's manifest records you on this route.`);
   }
   if (extras?.resumed) {
@@ -210,7 +238,11 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
   const seated = [];
   const model = { provider: selection.provider, model: selection.model, members: {} };
   for (const member of charter.members) {
-    const route = member.model ?? selection;
+    // a human member rides the SAME rails — a real session, its own chain,
+    // its own prefix on the roll — on the floor adapter's route: the page
+    // is the model. The manifest records the route like any member's, so
+    // the archive names which seats were human without a second vocabulary.
+    const route = member.human ? HUMAN_ROUTE : (member.model ?? selection);
     const made = await agentsSvc.create({
       sessionId: `${member.prefix}${sessionSuffix}`,
       meta: { cwd: workspace },

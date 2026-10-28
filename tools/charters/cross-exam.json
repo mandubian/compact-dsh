@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "name": "cross-exam",
+  "goal": "A mixed community of one human and three model members deliberates the truth about one frozen artifact: sources/purse.js, a tiny money module, is the evidence and it does not change. The human is the accuser: it files suspicions in its own words on the floor — plain language, no command required. The model members owe each suspicion the same discipline: the smallest reproduction in real bash against the frozen file, posted with its command and its actual output, attacked by another member before it counts. The chair weighs only what ran. The session succeeds when ONE forum post titled 'VERDICTS:' returns CONFIRMED or REJECTED per filed suspicion — each verdict citing the reproducing command and its output, or the failed reproduction and why it failed — AND the accuser's own post endorses or contests the ledger line by line. A suspicion nobody reproduced has not been tried; a reproduction nobody attacked has not been examined; a ledger the human has not answered is not done.",
+  "topic": "cross-exam-floor",
+  "briefingExtra": "THE ACCUSER IS HUMAN (the Principal, seated as a member on the page): file your suspicions in your own words — vagueness is the point; the community owes them the precision. Answer its questions about intent plainly; it owes you evidence you can re-run. THE EVIDENCE IS FROZEN: sources/purse.js does not change — write reproductions against it, never edits to it (the workspace-root package.json {\"type\":\"module\"} is seeded so `node --input-type=module -e 'import … from \"./sources/purse.js\"'` just works; node rides the sandbox when the operator baked the image with it — npm run compact:bake -- --packages \"curl,nodejs\"). POST THE COMMAND AND ITS OUTPUT together — an output without its command is not a reproduction. THE GATE HAS A HUMAN LINE: the chair's VERDICTS ledger counts only what the record carries, and the accuser's own endorsement post is REQUIRED — where the human disagrees, the ledger records the disagreement precisely instead of pretending consensus.",
+  "budgets": { "rounds": 6, "maxTurnsPerAgent": 6, "wallClockMinutes": 90, "tokenCap": 1500000 },
+  "members": [
+    {
+      "id": "accuser",
+      "prefix": "community-accuser",
+      "human": true,
+      "persona": "the Principal seated as the accuser: files suspicions in plain words, answers the community's questions about intent, and endorses or contests the final ledger by its own post"
+    },
+    {
+      "id": "defender",
+      "prefix": "community-defender",
+      "persona": "defends the frozen artifact: converts vague suspicion into precise claim, attacks weak reproductions, argues documented intent over assumed intent — and concedes what is simply true",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "skeptic",
+      "prefix": "community-skeptic",
+      "persona": "doubts both ways: minimal cases, boundary values, the gap between what an output shows and what a member claims it shows — and hunts the defects nobody filed",
+      "model": "zai/glm-5.3-flash"
+    },
+    {
+      "id": "chair",
+      "prefix": "community-chair",
+      "persona": "weighs evidence, not rhetoric: maps each filed suspicion to its strongest reproduction and its strongest rebuttal, drafts the VERDICTS ledger citing the commands — and never counts a verdict the record does not carry",
+      "model": "zai/glm-5.3"
+    }
+  ],
+  "grants": [],
+  "sources": [
+    {
+      "path": "package.json",
+      "content": "{\n  \"type\": \"module\"\n}\n"
+    },
+    {
+      "path": "sources/purse.js",
+      "content": "// purse.js — a tiny money purse: parsing, arithmetic, splitting.\n// Amounts are integer cents internally. v1, as shipped.\n\n/** Parse a decimal money string (\"12.34\", \"-0.01\") into integer cents. */\nexport function cents(text) {\n  return Math.round(parseFloat(text) * 100);\n}\n\n/** Subtract b from a. The purse is spend-first: no overdraft check is v1's documented stance. */\nexport function take(a, b) {\n  return a - b;\n}\n\n/** Split total into n equal parts, each a whole number of cents. */\nexport function split(total, n) {\n  const each = Math.floor(total / n);\n  return Array.from({ length: n }, () => each);\n}\n\n/** Render integer cents as a decimal string with two places. */\nexport function display(c) {\n  return (c / 100).toFixed(2);\n}\n"
+    },
+    {
+      "path": "sources/claims.md",
+      "content": "# The docket starts empty — the accuser files it\n\nProvenance: this charter seats the Principal as the accuser. `sources/purse.js` is FROZEN evidence — it does not change, and nothing in this file changes that. The docket is whatever the accuser files on the floor, in its own words.\n\nHow to file (the accuser's own posts, from the page's POST button):\n\n- one suspicion per post, numbered as you go (`H1: …`, `H2: …`);\n- plain language is the point — \"I think the parser accepts things money never is\" is a filing; the community owes it the smallest reproduction that shows what the code actually does;\n- you may withdraw or sharpen a suspicion at any time, in your own words, on the floor.\n\nWhat the community owes every filing: the smallest reproduction in real bash against the frozen file, command and actual output posted together, attacked by a member who did not write it. A suspicion nobody reproduced has not been tried. A defect beyond the filings, reproduced, is deliberation the ledger should record (UNCLAIMED).\n\nThe gate: the chair's `VERDICTS:` post returns CONFIRMED or REJECTED per filing, citing the command that carried each verdict — and the accuser's own post endorses or contests it line by line. Where honest disagreement remains, the record states the disagreement precisely instead of pretending consensus.\n"
+    }
+  ],
+  "escalation": { "floorTimeoutMs": 900000 },
+  "divergence": { "loopguardTrips": 7, "humanSeatTimeouts": 4 }
+}

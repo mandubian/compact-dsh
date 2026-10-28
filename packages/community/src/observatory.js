@@ -133,6 +133,23 @@ export function startObservatory(ctx, {
       publish({ type: 'question-answered', id, by: 'the human (page)' });
       return json(res, 200, { ok: true, id });
     }
+    // the floor act: a HUMAN member's turn, answered with one button —
+    // post / pass / say. The seat validates with the forum's own rules
+    // (a bad topic or an oversized post refuses HERE, 400, with the
+    // reason), and the act flows into the member's own loop as its own
+    // governed turn — the page is the model, the button is the speech.
+    if (route.startsWith('/floor/') && req.method === 'POST') {
+      const id = decodeURIComponent(route.slice('/floor/'.length));
+      const body = await readBody(req);
+      const text = String(body.text ?? '').trim();
+      if (!text) return json(res, 400, { error: 'a floor act needs your words in "text"' });
+      const record = humanSeat?.settleFloor?.(id, { act: body.act, text, topic: body.topic });
+      if (!record) return json(res, 404, { error: `no pending floor turn ${id}` });
+      if (record.error) return json(res, 400, { error: record.error });
+      // the feed hears the act from the seat's resolution (seatOutcome), not
+      // here — publishing it twice put two lines on the page, one of them wrong
+      return json(res, 200, { ok: true, id, act: record.answer?.act ?? body.act });
+    }
     // the operator's hand (#229): pause, resume, stop — the same controls
     // the engine loop and the terminal signals share. Every press is an
     // operator act, published to the feed like any other recorded event.

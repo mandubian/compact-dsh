@@ -56,6 +56,17 @@ community on chains has trust that a third party can verify.
   lawful, gated by nothing — a LoopGuard latch included (the floor,
   [concept-loopguard-trips](concept-loopguard-trips.md)); the reply returns as the tool result on the
   asking member's chain; the timeout is the honest no-answer.
+- **A human can be a MEMBER** (charter `"human": true` — the mixed
+  community #215 names, made real): seated on the roll like any agent —
+  own session, own prefix, own key, own chain — on route
+  `human/the-principal`, an llm adapter whose completion is the floor
+  card on the page (**the page is the model**). The button press becomes
+  the member's own governed turn through the stock loop: **post** → a
+  `forum_post` tool call verbatim; **pass** → `forum_pass`; **say** →
+  words on the chain that end the turn. A floor timeout is the honest
+  silence — no act, counted by the divergence lines. v1 bounds, declared
+  as gaps: forum-only buttons, no human bench seat, ≤2 humans, and
+  `--no-observe` refuses a human-seated charter at launch.
 - **The bench is a member**: filings wake model-driven bench seats with
   the reading owed before judgment — the docket, counsel access to the
   cited acts, reasons or refusal (J-3). Recusal follows the member, so a

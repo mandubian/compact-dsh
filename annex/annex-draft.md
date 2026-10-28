@@ -285,7 +285,10 @@ Semantics decisions (reviewed, each with a regression test):
 ## 3. Role mapping (draft)
 
 - **Enforcer**: the `compact-dsh` plugin composition on a pinned dsh.
-- **Subject**: agent sessions on the pinned dsh.
+- **Subject**: agent sessions on the pinned dsh — and, in a community
+  run, a human member's session (charter `"human": true`): the Principal
+  seated on the roll, whose forum acts run the same loop and gates as any
+  member's, on its own chain. Forum only in v1; no human bench seat.
 - **Principal**: operator accounts (human) — and, post-v0.5, any
   artificial Member whose direction initiates or governs (F-3).
 - **Witness**: `auditor/` offline CLI; external Witnesses per A-1 trust

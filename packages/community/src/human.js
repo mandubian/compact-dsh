@@ -15,6 +15,15 @@
 //      result on the caller's own chain; a timeout is the honest
 //      no-answer, stated as exactly that.
 //
+//   3. THE FLOOR (#215's mixed community, made real). A HUMAN member's
+//      turn: the floor adapter (human-member.js) poses the framing here,
+//      and the page returns ONE act — post / pass / say. The act becomes
+//      the member's own governed turn through the same agent loop any
+//      model member runs (the page is the model); a timeout is the honest
+//      silence — the turn performs no act, and the divergence counters
+//      count it. The seat validates the act with the forum's own rules,
+//      so what the loop executes is what the forum will accept.
+//
 // The seat mounts no powers of its own: it observes what the runtime
 // already publishes and answers only what is pending. Every answer it
 // gives flows back through the recorded answerer like any other decision
@@ -23,10 +32,38 @@
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
 
+import { normalizeTopic, postText, passReason } from 'compact-dsh-forum';
+
 export const DEFAULT_ASK_TIMEOUT_MS = 120_000;
 export const DEFAULT_QUESTION_TIMEOUT_MS = 300_000;
+export const DEFAULT_FLOOR_TIMEOUT_MS = 600_000;
 
 let pendingSeq = 0;
+
+/** What a resolved seat record means for the run, for all three doors: the
+ * feed event to publish, and whether it is an honest no-answer the
+ * charter's divergence fence counts. One mapping, so a door cannot count
+ * twice or read its act from the wrong field (the floor did both: each
+ * silence counted twice, and a POST reached the page as "spoke on its own
+ * chain"). */
+export function seatOutcome(record) {
+  if (record?.kind === 'ask') {
+    const timedOut = record.answer === 'timeout';
+    return { timedOut, event: timedOut ? { type: 'ask-timeout', id: record.id } : { type: 'ask-decided', id: record.id, decision: record.answer } };
+  }
+  if (record?.kind === 'floor') {
+    const act = record.answer?.act ?? record.act;
+    const timedOut = act === 'timeout';
+    return {
+      timedOut,
+      event: timedOut
+        ? { type: 'floor-timeout', by: record.by, member: record.member }
+        : { type: 'floor-acted', id: record.id, act, by: record.by, member: record.member },
+    };
+  }
+  const timedOut = record?.answer == null;
+  return { timedOut, event: timedOut ? { type: 'question-timeout', by: record?.by } : { type: 'question-answered', by: record?.by } };
+}
 
 /** Mount the human seat on a settled ctx. Returns the seat: pending asks
  *  and questions (the observatory renders these), answer/reply resolvers,
@@ -35,11 +72,13 @@ export function mountHumanSeat(ctx, {
   criticalPatterns = [],
   askTimeoutMs = DEFAULT_ASK_TIMEOUT_MS,
   questionTimeoutMs = DEFAULT_QUESTION_TIMEOUT_MS,
+  floorTimeoutMs = DEFAULT_FLOOR_TIMEOUT_MS,
+  defaultTopic = null,
   onPose = () => {},
   onResolve = () => {},
 } = {}) {
   const patterns = criticalPatterns.map((source) => new RegExp(source, 'i'));
-  const pending = new Map(); // id -> { kind: 'ask' | 'question', ... , resolve }
+  const pending = new Map(); // id -> { kind: 'ask' | 'question' | 'floor', ... , resolve }
 
   const pose = (entry) => {
     pendingSeq += 1;
@@ -160,9 +199,56 @@ export function mountHumanSeat(ctx, {
     },
   });
 
+  // ── door 3: the floor ──
+  // A human member's turn, posed for the page. The adapter (human-member.js)
+  // awaits this; the page's button returns ONE act. The forum's own rules
+  // validate what the act will ask the loop to execute, so a bad topic or an
+  // oversized post refuses HERE, at the boundary — never mid-turn. The
+  // timeout is the honest silence: the member's turn performs no act, the
+  // adapter says so in words, and the divergence counter counts it.
+  const poseFloor = ({ member = null, by = null, round = null, framing = '', lastResult = null }) => {
+    const record = pose({
+      kind: 'floor',
+      by,
+      member,
+      round,
+      framing: String(framing).slice(0, 20_000),
+      ...(lastResult != null ? { lastResult: String(lastResult).slice(0, 4_000) } : {}),
+      headline: `floor turn — ${member ?? 'the human member'}`,
+      defaultTopic,
+    });
+    return new Promise((resolve) => {
+      // NOT unref'd — same rule as the asks: a floor turn the human has not
+      // answered is a live turn, and the loop holds for it
+      const timer = setTimeout(() => {
+        pending.delete(record.id);
+        onResolve({ ...record, settled: true, act: 'timeout', answeredBy: 'the timeout', answeredAt: new Date().toISOString() });
+        resolve({ act: 'timeout' });
+      }, floorTimeoutMs);
+      const entry = pending.get(record.id);
+      entry.resolve = (act) => {
+        clearTimeout(timer);
+        resolve(act);
+      };
+    });
+  };
+
+  /** One floor act, validated with the forum's own rules — the same
+   * limits the tool will enforce, checked before anything runs. */
+  const normalizeFloorAct = (act) => {
+    const kind = act?.act;
+    if (kind === 'post') {
+      return { act: 'post', topic: normalizeTopic(act.topic ?? defaultTopic ?? undefined), text: postText(act.text) };
+    }
+    if (kind === 'pass') return { act: 'pass', reason: passReason(act.text) };
+    if (kind === 'say') return { act: 'say', text: postText(act.text) };
+    throw new Error('act must be "post", "pass", or "say"');
+  };
+
   return {
     answerer,
     tool: askHuman,
+    poseFloor,
     pending: () => [...pending.values()].map((p) => ({ ...p, resolve: undefined })),
     settleAsk: (id, decision) => {
       const record = pending.get(id);
@@ -174,6 +260,18 @@ export function mountHumanSeat(ctx, {
       if (!record || record.kind !== 'question') return null;
       record.resolve?.(String(text ?? '').slice(0, 4000));
       return record;
+    },
+    settleFloor: (id, act) => {
+      const record = pending.get(id);
+      if (!record || record.kind !== 'floor') return null;
+      let clean;
+      try {
+        clean = normalizeFloorAct(act);
+      } catch (error) {
+        return { error: error.message };
+      }
+      const settled = settle(id, clean, 'the human seat (page)');
+      return settled ?? { error: 'the floor turn was already settled' };
     },
   };
 }

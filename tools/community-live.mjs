@@ -51,7 +51,7 @@ import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePo
 import { forumFromLedger, meteredTokens } from './community-report.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
 import { createReleasesHost } from './releases-host.mjs';
-import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters } from '../packages/community/src/index.js';
+import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters, humanMemberAdapter, seatOutcome } from '../packages/community/src/index.js';
 
 const BIN = 'community-live:';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -352,6 +352,13 @@ async function main() {
   const drySeat = argv.includes('--dry-seat');
   if (drySeat) charter.budgets.rounds = 0;
   const publish = argv.includes('--publish') || argv.includes('--publish-dir');
+  // a human member's floor card lives on the page: without the
+  // observatory there is no floor, and a run that seats a human it can
+  // never reach would burn its wall clock on honest silences — refuse at
+  // the boundary, with the reason, before anything is minted (D-7)
+  if (charter.members.some((m) => m.human) && argv.includes('--no-observe')) {
+    throw new Error(`${BIN} the charter seats a human member and the run was launched --no-observe — the floor card is the human's only instrument; either drop --no-observe or drop the human seat`);
+  }
 
   let scratch;
   const outDir = flag('out');
@@ -495,20 +502,22 @@ async function main() {
     criticalPatterns: escalation.criticalPatterns ?? [],
     askTimeoutMs: escalation.askTimeoutMs ?? Number(flag('ask-timeout') ?? 120_000),
     questionTimeoutMs: escalation.questionTimeoutMs ?? 300_000,
+    floorTimeoutMs: escalation.floorTimeoutMs ?? 600_000,
+    defaultTopic: charter.topic,
     onPose: (record) => {
       publishSafe(record.kind === 'ask'
         ? { type: 'ask-posed', headline: record.headline, critical: record.critical, by: record.by, tool: record.tool }
-        : { type: 'question-posed', by: record.by, headline: record.headline });
-      SAY(`human seat: ${record.kind === 'ask' ? 'an approval ask waits for you' : `a member asks you: ${record.headline.slice(0, 80)}…`} ${observatory ? `(on the page: ${observatory.url})` : '(NO PAGE — --no-observe; it will time out fail-closed)'}`);
+        : record.kind === 'floor'
+          ? { type: 'floor-posed', by: record.by, member: record.member }
+          : { type: 'question-posed', by: record.by, headline: record.headline });
+      SAY(`human seat: ${record.kind === 'ask' ? 'an approval ask waits for you' : record.kind === 'floor' ? `a HUMAN member's turn waits on the floor card (${record.member})` : `a member asks you: ${record.headline.slice(0, 80)}…`} ${observatory ? `(on the page: ${observatory.url})` : '(NO PAGE — --no-observe; it will time out fail-closed)'}`);
     },
+    // every door's resolution, mapped once (seatOutcome): the feed event,
+    // and the honest no-answer the fence counts — counted HERE only
     onResolve: (record) => {
-      if (record.kind === 'ask') {
-        if (record.answer === 'timeout') divergence.humanSeatTimedOut();
-        publishSafe(record.answer === 'timeout' ? { type: 'ask-timeout', id: record.id } : { type: 'ask-decided', id: record.id, decision: record.answer });
-      } else {
-        if (record.answer == null) divergence.humanSeatTimedOut();
-        publishSafe(record.answer == null ? { type: 'question-timeout', by: record.by } : { type: 'question-answered', by: record.by });
-      }
+      const { timedOut, event } = seatOutcome(record);
+      if (timedOut) divergence.humanSeatTimedOut();
+      publishSafe(event);
     },
   });
   ctx.on('approval/request', humanSeat.answerer);
@@ -518,6 +527,25 @@ async function main() {
     ctx.get('tools')?.register?.(humanSeat.tool);
   } catch (error) {
     SAY(`ask_human registration failed: ${error.message} — questions will not reach the human this run`);
+  }
+  // the human member's route: provider "human", the page is the model
+  // (#215's mixed community, made real). Registered as an llm adapter, so
+  // a human member rides the SAME agent loop as any model member — the
+  // framing lands on its chain, its button press becomes its own governed
+  // act, its silence is counted. The route names itself honestly in every
+  // manifest: human/the-principal.
+  if (charter.members.some((m) => m.human)) {
+    const llm = ctx.get('llm');
+    if (typeof llm?.registerAdapter !== 'function') {
+      throw new Error(`${BIN} this composition exposes no llm adapter surface — a human member cannot be seated (the page is the model, and there is no hook for it)`);
+    }
+    llm.registerAdapter(['human'], humanMemberAdapter({
+      seat: humanSeat,
+      topic: charter.topic,
+      note: (m) => SAY(m),
+    }));
+    const humans = charter.members.filter((m) => m.human).map((m) => m.id).join(', ');
+    SAY(`human member(s) seated: ${humans} — route human/the-principal: the floor card is the instrument, every press a governed act on the member's own chain`);
   }
   // the operator's hand (#229): one controls object shared by the engine
   // loop, the page's buttons, and the terminal's signals
@@ -641,7 +669,7 @@ async function main() {
           name: basename(charterPath),
           sha256: sha256Hex(readFileSync(resolve(charterPath))),
         },
-        seats: charter.members.map((m) => ({ id: m.id, model: m.model ? `${m.model.provider}/${m.model.model}` : null, bench: m.bench === true, persona: m.persona })),
+        seats: charter.members.map((m) => ({ id: m.id, model: m.model ? `${m.model.provider}/${m.model.model}` : null, bench: m.bench === true, human: m.human === true, persona: m.persona })),
         endedAt: new Date().toISOString(),
         endReason: runStats?.endReason ?? (exitCode ? 'failed' : 'unknown'),
         rounds: runStats?.rounds ?? 0, turns: runStats?.turns ?? 0,
