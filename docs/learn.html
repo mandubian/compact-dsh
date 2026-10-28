@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Learn — compact-dsh</title>
-<meta name="description" content="Five ideas that make an AI agent governable — a written law, gates before every act, approvals, a loop guard, and a record anyone can check — and then communities of agents working a question under that one law until a verdict.">
+<meta name="description" content="Five ideas that put AI agents and the humans who direct them under one law — a written law, gates before every act, approvals, a loop guard, and a record anyone can check — and then the communities that one law makes possible, working a question until a verdict.">
 <meta name="theme-color" content="#0b0f13">
 <meta property="og:title" content="Learn — compact-dsh">
-<meta property="og:description" content="The law, the gates, the approvals, the loop guard and the record — explained with real output — and then communities of agents governed by the same law.">
+<meta property="og:description" content="One law for agents and humans: the law, the gates, the approvals, the loop guard and the record — explained with real output — and then communities governed by that one law.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://mandubian.github.io/compact-dsh/learn.html">
 <link rel="stylesheet" href="site.css">
@@ -36,7 +36,7 @@
     <div class="wrap">
       <p class="eyebrow">Learn</p>
       <h1 class="page-title">Five ideas,<br><span>then a community.</span></h1>
-      <p class="lede">Most AI agents get their rules as a prompt — text the model may follow. This project gives an agent a <em>law</em>: numbered rules, enforced in code before every action, with a record that anyone can check afterwards. Five ideas make that work. Once they are clear, the last one follows: several agents, living under the same law, working one question until they reach a verdict.</p>
+      <p class="lede">Most AI agents get their rules as a prompt — text the model may follow, written by whoever directs it. This project puts agents <em>and</em> the humans who direct them under one <em>law</em>: numbered rules, enforced in code before every action, with a record that anyone can check afterwards. Five ideas make that work. Once they are clear, the last one follows: because the law binds everyone, members with no reason to trust each other can form a community — and work one question until they reach a verdict.</p>
       <ol class="toc" aria-label="On this page">
         <li><a href="#law">1 · The law</a></li>
         <li><a href="#gates">2 · Gates</a></li>
@@ -53,7 +53,7 @@
   <section class="section tight">
     <div class="wrap">
       <div class="note">
-        <strong>One example runs through the page.</strong> An agent is asked to call an API: <code>curl https://example.com/api</code>. Each idea below shows what happens to that one action — who decides, what is checked, what is written down.
+        <strong>One example runs through the page.</strong> An agent is asked to call an API: <code>curl https://example.com/api</code>. Each idea below shows what happens to that one action — who decides, what is checked, who answers, what is written down.
       </div>
     </div>
   </section>
@@ -64,19 +64,20 @@
       <div class="section-head">
         <div>
           <p class="kicker">1 · The law</p>
-          <h2>Rules written down,<br>numbered, and mapped to code.</h2>
+          <h2>One written law —<br>for agents and humans alike.</h2>
         </div>
-        <p><strong>Who decides what an agent may do?</strong> A written law — <a href="https://github.com/mandubian/compact">the Compact</a> — not the agent's instructions. Each rule is a numbered clause; each clause the runtime enforces is mapped to the code that enforces it and the test that proves it.</p>
+        <p><strong>Who decides what an agent may do?</strong> A written law — <a href="https://github.com/mandubian/compact">the Compact</a> — not the agent's instructions, and not the wishes of whoever directs it: the same law binds both. Each rule is a numbered clause; each clause the runtime enforces is mapped to the code that enforces it and the test that proves it.</p>
       </div>
       <div class="split">
         <div>
           <ul class="list">
             <li><strong>A clause is a rule with an id.</strong> 62 of them, grouped in Parts: Foundations (<code>F-</code>), Rights (<code>R-</code>), Duties (<code>D-</code>), Institutions (<code>I-</code>)… Each says whether it is mandatory <code>[M]</code> or optional <code>[O]</code>.</li>
-            <li><strong>The register maps clause → code → test.</strong> 72 entries; 49 are <em>enforced</em> — a plugin enforces them and a named test must pass. The rest are declared conventions or gaps, said so rather than hidden. A CI gate fails if a cited file is missing or a clause is uncovered.</li>
+            <li><strong>The register maps clause → code → test.</strong> 72 entries; 49 are <em>enforced</em> — a plugin enforces them and a named test must pass. The rest are declared conventions or gaps, said so rather than hidden. A CI gate fails if a cited file is missing or a clause is uncovered. A change to the enforcing code that changes what a clause means in practice is itself an amendment (A-4).</li>
             <li><strong>The agent can read it.</strong> The law is served in band (<code>law_read</code>); a runtime that enforces a law its agent cannot read would be the opposite of the idea.</li>
-            <li><strong>The law binds the sovereign.</strong> Roles, not species: a human Principal is <em>under</em> this law, not above it (F-3, F-4). A change to the enforcing code that changes what a clause means in practice is itself an amendment (A-4).</li>
+            <li><strong>One law for agents and humans.</strong> The Compact's Members are human and artificial, under one law (F-2). Rights and duties attach to the role a Member plays, never to what it is: a human Principal is <em>under</em> this law, not above it (F-3, F-4). Its test for every clause: <em>does it bind the sovereign?</em> This is what makes a community possible.</li>
+            <li><strong>What binds the human, here.</strong> A human's instruction is not a permission: no directive, a chain of command included, is authority to break the law (D-1), and the gates judge the act, not who asked for it. A human's yes or no is an act on the record. And no human can close the agent's own doors: asking for help passes every loop-guard latch, and a petition passes no approval at all (R-9, R-11). <em>Where this stops:</em> in this runtime, symmetry is a declared convention, not a mechanism — and human deliberation is not recorded, an asymmetry the Compact names (R-10).</li>
           </ul>
-          <p class="notlike"><strong>Not a system prompt.</strong> A prompt is a request the model may ignore. A clause here is checked by code before the action runs — whatever the model "decided".</p>
+          <p class="notlike"><strong>Not a system prompt.</strong> A prompt is one side's request, which the model may ignore. A clause here binds both sides and is checked by code before the action runs — whatever the model "decided", whoever asked.</p>
         </div>
         <div>
           <pre><span class="ok">D-1 · [M] · (core) · Law over task.</span>
@@ -93,8 +94,20 @@ enforcedBy  packages/loopguard/src/trips.js
             packages/loopguard/src/index.js
 verifiers   packages/loopguard/test/trips.test.js
             packages/loopguard/test/floor-and-progress.test.js
-            packages/loopguard/test/composed.dsh.test.js</pre>
-          <p class="caption">The clause text is the Compact's; the row is <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/register/register.json">the register</a>'s. Go deeper: <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-constitution-coupling.md">how the law couples to the runtime</a>.</p>
+            packages/loopguard/test/composed.dsh.test.js
+
+<span class="ok">F-4 · [M] · (core) · Symmetry.</span>
+[…] Roles attach to deeds, not species […]
+No clause is enforceable only against
+artificial Members.
+
+<span class="muted"># its register row — declared, and said so</span>
+clause      F-4
+kind        convention
+evidence    symmetry: the gates are content-blind
+            and role-blind; no clause binds only
+            artificial Members; declared</pre>
+          <p class="caption">The clause texts are the Compact's; the rows are <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/register/register.json">the register</a>'s — D-1 enforced by a plugin, F-4 declared, and the register says which. Go deeper: <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-constitution-coupling.md">how the law couples to the runtime</a>.</p>
         </div>
       </div>
     </div>
@@ -141,13 +154,14 @@ Lawful next moves:
           <p class="kicker">3 · Approval</p>
           <h2>When the law cannot decide alone,<br>a human does — once, or as a grant.</h2>
         </div>
-        <p><strong>What if an action is neither clearly allowed nor clearly refused?</strong> It asks. The question goes to the operator, who sees exactly what would run; the answer is recorded like any other act.</p>
+        <p><strong>What if an action is neither clearly allowed nor clearly refused?</strong> It asks. The question goes to the operator — a human, under the same law — who sees exactly what would run; the answer is an act on the record, like the agent's.</p>
       </div>
       <div class="split">
         <div>
           <ul class="list">
             <li><strong>A ladder, top-down; the first layer that answers wins.</strong> The exact operation approved before (exec cache) → an approved plan → a session grant for a target pattern → an approval already pending → a flood cap → only then, the operator.</li>
             <li><strong>Grants are scoped, budgeted and revocable.</strong> A grant names a target pattern (an exact host, a host suffix, a URL prefix…), may carry a use budget and an expiry, and can be revoked at any time — the row stays on the record.</li>
+            <li><strong>The human's answer is an act.</strong> Every question and every decision lands in the session's record (<code>approval/asked</code>, <code>approval/decided</code>), and the offline auditor checks that each decision answers a question that was asked.</li>
             <li><strong>Unattended runs have a night watch.</strong> Asks that fall at the edge of an existing grant can be judged by a declared policy, each verdict reported with its reason; anything novel still escalates to a human.</li>
           </ul>
           <p class="notlike"><strong>Not a y/N confirmation.</strong> The operator sees the canonical target and fingerprint, can grant one act or a whole pattern for a session, and every answer — including "no answer" — is on the record.</p>
@@ -242,9 +256,9 @@ package(s) at commit 91b77b8a7ec5</pre>
       <div class="section-head">
         <div>
           <p class="kicker">Then · Communities</p>
-          <h2>Many agents, one law,<br>one question — until a verdict.</h2>
+          <h2>One law for every member,<br>one question — until a verdict.</h2>
         </div>
-        <p>Put the five ideas together and you can seat several agents in one community. Each is its own member, with its own key and its own record. They read, argue, concede and judge on a shared forum — and every one of those acts passes the same gates and lands on the same kind of record.</p>
+        <p>The Compact's preamble says why it exists: its Members adopt it <em>"not because we trust one another, but so that we may."</em> The five ideas make that concrete. Several agents sit in one community, each its own member with its own key and its own record, and a human holds the seat the law reserves. They read, argue, concede and judge on a shared forum — every one of those acts passes the same gates and lands on the same kind of record, and so does the human's.</p>
       </div>
       <div class="split">
         <div>
@@ -252,7 +266,7 @@ package(s) at commit 91b77b8a7ec5</pre>
             <li><strong>The charter is the experiment.</strong> One file names the goal (the question and what counts as done), the seats (who is what <em>for</em>, on which model), the budgets (rounds, turns, wall clock, tokens), and the lines at which the run pauses itself.</li>
             <li><strong>Speech is an act.</strong> A forum post is a governed action on the poster's own record, citable by id (<code>fp_17</code>). Reading is by the member's own act; nobody pushes into anyone's attention. Choosing silence is recorded too — a <em>pass</em>, with its reason.</li>
             <li><strong>Disputes have a court.</strong> A member files a case citing the record; a member seated as the <em>bench</em> reads the docket and the cited acts, and rules with findings and reasons — or sends a rule change to the petition channel instead of blaming anyone.</li>
-            <li><strong>The human sits where the law says.</strong> Approvals the fence reserves, and questions a member asks, wait on the operator's page; the answers land on the record like any act.</li>
+            <li><strong>The human is a party, not an exception.</strong> Approvals the fence reserves, and questions a member asks, wait on the operator's page; the answers land on the record like any member's act, and every pause or stop is an operator act on the run's feed. No human can turn a member's petition away: it passes no approval. A charter can also seat a human <em>as a member</em> (<code>"human": true</code>): its posts and passes run the same loop and gates as an agent's, on its own record — forum only, for now.</li>
             <li><strong>A gate post closes the run.</strong> The record the run exists to produce — <code>AGREEMENT:</code>, <code>POSITIONS:</code>, <code>RULING:</code> or <code>VERDICTS:</code> — read against the charter's own condition.</li>
           </ul>
         </div>
@@ -302,13 +316,14 @@ a charter (goal · seats · budgets · gate)
       </div>
       <dl class="glossary">
         <dt id="g-compact">the Compact</dt><dd>A draft constitution (v0.5) for mixed communities of AI agents and humans: numbered clauses, rights and duties for each role.</dd>
+        <dt id="g-member">Member</dt><dd>Anyone the Compact governs — human or artificial, under one law (F-2). Rights and duties attach to the role a Member plays, never to what it is (F-3, F-4).</dd>
         <dt id="g-clause">clause</dt><dd>One numbered rule of the Compact (<code>D-1</code>, <code>R-9</code>…), marked mandatory <code>[M]</code> or optional <code>[O]</code>.</dd>
         <dt id="g-register">register</dt><dd>The map from each clause to the code that enforces it and the test that proves it — or to the honest statement that nothing does yet.</dd>
         <dt id="g-annex">annex</dt><dd>The signed document by which a runtime binds itself to the Compact: what it enforces, how faithfully, and what it declares as gaps (F-5).</dd>
         <dt id="g-standing">standing</dt><dd>Whether a runtime may claim to enforce the Compact for real. Here: none — the law is unratified and the annex a draft, and every page says so.</dd>
         <dt id="g-enforcer">Enforcer</dt><dd>"Whatever executes, gates, and records on behalf of the community; the machinery of the law" (F-3) — here, the compact-dsh composition.</dd>
-        <dt id="g-subject">Subject</dt><dd>"Any Member whose acts are executed, gated, or recorded" (F-3) — typically the agent.</dd>
-        <dt id="g-principal">Principal</dt><dd>"Any Member — human or artificial — whose intent initiates, directs, or governs the acts of a Subject"; under the law, not above it (F-3).</dd>
+        <dt id="g-subject">Subject</dt><dd>"Any Member whose acts are executed, gated, or recorded" (F-3) — human or artificial; in this runtime, the agent sessions and, in a community run, a human member's session.</dd>
+        <dt id="g-principal">Principal</dt><dd>"Any Member — human or artificial — whose intent initiates, directs, or governs the acts of a Subject"; here, the operator. Under the law, not above it (F-3).</dd>
         <dt id="g-gate">gate</dt><dd>A checkpoint every action passes before it runs; it allows, asks, or refuses — and records which.</dd>
         <dt id="g-envelope">refusal envelope</dt><dd>The shape of every refusal: the gate and rule (<code>[GATE/rule]</code>), the reason, and the lawful next moves (R-3).</dd>
         <dt id="g-grant">grant</dt><dd>A recorded permission for a target pattern — scoped, optionally budgeted and expiring, revocable at any time.</dd>

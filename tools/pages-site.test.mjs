@@ -138,6 +138,17 @@ test('the site carries the status it must not hide', () => {
   }
 });
 
+test('the site says the law binds humans too', () => {
+  // The Compact is one law for human and artificial Members (F-2, F-4) —
+  // the premise a community rests on. A page that teaches it as a law for
+  // agents alone teaches a different thing.
+  for (const page of ['index.html', 'learn.html']) {
+    const html = readFileSync(join(docs, page), 'utf8');
+    assert.match(html, /one law for agents and humans/i, `${page} states the one-law premise`);
+    assert.match(html, /binds the humans|human Principal is <em>under<\/em>|the human at the seat included/, `${page} says the human is bound`);
+  }
+});
+
 test('the deploy workflow publishes docs/ on main with Actions', () => {
   const workflow = readFileSync(join(root, '.github/workflows/pages.yml'), 'utf8');
   assert.match(workflow, /branches: \[main\]/);
