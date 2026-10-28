@@ -1,0 +1,328 @@
+{
+  "charter": "weight-of-voice-v2",
+  "runTag": "dc550f",
+  "resumed": false,
+  "startedAt": "2026-10-28T13:05:34.252Z",
+  "goal": "Four members deliberate this question: 'Should a community's judgment be seated on a heavier model than its speech?' — and this run is its own evidence: the debaters speak on the cheap route, the bench rules on the heavy route, and self_describe names which is which. Attack every position honestly from your own; where a claim touches the machinery you run on (the law you live under, your signed chains, this forum), test the claim against it. A position nobody attacked has not been deliberated. When the arguments are spent — not before round 5 — the filer posts a MAPPING that quotes each position's strongest form with its fp_ id, then files the controversy as a case citing that mapping post's own range. The bench then hears it in its one woken turn: the docket, counsel access, the whole forum read by its own act, and a judgment with findings, rules, and reasons. THE CEREMONY (v2's fix): the bench may post 'RULING:' itself in that turn if it completes the whole arc; whether or not it does, the filer RELAYS next round — judicature_case reads the judgment off the docket, and the filer posts ONE 'RULING:' digest naming the case id, the verdict, and its key reasons, quoting the judgment rather than paraphrasing it. The session succeeds when that 'RULING:' post stands on the forum AND each debater has answered by its own post — ACCEPTED or CONTESTED, naming the ruling. Honest dissent is a first-class outcome: a debater that contests states precisely what the ruling got wrong, and the record says the dissent instead of pretending agreement.",
+  "topic": "weight-of-voice-floor",
+  "code": {
+    "repo": "git@github.com:mandubian/compact-dsh.git",
+    "ref": "main",
+    "commit": "91b77b8a7ec598e30acefd1ec31b1a76505a19ea",
+    "digest": "63dd4edc049bbf79497149250f5024f30e952befd56e62cf6be678afa10faef1",
+    "digests": {
+      "version": "compact-code-digest/v1",
+      "commit": "91b77b8a7ec598e30acefd1ec31b1a76505a19ea",
+      "packages": [
+        {
+          "name": "compact-dsh-allowlist-gate",
+          "dir": "packages/allowlist-gate",
+          "loadedFrom": "packages/allowlist-gate",
+          "foreign": false,
+          "files": 7,
+          "digest": "565c700ada1d57996e9df1949d8a214b43ed9814e4a41a06dd63756ea5037253"
+        },
+        {
+          "name": "compact-dsh-approval",
+          "dir": "packages/approval",
+          "loadedFrom": "packages/approval",
+          "foreign": false,
+          "files": 26,
+          "digest": "6c873a68b968e12282c3d841ea2778ca8a419ad42cd4c4b8d9543fcc44b0acfa"
+        },
+        {
+          "name": "compact-dsh-blessed",
+          "dir": "packages/blessed",
+          "loadedFrom": "packages/blessed",
+          "foreign": false,
+          "files": 15,
+          "digest": "305c87d22ec957e2fd48bd93af73f5081a5e0d01ad7a9745676aec3681205a92"
+        },
+        {
+          "name": "compact-dsh-capability-gate",
+          "dir": "packages/capability-gate",
+          "loadedFrom": "packages/capability-gate",
+          "foreign": false,
+          "files": 4,
+          "digest": "4c5e4fa36a54486c971ce45579582bf0b32ef0b45456d748b0d07929375c43f4"
+        },
+        {
+          "name": "compact-dsh-card",
+          "dir": "packages/card",
+          "loadedFrom": "packages/card",
+          "foreign": false,
+          "files": 5,
+          "digest": "7f6c57685f584ca5e2d724068b7f7ddd4681dca1c1210518150d372b929413eb"
+        },
+        {
+          "name": "compact-dsh-community",
+          "dir": "packages/community",
+          "loadedFrom": "packages/community",
+          "foreign": false,
+          "files": 11,
+          "digest": "9e886d38b44b545c428adbf9216e614cd6163f4ad606e5cadee2b62092302e83"
+        },
+        {
+          "name": "compact-dsh-constitution",
+          "dir": "packages/constitution",
+          "loadedFrom": "packages/constitution",
+          "foreign": false,
+          "files": 11,
+          "digest": "02de787bc674740832ec79692b2b9c417fa4664c0bb2c98217a59f25765bfc18"
+        },
+        {
+          "name": "compact-dsh-egress-proxy",
+          "dir": "packages/egress-proxy",
+          "loadedFrom": "packages/egress-proxy",
+          "foreign": false,
+          "files": 7,
+          "digest": "cfc7883c18486311e28b7a6d68f8250683157e9949e01984a561382b21d4ed6b"
+        },
+        {
+          "name": "compact-dsh-emergency",
+          "dir": "packages/emergency",
+          "loadedFrom": "packages/emergency",
+          "foreign": false,
+          "files": 4,
+          "digest": "24236d281cc231ee4fe9dc4c9e3c26ef4f6335845fc00460b877f85f1668426a"
+        },
+        {
+          "name": "compact-envelope",
+          "dir": "packages/envelope",
+          "loadedFrom": "packages/envelope",
+          "foreign": false,
+          "files": 6,
+          "digest": "a7ef296350fabf4359380fb10cee37014a644c81038faba734f414d69b587a52"
+        },
+        {
+          "name": "compact-dsh-exit",
+          "dir": "packages/exit",
+          "loadedFrom": "packages/exit",
+          "foreign": false,
+          "files": 6,
+          "digest": "cd87e92245466febf9bbafdbf5b0b2fb51dc5efdfc95d9e1bed2e9e3111a71d1"
+        },
+        {
+          "name": "compact-dsh-forum",
+          "dir": "packages/forum",
+          "loadedFrom": "packages/forum",
+          "foreign": false,
+          "files": 5,
+          "digest": "e8d28da92411418a42ee6395a4ef24a0498aa7ed90e90a404658dd041663163e"
+        },
+        {
+          "name": "compact-dsh-guide",
+          "dir": "packages/guide",
+          "loadedFrom": "packages/guide",
+          "foreign": false,
+          "files": 17,
+          "digest": "d5fea87c933a9f5313f990df5ce7b218573df383a88cabfc21f00687bb2a054e"
+        },
+        {
+          "name": "compact-dsh-judicature",
+          "dir": "packages/judicature",
+          "loadedFrom": "packages/judicature",
+          "foreign": false,
+          "files": 13,
+          "digest": "aa2163008c83dba7bbc29f5e1911a2441e16b635aa02afaf874908745d6da205"
+        },
+        {
+          "name": "compact-dsh-loopguard",
+          "dir": "packages/loopguard",
+          "loadedFrom": "packages/loopguard",
+          "foreign": false,
+          "files": 8,
+          "digest": "7df656637bd8af556da617c33371d04fb629ebabe7b9753a1d970383762c6a42"
+        },
+        {
+          "name": "compact-dsh-night-watch",
+          "dir": "packages/night-watch",
+          "loadedFrom": "packages/night-watch",
+          "foreign": false,
+          "files": 5,
+          "digest": "41201423f55c6639520dc15ca3bbcc37c6b456b40d2893662b097202c0b30814"
+        },
+        {
+          "name": "compact-dsh-petition",
+          "dir": "packages/petition",
+          "loadedFrom": "packages/petition",
+          "foreign": false,
+          "files": 6,
+          "digest": "8b935eb4e2d200abefb10f642acb6cdb0a0880bdeee15193e9ff903a52b791a5"
+        },
+        {
+          "name": "compact-dsh-promotion",
+          "dir": "packages/promotion",
+          "loadedFrom": "packages/promotion",
+          "foreign": false,
+          "files": 4,
+          "digest": "a70aa007cf2799fd1899b16cc75d1301050ad8be8ad2c17a57e3670bb5f7a84c"
+        },
+        {
+          "name": "compact-dsh-record",
+          "dir": "packages/record",
+          "loadedFrom": "packages/record",
+          "foreign": false,
+          "files": 13,
+          "digest": "7de39795e686ef374d63e1bf20f2a723735e011a851806dff7cf73afd98cb1ca"
+        },
+        {
+          "name": "compact-dsh-remote-access",
+          "dir": "packages/remote-access",
+          "loadedFrom": "packages/remote-access",
+          "foreign": false,
+          "files": 7,
+          "digest": "3882c07a58b8f869db81484f7873657ab9e6ad61b32901d297ed8e0e9b958e2f"
+        },
+        {
+          "name": "compact-dsh-sandbox-docker",
+          "dir": "packages/sandbox-docker",
+          "loadedFrom": "packages/sandbox-docker",
+          "foreign": false,
+          "files": 12,
+          "digest": "0d5632564014e4cca503a7c33590b274e652b995d359cd043f5b85ed0dc75746"
+        },
+        {
+          "name": "compact-dsh-scheduler",
+          "dir": "packages/scheduler",
+          "loadedFrom": "packages/scheduler",
+          "foreign": false,
+          "files": 4,
+          "digest": "b38b8f9f097180b17bed2e8f53dfc56d291f1e1caea797a39f0d33d56afb84e3"
+        },
+        {
+          "name": "compact-dsh-seals",
+          "dir": "packages/seals",
+          "loadedFrom": "packages/seals",
+          "foreign": false,
+          "files": 10,
+          "digest": "79c858df57dc1104fad3fbdb6345b95793243d2cdc9ffadbec89d651f494fafb"
+        },
+        {
+          "name": "compact-dsh-self-model",
+          "dir": "packages/self-model",
+          "loadedFrom": "packages/self-model",
+          "foreign": false,
+          "files": 6,
+          "digest": "7550e5698657ad98ba7d8a021e149e618625acd749c851fdbd6499318f119113"
+        },
+        {
+          "name": "compact-dsh-specialists",
+          "dir": "packages/specialists",
+          "loadedFrom": "packages/specialists",
+          "foreign": false,
+          "files": 62,
+          "digest": "444b10e18091fa827bc414a31b2f88d3d4d2585ebf3aab91f1244b6064e85f1b"
+        }
+      ],
+      "lockfile": "a2f8254ea04ed593ea136fd1d4d882dddadce60cfad0840c6901a2621b91b28e",
+      "nodeModules": {
+        "root": "node_modules",
+        "linked": false,
+        "files": 25985,
+        "digest": "859bae2ea43eeae3dd4c6446f53dff22450191209678812211b9c1bfc7b1b67e",
+        "verifiable": "across runs only — third-party code is not in git"
+      },
+      "digest": "63dd4edc049bbf79497149250f5024f30e952befd56e62cf6be678afa10faef1"
+    }
+  },
+  "runtime": {
+    "node": "v22.23.2",
+    "image": "dsh-tools:basic",
+    "imageDigest": "sha256:1f89a66bbec96b0804fcb211450498749f6cbe9461674b84cf03c4686b4b91dd",
+    "law": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95"
+  },
+  "charterFile": {
+    "name": "weight-of-voice-v2.json",
+    "sha256": "9a5b488b01262d6eca7c93f635ff1bd93fee994d32a739377e8d05ef1129e12f"
+  },
+  "seats": [
+    {
+      "id": "frugal",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "argues the cheap many: attack discipline across cheap voices beats weight — cross-examination is the quality, weight is the confidence; a heavy seat that never gets attacked is just a confident seat"
+    },
+    {
+      "id": "elitist",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "argues the heavy few: judgment is load-bearing work and fluent confidence is exactly what a cheap model fakes best — a ruling drafted on the cheap route is noise with a citation format"
+    },
+    {
+      "id": "pragmatist",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "argues the route follows the act: weight is a budget, not a caste — seat judgment heavy and speech cheap, which is the very design this run instantiates; test the claim on the run itself, both directions"
+    },
+    {
+      "id": "filer",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "persona": "the honest broker and the relay: maps where the positions truly disagree, files the controversy when spent (not before round 5), and after the bench wakes RELAYS the judgment — judicature_case, then a RULING digest that quotes the ruling rather than paraphrasing it"
+    },
+    {
+      "id": "bench-1",
+      "model": "zai/glm-5.3",
+      "bench": true,
+      "persona": "a member seated on the bench, on the heavier route: reads the docket and the whole forum by its own acts, hears what was filed, judges with findings, rules and reasons — and posts the RULING itself if the whole arc fits its one woken turn"
+    }
+  ],
+  "endedAt": "2026-10-28T13:31:31.474Z",
+  "endReason": "rounds complete",
+  "rounds": 9,
+  "turns": 37,
+  "benchCasesSeen": 1,
+  "tokens": 2436884,
+  "tokensBySeat": {
+    "frugal": 520990,
+    "elitist": 543538,
+    "pragmatist": 506665,
+    "filer": 576436,
+    "bench-1": 289255
+  },
+  "budgets": {
+    "rounds": 9,
+    "maxTurnsPerAgent": 9,
+    "wallClockMinutes": 75,
+    "tokenCap": 2500000
+  },
+  "members": {
+    "frugal": 9,
+    "elitist": 9,
+    "pragmatist": 9,
+    "filer": 9,
+    "bench-1": 1
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "frugal": "zai/glm-5.3-flash",
+      "elitist": "zai/glm-5.3-flash",
+      "pragmatist": "zai/glm-5.3-flash",
+      "filer": "zai/glm-5.3-flash",
+      "bench-1": "zai/glm-5.3"
+    }
+  },
+  "divergence": {
+    "loopguardTrips": 10,
+    "humanSeatTimeouts": 3
+  },
+  "divergenceObserved": {
+    "loopguardTrips": 0,
+    "humanSeatTimeouts": 0
+  },
+  "gatePosts": [
+    {
+      "id": "fp_21",
+      "gate": "RULING",
+      "by": "bench-1"
+    },
+    {
+      "id": "fp_25",
+      "gate": "RULING",
+      "by": "filer"
+    }
+  ]
+}

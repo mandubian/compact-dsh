@@ -29,6 +29,7 @@ const samples = [
   { html: 'runs/workshop/workshop-2914fd.html', account: 'runs/workshop/README.md' },
   { html: 'runs/weight-of-voice-v2/weight-of-voice-v2-a980e1.html', account: 'runs/weight-of-voice-v2/README.md' },
   { html: 'runs/weight-of-voice-v2-rerun/weight-of-voice-v2-0e3fa8.html', account: 'runs/weight-of-voice-v2-rerun/README.md' },
+  { html: 'runs/weight-of-voice-v2-dc550f/weight-of-voice-v2-dc550f.html', account: 'runs/weight-of-voice-v2-dc550f/README.md' },
 ];
 
 const links = (html) => [...html.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
@@ -221,7 +222,10 @@ test('the prose counts the runs the page actually carries', () => {
     assert.equal(m[1].toLowerCase(), words[charters], `the page says "${m[1]}" charters — the samples ride ${charters}`);
   }
   const featured = samples.filter((s) => !curationOf(s).archived).length;
-  for (const m of page.matchAll(/\b(\w+) featured\b/gi)) assert.equal(m[1].toLowerCase(), words[featured], 'the featured count');
+  // only number words are counts — "the featured run" is prose, not a claim
+  for (const m of page.matchAll(/\b(\w+) featured\b/gi)) {
+    if (words.includes(m[1].toLowerCase())) assert.equal(m[1].toLowerCase(), words[featured], 'the featured count');
+  }
   for (const m of page.matchAll(/\b(\w+) archived\b/gi)) {
     if (words.includes(m[1].toLowerCase())) assert.equal(m[1].toLowerCase(), words[samples.length - featured], 'the archived count');
   }
