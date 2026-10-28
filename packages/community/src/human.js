@@ -242,7 +242,8 @@ export function mountHumanSeat(ctx, {
   const normalizeFloorAct = (act) => {
     const kind = act?.act;
     if (kind === 'post') {
-      return { act: 'post', topic: normalizeTopic(act.topic ?? defaultTopic ?? undefined), text: postText(act.text) };
+      // a post ENDS the turn unless the human asks to keep the floor
+      return { act: 'post', topic: normalizeTopic(act.topic ?? defaultTopic ?? undefined), text: postText(act.text), keep: act.keep === true };
     }
     if (kind === 'pass') return { act: 'pass', reason: passReason(act.text) };
     if (kind === 'say') return { act: 'say', text: postText(act.text) };
