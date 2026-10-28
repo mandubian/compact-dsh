@@ -217,7 +217,9 @@ npm run compact -- "Call self_describe and report your standing and the law dige
 ```
 
 Expected (first verified live run, abridged): the agent reports, verbatim
-from the attestation injected at its turn boundary — standing **`none` with
+from the attestation it read through `self_describe` (the prompt asks for it;
+the unasked turn-boundary delivery reached no live session until 2026-10-28)
+— standing **`none` with
 its reason** (the law is an unratified draft; claiming otherwise would be the
 F-5 violation), the law digest, capabilities in force (`MA bound`, `CF
 bound`, `SCH absent`, `A-4/DYN absent` — refused tools named), budgets and

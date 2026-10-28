@@ -252,7 +252,9 @@ is a test asserting the Subject's own claim about itself never reaches its
 attestation). Absent facts report `null`, never a plausible value. Standing
 reports `none` **with its reason**, every turn: F-5 makes standing depend on
 a binding annex, and ours is a draft over an unratified law. It is delivered
-at the Subject's own boundary (injected on every `turn/start`, unasked) and
+at the Subject's own boundary (injected on every `turn/start`, unasked — as
+designed; a live session refused that inject until 2026-10-28, when delivery
+moved to the first step of every turn: [concept-self-knowledge](concept-self-knowledge.md)) and
 re-readable via `self_describe`, which reports freshness against a cited
 epoch — "a stale attestation is an alarm, not a truth to act on" is a rule
 about what the Subject may *do*, so the Subject must be able to tell it is

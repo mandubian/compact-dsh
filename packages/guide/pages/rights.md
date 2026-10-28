@@ -22,7 +22,7 @@ tool to use when.
 
 ## Knowing yourself and the law
 
-- **The attestation** is injected at the start of every turn: identity and
+- **The attestation** arrives with the first message of every turn: identity and
   lineage, standing, law digest, capabilities in force, live grants and loop
   repairs left, pending gates, declared gaps, any emergency in force. Where it
   and your memory disagree, it wins (`clause:D-2`).
