@@ -422,3 +422,39 @@ test('closing the observatory ends its live feeds — an open tab cannot hold a 
   assert.equal(closed, 'closed');
   await ended;
 });
+
+// read SSE frames from a GET until `until(frames)` or the timeout
+const readFrames = (url, headers = {}, until = () => false, ms = 2000) => new Promise((resolve) => {
+  const frames = [];
+  const req = http.get(url, { headers }, (res) => {
+    let buf = '';
+    res.on('data', (d) => {
+      buf += d;
+      for (;;) { const i = buf.indexOf('\n\n'); if (i < 0) break; frames.push(buf.slice(0, i)); buf = buf.slice(i + 2); }
+      if (until(frames)) { req.destroy(); resolve(frames); }
+    });
+  });
+  setTimeout(() => { req.destroy(); resolve(frames); }, ms);
+});
+
+test('the event stream resumes where the page left off — sequence ids, Last-Event-ID and ?since=', async () => {
+  // a page whose stream was dropped (a tunnel, a sleeping laptop) catches
+  // up on reconnect with exactly what it missed — never a doubled line
+  const obs = await startObservatory(stubCtx(), { humanSeat: mountHumanSeat(stubCtx()), port: 0, charterName: 'c', heartbeatMs: 0 });
+  for (let i = 1; i <= 5; i += 1) obs.publish({ type: 'turn', member: 'm' + i });
+  const seqOf = (f) => Number(/^id: (\d+)$/m.exec(f)?.[1]);
+  const fresh = await readFrames(`${obs.url}events`, {}, (fs) => fs.some((f) => /"hello"/.test(f)));
+  assert.deepEqual(fresh.filter((f) => /^id: /m.test(f)).map(seqOf), [1, 2, 3, 4, 5], 'every event carries its sequence as the SSE id');
+  const resumed = await readFrames(`${obs.url}events`, { 'last-event-id': '3' }, (fs) => fs.some((f) => /"hello"/.test(f)));
+  assert.deepEqual(resumed.filter((f) => /^id: /m.test(f)).map(seqOf), [4, 5], 'the browser\'s own reconnect resumes after Last-Event-ID');
+  const since = await readFrames(`${obs.url}events?since=4`, {}, (fs) => fs.some((f) => /"hello"/.test(f)));
+  assert.deepEqual(since.filter((f) => /^id: /m.test(f)).map(seqOf), [5], 'the page\'s watchdog reconnect resumes after ?since=');
+  await obs.close();
+});
+
+test('the event stream never goes quiet: a heartbeat the page\'s watchdog hears', async () => {
+  const obs = await startObservatory(stubCtx(), { humanSeat: mountHumanSeat(stubCtx()), port: 0, charterName: 'c', heartbeatMs: 50 });
+  const frames = await readFrames(`${obs.url}events`, {}, (fs) => fs.filter((f) => /^event: ping$/m.test(f)).length >= 2, 2000);
+  assert.ok(frames.filter((f) => /^event: ping$/m.test(f)).length >= 2, 'pings arrive while nothing else happens');
+  await obs.close();
+});
