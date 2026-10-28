@@ -8,7 +8,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { mountHumanSeat, seatOutcome, startObservatory, validateCharter, humanMemberAdapter, HUMAN_ROUTE, memberOfFraming, briefingText } from '../src/index.js';
+import { mountHumanSeat, seatOutcome, startObservatory, validateCharter, humanMemberAdapter, HUMAN_ROUTE, memberOfFraming, briefingText, roundFramingText } from '../src/index.js';
+import { readFileSync } from 'node:fs';
+import { LEGAL_TERMS } from '../../../tools/forum-legibility.mjs';
 
 function stubCtx({ deciding = new Map() } = {}) {
   const services = new Map([
@@ -435,4 +437,56 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   assert.match(script, /post ≤ 8000 · pass ≤ 2000/);
   assert.match(script, /if \(wasF\.focus\) \{ ta\.focus\(\); ta\.setSelectionRange/);
   assert.match(html, /body\.composing main \{ grid-template-columns: 1\.25fr 0\.6fr 1\.55fr; \}/);
+});
+
+// ── the plain voice (charter "voice": "plain"): the law keeps its register
+// on its own surfaces; the work is talked about in the problem's words ──
+
+const charterFile = (name) => validateCharter(JSON.parse(readFileSync(new URL(`../../../tools/charters/${name}.json`, import.meta.url), 'utf8')));
+const legalIn = (text) => LEGAL_TERMS.filter((t) => String(text).toLowerCase().includes(t));
+
+test('voice is opt-in: absent keeps the original briefing, "plain" selects the plain one, anything else is refused', () => {
+  const base = { ...BASE, members: [{ id: 'a', persona: 'works in turns, speaks plainly' }] };
+  assert.equal(validateCharter(base).voice, undefined);
+  assert.equal(validateCharter({ ...base, voice: 'plain' }).voice, 'plain');
+  assert.throws(() => validateCharter({ ...base, voice: 'legal' }), /"plain" or absent/);
+  // the original briefing is untouched
+  const original = charterFile('cross-exam');
+  assert.equal(original.voice, undefined);
+  assert.match(briefingText(original, original.members[1], {}), /THE LAW YOU LIVE UNDER/);
+});
+
+test('the plain briefing: same facts, no legal terms — and the shapes the floor reads stay', () => {
+  const c = charterFile('cross-exam-plain');
+  const agent = briefingText(c, c.members.find((m) => m.id === 'defender'), {});
+  const human = briefingText(c, c.members.find((m) => m.id === 'accuser'), {});
+  for (const [who, text] of [['agent', agent], ['human', human]]) {
+    assert.deepEqual(legalIn(text), [], `${who} briefing speaks plainly`);
+    assert.match(text, /law_read has the full text/, `${who}: the law is one call away, cited not narrated`);
+  }
+  // every fact of the original, in plain words
+  for (const fact of [/forum_post/, /forum_pass/, /forum_read/, /sandbox/, /which rule and what you can do instead/, /judicature_hear/, /petition/, /only hosts that exist/, /ask_human/]) assert.match(agent, fact);
+  assert.match(agent, /HOW TO TALK/);
+  assert.match(agent, /To the human: one question at a time/);
+  for (const button of ['Post & end turn', 'Pass', 'Say & end turn', 'post & keep the floor']) assert.ok(human.includes(button), button);
+  // the human adapter finds the member in both framings
+  assert.equal(memberOfFraming([{ role: 'user', content: [{ type: 'text', text: human }] }]), 'accuser');
+  const round = roundFramingText(c, c.members[0], 2, [], []);
+  assert.equal(memberOfFraming([{ role: 'user', content: [{ type: 'text', text: round }] }]), 'accuser');
+  assert.match(round, /Your turn: post, pass with a reason/);
+});
+
+test('cross-exam-plain differs from cross-exam ONLY in its words — the comparison is fair', () => {
+  const o = charterFile('cross-exam');
+  const p = charterFile('cross-exam-plain');
+  assert.deepEqual(p.budgets, o.budgets);
+  assert.deepEqual(p.escalation, o.escalation);
+  assert.deepEqual(p.divergence, o.divergence);
+  assert.deepEqual(p.members.map((m) => [m.id, m.prefix, m.human === true, m.model ?? null, m.bench]), o.members.map((m) => [m.id, m.prefix, m.human === true, m.model ?? null, m.bench]));
+  const code = (c, path) => c.sources.find((s) => s.path === path)?.content;
+  assert.equal(code(p, 'sources/purse.js'), code(o, 'sources/purse.js'), 'the same frozen code, byte for byte');
+  assert.equal(code(p, 'package.json'), code(o, 'package.json'));
+  // and the words are plain: goal, personas, extra briefing, the concerns note
+  assert.deepEqual(legalIn([p.goal, p.briefingExtra, ...p.members.map((m) => m.persona), code(p, 'sources/concerns.md')].join(' ')), []);
+  assert.match(p.goal, /VERDICTS:/, 'the machine-read marker stays a marker');
 });
