@@ -7,7 +7,7 @@ It records why autonoetic's wiki was ported in part and left out in part.*
 
 | Question | Surface | Standing |
 |---|---|---|
-| what am I, what may I do, what is left | the attestation (`self_describe`, injected each turn) | authoritative over memory (R-1) |
+| what am I, what may I do, what is left | the attestation (`self_describe`, delivered each turn) | authoritative over memory (R-1) |
 | why was I refused, what is lawful now | the refusal envelope | authoritative for that act (R-3) |
 | what does every Member hold to | the taught digest, closing the attestation | interpretive aid; the body prevails |
 | **what does the law say** | — | — |

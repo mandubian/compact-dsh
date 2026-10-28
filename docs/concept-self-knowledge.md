@@ -84,10 +84,30 @@ A freshness rule the Subject cannot evaluate is not a rule.
 
 ### The boundary is the turn
 
-"At any boundary of its own operation" — on dsh that is `turn/start`. The
-attestation is injected there, unasked, so the Subject begins each turn knowing
-what it is and what it has left. The on-demand tool is a *re-read*, not the
-delivery mechanism; a right that had to be requested would be a different right.
+"At any boundary of its own operation" — on dsh that is the turn. The
+attestation enters with the **first step of every turn**, ahead of the turn's
+own input, unasked, so the Subject begins each turn knowing what it is and what
+it has left. The on-demand tool is a *re-read*, not the delivery mechanism; a
+right that had to be requested would be a different right.
+
+**The mechanism, and its history (2026-10-28).**
+
+- **Now:** the self-model joins the loop's `agent/pre-step` waterfall — where a
+  step's input is assembled — and adds the attestation to the first step of
+  each turn that has input. The loop appends a step's input to the session as
+  `user/message` events, so the attestation lands on the Subject's own chain,
+  `source.code` included (the code digest, [CF-2](concept-supply-chain.md#the-code-itself-cf-2-applied-to-the-code)).
+- **Until 2026-10-28:** it was an `inject()` from the `turn/start` session
+  event. A live session refuses that as a reentrant append (*"session append
+  cannot reenter while another append is being published"*); the error was
+  swallowed, and **no live session ever received the attestation unasked** —
+  not the community samples, not CLI sessions. Members saw it only when they
+  called `self_describe`. The composed tests drove a stub that accepted the
+  inject, so they passed. The regression test now drives a real agent through
+  a real turn on the blessed composition (`packages/blessed/test/loader.dsh.test.js`).
+- **In plain terms:** the status reminder each agent was meant to get at the
+  start of every turn never went out; it does now, and a test on the real
+  runtime checks it.
 
 ## R-13 — inquiry
 

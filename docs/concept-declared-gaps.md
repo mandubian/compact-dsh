@@ -61,7 +61,7 @@ Two aggregation points, two audiences:
    are registered, what gaps are owed. Audience: the boot record and any
    auditor.
 2. **Per-turn attestation** — the self-model re-aggregates the same sources
-   into the block injected at every `turn/start` and readable via
+   into the block delivered with the first step of every turn and readable via
    `self_describe`. Audience: the Subject, which R-1 makes authoritative over
    the Subject's own memory.
 

@@ -74,6 +74,22 @@ async function boot() {
 const call = (tools, name, args, agent) =>
   tools.execute({ name, arguments: args, agent, callId: `c_${Math.random().toString(16).slice(2)}`, signal: new AbortController().signal });
 
+// The turn boundary as the live loop drives it: the first step of a turn
+// assembles its input through the `agent/pre-step` waterfall, and what the
+// waterfall returns is appended to the session. (The 2026-10-28 finding: an
+// inject() from the `turn/start` session event is refused live as a
+// reentrant append — these tests used to emit turn/start at a stub that
+// accepted it, which is why they passed while no live session was attested.)
+// The attestation the waterfall adds is mirrored into the stub's `injected`
+// so each test reads what the Subject received.
+async function turnBoundary(ctx, agent, { turn = 1, step = 1, input = true } = {}) {
+  const decision = await ctx.waterfall('agent/pre-step',
+    { agent, messages: [], turn, step, signal: new AbortController().signal },
+    () => Promise.resolve({ kind: 'enter', messages: input ? [{ role: 'user', content: [{ type: 'text', text: 'the turn input' }], source: { kind: 'driver' } }] : [] }));
+  agent.injected.push(...decision.messages.filter((m) => m?.source?.kind === 'compact-self-model'));
+  return decision;
+}
+
 test('composed: both rights are reachable as tools in the real registry', async () => {
   const { tools } = await boot();
   assert.ok(tools.get('self_describe'), 'R-1 is exercisable by the Subject');
@@ -83,7 +99,7 @@ test('composed: both rights are reachable as tools in the real registry', async 
 test('composed: the rendered tool result carries the attestation VALUE, not the arguments object', async () => {
   const { ctx, tools, agents } = await boot();
   const agent = agents.add('s1');
-  ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+  await turnBoundary(ctx, agent);
 
   const result = await call(tools, 'self_describe', { citing_epoch: ctx.get('compact-self-model').issuedTo('s1').epoch }, agent);
   const rendered = result?.content?.map(c => c?.text ?? '').join('') ?? '';
@@ -94,7 +110,7 @@ test('composed: the rendered tool result carries the attestation VALUE, not the 
 test('composed: the attestation arrives at the turn boundary, unasked (R-1)', async () => {
   const { ctx, agents } = await boot();
   const agent = agents.add('s1');
-  ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+  await turnBoundary(ctx, agent);
 
   assert.equal(agent.injected.length, 1, 'the Subject asked for nothing and was told anyway');
   const text = agent.injected[0].content[0].text;
@@ -123,7 +139,7 @@ test('composed: the injected turn-start block carries the REAL constitution\'s t
   }
   const agents = ctx.get('agents');
   const agent = agents.add('s1');
-  ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+  await turnBoundary(ctx, agent);
 
   assert.equal(agent.injected.length, 1);
   const text = agent.injected[0].content[0].text;
@@ -149,7 +165,7 @@ test('composed: a non-turn session event injects nothing', async () => {
 test('composed: self_describe re-reads on demand, and a stale citation is an alarm', async () => {
   const { ctx, tools, agents } = await boot();
   const agent = agents.add('s1');
-  ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+  await turnBoundary(ctx, agent);
   const issuedEpoch = ctx.get('compact-self-model').issuedTo('s1').epoch;
 
   const current = await call(tools, 'self_describe', { citing_epoch: issuedEpoch }, agent);
@@ -292,7 +308,7 @@ test('composed: the declared egress posture renders identically at the boundary 
   }
   const agents = ctx.get('agents');
   const agent = agents.add('s1');
-  ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+  await turnBoundary(ctx, agent);
 
   assert.equal(agent.injected.length, 1);
   const boundaryText = agent.injected[0].content[0].text;
@@ -672,7 +688,7 @@ test('composed: the attestation carries the code digest — rendered, and struct
   try {
     const { ctx, agents } = await boot();
     const agent = agents.add('s-code');
-    ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+    await turnBoundary(ctx, agent);
     const event = agent.injected.at(-1);
     assert.match(event.content[0].text, /Code: digest cccccccccccccccc over 2 workspace package\(s\) at commit deadbeefdead — 1 loaded from OUTSIDE the checkout/);
     assert.deepEqual(event.source.code, { digest, commit: 'deadbeef'.repeat(5) }, 'the chained event carries the digest, structured');
@@ -689,11 +705,25 @@ test('composed: no digest computed — the attestation says so, the event carrie
   try {
     const { ctx, agents } = await boot();
     const agent = agents.add('s-nocode');
-    ctx.emit('session/event', agent.session, { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } });
+    await turnBoundary(ctx, agent);
     const event = agent.injected.at(-1);
     assert.match(event.content[0].text, /Code: not digested at boot — this launcher computes no code digest; the commit alone names it/);
     assert.equal(event.source.code, undefined);
   } finally {
     if (before !== undefined) process.env.COMPACT_CODE_DIGEST_FILE = before;
   }
+});
+
+test('composed: once per turn — the first step of each turn, ahead of its input, never an empty step', async () => {
+  const { ctx, agents } = await boot();
+  const agent = agents.add('s-turns');
+  const first = await turnBoundary(ctx, agent, { turn: 1, step: 1 });
+  assert.equal(first.messages[0].source.kind, 'compact-self-model', 'the attestation leads the step');
+  assert.equal(first.messages[1].source.kind, 'driver', 'the turn\'s own input follows it, untouched');
+  const later = await turnBoundary(ctx, agent, { turn: 1, step: 2 });
+  assert.equal(later.messages.length, 1, 'a later step of the same turn carries no second attestation');
+  await turnBoundary(ctx, agent, { turn: 2, step: 3 });
+  assert.equal(agent.injected.length, 2, 'the next turn is attested afresh (step numbers do not restart per turn)');
+  const empty = await turnBoundary(ctx, agent, { turn: 3, step: 4, input: false });
+  assert.equal(empty.messages.length, 0, 'a step with no input is the loop ending the turn — nothing is added to keep it alive');
 });

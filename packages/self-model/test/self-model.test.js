@@ -151,7 +151,7 @@ test('the attestation renders a credential path masked (#8 G3): the row keeps th
   const secreted = b.grants.find(g => /services\/\*\*\*/.test(g.target));
   assert.ok(secreted, 'the credential path renders masked');
   assert.ok(!b.grants.some(g => g.target.includes('T00') || g.target.includes('SECRET')),
-    'the attestation is injected every turn — it carries no path credential');
+    'the attestation is delivered every turn — it carries no path credential');
 });
 
 test('structured pattern kinds render whole, and still ride the redaction (#8 G3)', async () => {

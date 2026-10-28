@@ -183,7 +183,7 @@ export function budgetsOf(ctx, sessionId, now) {
 function describePattern(pattern) {
   if (!pattern) return null;
   const v = pattern.value;
-  // #8 G3: the attestation is a RENDERING — it is injected into the Subject's
+  // #8 G3: the attestation is a RENDERING — it is delivered into the Subject's
   // context every turn, so EVERY rendered pattern rides the approval gate's
   // redaction (host, path family, masked credential), whichever branch builds
   // it. The grant ROW keeps the matching form; the attestation reports the

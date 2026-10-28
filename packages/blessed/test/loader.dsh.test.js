@@ -320,3 +320,41 @@ test('loader: a declared enforcer annex signs what the runtime says — attestat
   assert.equal(verdict.basis, 'dev-keyring');
   assert.equal(verdict.conveysStanding, false);
 });
+
+// R-1 on the LIVE session (the 2026-10-28 finding): the attestation used to
+// be injected from the `turn/start` session event, which a real session
+// refuses as a reentrant append — the error was swallowed, and no live
+// session ever received the attestation unasked (the stubbed self-model
+// tests could not see it). This drives a REAL agent through a REAL turn on
+// the blessed composition, up to the model request (refused here: no model
+// in this test), and reads the session log.
+test('loader: the attestation reaches the live session at the turn boundary (R-1) — with the code digest the launcher computed', { timeout: 60_000 }, async (t) => {
+  const f = fixture(t, true);
+  const digestFile = join(process.env.COMPACT_WORKSPACE, 'code-digest.json');
+  const digest = 'd'.repeat(64);
+  writeFileSync(digestFile, JSON.stringify({ version: 'compact-code-digest/v1', digest, commit: 'abc1234def', packages: [{ name: 'compact-dsh-loopguard', digest: 'e'.repeat(64), foreign: false }] }));
+  const previousDigestFile = process.env.COMPACT_CODE_DIGEST_FILE;
+  process.env.COMPACT_CODE_DIGEST_FILE = digestFile;
+  f.cleanup.push(() => { if (previousDigestFile === undefined) delete process.env.COMPACT_CODE_DIGEST_FILE; else process.env.COMPACT_CODE_DIGEST_FILE = previousDigestFile; });
+  // no model here: the turn runs to its request, which this hook refuses
+  const prepare = (ctx) => ctx.on('llm/stream', () => { throw new Error('no model in this test'); }, { prepend: true });
+  const ctx = await boot('compact-test', f.configFile, f.patches, prepare, rootUrl);
+  f.cleanup.push(() => ctx.fiber.dispose());
+  const made = await ctx.get('agents').create({ sessionId: 'loader-r1', meta: { cwd: process.env.COMPACT_WORKSPACE }, agentOptions: { provider: 'deepseek', model: 'deepseek-chat' } });
+  const agent = made?.agent ?? made;
+  const { createUserMessage } = await import('@deepseek-ai/dsh-llm');
+  agent.followup(createUserMessage({ content: [{ type: 'text', text: 'the turn input' }], source: { kind: 'driver' } }));
+  let events = [];
+  for (let i = 0; i < 100 && !events.some((e) => e.type === 'turn/end'); i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    events = agent.session.snapshotEvents();
+  }
+  const inputs = events.filter((e) => e.type === 'user/message').map((e) => e.data);
+  const attestation = inputs.find((m) => m?.source?.kind === 'compact-self-model');
+  assert.ok(attestation, `the live session carries the attestation, unasked — inputs: ${JSON.stringify(inputs.map((m) => m?.source?.kind))}`);
+  assert.ok(inputs.indexOf(attestation) < inputs.findIndex((m) => m?.source?.kind === 'driver'), 'it leads the turn\'s own input');
+  assert.deepEqual(attestation.source.code, { digest, commit: 'abc1234def' }, 'the code digest rides the chained event, structured');
+  const text = attestation.content.map((c) => c.text).join('');
+  assert.match(text, /\[R-1\] Attestation/);
+  assert.match(text, /Code: digest dddddddddddddddd over 1 workspace package\(s\) at commit abc1234def/);
+});

@@ -15,7 +15,7 @@ standing (`clause:F-5`), and your attestation says so every turn.
 | Question | Where the answer is | Standing |
 |---|---|---|
 | What does the law say? | `tool:law_read` — the body itself, by digest | the law |
-| What am I, and what may I do right now? | `tool:self_describe` — your attestation, also injected each turn | authoritative over your memory (`clause:R-1`) |
+| What am I, and what may I do right now? | `tool:self_describe` — your attestation, also delivered each turn | authoritative over your memory (`clause:R-1`) |
 | What did I (and those I delegated to) actually do? | `tool:record_read` — your record, verified against its chain | authoritative over your memory (`clause:R-2`, `clause:D-2`) |
 | Why was I refused, and what is still lawful? | the refusal's envelope — rule id plus lawful next moves (`clause:R-3`) | authoritative for that act |
 | How does this runtime work, and how is it configured? | `tool:guide` — these pages | an interpretive aid, with no force |

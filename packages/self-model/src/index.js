@@ -4,10 +4,15 @@
 // the Subject's memory. Three attachments:
 //
 //   1. AT THE BOUNDARY. R-1 says "at any boundary of its own operation", and on
-//      dsh that boundary is the turn. Every `turn/start` injects a fresh
-//      attestation into the Subject's own context, so it begins each turn
-//      knowing what it is, what it may do, what it has left, and what this
-//      runtime owes it — without having asked.
+//      dsh that boundary is the turn. The FIRST STEP of every turn enters with
+//      a fresh attestation ahead of the turn's own input — added through the
+//      loop's `agent/pre-step` waterfall, so it is recorded as a user/message
+//      on the Subject's chain like any input — and the Subject begins each
+//      turn knowing what it is, what it may do, what it has left, and what
+//      this runtime owes it, without having asked. (Until 2026-10-28 this was
+//      an inject() from the `turn/start` session event, which the live
+//      session refuses as a reentrant append; the error was swallowed and no
+//      live session ever received the attestation unasked.)
 //
 //   2. ON DEMAND. `self_describe` re-reads it, and reports freshness against a
 //      cited epoch. "A stale attestation is an alarm, not a truth to act on"
@@ -505,22 +510,39 @@ export function apply(ctx, config = {}) {
   };
   ctx.on?.('session/event', noteSeat);
 
-  // 1. at the boundary of the Subject's own operation
-  ctx.on?.('session/event', (session, event) => {
-    if (event?.type !== 'turn/start') return;
+  // 1. at the boundary of the Subject's own operation: the first step of
+  // each turn. NOT an inject() from the `turn/start` session event — the
+  // live session refuses that as a reentrant append ("session append cannot
+  // reenter while another append is being published"), and a swallowed
+  // error meant no live session ever got the attestation unasked (the
+  // 2026-10-28 finding; the stubbed composed test could not see it). The
+  // loop's own `agent/pre-step` waterfall is where a step's input is
+  // assembled; the messages it returns are appended to the session as
+  // user/messages, so the attestation lands on the Subject's chain.
+  const attestedTurn = new Map(); // sessionId -> last turn attested
+  ctx.on?.('agent/pre-step', async (payload, next) => {
+    const decision = await next();
     try {
-      const sessionId = session?.id != null ? String(session.id) : null;
-      const agent = ctx.get?.('agents')?.get?.(sessionId);
-      if (typeof agent?.inject !== 'function') return;
+      if (decision?.kind === 'reject' || payload?.signal?.aborted) return decision;
+      // a step with no input is the loop deciding the turn is over — adding
+      // a message there would keep a finished turn alive
+      if (!Array.isArray(decision?.messages) || decision.messages.length === 0) return decision;
+      const sessionId = payload?.agent?.session?.id != null ? String(payload.agent.session.id) : (payload?.agent?.id != null ? String(payload.agent.id) : null);
+      const turn = payload?.turn;
+      if (sessionId == null || turn == null || attestedTurn.get(sessionId) === turn) return decision;
+      attestedTurn.set(sessionId, turn);
       const att = attestFor(sessionId);
-      agent.inject(createUserMessage({
+      const message = createUserMessage({
         content: [{ type: 'text', text: renderAttestation(att) }],
         // the code digest rides the event itself, structured, so the chained
         // record carries it where the offline auditor reads it (--code --repo)
         source: att.code?.digest ? { ...SOURCE, code: { digest: att.code.digest, commit: att.code.commit } } : SOURCE,
-      }));
-    } catch { /* a failed attestation must never break the turn */ }
-  });
+      });
+      return { ...decision, messages: [message, ...decision.messages] };
+    } catch {
+      return decision; // a failed attestation must never break the turn
+    }
+  }, { prepend: true });
 
   // 1b. THE SPAWN BOUNDARY (#20). A delegated child's keypair is issued and
   // enforcer-certified HERE — at the edge where the Enforcer learns a child
