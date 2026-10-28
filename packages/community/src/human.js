@@ -137,6 +137,8 @@ export function mountHumanSeat(ctx, {
       critical,
       wouldOtherwise: isParamsEdge ? 'the night watch (params-edge)' : 'fail closed (unavailable)',
       resolvesTo: (answer) => (answer === 'approve' ? 'allowed-once' : 'denied'),
+      // when the fail-closed timeout fires — the page counts down to it
+      expiresAt: new Date(Date.now() + askTimeoutMs).toISOString(),
     });
     // NOT unref'd: a pending ask is a live decision — the loop holds while
     // the human thinks (the turn is blocked on this answer anyway; an
@@ -177,6 +179,7 @@ export function mountHumanSeat(ctx, {
         question: String(args?.question ?? ''),
         ...(args?.options ? { options: String(args.options) } : {}),
         ...(args?.context ? { context: String(args.context) } : {}),
+        expiresAt: new Date(Date.now() + questionTimeoutMs).toISOString(),
       });
       return await new Promise((resolve) => {
         // NOT unref'd — same rule as the asks: a question the human has not
@@ -216,6 +219,7 @@ export function mountHumanSeat(ctx, {
       ...(lastResult != null ? { lastResult: String(lastResult).slice(0, 4_000) } : {}),
       headline: `floor turn — ${member ?? 'the human member'}`,
       defaultTopic,
+      expiresAt: new Date(Date.now() + floorTimeoutMs).toISOString(),
     });
     return new Promise((resolve) => {
       // NOT unref'd — same rule as the asks: a floor turn the human has not

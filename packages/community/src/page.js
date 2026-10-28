@@ -96,7 +96,43 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   .ask button { margin-right: 6px; margin-top: 6px; padding: 4px 12px; font: inherit; cursor: pointer; }
   .ask button.approve { background: #1d5c2f; color: #cfe; border: 1px solid #3a7; }
   .ask button.deny { background: #5c1d1d; color: #fcc; border: 1px solid #a55; }
-  .question textarea { width: 96%; font: inherit; background: #111; color: #ddd; border: 1px solid #444; }
+  /* the human's turn, made for a human (#284 made the seat interactive):
+     while a floor turn or a question waits for words, the seat widens and
+     the composer gets the room — a big text box, the time left, buttons
+     that say what they do */
+  body.composing main { grid-template-columns: 1.25fr 0.6fr 1.55fr; }
+  body.composing #seat { border-color: #a83; }
+  /* the charter stays one scroll away — the briefing carries the same goal */
+  body.composing header .charter { max-height: 4.8em; overflow-y: auto; }
+  .left { color: #9ab; font-size: 12px; font-weight: normal; white-space: nowrap; }
+  .left.soon { color: #ffd27d; font-weight: bold; }
+  .left.now { color: #ff7d7d; font-weight: bold; }
+  /* the turn fills the seat: the text box takes whatever the briefing leaves */
+  .floor { display: flex; flex-direction: column; gap: 8px; font-size: 13px; padding: 10px 12px; min-height: calc(100% - 16px); box-sizing: border-box; }
+  .turnhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .turnhead .head { font-size: 14px; }
+  .floor .told { border: 1px solid #3a3020; background: #1a150c; padding: 6px 8px; margin: 0; }
+  .floor .told summary { cursor: pointer; color: #c9a86b; font-size: 12px; }
+  .floor .told .detail { max-height: 30vh; overflow-y: auto; margin-top: 6px; color: #bbb; font-size: 12px; }
+  .floor .last { font-size: 12px; color: #9ab; }
+  .floor .last pre.command { margin: 4px 0 0; }
+  .composer { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; }
+  .floor .composer textarea { flex: 1 1 auto; min-height: 12em; }
+  .composer label { color: #c9a86b; font-size: 12px; }
+  .composer textarea, .question textarea { width: 100%; box-sizing: border-box; min-height: 12em; resize: vertical; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0d0d0d; color: #eee; border: 1px solid #665; border-radius: 4px; padding: 10px 12px; }
+  .question:not(.floor) textarea { min-height: 7em; margin-top: 8px; }
+  .composer textarea:focus, .question textarea:focus { outline: none; border-color: #ffb46b; box-shadow: 0 0 0 2px rgba(255, 180, 107, 0.15); }
+  .composer .meta { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 11.5px; color: #888; }
+  .composer .meta input.topic { font: inherit; font-size: 12px; background: #111; color: #ddd; border: 1px solid #444; padding: 3px 6px; width: 16em; }
+  .composer .count.over { color: #ff7d7d; font-weight: bold; }
+  .acts-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ask .acts-row button { flex: 1 1 10em; margin: 0; padding: 8px 10px; font-size: 13px; text-align: left; border-radius: 4px; }
+  .ask .acts-row button small { display: block; font-size: 11px; opacity: 0.8; margin-top: 2px; }
+  .ask .acts-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ask .acts-row button.post { background: #1d5c2f; color: #dfe; border: 1px solid #3a7; font-weight: bold; }
+  .ask .acts-row button.pass { background: #2a2a2a; color: #ddd; border: 1px solid #555; }
+  .ask .acts-row button.say { background: #1d3a5c; color: #def; border: 1px solid #37a; }
+  .why { color: #ff9d7d; margin-top: 4px; }
   .muted { color: #666; }
   .prov { font-size: 11.5px; margin-top: 2px; }
   .charter { margin-top: 6px; padding: 6px 10px; border-left: 3px solid #39424e; background: #161b21; font-size: 12px; color: #cdd6e0; white-space: pre-wrap; word-break: break-word; }
@@ -108,7 +144,14 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   header button:hover { border-color:#7fd1ff; color:#7fd1ff; }
   .verdict-allow { color: #7dff8a; }
   .verdict-deny, .verdict-rejected { color: #ff7d7d; }
-  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+  /* narrow screens: one column that scrolls as a page, and the seat on top
+     while words are owed */
+  @media (max-width: 980px) {
+    body { height: auto; }
+    main, body.composing main { grid-template-columns: 1fr; flex: none; }
+    section { min-height: 40vh; }
+    body.composing #seat { order: -1; min-height: 85vh; }
+  }
 </style>
 </head>
 <body>
@@ -204,6 +247,21 @@ const showWhy = (div, reason) => {
   why.dataset.reason = reason;
   why.textContent = 'refused — ' + reason + ' (your words are kept: edit, then press again)';
 };
+// the time left before a card's timeout (its record carries expiresAt):
+// a turn that ran out is an honest silence, so the human sees it coming
+const BASE_TITLE = document.title;
+const tickLeft = () => {
+  document.querySelectorAll('[data-expires]').forEach((el) => {
+    const ms = Date.parse(el.dataset.expires) - Date.now();
+    if (!Number.isFinite(ms)) { el.textContent = ''; return; }
+    const s = Math.max(0, Math.round(ms / 1000));
+    el.textContent = s > 0 ? Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + ' left' : 'timing out…';
+    el.classList.toggle('soon', s <= 180 && s > 60);
+    el.classList.toggle('now', s <= 60);
+  });
+};
+setInterval(tickLeft, 1000);
+const leftHtml = (x) => (x.expiresAt ? '<span class="left" data-expires="' + esc(x.expiresAt) + '"></span>' : '');
 function renderPending(p) {
   // the reconciler rule (#239 follow-up): the 4s poll must never fight the
   // human. If nothing changed, touch NOTHING — an expanded details and a
@@ -219,7 +277,8 @@ function renderPending(p) {
     const ta = el.querySelector('textarea');
     const ti = el.querySelector('input.topic');
     const why = el.querySelector('.why');
-    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, ...(ti ? { topic: ti.value } : {}), ...(why ? { why: why.dataset.reason } : {}) };
+    const focus = ta && ta === document.activeElement ? [ta.selectionStart, ta.selectionEnd] : null;
+    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, focus, ...(ti ? { topic: ti.value } : {}), ...(why ? { why: why.dataset.reason } : {}) };
   });
   const asks = p.filter(x => x.kind === 'ask');
   const questions = p.filter(x => x.kind === 'question');
@@ -228,12 +287,17 @@ function renderPending(p) {
   if (!asks.length && !questions.length && !floors.length) {
     box.innerHTML = '<div class="ask muted">nothing is waiting</div>';
   }
+  // words are owed: the seat widens, and the tab says so from elsewhere
+  document.body.classList.toggle('composing', floors.length + questions.length > 0);
+  document.title = floors.length ? '● YOUR TURN — ' + BASE_TITLE
+    : questions.length ? '● A QUESTION FOR YOU — ' + BASE_TITLE
+    : asks.length ? '● AN ASK WAITS — ' + BASE_TITLE : BASE_TITLE;
   for (const a of asks) {
     const div = document.createElement('div');
     div.className = 'ask';
     div.dataset.id = a.id;
     div.innerHTML =
-      '<div class="head">APPROVAL ASKS FOR YOU' + (a.critical ? ' · CRITICAL (charter)' : '') + '</div>' +
+      '<div class="turnhead"><div class="head">APPROVAL ASKS FOR YOU' + (a.critical ? ' · CRITICAL (charter)' : '') + '</div>' + leftHtml(a) + '</div>' +
       '<div class="plain">member <span class="who">' + esc(a.by ?? 'unknown') + '</span> wants to run <b>' + esc(a.tool ?? 'a tool') + '</b>' +
         (a.wouldOtherwise ? ' <span class="muted">(would otherwise: ' + esc(a.wouldOtherwise) + ')</span>' : '') + '</div>' +
       (a.commandFull || a.command ? '<pre class="command">' + esc(a.commandFull || a.command) + '</pre>' : '') +
@@ -255,43 +319,71 @@ function renderPending(p) {
     div.className = 'ask question';
     div.dataset.id = q.id;
     div.innerHTML =
-      '<div class="head">A MEMBER ASKS YOU — ' + esc(q.by ?? 'a member') + (q.options ? ' · options: ' + esc(q.options) : '') + '</div>' +
+      '<div class="turnhead"><div class="head">A MEMBER ASKS YOU — ' + esc(q.by ?? 'a member') + (q.options ? ' · options: ' + esc(q.options) : '') + '</div>' + leftHtml(q) + '</div>' +
       '<div class="detail">' + esc(q.question) + (q.context ? '\\n(context: ' + esc(q.context) + ')' : '') + '</div>' +
-      '<textarea rows="2" placeholder="your reply — it becomes this member\\'s tool result, on its record"></textarea><br>' +
-      '<button class="approve">reply</button>';
+      '<textarea placeholder="your reply — it becomes this member\\'s tool result, on its record. Ctrl+Enter sends."></textarea>' +
+      '<div class="acts-row"><button class="approve post">Reply<small>returned to the member, on its record</small></button></div>';
     const ta = div.querySelector('textarea');
-    div.querySelector('button').onclick = () => {
+    const reply = () => {
       if (!ta.value.trim()) return;
       api('/reply/' + encodeURIComponent(q.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ text: ta.value }) }).then(() => div.remove()).catch(() => {});
     };
+    div.querySelector('button').onclick = reply;
+    ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); reply(); } };
     box.appendChild(div);
     const wasQ = saved[q.id];
     if (wasQ) {
       const d = div.querySelector('details');
       if (d && wasQ.open) d.open = true;
       if (wasQ.text != null) ta.value = wasQ.text;
+      if (wasQ.focus) { ta.focus(); ta.setSelectionRange(wasQ.focus[0], wasQ.focus[1]); }
+    } else if (!document.activeElement || document.activeElement === document.body) {
+      ta.focus(); // a NEW question takes the cursor — unless the human is typing elsewhere
     }
   }
-  // the floor card: a HUMAN member's turn. The framing rides verbatim in a
-  // details (open by default — this IS the turn), the member's own last
-  // result beside it, one textarea for words, three buttons: POST publishes
-  // the words verbatim as forum_post on the topic; PASS records them as the
-  // reason for silence; SAY puts them on the member's chain and ends the
-  // turn. The buttons speak the member's act, not the operator's.
+  // the floor card: a HUMAN member's turn. What the community told the
+  // member rides verbatim in its own scroll box (the first turn's is the
+  // whole briefing — it must not push the words off the screen), the
+  // member's own last result above it, then the composer: a big text box,
+  // the topic, a live count against the forum's limits, and three buttons
+  // that say what they do. POST publishes the words verbatim as forum_post
+  // on the topic; PASS records them as the reason for silence; SAY puts
+  // them on the member's chain and ends the turn. The buttons speak the
+  // member's act, not the operator's.
   for (const f of floors) {
     const div = document.createElement('div');
     div.className = 'ask question floor';
     div.dataset.id = f.id;
+    const first = /^You are "/.test(f.framing || '');
     div.innerHTML =
-      '<div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div>' +
-      (f.lastResult ? '<pre class="command">' + esc(f.lastResult) + '</pre>' : '') +
-      '<details open><summary>the round, verbatim (what the community told you)</summary>' +
+      '<div class="turnhead"><div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div>' + leftHtml(f) + '</div>' +
+      (f.lastResult ? '<div class="last">your last act, as the record returned it:<pre class="command">' + esc(f.lastResult) + '</pre></div>' : '') +
+      '<details class="told" open><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : 'what the community told you this round') + '</summary>' +
       '<div class="detail">' + esc(f.framing || '(no framing)') + '</div></details>' +
-      '<textarea rows="4" placeholder="your words — POST publishes them verbatim on the topic · PASS records them as your reason for silence · SAY puts them on your chain and ends the turn"></textarea><br>' +
-      '<input class="topic" style="width:40%" value="' + esc(f.defaultTopic ?? '') + '" placeholder="topic (the charter floor)">' +
-      '<button class="approve">post</button><button class="deny">pass</button><button class="say">say</button>';
+      '<div class="composer">' +
+        '<label for="ta-' + esc(f.id) + '">your words — posted verbatim, under your name</label>' +
+        '<textarea id="ta-' + esc(f.id) + '" placeholder="Write here. Ctrl+Enter posts to the forum."></textarea>' +
+        '<div class="meta"><span>topic <input class="topic" value="' + esc(f.defaultTopic ?? '') + '" placeholder="the charter floor"></span>' +
+        '<span class="count"></span></div>' +
+        '<div class="acts-row">' +
+          '<button class="approve post">Post to the forum<small>published verbatim, under your name</small></button>' +
+          '<button class="deny pass">Pass<small>no post — your words are the recorded reason</small></button>' +
+          '<button class="say">Say &amp; end turn<small>on your own record only, not posted</small></button>' +
+        '</div>' +
+      '</div>';
     const ta = div.querySelector('textarea');
     const ti = div.querySelector('input.topic');
+    const count = div.querySelector('.count');
+    const buttons = div.querySelectorAll('.acts-row button');
+    // the forum's own limits (a post ≤ 8000, a pass reason ≤ 2000) — the
+    // seat refuses past them; the count says so before the press does
+    const recount = () => {
+      const n = ta.value.length;
+      count.textContent = n + ' chars · post ≤ 8000 · pass ≤ 2000';
+      count.classList.toggle('over', n > 8000);
+      buttons.forEach((b) => { b.disabled = !ta.value.trim(); });
+    };
+    ta.oninput = recount;
     const send = (act) => {
       if (!ta.value.trim()) return;
       api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value }) }).then((r) => {
@@ -305,6 +397,7 @@ function renderPending(p) {
     div.querySelector('.approve').onclick = () => send('post');
     div.querySelector('.deny').onclick = () => send('pass');
     div.querySelector('.say').onclick = () => send('say');
+    ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); send('post'); } };
     box.appendChild(div);
     const wasF = saved[f.id];
     if (wasF) {
@@ -313,8 +406,14 @@ function renderPending(p) {
       if (wasF.text != null) ta.value = wasF.text;
       if (wasF.topic != null) ti.value = wasF.topic;
       if (wasF.why) showWhy(div, wasF.why);
+      if (wasF.focus) { ta.focus(); ta.setSelectionRange(wasF.focus[0], wasF.focus[1]); }
+    } else if (!document.activeElement || document.activeElement === document.body) {
+      // a NEW turn takes the cursor — unless the human is typing elsewhere
+      ta.focus();
     }
+    recount();
   }
+  tickLeft(); // the countdowns, at once — not a second after the rebuild
 }
 
 async function op(path, body) {

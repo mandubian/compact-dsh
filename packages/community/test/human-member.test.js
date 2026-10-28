@@ -244,6 +244,23 @@ test('the framing survives a notice after it: a LoopGuard trip leaves the member
   assert.equal(posed.lastResult, 'posted fp_7');
 });
 
+test('every pending card carries its expiry — the page counts down to the honest silence', async () => {
+  // floor turns and questions here; the approval ask's expiry is asserted
+  // where the ask door is driven (human-observatory.test.js)
+  const seat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 600_000, questionTimeoutMs: 300_000 });
+  const before = Date.now();
+  const turn = seat.poseFloor({ member: 'accuser', by: 'accuser', framing: 'Round 1 of 6, member "accuser".' });
+  const asked = seat.tool.execute({ question: 'which suspicion first?' }, { agent: { id: 'chair' } });
+  const [floor, question] = ['floor', 'question'].map((k) => seat.pending().find((p) => p.kind === k));
+  for (const [rec, ms] of [[floor, 600_000], [question, 300_000]]) {
+    const left = Date.parse(rec.expiresAt) - before;
+    assert.ok(left >= ms - 50 && left <= ms + 1000, `${rec.kind}: expiresAt is posedAt + its timeout (${left}ms)`);
+  }
+  seat.settleFloor(floor.id, { act: 'say', text: 'ok' });
+  seat.replyQuestion(question.id, 'the first one');
+  await Promise.all([turn, asked]);
+});
+
 test('the page script carries the floor card: three buttons, the reconciler carries typed words across renders', async () => {
   const { pageHtml } = await import('../src/page.js');
   const html = pageHtml({ charterName: 'cross-exam', token: 'tkn' });
@@ -261,4 +278,15 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   // card never came back (the reconciler saw nothing change)
   assert.match(script, /if \(r && r\.error\) \{ showWhy\(div, r\.error\); return; \}/);
   assert.match(script, /if \(wasF\.why\) showWhy\(div, wasF\.why\);/);
+  // made for a human: the seat widens while words are owed, the tab says
+  // so, each card counts down, Ctrl+Enter posts, the count names the
+  // forum's limits, and a rebuild keeps the cursor where the human left it
+  assert.match(script, /body\.classList\.toggle\('composing', floors\.length \+ questions\.length > 0\)/);
+  assert.match(script, /'● YOUR TURN — '/);
+  assert.match(script, /data-expires="' \+ esc\(x\.expiresAt\)/);
+  assert.match(script, /setInterval\(tickLeft, 1000\)/);
+  assert.match(script, /\(e\.ctrlKey \|\| e\.metaKey\) && e\.key === 'Enter'\) \{ e\.preventDefault\(\); send\('post'\);/);
+  assert.match(script, /post ≤ 8000 · pass ≤ 2000/);
+  assert.match(script, /if \(wasF\.focus\) \{ ta\.focus\(\); ta\.setSelectionRange/);
+  assert.match(html, /body\.composing main \{ grid-template-columns: 1\.25fr 0\.6fr 1\.55fr; \}/);
 });
