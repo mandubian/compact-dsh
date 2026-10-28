@@ -331,6 +331,66 @@ test('the seat and the page carry "keep the floor"; the human briefing says a po
   assert.match(brief, /A refused act always comes back on the card/);
 });
 
+test('a waiting floor card hears the abort: withdrawn at once, no act, not counted as silence', async () => {
+  // the live finding: every Ctrl-C after the first said "stopping
+  // IMMEDIATELY" and the run waited out the human's whole timeout — the
+  // card ignored the turn's cancel
+  const outcomes = [];
+  const seat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 600_000, onResolve: (r) => outcomes.push(seatOutcome(r)) });
+  const abort = new AbortController();
+  const turn = seat.poseFloor({ member: 'accuser', by: 'accuser', framing: 'Round 1 of 6, member "accuser".', signal: abort.signal });
+  assert.equal(seat.pending().length, 1);
+  abort.abort();
+  assert.deepEqual(await turn, { act: 'cancelled' });
+  assert.equal(seat.pending().length, 0, 'the card is gone from the page');
+  assert.deepEqual(outcomes, [{ timedOut: false, event: { type: 'floor-cancelled', by: 'accuser', member: 'accuser' } }]);
+  // an already-aborted signal never poses a card that waits
+  const late = new AbortController(); late.abort();
+  assert.deepEqual(await seat.poseFloor({ member: 'accuser', signal: late.signal }), { act: 'cancelled' });
+});
+
+test('the adapter hands its request signal to the floor: an aborted turn ends without an act', async () => {
+  const seat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 600_000 });
+  const adapter = humanMemberAdapter({ seat, topic: 'floor' });
+  const abort = new AbortController();
+  const p = collect(adapter.stream({ messages: MESSAGES('Round 2 of 6, member "accuser".'), signal: abort.signal }));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(seat.pending().length, 1, 'the card waits');
+  abort.abort();
+  const chunks = await p;
+  assert.deepEqual(chunks, [], 'no tool call, no words — the loop records the interruption');
+});
+
+test('a question hears its call\'s signal (dsh-tools: async work observes exec.signal)', async () => {
+  const outcomes = [];
+  const seat = mountHumanSeat(stubCtx(), { questionTimeoutMs: 300_000, onResolve: (r) => outcomes.push(seatOutcome(r)) });
+  const abort = new AbortController();
+  const asked = seat.tool.execute({ question: 'which first?' }, { agent: { id: 'chair' }, signal: abort.signal });
+  assert.equal(seat.pending().length, 1);
+  abort.abort();
+  assert.match(await asked, /withdrawn before the human answered/);
+  assert.equal(seat.pending().length, 0);
+  assert.deepEqual(outcomes, [{ timedOut: false, event: { type: 'question-cancelled', by: 'chair' } }]);
+});
+
+test('cancelPending withdraws every card: the ask DENIED (fail closed), the question and the turn unanswered', async () => {
+  const outcomes = [];
+  const seat = mountHumanSeat(stubCtx(), { askTimeoutMs: 600_000, questionTimeoutMs: 600_000, floorTimeoutMs: 600_000, onResolve: (r) => outcomes.push(seatOutcome(r)) });
+  const req = { agent: { id: 'skeptic' }, toolName: 'bash', reason: '[AG/fp] not covered\nhttps://example.com', fingerprint: 'fp_x' };
+  const ask = seat.answerer(req, () => Promise.resolve('unavailable'));
+  const question = seat.tool.execute({ question: 'which first?' }, { agent: { id: 'chair' } });
+  const turn = seat.poseFloor({ member: 'accuser', by: 'accuser', framing: 'x' });
+  const kinds = seat.pending().map((p) => p.kind).sort();
+  assert.deepEqual(kinds, ['ask', 'floor', 'question'], 'one card of each kind waits');
+  const n = seat.cancelPending('the operator stopped the run');
+  assert.equal(n, 3);
+  assert.equal(seat.pending().length, 0);
+  assert.deepEqual(await turn, { act: 'cancelled' });
+  assert.match(await question, /withdrawn/);
+  assert.equal(await ask, 'denied', 'a withdrawn ask fails closed');
+  assert.ok(outcomes.every((o) => o.timedOut === false), 'the operator\'s stop is never counted as the human\'s silence');
+});
+
 test('the page script carries the floor card: three buttons, the reconciler carries typed words across renders', async () => {
   const { pageHtml } = await import('../src/page.js');
   const html = pageHtml({ charterName: 'cross-exam', token: 'tkn' });

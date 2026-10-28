@@ -143,6 +143,9 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
         by: member,
         framing: framingOf(messages),
         lastResult: lastResultOf(messages),
+        // the loop's abort signal: an immediate stop cancels the turn, and
+        // the waiting card must hear it like a model's network call would
+        signal: options?.signal ?? null,
       });
       callSeq += 1;
       if (act.act === 'post' || act.act === 'pass') {
@@ -156,6 +159,15 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
         else endsTurn.set(member, id);
         note(`human member ${member ?? '?'} → ${name}${keep ? ', keeping the floor' : ''} (the page's button, carried as this member's own act)`);
         yield { type: 'tool-call-delta', index: 0, id, name, argumentsDelta: JSON.stringify(args) };
+        yield { type: 'finish', reason: { kind: 'stop' } };
+        return;
+      }
+      if (act.act === 'cancelled') {
+        note(`human member ${member ?? '?'} → turn withdrawn: the run is stopping (no act)`);
+        // an aborted request ends here — the loop records the interruption;
+        // a withdrawal without an abort still ends the turn in plain words
+        if (options?.signal?.aborted) return;
+        yield { type: 'text-delta', index: 0, text: '[the run is stopping — the Principal\'s turn was withdrawn before any act]' };
         yield { type: 'finish', reason: { kind: 'stop' } };
         return;
       }

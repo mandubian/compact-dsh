@@ -22,3 +22,13 @@ test('the observatory URL is persisted for recovery, then removed with the run',
   // and the boot line still says where it is — the SAY names the file
   assert.match(source, /the URL is kept at \$\{observatoryUrlFile\}/);
 });
+
+test('Ctrl-C can always stop the run: the second withdraws the human seat, the third exits', () => {
+  assert.match(source, /controls\.onStopNow\(\(\) => \{ const n = humanSeat\.cancelPending\(/);
+  assert.match(source, /\} else if \(signals === 2\) \{[\s\S]{0,400}controls\.stopNow\(\);/);
+  assert.match(source, /exiting NOW[\s\S]{0,200}process\.exit\(130\);/);
+  assert.match(source, /card\(s\) wait on the human seat \(\$\{kinds\}\) — answer on the page/);
+  // the reminder covers every kind that can hold a graceful drain — the approval too
+  assert.match(source, /const waiting = humanSeat\?\.pending\?\.\(\) \?\? \[\];/);
+  assert.match(source, /ask: 'an approval'/);
+});

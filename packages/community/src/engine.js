@@ -172,12 +172,20 @@ export function createRunControls() {
     paused: false,
     stopMode: null, // null | 'graceful' | 'now'
     _currentAgent: null,
+    _onStopNow: [],
     pause() { this.paused = true; },
     resume() { this.paused = false; },
     stop(mode = 'graceful') { this.stopMode = mode === 'now' ? 'now' : 'graceful'; },
     /** Immediate stop's teeth: cancel the turn in flight so `whenIdle`
      *  resolves now and drive() flushes what the record already holds. */
-    stopNow() { this.stop('now'); try { this._currentAgent?.cancel?.({ kind: 'user' }); } catch { /* already idle */ } },
+    stopNow() {
+      this.stop('now');
+      try { this._currentAgent?.cancel?.({ kind: 'user' }); } catch { /* already idle */ }
+      for (const hook of this._onStopNow) { try { hook(); } catch { /* a hook never blocks the stop */ } }
+    },
+    /** Run `hook` on every immediate stop — e.g. withdraw what waits on
+     *  the human, which no agent cancel reaches (a pending approval). */
+    onStopNow(hook) { this._onStopNow.push(hook); },
     state() { return { paused: this.paused, stopMode: this.stopMode }; },
   };
 }
@@ -371,6 +379,10 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
       }
     }
   }
+  // a stop that landed during the LAST turn is still the operator's stop:
+  // the per-turn check runs before a turn, so without this one the run
+  // recorded "rounds complete" for a run its operator had stopped
+  if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
   stats.endReason = 'rounds complete';
   return finish(stats, seated, hooks);
 }

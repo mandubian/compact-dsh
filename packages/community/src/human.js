@@ -48,11 +48,15 @@ let pendingSeq = 0;
  * chain"). */
 export function seatOutcome(record) {
   if (record?.kind === 'ask') {
+    // withdrawn because the run is stopping: denied (fail closed), and NOT
+    // the human's silence — the fence must not count the operator's stop
+    if (record.answer === 'cancelled') return { timedOut: false, event: { type: 'ask-cancelled', id: record.id } };
     const timedOut = record.answer === 'timeout';
     return { timedOut, event: timedOut ? { type: 'ask-timeout', id: record.id } : { type: 'ask-decided', id: record.id, decision: record.answer } };
   }
   if (record?.kind === 'floor') {
     const act = record.answer?.act ?? record.act;
+    if (act === 'cancelled') return { timedOut: false, event: { type: 'floor-cancelled', by: record.by, member: record.member } };
     const timedOut = act === 'timeout';
     return {
       timedOut,
@@ -61,6 +65,7 @@ export function seatOutcome(record) {
         : { type: 'floor-acted', id: record.id, act, by: record.by, member: record.member },
     };
   }
+  if (record?.cancelled) return { timedOut: false, event: { type: 'question-cancelled', by: record?.by } };
   const timedOut = record?.answer == null;
   return { timedOut, event: timedOut ? { type: 'question-timeout', by: record?.by } : { type: 'question-answered', by: record?.by } };
 }
@@ -153,6 +158,8 @@ export function mountHumanSeat(ctx, {
         clearTimeout(timer);
         resolve(answer === 'approve' ? 'allowed-once' : 'denied');
       };
+      // the run is stopping: the ask is withdrawn and DENIED (fail closed)
+      entry.cancel = (why) => settle(record.id, 'cancelled', why);
     });
   };
 
@@ -198,6 +205,19 @@ export function mountHumanSeat(ctx, {
           onResolve({ ...record, settled: true, answer: String(answer ?? '').slice(0, 4000), answeredBy: 'the human seat (page)', answeredAt: new Date().toISOString() });
           resolve(`[ask_human] The Principal answered:\n${String(answer ?? '').slice(0, 4000)}`);
         };
+        // withdrawn — the run is stopping, or this call was cancelled
+        // (dsh-tools: async work must observe exec.signal). Not an answer,
+        // and not the human's silence: the fence does not count it.
+        entry.cancel = (why) => {
+          if (!pending.has(record.id)) return;
+          clearTimeout(timer);
+          pending.delete(record.id);
+          onResolve({ ...record, settled: true, answer: null, cancelled: true, answeredBy: why ?? 'the run stopping', answeredAt: new Date().toISOString() });
+          resolve('[ask_human] The question was withdrawn before the human answered — the run is stopping. No answer.');
+        };
+        const signal = exec?.signal;
+        if (signal?.aborted) entry.cancel('the call was cancelled');
+        else signal?.addEventListener?.('abort', () => entry.cancel('the call was cancelled'), { once: true });
       });
     },
   });
@@ -209,7 +229,7 @@ export function mountHumanSeat(ctx, {
   // oversized post refuses HERE, at the boundary — never mid-turn. The
   // timeout is the honest silence: the member's turn performs no act, the
   // adapter says so in words, and the divergence counter counts it.
-  const poseFloor = ({ member = null, by = null, round = null, framing = '', lastResult = null }) => {
+  const poseFloor = ({ member = null, by = null, round = null, framing = '', lastResult = null, signal = null }) => {
     const record = pose({
       kind: 'floor',
       by,
@@ -234,6 +254,21 @@ export function mountHumanSeat(ctx, {
         clearTimeout(timer);
         resolve(act);
       };
+      // withdrawn — the turn was cancelled (an immediate stop aborts the
+      // model request's signal, and the page IS this member's model) or
+      // the run is stopping. No act, and not the human's silence. Before
+      // this, nothing could interrupt a waiting floor card: every Ctrl-C
+      // after the first said "stopping IMMEDIATELY" and the run waited
+      // out the human's whole timeout.
+      entry.cancel = (why) => {
+        if (!pending.has(record.id)) return;
+        clearTimeout(timer);
+        pending.delete(record.id);
+        onResolve({ ...record, settled: true, act: 'cancelled', answeredBy: why ?? 'the run stopping', answeredAt: new Date().toISOString() });
+        resolve({ act: 'cancelled' });
+      };
+      if (signal?.aborted) entry.cancel('the turn was cancelled');
+      else signal?.addEventListener?.('abort', () => entry.cancel('the turn was cancelled'), { once: true });
     });
   };
 
@@ -254,7 +289,15 @@ export function mountHumanSeat(ctx, {
     answerer,
     tool: askHuman,
     poseFloor,
-    pending: () => [...pending.values()].map((p) => ({ ...p, resolve: undefined })),
+    pending: () => [...pending.values()].map((p) => ({ ...p, resolve: undefined, cancel: undefined })),
+    /** The run is stopping NOW: withdraw every pending card — asks denied
+     * (fail closed), questions and floor turns unanswered — so no wait on
+     * the human outlives the operator's stop. Returns how many. */
+    cancelPending: (why = 'the operator stopped the run') => {
+      const open = [...pending.values()];
+      for (const entry of open) entry.cancel?.(why);
+      return open.length;
+    },
     settleAsk: (id, decision) => {
       const record = pending.get(id);
       if (!record || record.kind !== 'ask') return null;
