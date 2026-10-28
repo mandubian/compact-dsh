@@ -244,6 +244,31 @@ function post(listId, html, { empty = false, cls = '' } = {}) {
 }
 
 let lastPendingSig = null;
+// what the forum pane already shows, by post id: the stream and the poll
+// both deliver posts, and a reconnect replays — each post renders once,
+// in its place (newest first, by its number)
+const shownPosts = new Set();
+const postNo = (id) => Number(/^fp_(\d+)$/.exec(String(id ?? ''))?.[1] ?? NaN);
+function showPost(p) {
+  if (p.id != null) { if (shownPosts.has(p.id)) return; shownPosts.add(p.id); }
+  const block = postBlock({ id: p.id, by: p.by, topic: p.topic, text: p.text, at: p.at });
+  const ul = $('forum-list');
+  const emptyNote = ul.querySelector('.empty');
+  if (emptyNote) emptyNote.remove();
+  const li = document.createElement('li');
+  li.className = block.cls;
+  li.innerHTML = block.html;
+  const n = postNo(p.id);
+  if (Number.isFinite(n)) li.dataset.n = String(n);
+  const after = Number.isFinite(n) ? [...ul.children].find((x) => Number(x.dataset.n) < n) : null;
+  if (after) ul.insertBefore(li, after); else if (Number.isFinite(n) && ul.children.length && ul.lastChild.dataset.n) ul.appendChild(li); else ul.prepend(li);
+  while (ul.children.length > 200) ul.removeChild(ul.lastChild);
+}
+// the poll's safety net: whatever the forum holds that the pane does not
+// show is placed now — a stalled stream can delay the page, never hide a post
+function reconcileForum(forum) {
+  for (const p of forum?.posts ?? []) showPost(p);
+}
 const showWhy = (div, reason) => {
   let why = div.querySelector('.why');
   if (!why) { why = document.createElement('div'); why.className = 'why head'; div.appendChild(why); }
@@ -329,7 +354,7 @@ function renderPending(p) {
     const ta = div.querySelector('textarea');
     const reply = () => {
       if (!ta.value.trim()) return;
-      api('/reply/' + encodeURIComponent(q.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ text: ta.value }) }).then(() => div.remove()).catch(() => {});
+      api('/reply/' + encodeURIComponent(q.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ text: ta.value }) }).then(() => { div.remove(); setTimeout(refreshState, 300); }).catch(() => {});
     };
     div.querySelector('button').onclick = reply;
     ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); reply(); } };
@@ -396,6 +421,7 @@ function renderPending(p) {
         // here never came back (the reconciler saw nothing change)
         if (r && r.error) { showWhy(div, r.error); return; }
         div.remove();
+        setTimeout(refreshState, 300); // the post is on the forum: show it now, not at the next poll
       }).catch(() => {});
     };
     div.querySelector('.approve').onclick = () => send('post');
@@ -439,19 +465,39 @@ function renderBanner(controls) {
   else b.style.display = 'none';
 }
 
-const es = new EventSource('/' + token + '/events');
-es.onopen = () => { $('conn').textContent = 'live'; $('conn').className = 'live'; };
-es.onerror = () => { $('conn').textContent = 'reconnecting…'; $('conn').className = 'dead'; };
-es.onmessage = (m) => {
+// the stream, watched: every event carries a sequence number (seen ones
+// are skipped, so a replay never doubles a line), the server pings every
+// 15s, and a stream silent for 45s is replaced — resuming after the last
+// event seen. A tunnel that silently drops the stream can no longer
+// freeze the page: it says "reconnecting…" and catches up by itself.
+let es = null;
+let lastSeq = 0;
+let lastHeard = Date.now();
+const STREAM_SILENCE_MS = 45000;
+function connect() {
+  es = new EventSource('/' + token + '/events' + (lastSeq > 0 ? '?since=' + lastSeq : ''));
+  es.onopen = () => { lastHeard = Date.now(); $('conn').textContent = 'live'; $('conn').className = 'live'; };
+  es.onerror = () => { $('conn').textContent = 'reconnecting…'; $('conn').className = 'dead'; };
+  es.addEventListener('ping', () => { lastHeard = Date.now(); });
+  es.onmessage = onEvent;
+}
+setInterval(() => {
+  if (Date.now() - lastHeard < STREAM_SILENCE_MS) return;
+  try { es.close(); } catch { /* already closed */ }
+  $('conn').textContent = 'reconnecting…'; $('conn').className = 'dead';
+  lastHeard = Date.now();
+  connect();
+}, 5000);
+function onEvent(m) {
+  lastHeard = Date.now();
   let e; try { e = JSON.parse(m.data); } catch { return; }
+  if (e.seq != null) { if (e.seq <= lastSeq) return; lastSeq = e.seq; }
   const at = '<span class="at">' + esc(stamp(e.at).slice(11, 19)) + '</span> ';
   switch (e.type) {
     case 'hello': break;
-    case 'forum-post': {
-      const block = postBlock({ id: e.id, by: e.by, topic: e.topic, text: e.text, at: e.at });
-      post('forum-list', block.html, { cls: block.cls });
+    case 'forum-post':
+      showPost(e);
       break;
-    }
     case 'forum-pass':
       post('acts-list', at + '<span class="who">' + esc(e.by ?? '?') + '</span> passed — not a post: ' + esc(e.reason));
       break;
@@ -530,12 +576,15 @@ es.onmessage = (m) => {
       break;
     default: break;
   }
-};
+}
+connect();
 
-// poll the seat's pending (SSE announces; the poll is the reconciler — a
-// page opened mid-ask sees it without waiting for an event)
-setInterval(() => api('/state').then(s => { renderPending(s.pending || []); renderBanner(s.controls); }).catch(() => {}), 4000);
-api('/state').then(s => { renderPending(s.pending || []); renderBanner(s.controls); }).catch(() => {});
+// poll the seat's pending and the forum (SSE announces; the poll is the
+// reconciler — a page opened mid-ask sees it without waiting for an event,
+// and a post the stream missed still lands)
+const refreshState = () => api('/state').then(s => { renderPending(s.pending || []); renderBanner(s.controls); reconcileForum(s.forum); }).catch(() => {});
+setInterval(refreshState, 4000);
+refreshState();
 </script>
 </body>
 </html>

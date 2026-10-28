@@ -411,6 +411,16 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   // a post ends the turn; keeping the floor is the explicit second button,
   // and a card that comes back leads with the result, the briefing folded
   assert.match(script, /Post &amp; end turn/);
+  // the stream is watched and resumable, and the poll is the forum's safety
+  // net: a stalled stream (an SSH tunnel, a sleeping laptop) can delay the
+  // page, never freeze it (the live cross-exam finding)
+  assert.match(script, /es\.addEventListener\('ping', \(\) => \{ lastHeard = Date\.now\(\); \}\);/);
+  assert.match(script, /if \(Date\.now\(\) - lastHeard < STREAM_SILENCE_MS\) return;/);
+  assert.match(script, /'\?since=' \+ lastSeq/);
+  assert.match(script, /if \(e\.seq != null\) \{ if \(e\.seq <= lastSeq\) return; lastSeq = e\.seq; \}/);
+  assert.match(script, /if \(shownPosts\.has\(p\.id\)\) return;/);
+  assert.match(script, /reconcileForum\(s\.forum\)/);
+  assert.match(script, /setTimeout\(refreshState, 300\); \/\/ the post is on the forum/);
   assert.match(script, /div\.querySelector\('\.keep'\)\.onclick = \(\) => send\('post', true\);/);
   assert.match(script, /keep: keep === true/);
   assert.match(script, /'<details class="told"' \+ \(f\.lastResult \? '' : ' open'\)/);

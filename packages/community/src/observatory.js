@@ -40,6 +40,11 @@ export function startObservatory(ctx, {
   provenance = null,
   law = null,
   feed = null,
+  // the stream's heartbeat: a page's event stream must never go quiet,
+  // or a tunnel, proxy or sleeping laptop can drop it without either end
+  // noticing — the page then froze until a manual reload (the live
+  // cross-exam finding, through an SSH port forward)
+  heartbeatMs = 15_000,
 }) {
   if (host !== '127.0.0.1' && host !== 'localhost') {
     throw new Error(`observatory: refusing to bind ${host} — the page is loopback-only by design (a network-bound observatory is a network service this composition never declared)`);
@@ -49,11 +54,14 @@ export function startObservatory(ctx, {
   const history = []; // replay buffer for reconnects, bounded
   const HISTORY_CAP = 500;
 
+  let seq = 0;
+  const frameOf = (row) => `id: ${row.seq}\ndata: ${JSON.stringify(row)}\n\n`;
   const publish = (event) => {
-    const row = { at: new Date().toISOString(), ...event };
+    // seq: the page's dedupe key, and the SSE id a reconnect resumes after
+    const row = { at: new Date().toISOString(), ...event, seq: ++seq };
     history.push(row);
     if (history.length > HISTORY_CAP) history.splice(0, history.length - HISTORY_CAP);
-    const frame = `data: ${JSON.stringify(row)}\n\n`;
+    const frame = frameOf(row);
     for (const res of clients) {
       try { res.write(frame); } catch { /* a dead client prunes on close */ }
     }
@@ -61,6 +69,15 @@ export function startObservatory(ctx, {
   };
 
   if (feed) for (const event of feed.initial ?? []) publish(event);
+
+  // the heartbeat: a named event the page's watchdog listens for (a plain
+  // SSE comment would be invisible to it). Unref'd: it never holds a run.
+  const heartbeat = heartbeatMs > 0 ? setInterval(() => {
+    for (const res of clients) {
+      try { res.write(`event: ping\ndata: {}\n\n`); } catch { /* a dead client prunes on close */ }
+    }
+  }, heartbeatMs) : null;
+  heartbeat?.unref?.();
 
   const json = (res, status, body) => {
     res.writeHead(status, { 'content-type': 'application/json' });
@@ -95,8 +112,13 @@ export function startObservatory(ctx, {
         connection: 'keep-alive',
       });
       // the replay: a page that reconnects sees what it missed — the
-      // observatory's memory is the feed, bounded and stated
-      for (const row of history.slice(-100)) res.write(`data: ${JSON.stringify(row)}\n\n`);
+      // observatory's memory is the feed, bounded and stated. A page that
+      // says what it already has (the browser's Last-Event-ID on its own
+      // reconnect, or ?since= on the page's watchdog reconnect) gets only
+      // what came after; a fresh page gets the last 100.
+      const after = Number(req.headers['last-event-id'] ?? url.searchParams.get('since'));
+      const replay = Number.isFinite(after) && after > 0 ? history.filter((row) => row.seq > after) : history.slice(-100);
+      for (const row of replay) res.write(frameOf(row));
       res.write(`data: ${JSON.stringify({ at: new Date().toISOString(), type: 'hello', clients: clients.size + 1 })}\n\n`);
       clients.add(res);
       req.on('close', () => clients.delete(res));
@@ -190,6 +212,7 @@ export function startObservatory(ctx, {
         // open connection, and a page's event stream never ends on its own
         // — with a tab open, a finished run sat forever at its close
         close: () => new Promise((r) => {
+          if (heartbeat) clearInterval(heartbeat);
           for (const res of clients) { try { res.end(); } catch { /* already gone */ } }
           clients.clear();
           server.close(() => r());
