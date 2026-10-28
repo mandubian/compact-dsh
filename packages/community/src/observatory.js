@@ -186,7 +186,15 @@ export function startObservatory(ctx, {
         server,
         url,
         publish,
-        close: () => new Promise((r) => server.close(() => r())),
+        // close ENDS the live feeds first: server.close() waits for every
+        // open connection, and a page's event stream never ends on its own
+        // — with a tab open, a finished run sat forever at its close
+        close: () => new Promise((r) => {
+          for (const res of clients) { try { res.end(); } catch { /* already gone */ } }
+          clients.clear();
+          server.close(() => r());
+          server.closeIdleConnections?.();
+        }),
       });
     });
   });

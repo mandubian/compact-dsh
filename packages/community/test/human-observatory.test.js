@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import http from 'node:http';
 
 import { mountHumanSeat, startObservatory } from '../src/index.js';
 import { validateCharter } from '../src/charter.js';
@@ -406,4 +407,18 @@ test('the live page resolves clause citations in place — the law in force this
   const bare = pageHtml({ charterName: 'x', token: 'tkn' });
   assert.doesNotMatch(bare, /const LAW = \{/);
   assert.match(bare, /const LAW = null/, 'no law passed: the constant is an honest null');
+});
+
+test('closing the observatory ends its live feeds — an open tab cannot hold a finished run', async () => {
+  // server.close() waits for every connection, and an event stream never
+  // ends on its own: with a tab open, the launcher sat forever at its close
+  const seat = mountHumanSeat(stubCtx());
+  const obs = await startObservatory(stubCtx(), { humanSeat: seat, port: 0, charterName: 'c' });
+  const ended = new Promise((resolve) => {
+    http.get(`${obs.url}events`, (res) => { res.on('data', () => {}); res.on('end', resolve); res.on('close', resolve); });
+  });
+  await new Promise((r) => setTimeout(r, 50)); // the feed is open
+  const closed = await Promise.race([obs.close().then(() => 'closed'), new Promise((r) => setTimeout(() => r('STILL OPEN after 2s'), 2000))]);
+  assert.equal(closed, 'closed');
+  await ended;
 });

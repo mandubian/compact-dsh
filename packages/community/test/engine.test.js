@@ -238,3 +238,31 @@ test('engine bench blind spot: the hand reaches the bench loop — stop mid-wake
   assert.equal(wakes, 10, 'the stop landed inside the bench loop, not after it');
   assert.equal(stats.casesSeen, 10);
 });
+
+test('stopNow runs its hooks — what no agent cancel reaches (the human seat) is withdrawn too', () => {
+  const c = createRunControls();
+  let cancelled = 0; let hooked = 0;
+  c._currentAgent = { cancel: () => { cancelled += 1; } };
+  c.onStopNow(() => { hooked += 1; });
+  c.onStopNow(() => { throw new Error('a failing hook'); });
+  c.onStopNow(() => { hooked += 1; });
+  c.stopNow();
+  assert.equal(c.stopMode, 'now');
+  assert.equal(cancelled, 1);
+  assert.equal(hooked, 2, 'every hook runs; a throwing one blocks nothing');
+});
+
+test('a stop during the LAST turn is recorded as the stop, not as "rounds complete"', async () => {
+  const ctx = fakeCtx({ turnMs: 300 });
+  const controls = createRunControls();
+  const charter = validateCharter({
+    name: 'last-turn', goal: 'a goal long enough to matter for this run of the fake loop',
+    budgets: { rounds: 1, maxTurnsPerAgent: 2, wallClockMinutes: 5, tokenCap: 100000 },
+    members: [{ id: 'alpha', persona: 'works in turns, speaks when it has something' }],
+  });
+  const run = runCommunity(ctx, { charter, workspace: '/w', controls });
+  await sleep(100); // the only turn of the only round is in flight
+  controls.stop('graceful');
+  const stats = await run;
+  assert.equal(stats.endReason, 'stopped by the operator (graceful)');
+});
