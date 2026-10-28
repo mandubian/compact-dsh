@@ -38,6 +38,7 @@ test('the seat claims what would fail closed and poses it; the page approves; th
   const ctx = stubCtx();
   const seat = mountHumanSeat(ctx, { askTimeoutMs: 60_000 });
   let passedThrough = false;
+  const before = Date.now();
   const decision = seat.answerer(REQ(), () => { passedThrough = true; return Promise.resolve('unavailable'); });
   assert.equal(passedThrough, false, 'a novel ask is CLAIMED, not passed to the void');
   const pending = seat.pending();
@@ -45,6 +46,10 @@ test('the seat claims what would fail closed and poses it; the page approves; th
   assert.equal(pending[0].kind, 'ask');
   assert.match(pending[0].detail, /releases\.internal/);
   assert.match(pending[0].wouldOtherwise, /fail closed/);
+  // the page counts down to the fail-closed timeout (#287): the ask
+  // carries its expiry, posing time + askTimeoutMs
+  const left = Date.parse(pending[0].expiresAt) - before;
+  assert.ok(left >= 60_000 && left <= 61_000, `the ask carries its expiry (${left}ms after posing)`);
   // the page's button
   const settled = seat.settleAsk(pending[0].id, 'approve');
   assert.ok(settled);

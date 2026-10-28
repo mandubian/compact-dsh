@@ -245,6 +245,8 @@ test('the framing survives a notice after it: a LoopGuard trip leaves the member
 });
 
 test('every pending card carries its expiry — the page counts down to the honest silence', async () => {
+  // floor turns and questions here; the approval ask's expiry is asserted
+  // where the ask door is driven (human-observatory.test.js)
   const seat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 600_000, questionTimeoutMs: 300_000 });
   const before = Date.now();
   const turn = seat.poseFloor({ member: 'accuser', by: 'accuser', framing: 'Round 1 of 6, member "accuser".' });
