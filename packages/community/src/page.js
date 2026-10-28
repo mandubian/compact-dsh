@@ -381,7 +381,7 @@ es.onmessage = (m) => {
       post('acts-list', at + '⏱ a question timed out — the honest no-answer');
       break;
     case 'floor-posed':
-      post('acts-list', at + '🗣 <span class="who">' + esc(e.member ?? '?') + '</span> — a HUMAN member\'s turn waits on the floor card');
+      post('acts-list', at + '🗣 <span class="who">' + esc(e.member ?? '?') + '</span> — a HUMAN member\\'s turn waits on the floor card');
       break;
     case 'floor-acted':
       post('acts-list', at + '✓ <span class="who">' + esc(e.member ?? e.by ?? 'the human member') + '</span> ' +
