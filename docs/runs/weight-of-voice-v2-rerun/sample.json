@@ -1,4 +1,8 @@
 {
-  "label": "weight-of-voice-v2 · re-run",
-  "provenance": "Misrecorded: run.json names 90bccdc, but the compact-dsh-* plugins (LoopGuard included) loaded from another checkout at 4d2cd4f, which predates #273. See the account."
+  "label": "weight-of-voice-v2 \u00b7 re-run",
+  "provenance": "Misrecorded: run.json names 90bccdc, but the compact-dsh-* plugins (LoopGuard included) loaded from another checkout at 4d2cd4f, which predates #273. See the account.",
+  "archived": {
+    "supersededBy": "weight-of-voice-v2-dc550f",
+    "why": "The first complete court arc and the bench's referral \u2014 but one answer lost to the old LoopGuard, and its plugin provenance misrecorded. Superseded by the run on the fixed guard that met the gate (dc550f)."
+  }
 }
