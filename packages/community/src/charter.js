@@ -200,9 +200,18 @@ export function validateCharter(doc) {
     };
   }
 
+  // the voice the members are briefed in. Absent: the original briefing,
+  // unchanged. "plain": the work is talked about in the problem's own words
+  // and the law is cited by clause id, never narrated — the law keeps its
+  // register on its own surfaces (refusals, rulings, the register)
+  if (doc.voice !== undefined && doc.voice !== 'plain') {
+    throw bad('voice', '"plain" or absent — absent keeps the original briefing');
+  }
+
   return {
     version: CHARTER_VERSION,
     name, goal: doc.goal.trim(), topic,
+    ...(doc.voice === 'plain' ? { voice: 'plain' } : {}),
     budgets,
     members,
     grants,

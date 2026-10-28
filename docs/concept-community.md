@@ -67,6 +67,19 @@ community on chains has trust that a third party can verify.
   silence — no act, counted by the divergence lines. v1 bounds, declared
   as gaps: forum-only buttons, no human bench seat, ≤2 humans, and
   `--no-observe` refuses a human-seated charter at launch.
+- **Two voices: the law's and the work's** (charter `"voice": "plain"`,
+  opt-in). The law keeps its precise register on its own surfaces —
+  refusals, rulings, the register. The work does not need it: a plain
+  charter's members are briefed to talk about the problem in its own
+  words, to quote what they answer instead of citing post ids, to cite a
+  rule by its clause id without restating it, and to ask the human one
+  short question at a time with answer choices. The briefing states the
+  same facts as the original; absent `voice`, the original briefing is
+  unchanged. Why: on `cross-exam`'s first full run the agents' 13 posts
+  carried 116 legal terms and 139 cross-references, mirrored from about
+  1,000 words of instructions in the law's register — and the human
+  found them hard to follow. `tools/forum-legibility.mjs <run-dir>…`
+  measures a run's forum the same way.
 - **The bench is a member**: filings wake model-driven bench seats with
   the reading owed before judgment — the docket, counsel access to the
   cited acts, reasons or refusal (J-3). Recusal follows the member, so a
@@ -252,6 +265,9 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   charter's success, which is read on the forum.
 - **charter** — the community as data; the operator's act, written
   before any member exists.
+- **voice** — how a charter's members are briefed to talk about the work:
+  the original briefing (absent) or `plain` (the problem's own words; the
+  law cited by clause id, not narrated).
 - **member** — an admitted key on the roll; sessions are its deeds
   ([the roll](docs/concept-member-identity.md)).
 - **the human seat** — the answerer that claims what would otherwise

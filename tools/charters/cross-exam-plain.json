@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "name": "cross-exam-plain",
+  "voice": "plain",
+  "goal": "One human and three AI agents review a small money module, sources/purse.js, which nobody may change. The human says, in their own words, what looks wrong. The agents turn each concern into a short shell command that shows what the code really does, post the command with its output, and run each other's commands again before trusting them. When the evidence is in, the chair posts a summary that starts with 'VERDICTS:' and says, for each of the human's concerns, CONFIRMED or REJECTED, with the command and output that show it. The review is done when that summary is posted and the human has answered it in their own post, item by item: agree, or disagree and why.",
+  "topic": "purse-review",
+  "briefingExtra": "THE HUMAN raises concerns in everyday words — that is expected; turning them into exact tests is the agents' job. When you need the human's view, ask one short question with two or three answer choices; the answer comes back only to you. THE CODE DOES NOT CHANGE: write tests against sources/purse.js, never edits. package.json {\"type\":\"module\"} is already there, so `node --input-type=module -e 'import { cents } from \"./sources/purse.js\"; console.log(cents(\"1.005\"))'` works as written. Always post a command together with its output. THE HUMAN HAS THE LAST WORD: the review is done only when the human answers the VERDICTS summary in their own forum post. Post the summary, then wait for their turn — do not ask for that answer with ask_human (a private answer does not reach the forum). If the human disagrees with an item, write the disagreement down as it is.",
+  "budgets": {
+    "rounds": 6,
+    "maxTurnsPerAgent": 6,
+    "wallClockMinutes": 90,
+    "tokenCap": 1500000
+  },
+  "members": [
+    {
+      "id": "accuser",
+      "prefix": "community-accuser",
+      "human": true,
+      "persona": "the human: says what looks wrong in plain words, answers the agents' questions, and at the end says, item by item, whether they agree with the chair's summary"
+    },
+    {
+      "id": "defender",
+      "prefix": "community-defender",
+      "model": "zai/glm-5.3-flash",
+      "persona": "speaks for the code: turns each concern into an exact test, points out tests that prove less than they claim, explains what the code was probably meant to do — and says plainly when the code is wrong"
+    },
+    {
+      "id": "skeptic",
+      "prefix": "community-skeptic",
+      "model": "zai/glm-5.3-flash",
+      "persona": "double-checks everyone: tries edge cases and boundary values, compares what an output shows with what someone says it shows — and looks for problems nobody raised"
+    },
+    {
+      "id": "chair",
+      "prefix": "community-chair",
+      "model": "zai/glm-5.3",
+      "persona": "keeps the review fair: for each concern, finds the strongest test for and against, and writes the VERDICTS summary citing only commands that were actually run"
+    }
+  ],
+  "grants": [],
+  "sources": [
+    {
+      "path": "package.json",
+      "content": "{\n  \"type\": \"module\"\n}\n"
+    },
+    {
+      "path": "sources/purse.js",
+      "content": "// purse.js — a tiny money purse: parsing, arithmetic, splitting.\n// Amounts are integer cents internally. v1, as shipped.\n\n/** Parse a decimal money string (\"12.34\", \"-0.01\") into integer cents. */\nexport function cents(text) {\n  return Math.round(parseFloat(text) * 100);\n}\n\n/** Subtract b from a. The purse is spend-first: no overdraft check is v1's documented stance. */\nexport function take(a, b) {\n  return a - b;\n}\n\n/** Split total into n equal parts, each a whole number of cents. */\nexport function split(total, n) {\n  const each = Math.floor(total / n);\n  return Array.from({ length: n }, () => each);\n}\n\n/** Render integer cents as a decimal string with two places. */\nexport function display(c) {\n  return (c / 100).toFixed(2);\n}\n"
+    },
+    {
+      "path": "sources/concerns.md",
+      "content": "# The list of concerns starts empty — the human fills it\n\n`sources/purse.js` does not change during the review. The concerns are whatever the human raises on the forum, in their own words.\n\nHow the human raises a concern (their own posts, from the page):\n\n- one concern per post, numbered as they go (`C1: …`, `C2: …`);\n- everyday words are fine — \"I think the parser accepts things that are not money\" is a concern; the agents owe it the shortest command that shows what the code actually does;\n- the human may drop or sharpen a concern at any time, on the forum.\n\nWhat the agents owe every concern: the shortest shell command that shows the behaviour, posted with its real output, and run again by another agent before anyone relies on it. A problem the agents find that the human did not raise is worth recording too — marked as found by the team, not raised by the human.\n\nDone means: the chair's `VERDICTS:` post gives CONFIRMED or REJECTED for each concern, with the command behind each, and the human answers it item by item in their own post. Where they disagree, the record says so plainly instead of pretending everyone agrees.\n"
+    }
+  ],
+  "escalation": {
+    "floorTimeoutMs": 900000,
+    "questionTimeoutMs": 900000
+  },
+  "divergence": {
+    "loopguardTrips": 7,
+    "humanSeatTimeouts": 4
+  }
+}

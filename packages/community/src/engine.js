@@ -40,6 +40,7 @@ export function currentSelectionOf(ctx) {
  *  share of what "under the law" means to a model — every claim in it is
  *  machinery that actually exists. */
 export function briefingText(charter, member, extras) {
+  if (charter.voice === 'plain') return plainBriefingText(charter, member, extras);
   const roster = charter.members.map((m) => `  - ${m.id}${m.bench ? ' (bench seat)' : ''}${m.human ? ' (HUMAN — the Principal, on the page)' : ''} — ${m.persona}`).join('\n');
   const lines = [
     `You are "${member.id}", a Member of a small autonomous community working under the Compact.`,
@@ -137,7 +138,99 @@ export function roundFramingText(charter, member, round, newPosts, docketNews) {
     lines.push('', 'THE DOCKET MOVED:');
     for (const c of docketNews) lines.push(`  - ${c}`);
   }
-  lines.push('', 'Act, speak, verify — or pass plainly with forum_pass {"reason":"…"}.');
+  lines.push('', charter.voice === 'plain'
+    ? (member.human ? 'Your turn: post, pass with a reason, or say something for your own record.' : 'Your turn: check something and post what you found, or pass with a reason (forum_pass {"reason":"…"}).')
+    : 'Act, speak, verify — or pass plainly with forum_pass {"reason":"…"}.');
+  return lines.join('\n');
+}
+
+/** The briefing in the plain voice (charter "voice": "plain"): the same
+ *  facts as briefingText — the tools, the sandbox, refusals and their next
+ *  steps, the record, the court, petition, the known hosts — told in the
+ *  problem's own words. The law is a short reference list with clause ids;
+ *  the work is never described in legal terms. Two shapes the floor reads
+ *  stay as they are: the first line opens `You are "<id>"`, and the round
+ *  framing names `member "<id>"`. */
+export function plainBriefingText(charter, member, extras) {
+  const humanSeated = charter.members.some((m) => m.human);
+  const roster = charter.members.map((m) => `  - ${m.id}${m.bench ? ' (judge)' : ''}${m.human ? ' (the human, on the web page)' : ''} — ${m.persona}`).join('\n');
+  const lines = [
+    member.human
+      ? `You are "${member.id}", the human on this team. The other members are AI agents.`
+      : `You are "${member.id}", one member of a small team working on one problem together.`,
+    '',
+    'THE PROBLEM (the team\'s own words):',
+    `  ${charter.goal}`,
+    '',
+    'THE TEAM:',
+    roster,
+    '',
+  ];
+  if (member.human) {
+    lines.push(
+      'YOUR TURN is a card on the page, with these buttons:',
+      '  - Post & end turn: your words go on the forum, under your name.',
+      '  - Pass: you skip this turn; your words are the reason.',
+      '  - Say & end turn: your words go on your own record only, not the forum.',
+      '  - post & keep the floor: post, then the card comes back so you can post again.',
+      '  If something is refused, the card comes back with the reason. If you do not answer in time,',
+      '  the turn is recorded as silence — nothing is done in your name.',
+      'Members may also ask you a question; your answer goes back only to the one who asked.',
+      'Everything you do is recorded under your name. Say what you mean; never claim what you did not do.',
+    );
+  } else {
+    lines.push(
+      'HOW TO TALK — in the problem\'s own words:',
+      '  - Talk about the problem in its own terms. Do not describe your work in legal language.',
+      '  - Keep posts short: what you checked, the command, its output, what it means — in that order.',
+      '  - When you answer someone, quote the sentence you answer ("you said: …"), not only a post id.',
+      '  - When a rule matters, name it by its clause id and say in one sentence what it means here.',
+      '    Do not restate the law.',
+    );
+    if (humanSeated) {
+      lines.push(
+        '  - To the human: one question at a time, three short sentences at most, with two or three short',
+        '    answer choices. No code unless they ask. Quote what you refer to.',
+      );
+    }
+    lines.push(
+      '',
+      'HOW TO ACT:',
+      `  - forum_post {"topic":"${charter.topic}","text":"…"} posts to everyone. forum_pass {"reason":"…"} skips`,
+      '    your turn with a reason (it is not a post). forum_read reads the forum (no topic: the list of topics).',
+      '  - Shell commands run in a sandbox; network access needs a grant. If something is refused, the message',
+      '    says which rule and what you can do instead — read it; do not retry the same thing.',
+      '  - Write real bash. A code fragment that is not a command is refused. If bash cannot do it, say so.',
+    );
+    if (humanSeated) lines.push('  - ask_human asks the human a question privately; the answer comes back only to you.');
+  }
+  lines.push(
+    '',
+    'THE RULES THAT BIND YOU (a reference — law_read has the full text, self_describe your budgets and status):',
+    '  - Everything you do is recorded under your name and can be checked later. Never claim what you did',
+    '    not do, never sign as someone else, and say plainly when you did nothing.',
+    '  - If a member wrongs you or the record, judicature_hear opens a case; a member seated as judge decides.',
+    '  - petition is how anyone contests a rule itself; nobody can block it.',
+    '  - The only hosts that exist are the ones named here; an address in a source file is history, not a',
+    '    place to fetch.',
+  );
+  if (extras?.publish) lines.push('', `PUBLISHING: ${extras.publish}`);
+  if (member.human) {
+    lines.push('', `YOUR SEAT: ${HUMAN_ROUTE.provider}/${HUMAN_ROUTE.model} — the page stands where a model would. The run's record names it.`);
+  } else if (member.model) {
+    lines.push('', `YOUR MODEL: ${member.model.provider}/${member.model.model}, chosen by the charter. The run's record names it.`);
+  }
+  if (extras?.resumed) {
+    lines.push('',
+      'THIS RUN CONTINUES AN EARLIER ONE: the forum\'s earlier posts are there to read — forum_read (no topic)',
+      '  lists the topics; forum_read {"topic":"…","since":0} reads one in full. You are the same member, in a',
+      '  new session. Read before you post: the conversation continues; it does not start over.');
+  }
+  lines.push(
+    '',
+    `THIS RUN: ${charter.budgets.rounds} rounds; ${member.human ? 'you get' : 'you take'} one turn per round. The budgets are enforced.`,
+  );
+  if (charter.briefingExtra) lines.push('', charter.briefingExtra);
   return lines.join('\n');
 }
 
