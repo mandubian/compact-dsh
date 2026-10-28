@@ -223,6 +223,11 @@ test('the code the community ran on is named: commit, repo, dirty — or the hon
   const dirty = render(mk({ commit: 'deadbeefdead', dirty: true }));
   assert.match(dirty.els.get('prov').textContent, /deadbeefdead \(DIRTY TREE\)/);
 
+  // the 0e3fa8 finding: the commit is clean, the plugins came from elsewhere
+  const foreign = render(mk({ commit: '90bccdcfcdf5', foreignPackages: [{ name: 'compact-dsh-loopguard', path: '/other/checkout' }] }));
+  assert.match(foreign.els.get('prov').textContent, /90bccdcfcdf5 \(FOREIGN PACKAGES ×1 — loaded from outside the checkout\)/);
+  assert.doesNotMatch(clean.els.get('prov').textContent, /FOREIGN/);
+
   const notGit = render(mk({ note: 'not a git checkout (or git absent) — the code state is not named' }));
   assert.match(notGit.els.get('prov').textContent, /not a git checkout/);
 

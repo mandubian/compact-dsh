@@ -512,6 +512,7 @@ $('meta').textContent = (r.charter || '${safeName}') + ' · run ' + (r.runTag ??
 if (r.code && r.code.commit) {
   $('prov').textContent = 'code: ' + (r.code.repo ? String(r.code.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '') +
     String(r.code.commit).slice(0, 12) + (r.code.dirty ? ' (DIRTY TREE)' : '') +
+    (r.code.foreignPackages && r.code.foreignPackages.length ? ' (FOREIGN PACKAGES ×' + r.code.foreignPackages.length + ' — loaded from outside the checkout)' : '') +
     (r.runtime ? ' · law ' + String(r.runtime.law ?? '').slice(0, 12) + '… · ' + String(r.runtime.image ?? '') + ' · node ' + String(r.runtime.node ?? '') : '');
 } else if (r.code && r.code.note) {
   $('prov').textContent = 'code: ' + r.code.note;

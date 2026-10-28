@@ -75,7 +75,7 @@ export function samplesRows(docsDir = join(ROOT, 'docs')) {
       loopguard: data.timeline.filter((e) => e.type === 'notice' && /LoopGuard/.test(String(e.text ?? ''))).length,
       actOutcomes: data.actOutcomes === true,
       chains: existsSync(chainsDir) ? readdirSync(chainsDir).filter((f) => f.endsWith('.chain')).length : 0,
-      code: run.code?.commit ? { commit: String(run.code.commit).slice(0, 7), dirty: run.code.dirty === true } : null,
+      code: run.code?.commit ? { commit: String(run.code.commit).slice(0, 7), dirty: run.code.dirty === true, foreign: run.code.foreignPackages?.length ?? 0 } : null,
     });
   }
   return rows.sort((a, b) => String(a.endedAt).localeCompare(String(b.endedAt)));
@@ -104,7 +104,7 @@ export function renderSamplesTable(rows) {
     const ships = [
       r.actOutcomes ? 'act outcomes' : '<span class="muted">no act outcomes</span>',
       r.chains ? `${r.chains} signed chains` : '<span class="muted">no chains</span>',
-      r.code ? `code <code>${esc(r.code.commit)}</code>${r.code.dirty ? ' <span class="warn">dirty</span>' : ''}${r.provenanceNote ? ` <span class="warn" title="${esc(r.provenanceNote)}">misrecorded</span>` : ''}` : '<span class="muted">no code commit</span>',
+      r.code ? `code <code>${esc(r.code.commit)}</code>${r.code.dirty ? ' <span class="warn">dirty</span>' : ''}${r.code.foreign ? ` <span class="warn">${r.code.foreign} foreign</span>` : ''}${r.provenanceNote ? ` <span class="warn" title="${esc(r.provenanceNote)}">misrecorded</span>` : ''}` : '<span class="muted">no code commit</span>',
     ].join('<br>');
     L.push('<tr>' +
       `<td><a href="${esc(r.href)}" target="_blank" rel="noreferrer">${esc(r.label)}</a><br><small>${esc(String(r.endedAt).slice(0, 10))} · <span class="run-id">${esc(r.runTag)}</span>${r.archived ? ' · archived' : ''}</small></td>` +

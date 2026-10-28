@@ -254,7 +254,7 @@ export function formatReport({ paths, logs, statsByLog, forum, grants, run = nul
     // the code the community ran on: outputs never repeat, but runs stay
     // comparable when the tree that produced each is named
     if (run.code?.commit) {
-      L.push(`    code: ${(run.code.repo ? String(run.code.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '')}${run.code.commit}${run.code.dirty ? ' (DIRTY TREE — uncommitted changes present)' : ''}${run.code.ref ? ` [${run.code.ref}]` : ''}`);
+      L.push(`    code: ${(run.code.repo ? String(run.code.repo).replace(/^git@github.com:/, 'github.com/').replace(/\.git$/, '') + ' @ ' : '')}${run.code.commit}${run.code.dirty ? ' (DIRTY TREE — uncommitted changes present)' : ''}${run.code.foreignPackages?.length ? ` (FOREIGN PACKAGES ×${run.code.foreignPackages.length} — loaded from outside the checkout; the commit does not name them: ${run.code.foreignPackages.map((f) => f.name).join(', ')})` : ''}${run.code.ref ? ` [${run.code.ref}]` : ''}`);
     } else if (run.code?.note) {
       L.push(`    code: ${run.code.note}`);
     }
