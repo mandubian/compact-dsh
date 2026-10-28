@@ -6,6 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import vm from 'node:vm';
+
 import { replayPageHtml, pageHtml } from '../src/page.js';
 
 const stubDocument = () => {
@@ -285,4 +287,23 @@ test('clause citations resolve in place when the law is embedded (R-6, sliced ve
   const legacy = render(mk(null));
   assert.doesNotMatch(legacy.els.get('forum-list').children[0].innerHTML, /class="law"/,
     'a legacy archive (no embedded law) wraps nothing — absence, not error');
+});
+
+test('the live page and the replay ship scripts that PARSE — every escape survives the template literal', () => {
+  // The scripts are written inside JS template literals, where \' collapses
+  // to a bare ' — one such quote (#284's floor line) made the live page's
+  // whole script a syntax error: nothing rendered, the floor card never
+  // appeared, and every community run's page sat on "nothing is waiting".
+  // The other tests read the script as TEXT; this one compiles it.
+  const pages = {
+    live: pageHtml({ charterName: 'cross-exam', token: 'tkn' }),
+    replay: replayPageHtml({ charterName: 'page-test', data: { forum: [], acts: [], members: [] } }),
+  };
+  for (const [name, html] of Object.entries(pages)) {
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    assert.ok(scripts.length > 0, `${name}: the page ships a script`);
+    for (const [i, source] of scripts.entries()) {
+      assert.doesNotThrow(() => new vm.Script(source, { filename: `${name}-script-${i}.js` }), `${name} script ${i} parses`);
+    }
+  }
 });
