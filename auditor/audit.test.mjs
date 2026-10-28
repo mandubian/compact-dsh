@@ -419,3 +419,63 @@ test('the declarations join: --declarations × --roll verifies the Member\'s aut
     f.cleanup();
   }
 });
+
+// ── the code by content (CF-2): the chained digest, checked offline ──
+test('the code digest: recorded on the chain, checked against the detail and the commit — and named when it is not the commit\'s', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdirSync } = await import('node:fs');
+  const { pathToFileURL } = await import('node:url');
+  const { computeCodeDigest } = await import('../tools/code-digest.mjs');
+  const git = (cwd, ...args) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' }).trim();
+  const root = mkdtempSync(join(tmpdir(), 'audit-code-'));
+  try {
+    mkdirSync(join(root, 'packages', 'loopguard', 'src'), { recursive: true });
+    writeFileSync(join(root, 'packages', 'loopguard', 'package.json'), JSON.stringify({ name: 'compact-dsh-loopguard', main: 'src/index.js' }));
+    writeFileSync(join(root, 'packages', 'loopguard', 'src', 'index.js'), 'export const guard = 1;\n');
+    git(root, 'init', '-q');
+    git(root, '-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '.');
+    git(root, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'init');
+    const commit = git(root, 'rev-parse', 'HEAD');
+    const resolve = () => pathToFileURL(join(root, 'packages', 'loopguard', 'src', 'index.js')).href;
+    const detail = computeCodeDigest(root, { resolve, commit, nodeModules: false });
+    const detailFile = join(root, 'run.json');
+    writeFileSync(detailFile, JSON.stringify({ code: { commit, digest: detail.digest, digests: detail } }));
+    const attest = (seq, digest) => ({ seq, type: 'user/message', time: seq, data: { content: [{ type: 'text', text: '[R-1] Attestation' }], source: { kind: 'compact-self-model', plugin: 'compact-self-model', code: { digest, commit } } } });
+    const log = [LOG[0], attest(1, detail.digest), ...LOG.slice(1).map((e) => ({ ...e, seq: e.seq + 1 }))];
+
+    // no --code: the digest is reported as recorded, nothing is claimed beyond it
+    const bare = audit(log, null, 0, {});
+    assert.equal(bare.checked.code, 'recorded, not verified (pass --code and --repo)');
+    assert.equal(bare.code.recorded, detail.digest);
+    assert.equal(bare.verdict, 'conforming');
+
+    // --code --repo: the detail hashes to the chained digest, every package matches the commit
+    const ok = audit(log, null, 0, { codeFile: detailFile, repoDir: root });
+    assert.equal(ok.checked.code, 'verified against the commit', JSON.stringify(ok.findings));
+    assert.equal(ok.verdict, 'conforming');
+
+    // the code that loaded drifts from the commit: named, by package
+    writeFileSync(join(root, 'packages', 'loopguard', 'src', 'index.js'), 'export const guard = 0; // older\n');
+    const drifted = computeCodeDigest(root, { resolve, commit, nodeModules: false });
+    writeFileSync(detailFile, JSON.stringify({ code: { digests: drifted } }));
+    const bad = audit([LOG[0], attest(1, drifted.digest)], null, 0, { codeFile: detailFile, repoDir: root });
+    assert.equal(bad.checked.code, 'BROKEN');
+    assert.ok(bad.findings.some((f) => f.type === 'code' && f.rule === 'CF-2' && /compact-dsh-loopguard: the code that loaded .* is NOT the commit's/.test(f.detail)));
+
+    // a detail that is not this run's — it does not hash to the chained digest
+    const foreignDetail = audit([LOG[0], attest(1, detail.digest)], null, 0, { codeFile: detailFile, repoDir: root });
+    assert.ok(foreignDetail.findings.some((f) => /does not hash to the digest the record carries/.test(f.detail)));
+
+    // one session, one code: a digest that changes mid-session is a finding
+    const changed = audit([LOG[0], attest(1, detail.digest), attest(2, drifted.digest)], null, 0, {});
+    assert.ok(changed.findings.some((f) => /the code digest changed within the session/.test(f.detail)));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a log with no code digest is `not recorded` — and --code against it is an error, not a pass', () => {
+  assert.equal(audit(LOG, null, 0, {}).checked.code, 'not recorded');
+  const withCode = audit(LOG, null, 0, { codeFile: '/nonexistent/run.json' });
+  assert.ok(withCode.findings.some((f) => f.type === 'code' && /no attestation in this log carries a code digest/.test(f.detail)));
+});
