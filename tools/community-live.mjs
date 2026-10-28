@@ -629,8 +629,13 @@ async function main() {
       SAY(`${sig}: stopping GRACEFULLY — the current turn drains, the record flushes, the reason is recorded (press again to stop immediately)`);
       // a graceful stop drains the turn in flight — when that turn is the
       // human's, it waits for the human; say so instead of looking stuck
-      const waiting = humanSeat?.pending?.().filter((p) => p.kind === 'floor' || p.kind === 'question') ?? [];
-      if (waiting.length > 0) SAY(`${sig}: ${waiting.length} card(s) wait on the human seat — answer on the page to let the turn finish, or press Ctrl-C again to withdraw them and stop now`);
+      // EVERY kind can hold the drain: a floor turn, a member's question, and
+      // an approval ask a model member's turn is blocked on (Copilot, #288)
+      const waiting = humanSeat?.pending?.() ?? [];
+      if (waiting.length > 0) {
+        const kinds = [...new Set(waiting.map((p) => ({ floor: 'your floor turn', question: 'a question', ask: 'an approval' })[p.kind] ?? p.kind))].join(', ');
+        SAY(`${sig}: ${waiting.length} card(s) wait on the human seat (${kinds}) — answer on the page to let the turn finish, or press Ctrl-C again to withdraw them and stop now`);
+      }
       controls.resume();
       controls.stop('graceful');
     } else if (signals === 2) {
