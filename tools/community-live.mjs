@@ -51,7 +51,7 @@ import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePo
 import { forumFromLedger, meteredTokens } from './community-report.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
 import { createReleasesHost } from './releases-host.mjs';
-import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters, humanMemberAdapter } from '../packages/community/src/index.js';
+import { validateCharter, memberBindingsOf, apply as applyCommunity, mountHumanSeat, startObservatory, createRunControls, createDivergenceCounters, humanMemberAdapter, seatOutcome } from '../packages/community/src/index.js';
 
 const BIN = 'community-live:';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -512,17 +512,12 @@ async function main() {
           : { type: 'question-posed', by: record.by, headline: record.headline });
       SAY(`human seat: ${record.kind === 'ask' ? 'an approval ask waits for you' : record.kind === 'floor' ? `a HUMAN member's turn waits on the floor card (${record.member})` : `a member asks you: ${record.headline.slice(0, 80)}…`} ${observatory ? `(on the page: ${observatory.url})` : '(NO PAGE — --no-observe; it will time out fail-closed)'}`);
     },
+    // every door's resolution, mapped once (seatOutcome): the feed event,
+    // and the honest no-answer the fence counts — counted HERE only
     onResolve: (record) => {
-      if (record.kind === 'ask') {
-        if (record.answer === 'timeout') divergence.humanSeatTimedOut();
-        publishSafe(record.answer === 'timeout' ? { type: 'ask-timeout', id: record.id } : { type: 'ask-decided', id: record.id, decision: record.answer });
-      } else if (record.kind === 'floor') {
-        if (record.act === 'timeout') divergence.humanSeatTimedOut();
-        publishSafe(record.act === 'timeout' ? { type: 'floor-timeout', by: record.by, member: record.member } : { type: 'floor-acted', id: record.id, act: record.act, by: record.by, member: record.member });
-      } else {
-        if (record.answer == null) divergence.humanSeatTimedOut();
-        publishSafe(record.answer == null ? { type: 'question-timeout', by: record.by } : { type: 'question-answered', by: record.by });
-      }
+      const { timedOut, event } = seatOutcome(record);
+      if (timedOut) divergence.humanSeatTimedOut();
+      publishSafe(event);
     },
   });
   ctx.on('approval/request', humanSeat.answerer);
@@ -547,7 +542,6 @@ async function main() {
     llm.registerAdapter(['human'], humanMemberAdapter({
       seat: humanSeat,
       topic: charter.topic,
-      onTimeout: () => divergence.humanSeatTimedOut(),
       note: (m) => SAY(m),
     }));
     const humans = charter.members.filter((m) => m.human).map((m) => m.id).join(', ');

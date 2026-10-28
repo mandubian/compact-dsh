@@ -402,7 +402,7 @@
       "kind": "convention",
       "plugin": null,
       "service": null,
-      "evidence": "roles: mapped in annex section 3 (Enforcer = the plugin composition; Subject = agent sessions; Principal = operator accounts; Witness = the offline auditor)",
+      "evidence": "roles: mapped in annex section 3 (Enforcer = the plugin composition; Subject = agent sessions, and in a community run a human member's session (charter \"human\": true; forum only in v1); Principal = operator accounts; Witness = the offline auditor)",
       "enforcedBy": [],
       "verifiers": []
     },
@@ -411,7 +411,7 @@
       "kind": "convention",
       "plugin": null,
       "service": null,
-      "evidence": "symmetry: the gates are content-blind and role-blind; no clause binds only artificial Members; declared",
+      "evidence": "symmetry: the gates are content-blind and role-blind; no clause binds only artificial Members; a human community member's forum acts run the same agent loop and gates as a model member's, on its own chain (packages/community/src/human-member.js); declared",
       "enforcedBy": [],
       "verifiers": []
     },

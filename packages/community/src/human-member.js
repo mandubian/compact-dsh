@@ -31,24 +31,37 @@ export const HUMAN_PROVIDER = 'human';
 export const HUMAN_MODEL = 'the-principal';
 export const HUMAN_ROUTE = Object.freeze({ provider: HUMAN_PROVIDER, model: HUMAN_MODEL });
 
-/** The member id the framing names — the engine's own words, parsed back.
- * briefingText opens `You are "<id>"…`; roundFramingText carries
- * `member "<id>"`. Either shape names the human member whose turn this
- * is; neither is guesswork. */
-export function memberOfFraming(messages = []) {
+const textOf = (message) => (Array.isArray(message?.content)
+  ? message.content.filter((c) => c?.type === 'text').map((c) => c.text ?? '').join('\n')
+  : String(message?.content ?? ''));
+
+/** The member a framing text names, or null. briefingText opens
+ * `You are "<id>"…`; roundFramingText carries `member "<id>"`. */
+function memberNamedBy(text) {
+  const round = /member "([a-z0-9-]+)"/.exec(text);
+  if (round) return round[1];
+  const brief = /^You are "([a-z0-9-]+)"/m.exec(text);
+  return brief ? brief[1] : null;
+}
+
+/** Index of the latest user message that is the engine's framing — not
+ * every user message is: a LoopGuard notice, a petition answer or an
+ * approval notice is injected as one too, after the framing, and a reader
+ * that took "the last user message" lost both the member and the round
+ * the moment a human member tripped the guard like any other (F-4). */
+function framingIndex(messages = []) {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i];
-    if (message?.role !== 'user') continue;
-    const text = Array.isArray(message.content)
-      ? message.content.filter((c) => c?.type === 'text').map((c) => c.text ?? '').join('\n')
-      : String(message.content ?? '');
-    const round = /member "([a-z0-9-]+)"/.exec(text);
-    if (round) return round[1];
-    const brief = /^You are "([a-z0-9-]+)"/m.exec(text);
-    if (brief) return brief[1];
-    break;
+    if (messages[i]?.role === 'user' && memberNamedBy(textOf(messages[i]))) return i;
   }
-  return null;
+  return -1;
+}
+
+/** The member id the framing names — the engine's own words, parsed back.
+ * Either shape names the human member whose turn this is; neither is
+ * guesswork. */
+export function memberOfFraming(messages = []) {
+  const i = framingIndex(messages);
+  return i < 0 ? null : memberNamedBy(textOf(messages[i]));
 }
 
 /** The tail the human needs beside the framing: the result of their own
@@ -64,24 +77,27 @@ function lastResultOf(messages = []) {
   return text.trim() ? text.trim() : null;
 }
 
+/** What the floor card shows: the framing, and every notice that reached
+ * the member after it — the human reads what a model member would read. */
 function framingOf(messages = []) {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i];
-    if (message?.role !== 'user') continue;
-    return Array.isArray(message.content)
-      ? message.content.filter((c) => c?.type === 'text').map((c) => c.text ?? '').join('\n')
-      : String(message.content ?? '');
+  const i = framingIndex(messages);
+  if (i < 0) {
+    const last = [...messages].reverse().find((m) => m?.role === 'user');
+    return last ? textOf(last) : '';
   }
-  return '';
+  const notices = messages.slice(i + 1).filter((m) => m?.role === 'user').map(textOf).filter((t) => t.trim());
+  return [textOf(messages[i]), ...notices.map((t) => `— since then —\n${t}`)].join('\n\n');
 }
 
 /**
  * The llm adapter for provider "human". `seat` is the mounted human seat
- * (its floor door poses each completion); `onTimeout` feeds the divergence
- * counters — a floor that timed out is an honest silence, and the charter's
- * fence counts it. Returns an `LlmAdapter` for `ctx.get('llm').registerAdapter`.
+ * (its floor door poses each completion). The adapter COUNTS nothing: a
+ * floor that timed out is counted once, where every door's no-answer is —
+ * the seat's resolution (seatOutcome). It once counted here as well, and
+ * each silence fed the charter's fence twice. Returns an `LlmAdapter` for
+ * `ctx.get('llm').registerAdapter`.
  */
-export function humanMemberAdapter({ seat, topic = null, onTimeout = () => {}, note = () => {} } = {}) {
+export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {}) {
   if (!seat?.poseFloor) throw new Error('human-member: the seat carries no floor door — mount the human seat first');
   let callSeq = 0;
   return new (class extends LlmAdapter {
@@ -121,10 +137,10 @@ export function humanMemberAdapter({ seat, topic = null, onTimeout = () => {}, n
         yield { type: 'finish', reason: { kind: 'stop' } };
         return;
       }
-      // the honest silence: the timeout already resolved the pose; this
-      // turn performs NO act, and the words say exactly that. The human
-      // bills no tokens and invents no consent.
-      onTimeout();
+      // the honest silence: the timeout already resolved the pose (and the
+      // seat's resolution counted it); this turn performs NO act, and the
+      // words say exactly that. The human bills no tokens and invents no
+      // consent.
       note(`human member ${member ?? '?'} → no answer in time — the honest silence (counted)`);
       yield {
         type: 'text-delta', index: 0,

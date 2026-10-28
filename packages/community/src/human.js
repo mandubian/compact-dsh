@@ -40,6 +40,31 @@ export const DEFAULT_FLOOR_TIMEOUT_MS = 600_000;
 
 let pendingSeq = 0;
 
+/** What a resolved seat record means for the run, for all three doors: the
+ * feed event to publish, and whether it is an honest no-answer the
+ * charter's divergence fence counts. One mapping, so a door cannot count
+ * twice or read its act from the wrong field (the floor did both: each
+ * silence counted twice, and a POST reached the page as "spoke on its own
+ * chain"). */
+export function seatOutcome(record) {
+  if (record?.kind === 'ask') {
+    const timedOut = record.answer === 'timeout';
+    return { timedOut, event: timedOut ? { type: 'ask-timeout', id: record.id } : { type: 'ask-decided', id: record.id, decision: record.answer } };
+  }
+  if (record?.kind === 'floor') {
+    const act = record.answer?.act ?? record.act;
+    const timedOut = act === 'timeout';
+    return {
+      timedOut,
+      event: timedOut
+        ? { type: 'floor-timeout', by: record.by, member: record.member }
+        : { type: 'floor-acted', id: record.id, act, by: record.by, member: record.member },
+    };
+  }
+  const timedOut = record?.answer == null;
+  return { timedOut, event: timedOut ? { type: 'question-timeout', by: record?.by } : { type: 'question-answered', by: record?.by } };
+}
+
 /** Mount the human seat on a settled ctx. Returns the seat: pending asks
  *  and questions (the observatory renders these), answer/reply resolvers,
  *  and the ask_human tool for the driver to register. */

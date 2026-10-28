@@ -36,14 +36,14 @@
 
 import { validateCharter, memberBindingsOf, CHARTER_VERSION, DEFAULT_BUDGETS } from './charter.js';
 import { runCommunity, currentSelectionOf, createRunControls, createDivergenceCounters, briefingText, roundFramingText, benchFramingText, DRIVER_SOURCE } from './engine.js';
-import { mountHumanSeat, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS, DEFAULT_FLOOR_TIMEOUT_MS } from './human.js';
+import { mountHumanSeat, seatOutcome, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS, DEFAULT_FLOOR_TIMEOUT_MS } from './human.js';
 import { humanMemberAdapter, HUMAN_ROUTE, HUMAN_PROVIDER, HUMAN_MODEL, memberOfFraming } from './human-member.js';
 import { startObservatory, DEFAULT_OBSERVATORY_PORT } from './observatory.js';
 
 export {
   validateCharter, memberBindingsOf, CHARTER_VERSION, DEFAULT_BUDGETS,
   runCommunity, currentSelectionOf, createRunControls, createDivergenceCounters, briefingText, roundFramingText, benchFramingText, DRIVER_SOURCE,
-  mountHumanSeat, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS, DEFAULT_FLOOR_TIMEOUT_MS,
+  mountHumanSeat, seatOutcome, DEFAULT_ASK_TIMEOUT_MS, DEFAULT_QUESTION_TIMEOUT_MS, DEFAULT_FLOOR_TIMEOUT_MS,
   humanMemberAdapter, HUMAN_ROUTE, HUMAN_PROVIDER, HUMAN_MODEL, memberOfFraming,
   startObservatory, DEFAULT_OBSERVATORY_PORT,
 };

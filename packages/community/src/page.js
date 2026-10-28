@@ -198,6 +198,12 @@ function post(listId, html, { empty = false, cls = '' } = {}) {
 }
 
 let lastPendingSig = null;
+const showWhy = (div, reason) => {
+  let why = div.querySelector('.why');
+  if (!why) { why = document.createElement('div'); why.className = 'why head'; div.appendChild(why); }
+  why.dataset.reason = reason;
+  why.textContent = 'refused — ' + reason + ' (your words are kept: edit, then press again)';
+};
 function renderPending(p) {
   // the reconciler rule (#239 follow-up): the 4s poll must never fight the
   // human. If nothing changed, touch NOTHING — an expanded details and a
@@ -212,7 +218,8 @@ function renderPending(p) {
     const d = el.querySelector('details');
     const ta = el.querySelector('textarea');
     const ti = el.querySelector('input.topic');
-    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, ...(ti ? { topic: ti.value } : {}) };
+    const why = el.querySelector('.why');
+    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, ...(ti ? { topic: ti.value } : {}), ...(why ? { why: why.dataset.reason } : {}) };
   });
   const asks = p.filter(x => x.kind === 'ask');
   const questions = p.filter(x => x.kind === 'question');
@@ -287,7 +294,13 @@ function renderPending(p) {
     const ti = div.querySelector('input.topic');
     const send = (act) => {
       if (!ta.value.trim()) return;
-      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value }) }).then(() => div.remove()).catch(() => {});
+      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value }) }).then((r) => {
+        // a refusal (an oversized post, a bad topic) keeps the card and the
+        // words, and says why: the turn is still pending, and a card removed
+        // here never came back (the reconciler saw nothing change)
+        if (r && r.error) { showWhy(div, r.error); return; }
+        div.remove();
+      }).catch(() => {});
     };
     div.querySelector('.approve').onclick = () => send('post');
     div.querySelector('.deny').onclick = () => send('pass');
@@ -299,6 +312,7 @@ function renderPending(p) {
       if (d && wasF.open === false) d.open = false;
       if (wasF.text != null) ta.value = wasF.text;
       if (wasF.topic != null) ti.value = wasF.topic;
+      if (wasF.why) showWhy(div, wasF.why);
     }
   }
 }

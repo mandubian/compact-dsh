@@ -146,7 +146,8 @@ export function startObservatory(ctx, {
       const record = humanSeat?.settleFloor?.(id, { act: body.act, text, topic: body.topic });
       if (!record) return json(res, 404, { error: `no pending floor turn ${id}` });
       if (record.error) return json(res, 400, { error: record.error });
-      publish({ type: 'floor-acted', id, act: record.answer?.act ?? body.act, by: record.by ?? 'the human member', member: record.member ?? null });
+      // the feed hears the act from the seat's resolution (seatOutcome), not
+      // here — publishing it twice put two lines on the page, one of them wrong
       return json(res, 200, { ok: true, id, act: record.answer?.act ?? body.act });
     }
     // the operator's hand (#229): pause, resume, stop — the same controls

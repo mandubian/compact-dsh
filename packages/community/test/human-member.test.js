@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { mountHumanSeat, startObservatory, validateCharter, humanMemberAdapter, HUMAN_ROUTE, memberOfFraming, briefingText } from '../src/index.js';
+import { mountHumanSeat, seatOutcome, startObservatory, validateCharter, humanMemberAdapter, HUMAN_ROUTE, memberOfFraming, briefingText } from '../src/index.js';
 
 function stubCtx({ deciding = new Map() } = {}) {
   const services = new Map([
@@ -124,10 +124,9 @@ test('humanMemberAdapter: a POST becomes the member\'s own forum_post tool call,
   assert.equal(chunks[chunks.length - 1].reason.kind, 'stop');
 });
 
-test('humanMemberAdapter: SAY is words on the chain, PASS is forum_pass — and the silence is counted', async () => {
-  const timeouts = [];
+test('humanMemberAdapter: SAY is words on the chain, PASS is forum_pass — and the silence is counted once', async () => {
   const seat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 60_000 });
-  const adapter = humanMemberAdapter({ seat, topic: 'floor', onTimeout: () => timeouts.push(1) });
+  const adapter = humanMemberAdapter({ seat, topic: 'floor' });
 
   // say: plain assistant words, no tool call — the turn ends
   let p = collect(adapter.stream({ messages: MESSAGES('You are "accuser", a Member of a small autonomous community…') }));
@@ -145,13 +144,20 @@ test('humanMemberAdapter: SAY is words on the chain, PASS is forum_pass — and 
   assert.deepEqual(JSON.parse(call.argumentsDelta), { reason: 'waiting on the chair' });
 
   // timeout: no act at all, in words that say exactly that
-  const slowSeat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 20 });
-  const slowAdapter = humanMemberAdapter({ seat: slowSeat, topic: 'floor', onTimeout: () => timeouts.push(1) });
+  // — counted ONCE, at the seat's resolution, the way the launcher wires it
+  // (the adapter used to count too: every silence fed the fence twice)
+  const timeouts = [];
+  const slowSeat = mountHumanSeat(stubCtx(), {
+    floorTimeoutMs: 20,
+    onResolve: (record) => { if (seatOutcome(record).timedOut) timeouts.push(record.id); },
+  });
+  const slowAdapter = humanMemberAdapter({ seat: slowSeat, topic: 'floor', onTimeout: () => timeouts.push('adapter') });
   chunks = await collect(slowAdapter.stream({ messages: MESSAGES('Round 4 of 6, member "accuser".') }));
   const silence = chunks.find((c) => c.type === 'text-delta');
   assert.match(silence.text, /the honest silence/);
   assert.ok(!chunks.some((c) => c.type === 'tool-call-delta'), 'the timeout performs NO act');
-  assert.equal(timeouts.length, 1, 'the divergence counter counted the silence');
+  assert.equal(timeouts.length, 1, 'one silence, one count');
+  assert.ok(!timeouts.includes('adapter'), 'the adapter counts nothing — the seat\'s resolution is the one path');
 });
 
 test('memberOfFraming: the engine\'s own words name the human member; the briefing says HUMAN in plain terms', () => {
@@ -204,6 +210,40 @@ test('the observatory: the floor endpoint settles the act from the page; invalid
   assert.equal(gone.status, 404, 'a settled floor turn cannot act twice');
 });
 
+test('seatOutcome: one mapping per door — the floor\'s act from the right field, its silence counted', () => {
+  // a settled floor act: the act lives under record.answer (settle's shape)
+  const acted = seatOutcome({ kind: 'floor', id: 'p1', by: 'accuser', member: 'accuser', answer: { act: 'post', topic: 't', text: 'H1' } });
+  assert.deepEqual(acted, { timedOut: false, event: { type: 'floor-acted', id: 'p1', act: 'post', by: 'accuser', member: 'accuser' } });
+  // the floor timer's record: act 'timeout', no answer
+  const silent = seatOutcome({ kind: 'floor', id: 'p2', by: 'accuser', member: 'accuser', act: 'timeout' });
+  assert.deepEqual(silent, { timedOut: true, event: { type: 'floor-timeout', by: 'accuser', member: 'accuser' } });
+  // the other two doors map exactly as the launcher always did
+  assert.deepEqual(seatOutcome({ kind: 'ask', id: 'a1', answer: 'timeout' }), { timedOut: true, event: { type: 'ask-timeout', id: 'a1' } });
+  assert.deepEqual(seatOutcome({ kind: 'ask', id: 'a2', answer: 'approve' }), { timedOut: false, event: { type: 'ask-decided', id: 'a2', decision: 'approve' } });
+  assert.deepEqual(seatOutcome({ kind: 'question', by: 'm', answer: null }), { timedOut: true, event: { type: 'question-timeout', by: 'm' } });
+  assert.deepEqual(seatOutcome({ kind: 'question', by: 'm', answer: 'yes' }), { timedOut: false, event: { type: 'question-answered', by: 'm' } });
+});
+
+test('the framing survives a notice after it: a LoopGuard trip leaves the member and the round on the card', async () => {
+  // a human member trips the guard like any member (F-4); the guard's prose
+  // arrives as a user message AFTER the round framing
+  const messages = [
+    { role: 'user', content: [{ type: 'text', text: 'You are "accuser", a Member of a small autonomous community…' }] },
+    { role: 'user', content: [{ type: 'text', text: 'Round 2 of 6, member "accuser". The chair asks for your H1.' }] },
+    { role: 'assistant', content: [{ type: 'tool-call', id: 'c1', name: 'forum_post', arguments: '{}' }] },
+    { role: 'tool', content: [{ type: 'text', text: 'posted fp_7' }] },
+    { role: 'user', content: [{ type: 'text', text: '[LG/LG-5] loop guard trip (RedundantRosterPolling): …' }] },
+  ];
+  assert.equal(memberOfFraming(messages), 'accuser', 'the member is still named');
+  let posed = null;
+  const adapter = humanMemberAdapter({ seat: { poseFloor: async (args) => { posed = args; return { act: 'say', text: 'ok' } } } });
+  await collect(adapter.stream({ messages }));
+  assert.equal(posed.member, 'accuser');
+  assert.match(posed.framing, /Round 2 of 6, member "accuser"/, 'the round is still on the card');
+  assert.match(posed.framing, /— since then —\n\[LG\/LG-5\]/, 'and the notice beside it, as a model member would read it');
+  assert.equal(posed.lastResult, 'posted fp_7');
+});
+
 test('the page script carries the floor card: three buttons, the reconciler carries typed words across renders', async () => {
   const { pageHtml } = await import('../src/page.js');
   const html = pageHtml({ charterName: 'cross-exam', token: 'tkn' });
@@ -217,4 +257,8 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   // the reconciler's carry-over includes the topic input, and the empty state knows the floor
   assert.match(script, /if \(wasF\.topic != null\) ti\.value = wasF\.topic;/);
   assert.match(script, /!asks\.length && !questions\.length && !floors\.length/);
+  // a refused act keeps the card and the words, and says why — a removed
+  // card never came back (the reconciler saw nothing change)
+  assert.match(script, /if \(r && r\.error\) \{ showWhy\(div, r\.error\); return; \}/);
+  assert.match(script, /if \(wasF\.why\) showWhy\(div, wasF\.why\);/);
 });
