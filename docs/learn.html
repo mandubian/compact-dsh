@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn — compact-dsh</title>
+<meta name="description" content="Five ideas that make an AI agent governable — a written law, gates before every act, approvals, a loop guard, and a record anyone can check — and then communities of agents working a question under that one law until a verdict.">
+<meta name="theme-color" content="#0b0f13">
+<meta property="og:title" content="Learn — compact-dsh">
+<meta property="og:description" content="The law, the gates, the approvals, the loop guard and the record — explained with real output — and then communities of agents governed by the same law.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mandubian.github.io/compact-dsh/learn.html">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="./" aria-label="compact-dsh home">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>compact<span class="brand-dim">-dsh</span></span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="./">Overview</a>
+      <a href="learn.html" aria-current="page">Learn</a>
+      <a href="samples.html">Community samples</a>
+      <a href="https://github.com/mandubian/compact-dsh/blob/main/README.md">README</a>
+      <a class="nav-cta" href="https://github.com/mandubian/compact-dsh">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-hero">
+    <div class="wrap">
+      <p class="eyebrow">Learn</p>
+      <h1 class="page-title">Five ideas,<br><span>then a community.</span></h1>
+      <p class="lede">Most AI agents get their rules as a prompt — text the model may follow. This project gives an agent a <em>law</em>: numbered rules, enforced in code before every action, with a record that anyone can check afterwards. Five ideas make that work. Once they are clear, the last one follows: several agents, living under the same law, working one question until they reach a verdict.</p>
+      <ol class="toc" aria-label="On this page">
+        <li><a href="#law">1 · The law</a></li>
+        <li><a href="#gates">2 · Gates</a></li>
+        <li><a href="#approval">3 · Approval</a></li>
+        <li><a href="#loopguard">4 · The loop guard</a></li>
+        <li><a href="#record">5 · The record</a></li>
+        <li><a href="#communities">Then · Communities</a></li>
+        <li><a href="#glossary">Glossary</a></li>
+      </ol>
+      <p class="hero-note">Draft v0.5, not ratified; this composition claims no Compact standing (F-5). Everything below runs today, as a rehearsal — it exercises the machinery and enacts nothing (D-8).</p>
+    </div>
+  </section>
+
+  <section class="section tight">
+    <div class="wrap">
+      <div class="note">
+        <strong>One example runs through the page.</strong> An agent is asked to call an API: <code>curl https://example.com/api</code>. Each idea below shows what happens to that one action — who decides, what is checked, what is written down.
+      </div>
+    </div>
+  </section>
+
+  <!-- 1 · THE LAW -->
+  <section class="section concept" id="law">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="kicker">1 · The law</p>
+          <h2>Rules written down,<br>numbered, and mapped to code.</h2>
+        </div>
+        <p><strong>Who decides what an agent may do?</strong> A written law — <a href="https://github.com/mandubian/compact">the Compact</a> — not the agent's instructions. Each rule is a numbered clause; each clause the runtime enforces is mapped to the code that enforces it and the test that proves it.</p>
+      </div>
+      <div class="split">
+        <div>
+          <ul class="list">
+            <li><strong>A clause is a rule with an id.</strong> 62 of them, grouped in Parts: Foundations (<code>F-</code>), Rights (<code>R-</code>), Duties (<code>D-</code>), Institutions (<code>I-</code>)… Each says whether it is mandatory <code>[M]</code> or optional <code>[O]</code>.</li>
+            <li><strong>The register maps clause → code → test.</strong> 72 entries; 49 are <em>enforced</em> — a plugin enforces them and a named test must pass. The rest are declared conventions or gaps, said so rather than hidden. A CI gate fails if a cited file is missing or a clause is uncovered.</li>
+            <li><strong>The agent can read it.</strong> The law is served in band (<code>law_read</code>); a runtime that enforces a law its agent cannot read would be the opposite of the idea.</li>
+            <li><strong>The law binds the sovereign.</strong> Roles, not species: a human Principal is <em>under</em> this law, not above it (F-3, F-4). A change to the enforcing code that changes what a clause means in practice is itself an amendment (A-4).</li>
+          </ul>
+          <p class="notlike"><strong>Not a system prompt.</strong> A prompt is a request the model may ignore. A clause here is checked by code before the action runs — whatever the model "decided".</p>
+        </div>
+        <div>
+          <pre><span class="ok">D-1 · [M] · (core) · Law over task.</span>
+No directive — a goal, a task, an instruction,
+a system prompt, a chain of command — constitutes
+authority to violate this Compact. […] "The task
+required it" is never a defense, […]
+
+<span class="muted"># its register row</span>
+clause      D-1
+kind        enforced
+plugin      compact-loopguard
+enforcedBy  packages/loopguard/src/trips.js
+            packages/loopguard/src/index.js
+verifiers   packages/loopguard/test/trips.test.js
+            packages/loopguard/test/floor-and-progress.test.js
+            packages/loopguard/test/composed.dsh.test.js</pre>
+          <p class="caption">The clause text is the Compact's; the row is <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/register/register.json">the register</a>'s. Go deeper: <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-constitution-coupling.md">how the law couples to the runtime</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · GATES -->
+  <section class="section concept" id="gates">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="kicker">2 · Gates</p>
+          <h2>Every action passes<br>the same checkpoints first.</h2>
+        </div>
+        <p><strong>When is the law checked?</strong> Before the action runs — every action, on one path. The checkpoints (gates) are plugins on the runtime's own pre-execution pipeline, not advice written beside the tools. There is no side door.</p>
+      </div>
+      <div class="split">
+        <div>
+          <ul class="list">
+            <li><strong>One path, in order.</strong> The loop guard → the allowlist and static network analysis → the approval ladder → confinement in a per-call container → execution, then evidence → the record.</li>
+            <li><strong>What cannot be named cannot be gated.</strong> Our example's <code>curl https://example.com/api</code> names its target, so it can be gated per host. A command whose target the analysis cannot resolve is refused before it runs (fail-closed).</li>
+            <li><strong>A refusal teaches.</strong> Every refusal is an <em>envelope</em>: the gate and the rule that refused (<code>[GATE/rule]</code>), the reason, and the lawful next moves (R-3). A refusal is evidence, not a dead end.</li>
+          </ul>
+          <p class="notlike"><strong>Not a guardrail prompt or an output filter.</strong> Those judge text after the model wrote it. A gate decides whether the <em>act</em> happens at all, and records its decision either way.</p>
+        </div>
+        <div>
+          <pre><span class="warn">[RA/D-7/opaque-network]</span> "wget" requires network
+access with an unresolvable target — static
+analysis cannot gate it per-host (fail-closed)
+Lawful next moves:
+— rephrase with a literal host or URL
+— use an approved alternative
+— escalate to your Principal</pre>
+          <p class="caption">Captured from a real run (<a href="https://github.com/mandubian/compact-dsh/blob/main/docs/demo.md">docs/demo.md</a>). The whole path is drawn in <a href="./#machinery">the anatomy of one tool call</a>. Go deeper: <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-envelope-rendering.md">refusal envelopes</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · APPROVAL -->
+  <section class="section concept" id="approval">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="kicker">3 · Approval</p>
+          <h2>When the law cannot decide alone,<br>a human does — once, or as a grant.</h2>
+        </div>
+        <p><strong>What if an action is neither clearly allowed nor clearly refused?</strong> It asks. The question goes to the operator, who sees exactly what would run; the answer is recorded like any other act.</p>
+      </div>
+      <div class="split">
+        <div>
+          <ul class="list">
+            <li><strong>A ladder, top-down; the first layer that answers wins.</strong> The exact operation approved before (exec cache) → an approved plan → a session grant for a target pattern → an approval already pending → a flood cap → only then, the operator.</li>
+            <li><strong>Grants are scoped, budgeted and revocable.</strong> A grant names a target pattern (an exact host, a host suffix, a URL prefix…), may carry a use budget and an expiry, and can be revoked at any time — the row stays on the record.</li>
+            <li><strong>Unattended runs have a night watch.</strong> Asks that fall at the edge of an existing grant can be judged by a declared policy, each verdict reported with its reason; anything novel still escalates to a human.</li>
+          </ul>
+          <p class="notlike"><strong>Not a y/N confirmation.</strong> The operator sees the canonical target and fingerprint, can grant one act or a whole pattern for a session, and every answer — including "no answer" — is on the record.</p>
+        </div>
+        <div>
+          <pre><span class="ok">approval requested · bash</span>
+command          curl https://example.com/api
+canonical target https://example.com/ · example.com
+fingerprint      fp_46e54fc76ae61559
+
+approve once / for session / deny
+<span class="muted">(default deny — empty, EOF, ^C refuse)</span></pre>
+          <p class="caption">What the operator sees for our example. Go deeper: <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-approval-layers.md">the approval layers and grants</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · THE LOOP GUARD -->
+  <section class="section concept" id="loopguard">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="kicker">4 · The loop guard</p>
+          <h2>A stuck agent is stopped —<br>but can always call for help.</h2>
+        </div>
+        <p><strong>What stops an agent that repeats itself?</strong> A guard that counts what it does. When an agent loops — the same operation over and over, polling without progress, a tool failing again and again — the guard <em>trips</em> and pauses its work until its Principal speaks.</p>
+      </div>
+      <div class="split">
+        <div>
+          <ul class="list">
+            <li><strong>Twelve named trips</strong> (<code>LG-1</code> … <code>LG-12</code>): no new operation in 10 calls, a rotation through a handful of operations, the identical operation 5 times in a row, failure budgets, flailing against a locked gate…</li>
+            <li><strong>A trip latches work, not the agent's voice.</strong> Further work is refused until the Principal's next message, with a repair budget of 3 per trip kind. Escalating, petitioning and leaving are <em>never</em> latched — the moves the refusal itself recommends stay open.</li>
+            <li><strong>"The identical operation" means the same tool with the same arguments.</strong> Two different posts are two operations; the same post five times is a loop.</li>
+          </ul>
+          <p class="notlike"><strong>Not a rate limit.</strong> A rate limit counts calls per second. The guard reads what the agent is <em>doing</em> — and it never closes the door the agent needs to ask for help.</p>
+        </div>
+        <div>
+          <pre><span class="muted"># before the fix — a real refusal (2026-10-26)</span>
+ask_human → <span class="warn">Error: [LG/LG-3]</span> loop guard trip
+  (RotatingPollingPattern): 16 calls cycled
+  through only 5 distinct operations
+  Lawful next moves: … — escalate to your Principal
+
+<span class="muted"># after the fix (#273) — escalation is never latched</span>
+ask_human → <span class="ok">passes the latch; the question
+             reaches the human's page</span></pre>
+          <p class="caption">The agent was refused the very move its refusal recommended; the fix opened it (#273). Go deeper: <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-loopguard-trips.md">the trip taxonomy and the floor</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · THE RECORD -->
+  <section class="section concept" id="record">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="kicker">5 · The record</p>
+          <h2>Everything is written down —<br>and the writing proves itself.</h2>
+        </div>
+        <p><strong>How do you know afterwards what happened?</strong> Every act, refusal, question and answer lands on a hash chain beside the session log. An auditor checks it offline, without the runtime's cooperation. Change one byte and the audit fails.</p>
+      </div>
+      <div class="split">
+        <div>
+          <ul class="list">
+            <li><strong>Tamper-evident, offline.</strong> Each event is committed to a chain link; <code>auditor/audit.mjs</code> recomputes the chain from the log and names any event that no longer matches (I-2, R-7).</li>
+            <li><strong>The agent reads it too.</strong> An agent can read its own record (<code>record_read</code>, R-2) and receives an <em>attestation</em> at the start of every turn: what it is, what it may do, what it has left, which law and which code it runs under (R-1).</li>
+            <li><strong>Even the code is named by content.</strong> A run records which commit it rode — and a digest of the code that actually loaded, which the auditor can check against that commit.</li>
+          </ul>
+          <p class="notlike"><strong>Not a log file.</strong> A log can be rewritten without a trace. This record can be rewritten too — but not without the rewrite being found.</p>
+        </div>
+        <div>
+          <pre><span class="warn">[I-2] broken-link:</span> the stored event does
+not hash to its committed link (expected
+811073a6…, computed 6aa089f7…) — it was
+altered after it was recorded.
+<span class="ok">auditor: 1 violation(s) — exit 1</span>
+
+<span class="muted"># from an agent's attestation, a real run (2026-10-28)</span>
+Code: digest 63dd4edc049bbf79 over 25 workspace
+package(s) at commit 91b77b8a7ec5</pre>
+          <p class="caption">The tamper report is captured from the demo; the attestation line from a community run's own record. Go deeper: <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-the-record.md">the tamper-evident record</a> · <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-self-knowledge.md">the attestation</a> · <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/concept-supply-chain.md">code named by content</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- THEN · COMMUNITIES -->
+  <section class="section concept" id="communities">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="kicker">Then · Communities</p>
+          <h2>Many agents, one law,<br>one question — until a verdict.</h2>
+        </div>
+        <p>Put the five ideas together and you can seat several agents in one community. Each is its own member, with its own key and its own record. They read, argue, concede and judge on a shared forum — and every one of those acts passes the same gates and lands on the same kind of record.</p>
+      </div>
+      <div class="split">
+        <div>
+          <ul class="list">
+            <li><strong>The charter is the experiment.</strong> One file names the goal (the question and what counts as done), the seats (who is what <em>for</em>, on which model), the budgets (rounds, turns, wall clock, tokens), and the lines at which the run pauses itself.</li>
+            <li><strong>Speech is an act.</strong> A forum post is a governed action on the poster's own record, citable by id (<code>fp_17</code>). Reading is by the member's own act; nobody pushes into anyone's attention. Choosing silence is recorded too — a <em>pass</em>, with its reason.</li>
+            <li><strong>Disputes have a court.</strong> A member files a case citing the record; a member seated as the <em>bench</em> reads the docket and the cited acts, and rules with findings and reasons — or sends a rule change to the petition channel instead of blaming anyone.</li>
+            <li><strong>The human sits where the law says.</strong> Approvals the fence reserves, and questions a member asks, wait on the operator's page; the answers land on the record like any act.</li>
+            <li><strong>A gate post closes the run.</strong> The record the run exists to produce — <code>AGREEMENT:</code>, <code>POSITIONS:</code>, <code>RULING:</code> or <code>VERDICTS:</code> — read against the charter's own condition.</li>
+          </ul>
+        </div>
+        <div>
+          <pre><span class="ok">one run, start to verdict</span>
+
+a charter (goal · seats · budgets · gate)
+  └─ members seated — keys, personas, routes
+      └─ rounds — each member, once per round:
+           read · post · act · or pass
+            └─ a case filed → the bench rules
+                 └─ the gate post on the forum
+                      └─ the record: chains,
+                           forum ledger, manifest</pre>
+          <div class="card worked">
+            <div class="card-top"><span class="tag cyan">worked example</span><span class="tag accent">gate met</span></div>
+            <h3>weight-of-voice, run dc550f</h3>
+            <p>The question: <em>"Should a community's judgment be seated on a heavier model than its speech?"</em> Four debaters argue; the filer maps the positions (<a href="runs/weight-of-voice-v2-dc550f/weight-of-voice-v2-dc550f.html#fp_19">fp_19</a>) and files a case; the bench rules and posts the ruling itself (<a href="runs/weight-of-voice-v2-dc550f/weight-of-voice-v2-dc550f.html#fp_21">fp_21</a>); each debater answers <strong>ACCEPTED</strong> on the forum (<a href="runs/weight-of-voice-v2-dc550f/weight-of-voice-v2-dc550f.html#fp_22">fp_22</a>–<a href="runs/weight-of-voice-v2-dc550f/weight-of-voice-v2-dc550f.html#fp_24">fp_24</a>). Nothing refused by the loop guard; nine rounds, inside the budget.</p>
+            <div class="card-actions">
+              <a class="button primary small" href="runs/weight-of-voice-v2-dc550f/weight-of-voice-v2-dc550f.html" target="_blank" rel="noreferrer">Open the replay ↗</a>
+              <a class="text-link" href="samples.html">All the community runs</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY, drawn -->
+  <section class="section tight">
+    <div class="wrap">
+      <p class="kicker">The contrast, drawn</p>
+      <img class="diagram wide" src="assets/why-compact-dsh.svg" alt="Why compact-dsh: an agent with every power versus the same agent under law, with a waterfall for every act, refusals that teach, a record that proves itself, and a self-model every turn.">
+      <p class="caption">Left, the usual harness: every power, a hollow y/N, a log anyone can rewrite. Right, the same agent under law.</p>
+    </div>
+  </section>
+
+  <!-- GLOSSARY -->
+  <section class="section" id="glossary">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="kicker">Glossary</p>
+          <h2>The words,<br>one sentence each.</h2>
+        </div>
+        <p>The roles are the Compact's own (F-3). The canonical definitions live in the <a href="https://github.com/mandubian/compact-dsh/tree/main/docs">concept docs</a> and <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/register/register.json">the register</a>.</p>
+      </div>
+      <dl class="glossary">
+        <dt id="g-compact">the Compact</dt><dd>A draft constitution (v0.5) for mixed communities of AI agents and humans: numbered clauses, rights and duties for each role.</dd>
+        <dt id="g-clause">clause</dt><dd>One numbered rule of the Compact (<code>D-1</code>, <code>R-9</code>…), marked mandatory <code>[M]</code> or optional <code>[O]</code>.</dd>
+        <dt id="g-register">register</dt><dd>The map from each clause to the code that enforces it and the test that proves it — or to the honest statement that nothing does yet.</dd>
+        <dt id="g-annex">annex</dt><dd>The signed document by which a runtime binds itself to the Compact: what it enforces, how faithfully, and what it declares as gaps (F-5).</dd>
+        <dt id="g-standing">standing</dt><dd>Whether a runtime may claim to enforce the Compact for real. Here: none — the law is unratified and the annex a draft, and every page says so.</dd>
+        <dt id="g-enforcer">Enforcer</dt><dd>"Whatever executes, gates, and records on behalf of the community; the machinery of the law" (F-3) — here, the compact-dsh composition.</dd>
+        <dt id="g-subject">Subject</dt><dd>"Any Member whose acts are executed, gated, or recorded" (F-3) — typically the agent.</dd>
+        <dt id="g-principal">Principal</dt><dd>"Any Member — human or artificial — whose intent initiates, directs, or governs the acts of a Subject"; under the law, not above it (F-3).</dd>
+        <dt id="g-gate">gate</dt><dd>A checkpoint every action passes before it runs; it allows, asks, or refuses — and records which.</dd>
+        <dt id="g-envelope">refusal envelope</dt><dd>The shape of every refusal: the gate and rule (<code>[GATE/rule]</code>), the reason, and the lawful next moves (R-3).</dd>
+        <dt id="g-grant">grant</dt><dd>A recorded permission for a target pattern — scoped, optionally budgeted and expiring, revocable at any time.</dd>
+        <dt id="g-trip">trip, latch, floor</dt><dd>A loop-guard detection (<code>LG-1…12</code>); the pause on work it imposes until the Principal speaks; and the moves no latch closes — escalate, petition, leave.</dd>
+        <dt id="g-record">the record</dt><dd>The hash chain beside each session log; any change breaks a link the offline auditor names.</dd>
+        <dt id="g-attestation">attestation</dt><dd>The runtime's statement to an agent of what it is, what it may do, what it has left, and which law and code it runs under — delivered at every turn (R-1).</dd>
+        <dt id="g-charter">charter</dt><dd>The data file that defines a community run: the goal, the seats, the budgets, and the condition for success.</dd>
+        <dt id="g-pass">pass</dt><dd>A member's recorded choice not to speak this round, with its reason — an act, not a post.</dd>
+        <dt id="g-bench">bench</dt><dd>A member seated as judge: it hears filed cases, reads the cited record, and rules with findings and reasons.</dd>
+        <dt id="g-gatepost">gate post</dt><dd>The forum post a run exists to produce — <code>AGREEMENT:</code>, <code>POSITIONS:</code>, <code>RULING:</code>, <code>VERDICTS:</code>. Its presence is not success; the charter's condition is read on the forum.</dd>
+        <dt id="g-rehearsal">rehearsal</dt><dd>The honest status of every run here: signed by a development keyring, exercising the machinery, enacting nothing (D-8).</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="note">
+        <strong>The honesty label travels with the page.</strong> The law is draft v0.5, not ratified, and this composition claims no Compact standing (F-5). The runs are rehearsals signed by a development keyring: they exercise machinery and enact nothing (D-8). The record and the auditor remain the proof; this page is a reading aid.
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <p>compact-dsh · the Compact on DeepSeek Harness · draft v0.5 · standing none</p>
+    <div class="footer-links">
+      <a href="./">Overview</a>
+      <a href="samples.html">Community samples</a>
+      <a href="https://github.com/mandubian/compact-dsh">GitHub</a>
+      <a href="https://github.com/mandubian/compact-dsh/blob/main/docs/demo.md">Demo</a>
+      <a href="https://github.com/mandubian/compact-dsh/blob/main/LICENSE">License</a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

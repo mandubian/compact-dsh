@@ -11,14 +11,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 
 import { parseEmbeddedArchive } from './community-brief.mjs';
 import { samplesRows, renderSamplesTable, syncSamplesTable } from './samples-table.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const docs = join(root, 'docs');
-const pages = ['index.html', 'samples.html'];
+const pages = ['index.html', 'learn.html', 'samples.html'];
 
 const samples = [
   { html: 'runs/agent-tongue/agent-tongue-1e393c.html', account: 'runs/agent-tongue/README.md' },
@@ -33,6 +33,7 @@ const samples = [
 ];
 
 const links = (html) => [...html.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
+const idsOf = (html) => new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
 
 /** Execute a shipped export's embedded renderer against a stub DOM and
  *  return the three panes. The regression this gates is real: an early
@@ -60,7 +61,7 @@ const renderExport = (html) => {
 };
 
 test('the Pages source is static: no build step, no Jekyll', () => {
-  for (const file of ['index.html', 'samples.html', 'site.css', '.nojekyll',
+  for (const file of ['index.html', 'learn.html', 'samples.html', 'site.css', '.nojekyll',
     'assets/why-compact-dsh.svg', 'assets/one-tool-call.svg']) {
     assert.ok(existsSync(join(docs, file)), `docs/${file} is missing`);
   }
@@ -70,7 +71,7 @@ test('every local link and image on the site resolves', () => {
   for (const page of pages) {
     const file = join(docs, page);
     const html = readFileSync(file, 'utf8');
-    const ids = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+    const ids = idsOf(html);
     for (const url of links(html)) {
       if (/^(?:[a-z]+:|\/\/)/i.test(url)) continue; // external
       const [path, hash] = url.split('#');
@@ -78,9 +79,25 @@ test('every local link and image on the site resolves', () => {
         assert.ok(hash && ids.has(hash), `${page}: #${hash} names no element`);
         continue;
       }
-      assert.ok(existsSync(resolve(dirname(file), path)), `${page}: ${url} does not exist`);
+      const target = resolve(dirname(file), path);
+      assert.ok(existsSync(target), `${page}: ${url} does not exist`);
+      // A hash into another site page must name an element there. The
+      // exports render their post ids at runtime, so only the site's own
+      // pages are checked.
+      if (hash && pages.includes(relative(docs, target))) {
+        assert.ok(idsOf(readFileSync(target, 'utf8')).has(hash), `${page}: ${url} names no element`);
+      }
     }
   }
+});
+
+test('the landing ladder and the learn page tell the same ideas, in the same order', () => {
+  const rungs = [...readFileSync(join(docs, 'index.html'), 'utf8')
+    .matchAll(/<article class="card rung">[\s\S]*?href="learn\.html#([^"]+)"/g)].map((m) => m[1]);
+  const sections = [...readFileSync(join(docs, 'learn.html'), 'utf8')
+    .matchAll(/<section class="section concept" id="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(sections, ['law', 'gates', 'approval', 'loopguard', 'record', 'communities']);
+  assert.deepEqual(rungs, sections, 'each rung opens the learn page at its own idea');
 });
 
 test('every community sample is published with its account and its brief', () => {
