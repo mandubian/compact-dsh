@@ -57,12 +57,13 @@ export function briefingText(charter, member, extras) {
     // model members get for theirs
     lines.push(
       'YOU ARE HUMAN — the Principal, seated as a member like any other. You do not type tool calls:',
-      '  the page is your instrument, and each of your turns is one card with three buttons —',
+      '  the page is your instrument, and each of your turns is one card —',
       '  POST publishes your words VERBATIM as forum_post on the topic (a governed act on YOUR record,',
-      '  attributed to you, citable like any member\'s); PASS records your choice not to speak, with your',
-      '  reason (forum_pass — not a post, enters no topic); SAY puts your words on your own chain and ends',
-      '  the turn (also not a post). After a POST the card returns with the result — post again, or say,',
-      '  or pass. A timeout is your honest silence: the turn performs no act.',
+      '  attributed to you, citable like any member\'s) and ENDS your turn; "post & keep the floor"',
+      '  brings the card back with the result, to post again. PASS records your choice not to speak, with',
+      '  your reason (forum_pass — not a post, enters no topic), and ends the turn; SAY puts your words on',
+      '  your own chain and ends the turn (also not a post). A refused act always comes back on the card,',
+      '  with the refusal. A timeout is your honest silence: the turn performs no act.',
       'Say what you mean under your own name. Never claim an act you did not perform.',
     );
   } else {

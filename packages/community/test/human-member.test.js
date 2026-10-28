@@ -72,7 +72,7 @@ test('the floor door: pose waits, the page settles one act, and the forum\'s own
 
   const settled = seat.settleFloor(pending[0].id, { act: 'post', text: 'I suspect the parser lies.' });
   assert.ok(settled && !settled.error);
-  assert.deepEqual(await turnP, { act: 'post', topic: 'cross-exam-floor', text: 'I suspect the parser lies.' });
+  assert.deepEqual(await turnP, { act: 'post', topic: 'cross-exam-floor', text: 'I suspect the parser lies.', keep: false });
   assert.equal(seat.pending().length, 0);
 
   // pass and say carry their own shape
@@ -204,7 +204,7 @@ test('the observatory: the floor endpoint settles the act from the page; invalid
 
   const ok = await fetch(`${obs.url}floor/${floor.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ act: 'post', text: 'H1: the parser accepts garbage.', topic: 'cross-exam-floor' }) });
   assert.equal(ok.status, 200);
-  assert.deepEqual(await turnP, { act: 'post', topic: 'cross-exam-floor', text: 'H1: the parser accepts garbage.' });
+  assert.deepEqual(await turnP, { act: 'post', topic: 'cross-exam-floor', text: 'H1: the parser accepts garbage.', keep: false });
 
   const gone = await fetch(`${obs.url}floor/${floor.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ act: 'pass', text: 'x' }) });
   assert.equal(gone.status, 404, 'a settled floor turn cannot act twice');
@@ -259,6 +259,76 @@ test('every pending card carries its expiry — the page counts down to the hone
   seat.settleFloor(floor.id, { act: 'say', text: 'ok' });
   seat.replyQuestion(question.id, 'the first one');
   await Promise.all([turn, asked]);
+});
+
+test('a landed post or pass ENDS the human\'s turn — no second card; keep the floor, or a refusal, brings it back', async () => {
+  // the live cross-exam finding: after a post the loop handed the result
+  // back to the page, which re-posed a card — it read as a new question,
+  // and the whole community waited on it
+  const posed = [];
+  const queue = [];
+  const seat = { poseFloor: async (args) => { posed.push(args); return queue.shift(); } };
+  const adapter = humanMemberAdapter({ seat, topic: 'floor' });
+  const framing = { role: 'user', content: [{ type: 'text', text: 'Round 1 of 6, member "accuser".' }] };
+  const call = (id, name) => ({ role: 'assistant', content: [{ type: 'tool-call', id, name, arguments: '{}' }] });
+  const result = (id, text) => ({ role: 'tool', toolCallId: id, content: [{ type: 'text', text }] });
+
+  // post → the tool call; its LANDED result → the turn ends, no card
+  queue.push({ act: 'post', topic: 'floor', text: 'H1', keep: false });
+  let chunks = await collect(adapter.stream({ messages: [framing] }));
+  const id1 = chunks.find((c) => c.type === 'tool-call-delta').id;
+  chunks = await collect(adapter.stream({ messages: [framing, call(id1, 'forum_post'), result(id1, '[forum] fp_7 posted to floor (1 post(s) in topic). It is a governed act on your record.')] }));
+  assert.equal(posed.length, 1, 'no second card');
+  assert.deepEqual(chunks.map((c) => c.type), ['text-delta', 'finish']);
+  assert.match(chunks[0].text, /posted fp_7 and ended the turn/);
+
+  // pass → ends the turn the same way
+  queue.push({ act: 'pass', reason: 'waiting on the chair' });
+  chunks = await collect(adapter.stream({ messages: [framing] }));
+  const id2 = chunks.find((c) => c.type === 'tool-call-delta').id;
+  chunks = await collect(adapter.stream({ messages: [framing, call(id2, 'forum_pass'), result(id2, '[forum] pass recorded — not a post. It entered no topic.')] }));
+  assert.equal(posed.length, 2, 'no card after a pass either');
+  assert.match(chunks[0].text, /passed and ended the turn/);
+
+  // post & keep the floor → the card comes back with the result
+  queue.push({ act: 'post', topic: 'floor', text: 'H2', keep: true }, { act: 'say', text: 'done' });
+  chunks = await collect(adapter.stream({ messages: [framing] }));
+  const id3 = chunks.find((c) => c.type === 'tool-call-delta').id;
+  await collect(adapter.stream({ messages: [framing, call(id3, 'forum_post'), result(id3, '[forum] fp_8 posted to floor (2 post(s) in topic).')] }));
+  assert.equal(posed.length, 4, 'kept the floor: a second card');
+  assert.match(posed[3].lastResult, /fp_8 posted/);
+
+  // a REFUSED post never ends the turn silently: the card returns with the refusal
+  queue.push({ act: 'post', topic: 'floor', text: 'H3', keep: false }, { act: 'say', text: 'ok' });
+  chunks = await collect(adapter.stream({ messages: [framing] }));
+  const id4 = chunks.find((c) => c.type === 'tool-call-delta').id;
+  await collect(adapter.stream({ messages: [framing, call(id4, 'forum_post'), result(id4, 'Error: [LG/LG-5] loop guard trip (RedundantRosterPolling): …')] }));
+  assert.equal(posed.length, 6, 'refused: the card is back');
+  assert.match(posed[5].lastResult, /\[LG\/LG-5\]/);
+});
+
+test('a new turn\'s card shows no "last act" from the turn before — the round\'s news leads', async () => {
+  let posed = null;
+  const adapter = humanMemberAdapter({ seat: { poseFloor: async (args) => { posed = args; return { act: 'say', text: 'ok' }; } } });
+  await collect(adapter.stream({ messages: [
+    { role: 'user', content: [{ type: 'text', text: 'Round 1 of 2, member "accuser".' }] },
+    { role: 'assistant', content: [{ type: 'tool-call', id: 'human-1', name: 'forum_post', arguments: '{}' }] },
+    { role: 'tool', toolCallId: 'human-1', content: [{ type: 'text', text: '[forum] fp_1 posted to floor (1 post(s) in topic).' }] },
+    { role: 'assistant', content: [{ type: 'text', text: '[the Principal posted fp_1 and ended the turn]' }] },
+    { role: 'user', content: [{ type: 'text', text: 'Round 2 of 2, member "accuser". New on the forum since your last turn (1 post(s)):' }] },
+  ] }));
+  assert.equal(posed.lastResult, null, 'round 1\'s post is not round 2\'s last act');
+  assert.match(posed.framing, /^Round 2 of 2/);
+});
+
+test('the seat and the page carry "keep the floor"; the human briefing says a post ends the turn', async () => {
+  const seat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 60_000, defaultTopic: 'floor' });
+  const turn = seat.poseFloor({ member: 'accuser', by: 'accuser', framing: 'x' });
+  seat.settleFloor(seat.pending()[0].id, { act: 'post', text: 'H1', keep: true });
+  assert.equal((await turn).keep, true);
+  const brief = briefingText(validateCharter({ ...BASE, members: [{ id: 'accuser', human: true, persona: 'the Principal, as accuser' }] }), { id: 'accuser', human: true });
+  assert.match(brief, /and ENDS your turn; "post & keep the floor"/);
+  assert.match(brief, /A refused act always comes back on the card/);
 });
 
 test('a waiting floor card hears the abort: withdrawn at once, no act, not counted as silence', async () => {
@@ -338,6 +408,12 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   // card never came back (the reconciler saw nothing change)
   assert.match(script, /if \(r && r\.error\) \{ showWhy\(div, r\.error\); return; \}/);
   assert.match(script, /if \(wasF\.why\) showWhy\(div, wasF\.why\);/);
+  // a post ends the turn; keeping the floor is the explicit second button,
+  // and a card that comes back leads with the result, the briefing folded
+  assert.match(script, /Post &amp; end turn/);
+  assert.match(script, /div\.querySelector\('\.keep'\)\.onclick = \(\) => send\('post', true\);/);
+  assert.match(script, /keep: keep === true/);
+  assert.match(script, /'<details class="told"' \+ \(f\.lastResult \? '' : ' open'\)/);
   // made for a human: the seat widens while words are owed, the tab says
   // so, each card counts down, Ctrl+Enter posts, the count names the
   // forum's limits, and a rebuild keeps the cursor where the human left it

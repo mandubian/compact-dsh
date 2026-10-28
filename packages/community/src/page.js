@@ -133,6 +133,9 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   .ask .acts-row button.pass { background: #2a2a2a; color: #ddd; border: 1px solid #555; }
   .ask .acts-row button.say { background: #1d3a5c; color: #def; border: 1px solid #37a; }
   .why { color: #ff9d7d; margin-top: 4px; }
+  .keeprow { text-align: right; }
+  .ask .keeprow button.keep { margin: 0; padding: 2px 8px; font-size: 11.5px; background: none; color: #9ab; border: 1px dashed #445; border-radius: 4px; }
+  .ask .keeprow button.keep:disabled { opacity: 0.4; cursor: not-allowed; }
   .muted { color: #666; }
   .prov { font-size: 11.5px; margin-top: 2px; }
   .charter { margin-top: 6px; padding: 6px 10px; border-left: 3px solid #39424e; background: #161b21; font-size: 12px; color: #cdd6e0; white-space: pre-wrap; word-break: break-word; }
@@ -358,7 +361,7 @@ function renderPending(p) {
     div.innerHTML =
       '<div class="turnhead"><div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div>' + leftHtml(f) + '</div>' +
       (f.lastResult ? '<div class="last">your last act, as the record returned it:<pre class="command">' + esc(f.lastResult) + '</pre></div>' : '') +
-      '<details class="told" open><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : 'what the community told you this round') + '</summary>' +
+      '<details class="told"' + (f.lastResult ? '' : ' open') + '><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : 'what the community told you this round') + '</summary>' +
       '<div class="detail">' + esc(f.framing || '(no framing)') + '</div></details>' +
       '<div class="composer">' +
         '<label for="ta-' + esc(f.id) + '">your words — posted verbatim, under your name</label>' +
@@ -366,15 +369,16 @@ function renderPending(p) {
         '<div class="meta"><span>topic <input class="topic" value="' + esc(f.defaultTopic ?? '') + '" placeholder="the charter floor"></span>' +
         '<span class="count"></span></div>' +
         '<div class="acts-row">' +
-          '<button class="approve post">Post to the forum<small>published verbatim, under your name</small></button>' +
-          '<button class="deny pass">Pass<small>no post — your words are the recorded reason</small></button>' +
+          '<button class="approve post">Post &amp; end turn<small>published verbatim, under your name</small></button>' +
+          '<button class="deny pass">Pass<small>no post — your words are the recorded reason; ends the turn</small></button>' +
           '<button class="say">Say &amp; end turn<small>on your own record only, not posted</small></button>' +
         '</div>' +
+        '<div class="keeprow"><button class="keep" title="post, then this card comes back with the result — to post again">post &amp; keep the floor</button></div>' +
       '</div>';
     const ta = div.querySelector('textarea');
     const ti = div.querySelector('input.topic');
     const count = div.querySelector('.count');
-    const buttons = div.querySelectorAll('.acts-row button');
+    const buttons = div.querySelectorAll('.acts-row button, .keeprow button');
     // the forum's own limits (a post ≤ 8000, a pass reason ≤ 2000) — the
     // seat refuses past them; the count says so before the press does
     const recount = () => {
@@ -384,9 +388,9 @@ function renderPending(p) {
       buttons.forEach((b) => { b.disabled = !ta.value.trim(); });
     };
     ta.oninput = recount;
-    const send = (act) => {
+    const send = (act, keep) => {
       if (!ta.value.trim()) return;
-      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value }) }).then((r) => {
+      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value, keep: keep === true }) }).then((r) => {
         // a refusal (an oversized post, a bad topic) keeps the card and the
         // words, and says why: the turn is still pending, and a card removed
         // here never came back (the reconciler saw nothing change)
@@ -397,12 +401,14 @@ function renderPending(p) {
     div.querySelector('.approve').onclick = () => send('post');
     div.querySelector('.deny').onclick = () => send('pass');
     div.querySelector('.say').onclick = () => send('say');
+    div.querySelector('.keep').onclick = () => send('post', true);
     ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); send('post'); } };
     box.appendChild(div);
     const wasF = saved[f.id];
     if (wasF) {
       const d = div.querySelector('details');
       if (d && wasF.open === false) d.open = false;
+      if (d && wasF.open === true) d.open = true;
       if (wasF.text != null) ta.value = wasF.text;
       if (wasF.topic != null) ti.value = wasF.topic;
       if (wasF.why) showWhy(div, wasF.why);

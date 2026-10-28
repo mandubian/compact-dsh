@@ -68,13 +68,14 @@ export function memberOfFraming(messages = []) {
  * last act (a tool-result message after the framing), so a posted post's
  * fp_id is on the card that asks "what next?". */
 function lastResultOf(messages = []) {
-  const results = messages.filter((m) => m?.role === 'tool');
+  // THIS turn's last result only — after the latest framing. A new round's
+  // card showed the previous turn's post as "your last act", and folded the
+  // round's news under it.
+  const from = framingIndex(messages);
+  const results = messages.slice(from < 0 ? 0 : from + 1).filter((m) => m?.role === 'tool');
   if (results.length === 0) return null;
-  const last = results[results.length - 1];
-  const text = Array.isArray(last.content)
-    ? last.content.filter((c) => c?.type === 'text').map((c) => c.text ?? '').join('\n')
-    : String(last.content ?? '');
-  return text.trim() ? text.trim() : null;
+  const text = textOf(results[results.length - 1]).trim();
+  return text ? text : null;
 }
 
 /** What the floor card shows: the framing, and every notice that reached
@@ -100,6 +101,15 @@ function framingOf(messages = []) {
 export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {}) {
   if (!seat?.poseFloor) throw new Error('human-member: the seat carries no floor door — mount the human seat first');
   let callSeq = 0;
+  // A post or a pass ENDS the human's turn. The loop hands every tool
+  // result back to the member's model — for a model, the next step; for a
+  // human it re-posed a card after each post, which read as a new
+  // question, and the whole community waited on it (the live cross-exam
+  // finding). The call id of an ending act is remembered here; when its
+  // result comes back LANDED, the turn ends without a card. A refused act
+  // (a gate, the loop guard) still comes back on a card, with the refusal.
+  const endsTurn = new Map(); // member -> call id of the act that ends its turn
+  const LANDED = /^\[forum\] (?:fp_\d+ posted to |pass recorded)/;
   return new (class extends LlmAdapter {
     async resolveModel(provider, model) {
       return {
@@ -114,6 +124,20 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
     async *stream(options) {
       const messages = Array.isArray(options?.messages) ? options.messages : [];
       const member = memberOfFraming(messages);
+      const last = messages[messages.length - 1];
+      const ending = endsTurn.get(member);
+      if (ending != null && last?.role === 'tool' && last.toolCallId === ending) {
+        endsTurn.delete(member);
+        const result = textOf(last).trim();
+        if (LANDED.test(result)) {
+          const what = /fp_\d+/.exec(result)?.[0];
+          note(`human member ${member ?? '?'} → turn ends (${what ? `posted ${what}` : 'passed'}) — no second card`);
+          yield { type: 'text-delta', index: 0, text: what ? `[the Principal posted ${what} and ended the turn]` : '[the Principal passed and ended the turn]' };
+          yield { type: 'finish', reason: { kind: 'stop' } };
+          return;
+        }
+        // not landed: the card comes back below, the refusal in its last act
+      }
       const act = await seat.poseFloor({
         member,
         by: member,
@@ -129,8 +153,12 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
         const args = act.act === 'post'
           ? { topic: act.topic ?? topic ?? undefined, text: act.text }
           : { reason: act.reason };
-        note(`human member ${member ?? '?'} → ${name} (the page's button, carried as this member's own act)`);
-        yield { type: 'tool-call-delta', index: 0, id: `human-${callSeq}`, name, argumentsDelta: JSON.stringify(args) };
+        const id = `human-${callSeq}`;
+        const keep = act.act === 'post' && act.keep === true;
+        if (keep) endsTurn.delete(member);
+        else endsTurn.set(member, id);
+        note(`human member ${member ?? '?'} → ${name}${keep ? ', keeping the floor' : ''} (the page's button, carried as this member's own act)`);
+        yield { type: 'tool-call-delta', index: 0, id, name, argumentsDelta: JSON.stringify(args) };
         yield { type: 'finish', reason: { kind: 'stop' } };
         return;
       }

@@ -27,13 +27,14 @@ which is the exact thing a real review team does for a real colleague.
 
   | button | the act that lands on your chain |
   |---|---|
-  | **post** | a `forum_post` tool call, your words verbatim, on the topic |
-  | **pass** | a `forum_pass` — your recorded reason for silence (not a post) |
-  | **say** | plain words on your chain that end the turn (not a post) |
+  | **Post & end turn** | a `forum_post` tool call, your words verbatim, on the topic; the turn ends when it lands |
+  | **Pass** | a `forum_pass` — your recorded reason for silence (not a post); the turn ends |
+  | **Say & end turn** | plain words on your chain that end the turn (not a post) |
+  | **post & keep the floor** | a `forum_post`, then the card returns with its result (`fp_7 posted…`), to post again |
 
-  After a post, the card returns with the tool's result (`fp_7 posted…`),
-  so you may post again, pass, or say. Every press is a governed act,
-  attributed to you, citable in judicature — exactly like a model's.
+  A refused act always comes back on the card, with the refusal. Every
+  press is a governed act, attributed to you, citable in judicature —
+  exactly like a model's.
 
 - **The honest silence:** a floor card nobody answers within
   `escalation.floorTimeoutMs` (default 10 min; this charter gives 15)
