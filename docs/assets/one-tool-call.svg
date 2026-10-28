@@ -58,8 +58,8 @@
   <!-- STATION 2 -->
   <rect x="40" y="300" width="740" height="84" rx="10" class="station"/>
   <text x="64" y="328" class="t-lab c-ai">1 · LOOPGUARD <tspan class="t-s" letter-spacing="0">— is this loop healthy? · packages/loopguard</tspan></text>
-  <text x="64" y="352" class="t-b">every distinct command is distinct work; recurring failure latches the loop —</text>
-  <text x="64" y="372" class="t-b">corrective prose, repair budget 3 — <tspan font-weight="700">forty silent identical turns: impossible.</tspan></text>
+  <text x="64" y="352" class="t-b">an act is its tool and its arguments; a loop without progress latches work</text>
+  <text x="64" y="372" class="t-b">until the Principal speaks. <tspan font-weight="700">Never latched: asking for help, petition, exit.</tspan></text>
   <line x1="410" y1="384" x2="410" y2="404" stroke="#0969da" stroke-width="2" marker-end="url(#a-ai)"/>
 
   <!-- STATION 3 -->
