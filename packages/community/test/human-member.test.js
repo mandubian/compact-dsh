@@ -490,3 +490,28 @@ test('cross-exam-plain differs from cross-exam ONLY in its words — the compari
   assert.deepEqual(legalIn([p.goal, p.briefingExtra, ...p.members.map((m) => m.persona), code(p, 'sources/concerns.md')].join(' ')), []);
   assert.match(p.goal, /VERDICTS:/, 'the machine-read marker stays a marker');
 });
+
+test('cross-exam-fix: review, then the human decides, then a fix in a copy — plain, ordered, and the summaries detectable', async () => {
+  const { GATE_RE } = await import('../../../tools/run-manifest.mjs');
+  const f = charterFile('cross-exam-fix');
+  const plain = charterFile('cross-exam-plain');
+  assert.equal(f.voice, 'plain');
+  const code = (c, path) => c.sources.find((s) => s.path === path)?.content;
+  assert.equal(code(f, 'sources/purse.js'), code(charterFile('cross-exam'), 'sources/purse.js'), 'the same code under review, byte for byte');
+  assert.deepEqual(f.members.map((m) => [m.id, m.prefix, m.human === true, m.model ?? null]), plain.members.map((m) => [m.id, m.prefix, m.human === true, m.model ?? null]), 'the same people at the table');
+  assert.deepEqual(legalIn([f.goal, f.briefingExtra, ...f.members.map((m) => m.persona), code(f, 'sources/steps.md')].join(' ')), [], 'plain words throughout');
+  // the steps, in order, and the copy that takes the fix
+  assert.match(f.goal, /1\) REVIEW[\s\S]*2\) THE HUMAN DECIDES[\s\S]*3\) FIX/);
+  assert.match(f.goal, /sources\/purse\.fixed\.js; the original sources\/purse\.js never changes/);
+  assert.match(f.briefingExtra, /Nobody starts fixing before the human has said what to fix/);
+  // what the cross-exam-plain run taught: the stage said aloud, the summary's
+  // first line, the human's answers recorded as given, no workarounds, a stop
+  assert.match(f.briefingExtra, /Where we are: …  What we need from you: …/);
+  assert.match(f.briefingExtra, /the first line of each is exactly VERDICTS: — nothing before it, not even your name/);
+  assert.match(f.briefingExtra, /do not call it item by item/);
+  assert.match(f.briefingExtra, /do not invent a workaround/);
+  assert.match(f.briefingExtra, /once the human has answered the fix summary, the work is over — pass with a reason/);
+  // a summary written to the rule is the gate post the tools detect
+  assert.match('VERDICTS:\n1) C1 — CONFIRMED …', GATE_RE);
+  assert.doesNotMatch('Chair. I re-ran every command…\n\nVERDICTS:\n1) …', GATE_RE, 'the cross-exam-plain-1 shape is why the rule exists');
+});
