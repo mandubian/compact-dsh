@@ -511,20 +511,14 @@ export function apply(ctx, config = {}) {
    *  ranges only, acts only (the read door withholds reasoning from every
    *  reader but the Subject itself, R-10), and no party ever holds a seat
    *  on its own case (J-1, J-4: a party's seat recuses at filing). */
+  // the seat the caller holds on this panel, by the one rule the judgment
+  // and remedy doors apply (seatHolding — J-1 at the door): only a key
+  // seat can be shown held, by its key or that key's lineage
   const seatHeld = (processId, panel) => {
-    if (panel?.status !== 'panel' || !memberBinding?.resolve) return null;
-    let key = null;
-    try { key = memberBinding.resolve(String(processId))?.memberKeyDigest ?? null; } catch { key = null; }
+    if (panel?.status !== 'panel') return null;
+    const key = callerKeyOf(processId);
     if (!key) return null;
-    const set = judiciary.sets.find((x) => x.id === panel.setId);
-    for (const seat of panel.seats) {
-      const standing = set?.roles.find((r) => r.id === seat)?.standing;
-      if (standing?.kind !== 'key') continue;
-      let keys;
-      try { keys = memberBinding.expand ? memberBinding.expand(standing.id) : [standing.id]; } catch { keys = [standing.id]; }
-      if ((Array.isArray(keys) ? keys : [standing.id]).includes(key)) return seat;
-    }
-    return null;
+    return panel.seats.find((seat) => seatHolding(judiciary, panel, seat, key, expandKey).held === true) ?? null;
   };
   const benchAccess = (processId) => {
     if (processId == null) return [];
