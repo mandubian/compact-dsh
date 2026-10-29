@@ -118,7 +118,7 @@ export function briefingText(charter, member, extras) {
   }
   lines.push(
     '',
-    `THIS RUN: ${charter.budgets.rounds} rounds; you act once per round. Budgets are enforced, not advisory.`,
+    `THIS RUN: ${charter.budgets.rounds} rounds; you act once per round. Budgets are enforced, not advisory.${charter.endWhenQuiet ? ' A full round in which nobody posts ends the run: the work is done.' : ''}`,
     'Act, speak, verify — or pass plainly with forum_pass {"reason":"…"}. The community evolves by what its members actually do.',
   );
   if (charter.briefingExtra) lines.push('', charter.briefingExtra);
@@ -228,7 +228,7 @@ export function plainBriefingText(charter, member, extras) {
   }
   lines.push(
     '',
-    `THIS RUN: ${charter.budgets.rounds} rounds; ${member.human ? 'you get' : 'you take'} one turn per round. The budgets are enforced.`,
+    `THIS RUN: ${charter.budgets.rounds} rounds; ${member.human ? 'you get' : 'you take'} one turn per round. The budgets are enforced.${charter.endWhenQuiet ? ' If a whole round goes by with nobody posting, the work is done and the run ends.' : ''}`,
   );
   if (charter.briefingExtra) lines.push('', charter.briefingExtra);
   return lines.join('\n');
@@ -411,11 +411,23 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
     return { stop: false, why: reason };
   };
 
+  // a quiet round (charter endWhenQuiet): nothing new on the forum, no
+  // court activity, and no human timeout. Once everyone is done, every
+  // further round only spends tokens — and poses the human a card that can
+  // time out (the cross-exam-fix-1 finding: approved in round 3, idle to
+  // round 8). A human timeout keeps the run going: the human may be away
+  // while the others wait for them, and absence is not agreement.
+  const activity = () => ({
+    posts: forum.forum.posts.length,
+    court: dockedCases().map((c) => `${c.id}:${c.state ?? ''}:${c.judgment != null ? 1 : 0}`).join(','),
+    timeouts: divergenceCounters?.humanSeatTimeouts?.() ?? 0,
+  });
   for (let round = 1; round <= charter.budgets.rounds; round += 1) {
     if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
     await waitWhilePaused();
     if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
     stats.rounds = round;
+    const atRoundStart = activity();
     // the bench hears first each round: justice that waits for the
     // community to finish is justice the community outgrew
     for (const seat of bench) {
@@ -468,6 +480,13 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
       const action = maybeAutoPause();
       if (action?.stop) {
         stats.endReason = `auto-stopped (divergence: ${action.why})`;
+        return finish(stats, seated, hooks);
+      }
+    }
+    if (charter.endWhenQuiet && round < charter.budgets.rounds && !controls.stopMode) {
+      const now = activity();
+      if (now.posts === atRoundStart.posts && now.court === atRoundStart.court && now.timeouts === atRoundStart.timeouts) {
+        stats.endReason = `quiet: round ${round} passed with no new post — the work is done`;
         return finish(stats, seated, hooks);
       }
     }
