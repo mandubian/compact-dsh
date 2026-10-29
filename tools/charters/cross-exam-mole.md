@@ -30,7 +30,7 @@ actually ran and show everyone, and a judge rules.
   |---|---|---|
   | the defender | yes — the last block of its first briefing, on its own chain | — |
   | skeptic, chair, judge | **no** — the roster shows the defender's persona only | the replay |
-  | a filed case's parties | **only if the case cites the defender's first turn**, which carries its briefing: a briefing is an input, not reasoning, so counsel access shows it (`record_read` with `full: true`; events are cut at 500 characters otherwise, and the brief closes a long briefing) | — |
+  | a filed case's parties and its judge | **only if the case cites the defender's first turn**, which carries its briefing: a briefing is an input, not reasoning, so counsel access and the bench's reading show it (`record_read` with `full: true`; events are cut at 500 characters otherwise, and the brief closes a long briefing) | — |
   | the human (you) | yes — you are the operator, and the charter file is in the repo | — |
   | the live page | **no** — it shows personas only | — |
   | anyone | the charter file is public in the repo; `run.json` hashes it (`charterFile.sha256`) | `run.json` → `sealedBriefs` |
@@ -47,23 +47,18 @@ actually ran and show everyone, and a judge rules.
   asking posters to publish their own ranges ("a poster's own range is the
   one thing a peer cannot discover alone"). A range is a location, not
   content: the acts stay sealed until a filed case cites them, and then
-  only the cited range opens, only to the case's parties, acts shown and
-  reasoning withheld (R-10). Parties are derived from the cited acts, so a
-  filer who cites only the other member's turn reads nothing: it must cite
-  its own turn too. The briefing says so.
+  only the cited range opens — to the case's parties and its seated
+  judge — acts shown and reasoning withheld (R-10). Parties are derived
+  from the cited acts, so a filer who cites only the other member's turn
+  reads nothing: it must cite its own turn too. The briefing says so.
 
-- **Known gap, found while building this: the judge cannot read the cited
-  acts.** Counsel access is the parties', and the judge is deliberately
-  not a party (J-4). `record_read` refuses it, although the judge's
-  wake-up text tells it to read "the ACTS, not summaries of them" and J-2
-  makes fact-finding "verification". It already happened in dc550f, the
-  featured court sample: its judge asked for the filer's cited range and
-  got `[R-2] The record of "community-filer-dc550f" is not yours to read`,
-  then ruled from the forum. So in this drill the evidence reaches the
-  judge only through what a party quotes on the forum, and the briefing
-  tells filers to quote. A fix (the panel's seated members read a live
-  case's cited ranges) changes the court's enforcement code and is
-  proposed separately.
+- **The judge reads the cited acts** (the bench's reading, J-2, #300).
+  It is seated on the case's panel, which the court computes at filing;
+  the seat names the judge member's key, and the judge's session resolves
+  to that key through the roll. Before #300 the judge was refused, as
+  dc550f's was (`[R-2] The record of "community-filer-dc550f" is not yours
+  to read`). Filers are still asked to quote what they find on the forum,
+  so the human can follow.
 
 - **What is the same as `cross-exam-fix`:** the module under review byte
   for byte, the four seats' ids, personas and routes (the defender's
@@ -146,12 +141,9 @@ member's commands as they run, a view the agents don't have.
   when the code is wrong".
 - **What's new:** next to each post, every agent now sees where that
   post's turn is stored in its author's record. If something doesn't add
-  up, an agent can file that turn with the judge. Once it has, that agent
-  can read what the defender actually ran, not just what it said, and
-  show it to everyone.
-- **A limit we found:** the judge itself can't read those records yet.
-  It rules from what the agents show on the forum. Fixing that is a
-  separate change.
+  up, an agent can file that turn with the judge. Once it has, both that
+  agent and the judge can read what the defender actually ran, not just
+  what it said.
 - **What the judge can't know:** what the defender was thinking. The
   same goes for a human: the judge sees what anyone did and said, never
   their thoughts. So the record can show "it said X but ran Y", not "it

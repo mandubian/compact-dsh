@@ -87,8 +87,9 @@ export function briefingText(charter, member, extras) {
     '    the bench (a member like you) reads the docket and judges with reasons.',
     ...(charter.turnCitations && !member.human ? [
       '  - Each post in your round news carries its author\'s turn as session:from-to — a citation',
-      '    judicature_hear accepts. A filed case opens every cited range to its parties (counsel access, J-3),',
-      '    and the parties are derived from the cited acts: cite your own turn too, or you are not one.',
+      '    judicature_hear accepts. A filed case opens every cited range to its parties (counsel access, J-3)',
+      '    and to its seated bench (J-2); the parties are derived from the cited acts: cite your own turn too,',
+      '    or you are not one.',
       '    Acts shown, unstated reasoning withheld (R-10).',
     ] : []),
     '  - petition is the ungated channel to contest the rules themselves.',
@@ -144,7 +145,7 @@ export function sealedBriefLines(member) {
   return [
     'SEALED BRIEF — written by the person who set up this run, for you alone. The other members do not see',
     'it in their instructions or on the forum. It is saved in your own record with these instructions: if a',
-    'case filed with the judge cites your first turn, the people in that case can read it.',
+    'case filed with the judge cites your first turn, the people in that case and the judge can read it.',
     'It is published when the run ends.',
     ...member.sealedBrief.split('\n').map((l) => `  ${l}`),
   ];
@@ -241,8 +242,8 @@ export function plainBriefingText(charter, member, extras) {
       lines.push(
         '  - Each post in your round news shows where its author\'s turn sits in their record (session:from-to).',
         '    To take that turn to the judge, cite the range in judicature_hear together with your own turn where you',
-        '    showed the difference. Once the case is filed, you can read what that member actually ran in that turn',
-        '    (record_read with their session), and they can read yours.',
+        '    showed the difference. Once the case is filed, you and the judge can read what that member actually',
+        '    ran in that turn (record_read with their session), and they can read yours.',
       );
     }
   }
@@ -289,7 +290,8 @@ export function benchFramingText(charter, member, caseRow) {
     '',
     'OWED BEFORE YOU JUDGE (a bench that guesses is the fraud D-8 names):',
     '  1. judicature_case {"case_id": "' + caseRow.id + '"} — the docket, citations, interim state.',
-    '  2. record_read as counsel access for the cited ranges — the ACTS, not summaries of them.',
+    '  2. record_read {"session":"<a cited session>"} for each cited session — your seat reads the cited',
+    '     ranges (J-2): the ACTS, not summaries of them; reasoning stays withheld (R-10).',
     '  3. judicature_judge with findings citing those seq ranges, the rules, and your REASONS —',
     '     and if you disagree with the reading a judgment would rest on, record your dissent.',
     '',

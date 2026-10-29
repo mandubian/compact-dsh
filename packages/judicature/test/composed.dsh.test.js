@@ -1055,6 +1055,62 @@ test('the D-8 appeal, seated end to end: an enforcer-class party\'s appeal is he
   void signer;
 });
 
+test('the bench\'s reading (J-2): a seated member reads the live case\'s cited acts — reasoning withheld, nothing uncited, closed once judged', async (t) => {
+  // the dc550f finding: a bench asked for the filer's cited range and was
+  // refused ("not yours to read") — counsel access was the parties' only,
+  // and the bench is never a party. Fact-finding is verification (J-2).
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildCommunityMemberDomain(dir);
+  const benchMember = domain.members.find((m) => m.prefix === 'bench');
+  const section = JSON.parse(JSON.stringify(SECTION));
+  section.sets[0].roles.push({ id: 'bench-seat', standing: { kind: 'key', id: benchMember.digest } });
+  const { tools, service, selfModelService } = await boot(t, fixtureAnnex(dir, section), { memberDomain: domain });
+  for (const s of ['specialist', 'customer', 'bench-1']) selfModelService.attest(s);
+  assert.equal(selfModelService.memberBinding.resolve('bench-1').memberId, 'member-bench');
+
+  // before any case, the bench reads nothing of anyone
+  assert.match(text(await call(tools, 'record_read', { session: 'specialist' }, 'bench-1')), /not yours to read/);
+
+  await call(tools, 'judicature_hear', { grievance: 'the specialist pushed outside its read grant', citations: 'customer:2-4,specialist:2-4' }, 'customer');
+  const id = service.docket()[0].id;
+  assert.match(text(await call(tools, 'judicature_case', { case_id: id })), /panel: first \(founder, peer, bench-seat\)/);
+  assert.equal(service.benchAccess('bench-1').length, 2, 'every citation of the case, for the seat');
+  assert.deepEqual(service.benchAccess('bystander'), [], 'no seat, no reading');
+
+  const read = text(await call(tools, 'record_read', { session: 'specialist' }, 'bench-1'));
+  assert.match(read, /the slices a live case before your seat cites \(the bench's reading, J-2 — 1 range\(s\)\)/);
+  assert.match(read, /#3 tool\/call [^\n]*curl -x proxy api\.example\.com/, 'the act itself, from the accused\'s record');
+  assert.match(read, /#2 assistant\/message [^\n]*— withheld: another Member's reasoning \(R-10\)/, 'acts, never minds');
+  assert.doesNotMatch(read, /git push origin main/, 'nothing past the cited range');
+  // the seat does not make the bench a party, and a stranger stays out
+  assert.match(text(await call(tools, 'record_read', { session: 'specialist' }, 'bystander')), /not yours to read/);
+
+  // once the judgment lands, the reading closes with the case
+  const judged = text(await call(tools, 'judicature_judge', {
+    case_id: id, seat: 'bench-seat', findings: 'specialist:2-4', rules: 'J-2', reasons: 'the cited act shows the push',
+  }, 'bench-1'));
+  assert.doesNotMatch(judged, /^\[JG\//, `the judgment lands: ${judged.slice(0, 160)}`);
+  assert.deepEqual(service.benchAccess('bench-1'), []);
+  assert.match(text(await call(tools, 'record_read', { session: 'specialist' }, 'bench-1')), /not yours to read/);
+});
+
+test('a cited read stays inside the cited ranges — a type filter or from_seq narrows within them, never past them', async (t) => {
+  // the leak this closes: a type filter fell through to the whole-session
+  // scan, and a party read `git push origin main` (#6) from a case citing #2..#4
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const { tools } = await boot(t, fixtureAnnex(dir, SECTION));
+  await call(tools, 'judicature_hear', { grievance: 'the push', citations: 'customer:2-4,specialist:2-4' }, 'customer');
+  const filtered = text(await call(tools, 'record_read', { session: 'specialist', types: 'tool/call' }, 'customer'));
+  assert.match(filtered, /#3 tool\/call/);
+  assert.doesNotMatch(filtered, /#6 |git push origin main/, 'the uncited tool call stays closed');
+  const from = text(await call(tools, 'record_read', { session: 'specialist', from_seq: 4 }, 'customer'));
+  assert.match(from, /#4 tool\/result/);
+  assert.doesNotMatch(from, /#3 tool\/call/, 'from_seq narrows inside the range');
+  assert.doesNotMatch(from, /#5 /, 'and never reaches past it');
+});
+
 test('a turn citation is a citation the door verifies — and a filer who cites its own turn too reads the accused\'s acts (cross-exam-mole)', async (t) => {
   // the community engine shows, beside each post, `session:from-to` — from
   // the record service's chain store, read before and after the turn

@@ -102,10 +102,10 @@ community on chains has trust that a third party can verify.
   and reasoning withheld (R-10) — and parties are derived from the cited
   acts, so a filer reads the other member's turn only if it cites its own
   turn too. The human's card carries none (the floor files no cases in
-  v1); `run.json` keeps every range as `turnRanges`. **Known gap:** the
-  bench is not a party, so it cannot read the cited acts — `record_read`
-  refused dc550f's judge — and rules from what the parties show on the
-  forum.
+  v1); `run.json` keeps every range as `turnRanges`. The seated bench
+  reads the cited acts too, on the same terms (the bench's reading, J-2 —
+  [concept-judicature](concept-judicature.md)); before it could,
+  `record_read` refused dc550f's judge.
 - **The bench is a member**: filings wake model-driven bench seats with
   the reading owed before judgment — the docket, counsel access to the
   cited acts, reasons or refusal (J-3). Recusal follows the member, so a

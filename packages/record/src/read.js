@@ -38,7 +38,14 @@
 //   extension is not a blanket grant — ONLY the cited ranges of the cited
 //   session, only while the case is live, granted by the judicature
 //   service's own computation of who is a party. The rest of that record
-//   stays another Member's history.
+//   stays another Member's history — a type filter or a from_seq narrows
+//   WITHIN the cited ranges, never past them.
+//
+//   THE BENCH'S READING (J-2). Fact-finding is verification: a member
+//   seated on a live case's panel reads the case's cited ranges through
+//   the same door, on the same terms — the cited ranges only, acts only,
+//   reasoning withheld (R-10). The judicature service computes the seat;
+//   the read door only honours it.
 //
 //   FRESH AND CITABLE. The session's buffered events are flushed first, so the
 //   Subject reads up to its own latest act; every answer names the verified
@@ -114,11 +121,16 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
   if (caller == null) return '[R-2] No calling Subject is identifiable, so there is no "own record" to read.';
   const target = typeof session === 'string' && session.trim() ? session.trim() : caller;
   let scope = await scopeOf(deps.persistence, caller, target);
-  // counsel access (J-3): a live case citing this session against the caller
-  // extends standing to exactly those ranges — nothing more
+  // counsel access (J-3) and the bench's reading (J-2): a live case citing
+  // this session extends standing to exactly those ranges — nothing more
   if (!scope.ok) {
-    const cited = (await deps.counsel?.(caller, target)) ?? [];
-    if (cited.length > 0) scope = { ok: true, relation: 'cited', ranges: cited };
+    const counsel = (await deps.counsel?.(caller, target)) ?? [];
+    const bench = (await deps.bench?.(caller, target)) ?? [];
+    const seen = new Set();
+    const ranges = [...counsel, ...bench]
+      .filter((r) => { const k = `${r.fromSeq}-${r.toSeq}`; if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((a, b) => a.fromSeq - b.fromSeq);
+    if (ranges.length > 0) scope = { ok: true, relation: 'cited', ranges, counsel: counsel.length > 0, bench: bench.length > 0 };
   }
   if (!scope.ok) {
     return `[R-2] The record of "${target}" is not yours to read: ${scope.reason}. R-2 covers acts done in your ` +
@@ -160,15 +172,21 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
         verified = verified ? [Math.min(verified[0], events[0].seq), Math.max(verified[1], events.at(-1).seq)]
           : [events[0].seq, events.at(-1).seq];
       };
-      if (!filter && scope.relation === 'cited') {
-        // counsel access reads the cited ranges themselves — each verified,
-        // bounded by the same cap, nothing outside them
+      if (scope.relation === 'cited') {
+        // a cited read reads the cited ranges themselves — each verified,
+        // bounded by the same cap, nothing outside them. A type filter or a
+        // from_seq narrows INSIDE the ranges: before, a filter fell through
+        // to the whole-session scan below and returned uncited acts
         window = [];
-        const ranges = scope.ranges.slice(0, Math.max(1, n));
-        for (const r of ranges) {
+        for (const r of scope.ranges) {
+          if (hasFrom && r.toSeq < from) continue;
           const { events } = await handle.read(r.fromSeq, r.toSeq - r.fromSeq + 1);
           mark(events);
-          window.push(...events.slice(0, Math.max(0, n - window.length)));
+          for (const e of events) {
+            if (hasFrom && e.seq < from) continue;
+            if (filter && !filter(e.type)) continue;
+            if (window.length < n) window.push(e);
+          }
           if (window.length >= n) break;
         }
       } else if (!filter) {
@@ -206,7 +224,10 @@ export async function readRecord(deps, { caller, session, fromSeq, limit, types,
   const withheldCount = window.filter(e => withheldType(e.type)).length;
   const whose = scope.relation === 'self' ? 'your own session'
     : scope.relation === 'cited'
-      ? `the slices a filed case cites against you (counsel access, J-3 — ${scope.ranges.length} range(s))`
+      ? `${[
+        scope.counsel ? 'the slices a filed case cites against you (counsel access, J-3' : null,
+        scope.bench ? `${scope.counsel ? 'and ' : ''}the slices a live case before your seat cites (the bench's reading, J-2` : null,
+      ].filter(Boolean).join(') ')} — ${scope.ranges.length} range(s))`
       : `a session delegated from yours (depth ${scope.depth})`;
 
   const lines = [
