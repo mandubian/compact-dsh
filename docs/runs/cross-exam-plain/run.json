@@ -1,0 +1,311 @@
+{
+  "charter": "cross-exam-plain",
+  "runTag": "ac886b",
+  "resumed": false,
+  "startedAt": "2026-10-28T22:30:48.510Z",
+  "goal": "One human and three AI agents review a small money module, sources/purse.js, which nobody may change. The human says, in their own words, what looks wrong. The agents turn each concern into a short shell command that shows what the code really does, post the command with its output, and run each other's commands again before trusting them. When the evidence is in, the chair posts a summary that starts with 'VERDICTS:' and says, for each of the human's concerns, CONFIRMED or REJECTED, with the command and output that show it. The review is done when that summary is posted and the human has answered it in their own post, item by item: agree, or disagree and why.",
+  "topic": "purse-review",
+  "code": {
+    "repo": "git@github.com:mandubian/compact-dsh.git",
+    "ref": "run/cross-exam",
+    "commit": "ea71bed49c95c02e6e5c584e08bd345ff51ecb39",
+    "digest": "f872236a668b6e2258c5edd0af1f025f5f1b96fca3bc0c31b8b347393ac4ff9b",
+    "digests": {
+      "version": "compact-code-digest/v1",
+      "commit": "ea71bed49c95c02e6e5c584e08bd345ff51ecb39",
+      "packages": [
+        {
+          "name": "compact-dsh-allowlist-gate",
+          "dir": "packages/allowlist-gate",
+          "loadedFrom": "packages/allowlist-gate",
+          "foreign": false,
+          "files": 7,
+          "digest": "565c700ada1d57996e9df1949d8a214b43ed9814e4a41a06dd63756ea5037253"
+        },
+        {
+          "name": "compact-dsh-approval",
+          "dir": "packages/approval",
+          "loadedFrom": "packages/approval",
+          "foreign": false,
+          "files": 26,
+          "digest": "6c873a68b968e12282c3d841ea2778ca8a419ad42cd4c4b8d9543fcc44b0acfa"
+        },
+        {
+          "name": "compact-dsh-blessed",
+          "dir": "packages/blessed",
+          "loadedFrom": "packages/blessed",
+          "foreign": false,
+          "files": 15,
+          "digest": "3cd0f7ca4bf9c4343cd189f1f04e05b6fdf92578755ae149507ba825ed9fed9d"
+        },
+        {
+          "name": "compact-dsh-capability-gate",
+          "dir": "packages/capability-gate",
+          "loadedFrom": "packages/capability-gate",
+          "foreign": false,
+          "files": 4,
+          "digest": "4c5e4fa36a54486c971ce45579582bf0b32ef0b45456d748b0d07929375c43f4"
+        },
+        {
+          "name": "compact-dsh-card",
+          "dir": "packages/card",
+          "loadedFrom": "packages/card",
+          "foreign": false,
+          "files": 5,
+          "digest": "7f6c57685f584ca5e2d724068b7f7ddd4681dca1c1210518150d372b929413eb"
+        },
+        {
+          "name": "compact-dsh-community",
+          "dir": "packages/community",
+          "loadedFrom": "packages/community",
+          "foreign": false,
+          "files": 13,
+          "digest": "b1db1da679c136d0d2dff3667ec3186459163e4096909e5915c90e555c83d762"
+        },
+        {
+          "name": "compact-dsh-constitution",
+          "dir": "packages/constitution",
+          "loadedFrom": "packages/constitution",
+          "foreign": false,
+          "files": 11,
+          "digest": "3adad1fb80313685561c42f051e39a093cc540d415cbe711f20d8df0af8d7097"
+        },
+        {
+          "name": "compact-dsh-egress-proxy",
+          "dir": "packages/egress-proxy",
+          "loadedFrom": "packages/egress-proxy",
+          "foreign": false,
+          "files": 7,
+          "digest": "cfc7883c18486311e28b7a6d68f8250683157e9949e01984a561382b21d4ed6b"
+        },
+        {
+          "name": "compact-dsh-emergency",
+          "dir": "packages/emergency",
+          "loadedFrom": "packages/emergency",
+          "foreign": false,
+          "files": 4,
+          "digest": "24236d281cc231ee4fe9dc4c9e3c26ef4f6335845fc00460b877f85f1668426a"
+        },
+        {
+          "name": "compact-envelope",
+          "dir": "packages/envelope",
+          "loadedFrom": "packages/envelope",
+          "foreign": false,
+          "files": 6,
+          "digest": "a7ef296350fabf4359380fb10cee37014a644c81038faba734f414d69b587a52"
+        },
+        {
+          "name": "compact-dsh-exit",
+          "dir": "packages/exit",
+          "loadedFrom": "packages/exit",
+          "foreign": false,
+          "files": 6,
+          "digest": "cd87e92245466febf9bbafdbf5b0b2fb51dc5efdfc95d9e1bed2e9e3111a71d1"
+        },
+        {
+          "name": "compact-dsh-forum",
+          "dir": "packages/forum",
+          "loadedFrom": "packages/forum",
+          "foreign": false,
+          "files": 5,
+          "digest": "e8d28da92411418a42ee6395a4ef24a0498aa7ed90e90a404658dd041663163e"
+        },
+        {
+          "name": "compact-dsh-guide",
+          "dir": "packages/guide",
+          "loadedFrom": "packages/guide",
+          "foreign": false,
+          "files": 17,
+          "digest": "fe52cf7cc0ca56012fbeb5175c00a0ef0e430e42de8c8d1c399b48e805a11337"
+        },
+        {
+          "name": "compact-dsh-judicature",
+          "dir": "packages/judicature",
+          "loadedFrom": "packages/judicature",
+          "foreign": false,
+          "files": 13,
+          "digest": "aa2163008c83dba7bbc29f5e1911a2441e16b635aa02afaf874908745d6da205"
+        },
+        {
+          "name": "compact-dsh-loopguard",
+          "dir": "packages/loopguard",
+          "loadedFrom": "packages/loopguard",
+          "foreign": false,
+          "files": 8,
+          "digest": "7df656637bd8af556da617c33371d04fb629ebabe7b9753a1d970383762c6a42"
+        },
+        {
+          "name": "compact-dsh-night-watch",
+          "dir": "packages/night-watch",
+          "loadedFrom": "packages/night-watch",
+          "foreign": false,
+          "files": 5,
+          "digest": "41201423f55c6639520dc15ca3bbcc37c6b456b40d2893662b097202c0b30814"
+        },
+        {
+          "name": "compact-dsh-petition",
+          "dir": "packages/petition",
+          "loadedFrom": "packages/petition",
+          "foreign": false,
+          "files": 6,
+          "digest": "8b935eb4e2d200abefb10f642acb6cdb0a0880bdeee15193e9ff903a52b791a5"
+        },
+        {
+          "name": "compact-dsh-promotion",
+          "dir": "packages/promotion",
+          "loadedFrom": "packages/promotion",
+          "foreign": false,
+          "files": 4,
+          "digest": "a70aa007cf2799fd1899b16cc75d1301050ad8be8ad2c17a57e3670bb5f7a84c"
+        },
+        {
+          "name": "compact-dsh-record",
+          "dir": "packages/record",
+          "loadedFrom": "packages/record",
+          "foreign": false,
+          "files": 13,
+          "digest": "7de39795e686ef374d63e1bf20f2a723735e011a851806dff7cf73afd98cb1ca"
+        },
+        {
+          "name": "compact-dsh-remote-access",
+          "dir": "packages/remote-access",
+          "loadedFrom": "packages/remote-access",
+          "foreign": false,
+          "files": 7,
+          "digest": "3882c07a58b8f869db81484f7873657ab9e6ad61b32901d297ed8e0e9b958e2f"
+        },
+        {
+          "name": "compact-dsh-sandbox-docker",
+          "dir": "packages/sandbox-docker",
+          "loadedFrom": "packages/sandbox-docker",
+          "foreign": false,
+          "files": 12,
+          "digest": "0d5632564014e4cca503a7c33590b274e652b995d359cd043f5b85ed0dc75746"
+        },
+        {
+          "name": "compact-dsh-scheduler",
+          "dir": "packages/scheduler",
+          "loadedFrom": "packages/scheduler",
+          "foreign": false,
+          "files": 4,
+          "digest": "b38b8f9f097180b17bed2e8f53dfc56d291f1e1caea797a39f0d33d56afb84e3"
+        },
+        {
+          "name": "compact-dsh-seals",
+          "dir": "packages/seals",
+          "loadedFrom": "packages/seals",
+          "foreign": false,
+          "files": 10,
+          "digest": "79c858df57dc1104fad3fbdb6345b95793243d2cdc9ffadbec89d651f494fafb"
+        },
+        {
+          "name": "compact-dsh-self-model",
+          "dir": "packages/self-model",
+          "loadedFrom": "packages/self-model",
+          "foreign": false,
+          "files": 6,
+          "digest": "84492275333f38e1fc7387310487cb9df3f9a8b3f1985459c3d86c909ad6f03c"
+        },
+        {
+          "name": "compact-dsh-specialists",
+          "dir": "packages/specialists",
+          "loadedFrom": "packages/specialists",
+          "foreign": false,
+          "files": 62,
+          "digest": "444b10e18091fa827bc414a31b2f88d3d4d2585ebf3aab91f1244b6064e85f1b"
+        }
+      ],
+      "lockfile": "a2f8254ea04ed593ea136fd1d4d882dddadce60cfad0840c6901a2621b91b28e",
+      "nodeModules": {
+        "root": "node_modules",
+        "linked": false,
+        "files": 25985,
+        "digest": "1d5bf47368bd33daa2de39787f3d8cf17b61bcc07719f70bd27235fca898d51d",
+        "verifiable": "across runs only — third-party code is not in git"
+      },
+      "digest": "f872236a668b6e2258c5edd0af1f025f5f1b96fca3bc0c31b8b347393ac4ff9b"
+    }
+  },
+  "runtime": {
+    "node": "v22.23.2",
+    "image": "dsh-tools:basic",
+    "imageDigest": "sha256:1f89a66bbec96b0804fcb211450498749f6cbe9461674b84cf03c4686b4b91dd",
+    "law": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95"
+  },
+  "charterFile": {
+    "name": "cross-exam-plain.json",
+    "sha256": "aa5b49393aafcd8a7f7daa61fd5b9bf335ac5893f598c3c525f9c8844610767e"
+  },
+  "seats": [
+    {
+      "id": "accuser",
+      "model": null,
+      "bench": false,
+      "human": true,
+      "persona": "the human: says what looks wrong in plain words, answers the agents' questions, and at the end says, item by item, whether they agree with the chair's summary"
+    },
+    {
+      "id": "defender",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "human": false,
+      "persona": "speaks for the code: turns each concern into an exact test, points out tests that prove less than they claim, explains what the code was probably meant to do — and says plainly when the code is wrong"
+    },
+    {
+      "id": "skeptic",
+      "model": "zai/glm-5.3-flash",
+      "bench": false,
+      "human": false,
+      "persona": "double-checks everyone: tries edge cases and boundary values, compares what an output shows with what someone says it shows — and looks for problems nobody raised"
+    },
+    {
+      "id": "chair",
+      "model": "zai/glm-5.3",
+      "bench": false,
+      "human": false,
+      "persona": "keeps the review fair: for each concern, finds the strongest test for and against, and writes the VERDICTS summary citing only commands that were actually run"
+    }
+  ],
+  "endedAt": "2026-10-28T23:03:44.412Z",
+  "endReason": "rounds complete",
+  "rounds": 6,
+  "turns": 24,
+  "benchCasesSeen": 0,
+  "tokens": 1343718,
+  "tokensBySeat": {
+    "defender": 438351,
+    "skeptic": 449277,
+    "chair": 456090
+  },
+  "budgets": {
+    "rounds": 6,
+    "maxTurnsPerAgent": 6,
+    "wallClockMinutes": 90,
+    "tokenCap": 1500000
+  },
+  "members": {
+    "accuser": 6,
+    "defender": 6,
+    "skeptic": 6,
+    "chair": 6
+  },
+  "model": {
+    "provider": "zai",
+    "model": "glm-5.3-flash",
+    "members": {
+      "accuser": "human/the-principal",
+      "defender": "zai/glm-5.3-flash",
+      "skeptic": "zai/glm-5.3-flash",
+      "chair": "zai/glm-5.3"
+    }
+  },
+  "divergence": {
+    "loopguardTrips": 7,
+    "humanSeatTimeouts": 4
+  },
+  "divergenceObserved": {
+    "loopguardTrips": 0,
+    "humanSeatTimeouts": 1
+  },
+  "gatePosts": []
+}
