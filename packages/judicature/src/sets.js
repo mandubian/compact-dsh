@@ -291,6 +291,35 @@ export function recusePerSet(validated, parties) {
  *
  * @returns {{status:'panel', setId, seats, refusals} | {status:'unheard', attempts}}
  */
+/**
+ * Does the caller hold `seat` on `panel`? (J-1 at the door: an act under a
+ * seat's name lands only from its holder.) A seat names a standing; a
+ * session can be shown to hold only a KEY standing — through the roll
+ * binding, the session resolves to its member's key, and `expand` walks
+ * that key's lineage (a re-keyed member still holds its seat).
+ *
+ *   { held: true }                  the caller's key is the seat's key
+ *   { held: false, reason }         a key seat, and the caller is not it
+ *   { held: null, kind }            a principal or witness standing: no
+ *                                   session resolves to it — not checkable
+ *                                   here (a declared gap, never a pass)
+ */
+export function seatHolding(validated, panel, seat, callerKey, expand = (id) => [id]) {
+  const set = validated?.sets?.find((s) => s.id === panel?.setId);
+  const standing = set?.roles?.find((r) => r.id === seat)?.standing;
+  if (!standing) return { held: false, reason: `seat "${seat}" names no role of set ${panel?.setId ?? '(none)'}` };
+  if (standing.kind !== 'key') return { held: null, kind: standing.kind };
+  if (!callerKey) {
+    return { held: false, reason: `seat "${seat}" is held under a member key, and this session resolves to none through the roll binding` };
+  }
+  let keys;
+  try { keys = expand(standing.id); } catch { keys = [standing.id]; }
+  if (!Array.isArray(keys)) keys = [standing.id];
+  return keys.includes(callerKey)
+    ? { held: true }
+    : { held: false, reason: `seat "${seat}" is held under another member's key — this session's member does not hold it` };
+}
+
 export function resolvePanel(validated, parties) {
   const attempts = recusePerSet(validated, parties);
   const first = attempts.find((a) => a.seats.length > 0);

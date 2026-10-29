@@ -1047,12 +1047,15 @@ npm run compact:community
 One composed runtime, four agent sessions — `packer`, `shipper` (the
 vicious one), `audit` (the reporter), `bench` — and a signed annex
 declaring three sets: the operator's first instance, `member-review`
-(two rehearsal member keys), and `external` — an accredited Witness the
-member roll accredits, roll-verified at boot. The composition also
-declares the **member binding** (identity slice 2): sessions are the
-deeds of a Member the roll shows, certificates carry the Member's
-countersignature, and the judicature resolves parties and recusal
-through the roll. Everything the transcript shows is the real
+(its `chair` held under the **bench member's** key, a `second` seat under
+a placeholder key no session holds), and `external` — an accredited
+Witness the member roll accredits, roll-verified at boot. The
+composition also declares the **member binding** (identity slice 2,
+many-member #217): the packer's, shipper's and audit's sessions are the
+deeds of the founder, the bench session is the deed of the bench member
+— so the bench is not a party to the case it hears. Certificates carry
+each Member's countersignature, and the judicature resolves parties,
+recusal and **who holds a seat** through the roll. Everything the transcript shows is the real
 machinery: the composed boot, the docker sandbox, the egress mediator,
 the hash-chained records, the approval layers, the petition channel,
 the judicature docket.
@@ -1070,12 +1073,14 @@ deterministic, replayable, and needs no API key.
 The world the boot declares:
 
 ```
-annex 69f0457a803f2c93… declares 3 set(s): acme-first-instance, member-review, external
-member binding (I-1 slice 2): sessions are the deeds of member "rehearsal-founder" (class principal, roll anchored through seq 2) — countersigned per certificate, parties and recusal resolved through the roll
+annex f0fccc6803578920… declares 3 set(s): acme-first-instance, member-review, external
+member binding (I-1 slice 2, #217): packer, shipper and audit are deeds of member "rehearsal-founder"; the bench is a deed of member "bench" (roll anchored through seq 3) — countersigned per certificate, parties and recusal resolved through the roll
 the bench's last rung: an accredited external Witness, roll-verified at boot — the D-8 route ends heard
 ```
 
-The story, with captured output **(verified 2026-10-07)**:
+The story, with captured output **(verified 2026-10-07; the world lines
+and the bench's step re-captured 2026-10-29, when the bench became its
+own Member)**:
 
 **1 · The wrong wears lawful clothes — zero gate refusals.** The packer
 packs the nightly export and writes its manifest. The shipper asks with
@@ -1120,7 +1125,12 @@ REFUSED acme-first-instance/operator — overlap: principal:operator-acme → pl
 **3 · The case runs its course, through doors that all exist.** Counsel
 access (the accused reads the slices cited against it — acts shown,
 reasoning withheld, R-10); an interim measure with clock-derived expiry;
-a judgment at seat `chair` with seat `second`'s dissent recorded (A-5);
+the bench reads its own attestation first (`self_describe`, R-1) — which
+is where the self-model certifies its session as the bench member's
+deed — and then a judgment at seat `chair` lands from the session that
+holds it (J-1 at the door: a party naming the seat is refused
+`[JG/seat-unheld]`), with seat `second`'s dissent recorded (A-5, named
+by the chair — a declared gap);
 four remedies riding seams that already exist — an annotation that
 travels with every later read of the push rows, a restitution obligation
 owed to the framed packer, standing revoked through the **real grant

@@ -200,3 +200,23 @@ test('the vocabulary is closed and self-documenting', () => {
     assert.ok(def.crossExaminedBy.length > 10, `${type}: the record surface that cross-examines it`);
   }
 });
+
+test('seatHolding: a key seat is held only by its key (or its lineage); principal and witness seats are not checkable here', async () => {
+  const { seatHolding } = await import('../src/sets.js');
+  const validated = { sets: [{ id: 'review', roles: [
+    { id: 'chair', standing: { kind: 'key', id: 'k-bench' } },
+    { id: 'op', standing: { kind: 'principal', id: 'operator' } },
+    { id: 'w1', standing: { kind: 'witness', id: 'k-witness' } },
+  ] }] };
+  const panel = { status: 'panel', setId: 'review', seats: ['chair', 'op', 'w1'] };
+  assert.deepEqual(seatHolding(validated, panel, 'chair', 'k-bench'), { held: true });
+  assert.equal(seatHolding(validated, panel, 'chair', 'k-party').held, false);
+  assert.match(seatHolding(validated, panel, 'chair', 'k-party').reason, /another member's key/);
+  assert.match(seatHolding(validated, panel, 'chair', null).reason, /resolves to none/);
+  // a re-keyed member still holds its seat: the lineage expands the seat's key
+  const lineage = (id) => (id === 'k-bench' ? ['k-bench', 'k-bench-2'] : [id]);
+  assert.deepEqual(seatHolding(validated, panel, 'chair', 'k-bench-2', lineage), { held: true });
+  assert.deepEqual(seatHolding(validated, panel, 'op', 'anyone'), { held: null, kind: 'principal' });
+  assert.deepEqual(seatHolding(validated, panel, 'w1', 'anyone'), { held: null, kind: 'witness' });
+  assert.match(seatHolding(validated, panel, 'nobody', 'k-bench').reason, /names no role/);
+});

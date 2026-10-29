@@ -41,7 +41,7 @@ import { buildEnvelope } from 'compact-envelope';
 import { verifyAnnex, parseManifest, verifyRoll } from 'compact-dsh-seals';
 import { COMPACT_DIGEST } from 'compact-dsh-constitution';
 import {
-  SetError, validateAdjudicatorSets, undeclared, recusePerSet, resolvePanel,
+  SetError, validateAdjudicatorSets, undeclared, recusePerSet, resolvePanel, seatHolding,
   independenceBetweenSets, trajectoryState, STANDING_KINDS, EDGE_VOCABULARY,
 } from './sets.js';
 import {
@@ -64,7 +64,7 @@ import {
 } from './precedent.js';
 
 export {
-  SetError, validateAdjudicatorSets, undeclared, recusePerSet, resolvePanel,
+  SetError, validateAdjudicatorSets, undeclared, recusePerSet, resolvePanel, seatHolding,
   independenceBetweenSets, trajectoryState, STANDING_KINDS, EDGE_VOCABULARY,
   CaseError, fileCase, caseState, recordInterim, reviewInterimsAtOpening,
   landJudgment, deriveParties, isParty, citationsAgainst, renderCase,
@@ -197,6 +197,24 @@ export function caseUnknownEnvelope(id) {
 }
 
 /** The [JG/judgment-refused] envelope — a judgment that cannot lawfully land. */
+/** The [JG/seat-unheld] envelope — J-1 at the door: an act under a seat's
+ *  name (a judgment, a dissent, a remedy) lands only from the session that
+ *  holds the seat. Before it, the door checked only that the NAMED seat was
+ *  on the panel, and a party could land a judgment on its own case. */
+export function seatUnheldEnvelope(seat, detail) {
+  return buildEnvelope({
+    gate: GATE,
+    ruleId: 'seat-unheld',
+    reason: `seat "${seat}" is not yours to act under: ${detail}. No one judges their own case (J-1), and an act ` +
+      'attributed to a seat its caller does not hold is a record of something that did not happen (D-3) — the ' +
+      'door checks who holds the seat, not only that the seat exists',
+    lawfulNextMoves: [
+      'judicature_case names the panel and its seats — act only under a seat your member holds',
+      'a party is heard, not seated: argue on the forum, or file what you contest with judicature_hear',
+    ],
+  });
+}
+
 export function judgmentRefusedEnvelope(detail) {
   return buildEnvelope({
     gate: GATE,
@@ -400,6 +418,28 @@ export function apply(ctx, config = {}) {
   const callerOf = (exec) => {
     const id = exec?.agent?.session?.id ?? exec?.agent?.id;
     return id != null ? String(id) : null;
+  };
+
+  /** J-1 at the door: the session acting under `seat` must hold it. A seat
+   *  held under a member key is checked through the roll binding; a
+   *  principal or witness seat is not checkable here (declared gap) and
+   *  keeps the form check alone. A seat the panel did not resolve is left
+   *  to the form check that already refuses it. Returns an envelope's text
+   *  to return, or null to proceed. */
+  const callerKeyOf = (processId) => {
+    if (processId == null || !memberBinding?.resolve) return null;
+    try { return memberBinding.resolve(String(processId))?.memberKeyDigest ?? null; } catch { return null; }
+  };
+  const expandKey = (id) => {
+    try { const keys = memberBinding?.expand?.(id); return Array.isArray(keys) ? keys : [id]; } catch { return [id]; }
+  };
+  const refuseUnheldSeat = (caller, panel, seat, tool) => {
+    if (panel?.status !== 'panel' || !panel.seats.includes(seat)) return null;
+    const holding = seatHolding(judiciary, panel, seat, callerKeyOf(caller), expandKey);
+    if (holding.held !== false) return null;
+    const envelope = seatUnheldEnvelope(seat, holding.reason);
+    emitRefusal(envelope, tool);
+    return envelope.text;
   };
 
   /** Verify every citation against its chain — a failed verification is a
@@ -764,6 +804,15 @@ export function apply(ctx, config = {}) {
       }
       const caller = callerOf(exec);
       const by = caller != null ? `process:${caller}` : null;
+      // J-1 at the door: the judgment's seat is its holder's act — on the
+      // open appeal's panel when one stands, else the first instance's. A
+      // dissent is still NAMED by the landing seat's holder (the dissenting
+      // seat does not countersign it): a dissent door is not built, and
+      // refusing it here would leave a key-held panel no way to record
+      // dissent at all (A-5). Declared, not hidden.
+      const operative = c.appeal != null && c.appeal.judgment == null ? c.appeal.panel : c.panel;
+      const unheld = refuseUnheldSeat(caller, operative, String(args?.seat ?? ''), 'judicature_judge');
+      if (unheld) return unheld;
 
       // the appellate branch (J-5): an open appeal re-hears from the
       // disjoint panel's seats, with the disposition the door's honesty is
@@ -837,13 +886,18 @@ export function apply(ctx, config = {}) {
       },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
-    async execute(args) {
+    async execute(args, exec) {
       const c = docket.get(String(args?.case_id ?? '').trim());
       if (!c) {
         const envelope = caseUnknownEnvelope(String(args?.case_id ?? ''));
         emitRefusal(envelope, 'judicature_remedy');
         return envelope.text;
       }
+      // J-1 at the door: a remedy is attributed to a seat of the operative
+      // panel (the appellate panel once its judgment landed) — its holder's act
+      const unheld = refuseUnheldSeat(callerOf(exec), c.appeal?.judgment != null ? c.appeal.panel : c.panel,
+        String(args?.seat ?? ''), 'judicature_remedy');
+      if (unheld) return unheld;
       const refuse = (detail) => {
         const envelope = detail instanceof CaseError
           ? remedyRefusedEnvelope(clean(detail))

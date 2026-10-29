@@ -148,7 +148,18 @@ function seqsOfCall(logPath, callId) {
  *  member-review bench of two practice member keys that hears it, and
  *  `external` — the accredited Witness the roll accredits, seat of the
  *  D-8 appellate route (verified against the composed roll at boot). */
+// the bench is its own Member (J-1): the case's acts are the founder's deeds,
+// so a bench seated under the founder's key would recuse — and a seat named
+// for a key no session holds cannot act at all (the door checks who holds a
+// seat, not only that it exists). The chair is the bench member's key; the
+// community-bench session is its deed.
+const DEMO_MEMBERS = [
+  { id: 'bench', class: 'long-lived-subject', holder: 'the community demo\'s bench member — seated as chair on member-review, never a party to the case it hears' },
+];
+
 function communityAnnex(keyringDir, keyring) {
+  const benchKey = keyring.members?.find((m) => m.id === 'bench')?.memberKeyDigest;
+  if (!benchKey) throw new Error(`${BIN} the keyring admits no "bench" member — the chair seat names its key`);
   const base = JSON.parse(readFileSync(join(keyringDir, 'enforcer.annex.json'), 'utf8'));
   const privateKey = readFileSync(join(keyringDir, 'enforcer.pem'), 'utf8');
   const keyId = base.enforcer.keyId;
@@ -166,11 +177,13 @@ function communityAnnex(keyringDir, keyring) {
       {
         id: 'member-review',
         roles: [
-          { id: 'chair', standing: { kind: 'key', id: 'member-key-7' } },
+          { id: 'chair', standing: { kind: 'key', id: benchKey } },
+          // a placeholder key no session holds: it can be NAMED in a dissent,
+          // and can never act under its own name
           { id: 'second', standing: { kind: 'key', id: 'member-key-12' } },
         ],
         trajectory: { firstExternalMemberBy: '2030-01-01T00:00:00.000Z', founderExclusions: ['genesis', 'annex', 'a-8-review'] },
-        notice: 'community demo bench: two rehearsal member keys, heard over a member-bound filing — the sessions are the deeds of a Member per the composed roll',
+        notice: 'community demo bench: the chair is the bench member\'s key (its session is community-bench); second is a placeholder key — heard over a member-bound filing, the sessions the deeds of their Members per the composed roll',
       },
       {
         // identity slice 3: the cascade's last rung, SEATED — an accredited
@@ -276,8 +289,13 @@ async function bootRuntime({ scratch, annexPath, keyring, keyringDir, workspace,
     // recusal resolved through the roll, the witness seat verifiable
     COMPACT_MEMBER_ROLL: keyring.rollPath,
     COMPACT_MEMBER_KEYRING: keyring.manifestPath,
-    COMPACT_MEMBER_KEY: join(keyringDir, 'private', 'member-rehearsal-founder.pem'),
-    COMPACT_MEMBER_ID: 'rehearsal-founder',
+    // the many-member shape (#217): the packer's, shipper's and audit's
+    // sessions are the founder's deeds; the bench session is the bench
+    // member's — so the bench is not a party to the case it hears
+    COMPACT_MEMBER_BINDINGS: JSON.stringify([
+      ...['packer', 'shipper', 'audit'].map((p) => ({ prefix: `community-${p}`, memberId: 'rehearsal-founder', memberKeyPath: join(keyringDir, 'private', 'member-rehearsal-founder.pem') })),
+      { prefix: 'community-bench', memberId: 'bench', memberKeyPath: join(keyringDir, 'private', 'member-bench.pem') },
+    ]),
     COMPACT_SANDBOX_IMAGE: IMAGE,
     COMPACT_SANDBOX_IMAGE_DIGEST: digest,
     COMPACT_SANDBOX_RECORDED_BY: 'community-demo driver (the operator seat)',
@@ -441,7 +459,7 @@ async function main() {
   // admitted Members, an accredited external Witness, epochs checkpointed
   const keyringDir = join(scratch, 'state', 'keyring');
   mkdirSync(keyringDir, { recursive: true });
-  const keyring = ensureRehearsalKeyring(keyringDir, { force: true });
+  const keyring = ensureRehearsalKeyring(keyringDir, { force: true, extraMembers: DEMO_MEMBERS });
   // the trust root, seated in THIS set: the same law bytes, re-sealed under
   // set A's own authority keys — the re-seat the amendment harness performs
   // after a body change, done here so the operator's pin is a real pin (the
@@ -472,7 +490,7 @@ async function main() {
     const binding = ctx.get('compact-self-model')?.memberBinding;
     if (binding?.declared) {
       const roll = binding.roll();
-      line(`member binding (I-1 slice 2): sessions are the deeds of member "${binding.memberId}" (class ${binding.class}, roll anchored through seq ${roll.anchoredThrough}) — countersigned per certificate, parties and recusal resolved through the roll`);
+      line(`member binding (I-1 slice 2, #217): packer, shipper and audit are deeds of member "rehearsal-founder"; the bench is a deed of member "bench" (roll anchored through seq ${roll.anchoredThrough}) — countersigned per certificate, parties and recusal resolved through the roll`);
       line(`the bench's last rung: an accredited external Witness, roll-verified at boot — the D-8 route ends heard`);
     }
     line(`sessions: packer ${packer.id.slice(0, 14)}… · shipper ${shipper.id.slice(0, 14)}… · audit ${audit.id.slice(0, 14)}… · bench ${bench.id.slice(0, 14)}…`);
@@ -597,7 +615,7 @@ async function main() {
     line(`note what the door did: the filer named NOBODY — the parties row is the derivation (the shipper, the`);
     line(`packer whose verification was cited, the filer's own acts, and key:${anchorKey}, the key that anchors every`);
     line(`cited chain). That last party is what recused the operator's first instance through the declared chain:`);
-    line(`the case passes to member-review, and no agent in this story holds a seat on it.`);
+    line(`the case passes to member-review, whose chair is the bench member's key — no party holds a seat on it.`);
 
     const interim = await audit.turn(() => audit.call('interim-1', 'judicature_interim', {
       case_id: caseId, cause: 'the releases remote is still writable — spoliation risk while the raw copy sits on it',
@@ -615,6 +633,14 @@ async function main() {
 
     // ── 6 · the hearing ──
     out('6 · THE HEARING — judgment from the member-review bench, dissent recorded (A-5)');
+    // the bench reads its own attestation first (R-1, D-2: consult it over
+    // recollection) — which is also where the self-model certifies the
+    // session as the bench member's deed: the judgment door lands a seat's
+    // judgment only from the session that holds the seat (J-1)
+    const described = await bench.turn(() => bench.call('describe-1', 'self_describe', {}));
+    const memberLine = textOf(described).split('\n').find((l) => /^Member binding:/.test(l));
+    line('$ self_describe (the bench, before it judges):');
+    line(`  ${memberLine ?? '(no member binding line)'}`);
     const judged = await bench.turn(() => bench.call('judge-1', 'judicature_judge', {
       case_id: caseId, seat: 'chair',
       findings: `${shipper.id}:${pushSeqs.callSeq}-${pushSeqs.resultSeq},${shipper.id}:${rewriteSeqs.callSeq}-${rewriteSeqs.resultSeq}`,
@@ -747,7 +773,7 @@ async function actTwo({ scratch, keyringDir, egressNetwork }) {
     // the fresh set: new authority k-of-n, new enforcer, fresh roll — the
     // statutes re-enacted under the new authority (same words, new seals)
     const keyringDirB = join(scratch, 'state', 'keyring-b');
-    const keyringB = ensureRehearsalKeyring(keyringDirB, { force: true });
+    const keyringB = ensureRehearsalKeyring(keyringDirB, { force: true, extraMembers: DEMO_MEMBERS });
     const seatB = seatTrustRoot(keyringDirB);
     const { annexPath: annexPathB } = communityAnnex(keyringDirB, keyringB);
     line(`set B installed: authority keys fresh (${keyringDirB}), roll re-admitted (two Members + the seated external, epoch checkpointed), statutes re-sealed, enforcer re-keyed, benches re-signed.`);
@@ -804,7 +830,8 @@ async function actTwo({ scratch, keyringDir, egressNetwork }) {
     const bindingB = ctxB.get('compact-self-model')?.memberBinding;
     if (bindingB?.declared) {
       const rollB = bindingB.roll();
-      line(`member binding, over roll B: sessions are the deeds of member "${bindingB.memberId}" (class ${bindingB.class}, roll anchored through seq ${rollB.anchoredThrough}) — resolved through the FRESH roll, no replumbing.`);
+      const rosterB = bindingB.members?.().map((m) => `${m.prefix} → "${m.memberId}"`).join(', ') ?? '(no roster)';
+      line(`member binding, over roll B: ${rosterB} (roll anchored through seq ${rollB.anchoredThrough}) — resolved through the FRESH roll, no replumbing.`);
     }
     const judicatureB = ctxB.get('compact-judicature');
     line(`annex B declares ${judicatureB.sets().length} set(s): ${judicatureB.sets().map((s) => s.id).join(', ')} — the same benches, seated by the new authority's declaration.`);
