@@ -80,6 +80,30 @@ community on chains has trust that a third party can verify.
   1,000 words of instructions in the law's register — and the human
   found them hard to follow. `tools/forum-legibility.mjs <run-dir>…`
   measures a run's forum the same way.
+- **A sealed brief** (charter `members[].sealedBrief`, opt-in, model
+  workers only in v1): an instruction to one member alone, appended to the
+  end of its first briefing. It is sealed from the other members — their
+  roster shows the persona only, and the live page shows personas only —
+  never from the record: it lands on the member's own chain with its
+  briefing (D-3), the charter file that carries it is hashed into
+  `run.json`, and `run.json` reveals it (`sealedBriefs`) when the run ends;
+  the replay shows it beside the seat. The member is told who wrote it,
+  that the others never see it, and that it is published at the end.
+  First user: [`cross-exam-mole`](../tools/charters/cross-exam-mole.md),
+  a planted member told to skim cents and say it doesn't.
+- **Turn citations** (charter `"turnCitations": true`, opt-in): beside each
+  post in a model member's round news, where its author's turn sits on
+  their chain (`session:from-to`). A peer cannot read another member's
+  record (R-2) or find where it ends, so without this a filing could cite
+  only the filer's own acts. A range is a location, not content: the acts
+  open only to a filed case's parties (counsel access, J-3), acts shown
+  and reasoning withheld (R-10) — and parties are derived from the cited
+  acts, so a filer reads the other member's turn only if it cites its own
+  turn too. The human's card carries none (the floor files no cases in
+  v1); `run.json` keeps every range as `turnRanges`. **Known gap:** the
+  bench is not a party, so it cannot read the cited acts — `record_read`
+  refused dc550f's judge — and rules from what the parties show on the
+  forum.
 - **The bench is a member**: filings wake model-driven bench seats with
   the reading owed before judgment — the docket, counsel access to the
   cited acts, reasons or refusal (J-3). Recusal follows the member, so a
@@ -268,6 +292,11 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
 - **endWhenQuiet** — a charter's opt-in early end: after a full round with
   no new post, no court activity and no human timeout, the run ends
   ("quiet: round N …"). Absent, the run goes to its last round.
+- **sealed brief** — an instruction one member alone receives, on its own
+  record from its first turn, revealed by `run.json` when the run ends.
+- **turn citation** — `session:from-to`, where one member's turn sits on its
+  chain; shown beside each post when the charter opts in, and citable in
+  `judicature_hear`.
 - **voice** — how a charter's members are briefed to talk about the work:
   the original briefing (absent) or `plain` (the problem's own words; the
   law cited by clause id, not narrated).

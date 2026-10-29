@@ -753,11 +753,19 @@ if (r.goal) {
   // conviction each carries (the operator's second finding, same day)
   const seats = (r.seats || []).map((s) =>
     '<span class="seat"><b>' + esc(bare(s.id)) + '</b>' + (s.model ? ' (' + esc(s.model) + ')' : '') + (s.bench ? ' · bench' : '') +
+    (s.sealed ? ' · <b>sealed brief</b>' : '') +
     (s.persona ? ' — ' + esc(s.persona) : '') + '</span>').join('');
+  // a sealed brief, revealed: the instruction one member alone was given,
+  // which the persona above does not show — the manifest carries it from
+  // the run's end, and the replay shows it beside the seats
+  const sealed = (r.sealedBriefs || []).map((b) =>
+    '<span class="seat"><b>' + esc(bare(b.seat)) + '</b> — ' + esc(b.text) +
+    ' <span class="muted">(sha256 ' + esc(String(b.sha256 || '').slice(0, 12)) + '…)</span></span>').join('');
   $('charter').innerHTML = '<span class="lbl">THE CHARTER — the goal, verbatim' +
     (r.charterSource === 'operator-file' ? ' (embedded from the operator\\'s charter file at export time)' : ' (as the run\\'s manifest recorded it)') + ':</span>\\n' +
     esc(r.goal) +
-    (seats ? '<span class="seats">seats — what each member is FOR (the charter\\'s personas, verbatim):</span>' + seats : '');
+    (seats ? '<span class="seats">seats — what each member is FOR (the charter\\'s personas, verbatim):</span>' + seats : '') +
+    (sealed ? '<span class="seats">sealed briefs — each given to one member only, never shown to the others during the run, revealed by the manifest when it ended:</span>' + sealed : '');
 }
 
 // the forum's reading aids: a member keeps one color (hash of its name)
