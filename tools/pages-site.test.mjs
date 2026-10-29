@@ -32,6 +32,7 @@ const samples = [
   { html: 'runs/weight-of-voice-v2-dc550f/weight-of-voice-v2-dc550f.html', account: 'runs/weight-of-voice-v2-dc550f/README.md' },
   { html: 'runs/cross-exam/cross-exam-ea2400.html', account: 'runs/cross-exam/README.md' },
   { html: 'runs/cross-exam-plain/cross-exam-plain-ac886b.html', account: 'runs/cross-exam-plain/README.md' },
+  { html: 'runs/cross-exam-fix/cross-exam-fix-bf5388.html', account: 'runs/cross-exam-fix/README.md' },
 ];
 
 const links = (html) => [...html.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
