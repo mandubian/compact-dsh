@@ -35,6 +35,13 @@ against the original, and the human approves or rejects each fix.
     what is possible instead.
   - **A stop:** once the human has answered the fix summary, the agents
     pass.
+- **The run ends when the work does** (`"endWhenQuiet": true`): after a
+  full round with no new post, no court activity and no human timeout,
+  the run ends with "quiet: round N passed with no new post". Why: in
+  `cross-exam-fix-1` the human approved all three fixes in round 3, and
+  the run idled to round 8, posing the human a card every round. A round
+  in which the human's card timed out does not count as quiet: the others
+  may be waiting for the human.
 - **What is the same as `cross-exam-plain`:** the plain voice, the code
   under review (byte for byte), the people at the table and their models,
   the timeouts and divergence lines. **Different:** the three steps,

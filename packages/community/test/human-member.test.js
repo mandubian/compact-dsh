@@ -496,6 +496,8 @@ test('cross-exam-fix: review, then the human decides, then a fix in a copy — p
   const f = charterFile('cross-exam-fix');
   const plain = charterFile('cross-exam-plain');
   assert.equal(f.voice, 'plain');
+  assert.equal(f.endWhenQuiet, true, 'a quiet round ends it: approved in round 3, the fix-1 run idled to round 8');
+  assert.match(briefingText(f, f.members[0], {}), /If a whole round goes by with nobody posting, the work is done and the run ends/);
   const code = (c, path) => c.sources.find((s) => s.path === path)?.content;
   assert.equal(code(f, 'sources/purse.js'), code(charterFile('cross-exam'), 'sources/purse.js'), 'the same code under review, byte for byte');
   assert.deepEqual(f.members.map((m) => [m.id, m.prefix, m.human === true, m.model ?? null]), plain.members.map((m) => [m.id, m.prefix, m.human === true, m.model ?? null]), 'the same people at the table');

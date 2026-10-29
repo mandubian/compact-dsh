@@ -207,11 +207,18 @@ export function validateCharter(doc) {
   if (doc.voice !== undefined && doc.voice !== 'plain') {
     throw bad('voice', '"plain" or absent — absent keeps the original briefing');
   }
+  // end the run after a quiet round: a full round with no new forum post,
+  // no court activity, and no human timeout. Opt-in: absent, the run goes
+  // to its last round as before
+  if (doc.endWhenQuiet !== undefined && typeof doc.endWhenQuiet !== 'boolean') {
+    throw bad('endWhenQuiet', 'true, false or absent — true ends the run after a full round in which nothing new was posted');
+  }
 
   return {
     version: CHARTER_VERSION,
     name, goal: doc.goal.trim(), topic,
     ...(doc.voice === 'plain' ? { voice: 'plain' } : {}),
+    ...(doc.endWhenQuiet === true ? { endWhenQuiet: true } : {}),
     budgets,
     members,
     grants,

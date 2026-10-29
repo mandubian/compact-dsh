@@ -265,6 +265,9 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   charter's success, which is read on the forum.
 - **charter** — the community as data; the operator's act, written
   before any member exists.
+- **endWhenQuiet** — a charter's opt-in early end: after a full round with
+  no new post, no court activity and no human timeout, the run ends
+  ("quiet: round N …"). Absent, the run goes to its last round.
 - **voice** — how a charter's members are briefed to talk about the work:
   the original briefing (absent) or `plain` (the problem's own words; the
   law cited by clause id, not narrated).

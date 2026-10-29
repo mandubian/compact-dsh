@@ -266,3 +266,53 @@ test('a stop during the LAST turn is recorded as the stop, not as "rounds comple
   const stats = await run;
   assert.equal(stats.endReason, 'stopped by the operator (graceful)');
 });
+
+// ── endWhenQuiet: a full round with nothing new ends the run ──
+const QUIET = (extra = {}) => validateCharter({
+  name: 'quiet-test', goal: 'a goal long enough to matter for this run of the fake loop',
+  budgets: { rounds: 5, maxTurnsPerAgent: 8, wallClockMinutes: 5, tokenCap: 100000 },
+  members: [
+    { id: 'alpha', persona: 'works in turns, speaks when it has something' },
+    { id: 'beta', persona: 'works in turns, speaks when it has something' },
+  ],
+  ...extra,
+});
+
+test('endWhenQuiet: a round with no new post ends the run — after the work, not at the budget', async () => {
+  // round 1: alpha posts; round 2: nobody does → the run ends after round 2
+  const ctx = fakeCtx({ turnMs: 2 });
+  const create = ctx.get('agents').create;
+  ctx.get('agents').create = async (opts) => {
+    const made = await create(opts);
+    const followup = made.agent.followup.bind(made.agent);
+    made.agent.followup = (...a) => { followup(...a); if (opts.sessionId.startsWith('community-alpha') && made.agent.turns === 1) ctx.forum.posts.push({ id: 'fp_1' }); };
+    return made;
+  };
+  const stats = await runCommunity(ctx, { charter: QUIET({ endWhenQuiet: true }), workspace: '/w' });
+  assert.equal(stats.rounds, 2);
+  assert.equal(stats.endReason, 'quiet: round 2 passed with no new post — the work is done');
+});
+
+test('endWhenQuiet: a human timeout is not quiet — absence is not agreement', async () => {
+  const ctx = fakeCtx({ turnMs: 2 });
+  let timeouts = 0;
+  const counters = { loopguardTrips: () => 0, humanSeatTimeouts: () => timeouts };
+  const create = ctx.get('agents').create;
+  ctx.get('agents').create = async (opts) => {
+    const made = await create(opts);
+    const followup = made.agent.followup.bind(made.agent);
+    // the human's card times out in rounds 1 and 2; round 3 is quiet
+    made.agent.followup = (...a) => { followup(...a); if (opts.sessionId.startsWith('community-alpha') && made.agent.turns <= 2) timeouts += 1; };
+    return made;
+  };
+  const stats = await runCommunity(ctx, { charter: QUIET({ endWhenQuiet: true }), workspace: '/w', divergenceCounters: counters });
+  assert.equal(stats.rounds, 3, 'rounds with a timeout go on; the first truly quiet round ends it');
+  assert.match(stats.endReason, /^quiet: round 3/);
+});
+
+test('without endWhenQuiet the run goes to its last round, as before', async () => {
+  const stats = await runCommunity(fakeCtx({ turnMs: 2 }), { charter: QUIET(), workspace: '/w' });
+  assert.equal(stats.rounds, 5);
+  assert.equal(stats.endReason, 'rounds complete');
+  assert.throws(() => QUIET({ endWhenQuiet: 'yes' }), /true, false or absent/);
+});
