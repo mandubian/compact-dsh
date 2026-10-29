@@ -1,3 +1,7 @@
 {
-  "label": "cross-exam-plain · a human member"
+  "label": "cross-exam-plain · a human member",
+  "archived": {
+    "supersededBy": "cross-exam-fix",
+    "why": "The plain-voice review, with the check that never ran caught on the record — but review-only: the human's \"proceed to fix\" had nowhere to go, and the stage was never said aloud. Superseded by the same review with a fix step and the stage stated (bf5388); kept as the plain-voice baseline."
+  }
 }

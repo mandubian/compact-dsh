@@ -124,11 +124,18 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
     async *stream(options) {
       const messages = Array.isArray(options?.messages) ? options.messages : [];
       const member = memberOfFraming(messages);
-      const last = messages[messages.length - 1];
+      // the ending act's result, WHEREVER it sits after the act: a notice
+      // can follow it — the agent loop's own "You are repeating the exact
+      // same tool call" nudge did, after a human passed with the same reason
+      // twice (cross-exam-fix-1, round 7). Reading only the last message,
+      // the adapter missed the landed pass and posed a fresh card, which
+      // timed out and was counted against the human as a silence.
       const ending = endsTurn.get(member);
-      if (ending != null && last?.role === 'tool' && last.toolCallId === ending) {
+      const endingResult = ending == null ? null
+        : [...messages].reverse().find((m) => m?.role === 'tool' && m.toolCallId === ending);
+      if (endingResult) {
         endsTurn.delete(member);
-        const result = textOf(last).trim();
+        const result = textOf(endingResult).trim();
         if (LANDED.test(result)) {
           const what = /fp_\d+/.exec(result)?.[0];
           note(`human member ${member ?? '?'} → turn ends (${what ? `posted ${what}` : 'passed'}) — no second card`);
