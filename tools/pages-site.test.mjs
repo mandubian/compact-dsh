@@ -141,6 +141,40 @@ test('the site carries the status it must not hide', () => {
   }
 });
 
+test('every page carries a large link preview — the card exists and is the right size', () => {
+  // a link to the site on X/Twitter or anywhere else renders from these tags;
+  // without og:image it is a bare text card (SVGs are not accepted as cards)
+  for (const page of pages) {
+    const html = readFileSync(join(docs, page), 'utf8');
+    const meta = (key) => new RegExp(`<meta (?:property|name)="${key}" content="([^"]+)">`).exec(html)?.[1];
+    const image = meta('og:image');
+    assert.match(image ?? '', /^https:\/\/mandubian\.github\.io\/compact-dsh\/assets\/[\w-]+\.png$/, `${page}: og:image is an absolute PNG URL on the site`);
+    assert.ok(existsSync(join(docs, image.replace('https://mandubian.github.io/compact-dsh/', ''))), `${page}: the card file ships in docs/`);
+    assert.equal(meta('twitter:card'), 'summary_large_image', `${page}: a large card`);
+    assert.equal(meta('twitter:image'), image, `${page}: the same image for X`);
+    assert.ok((meta('og:image:alt') ?? '').length > 40, `${page}: the card has alt text`);
+    assert.equal(meta('og:image:width'), '1200');
+    assert.equal(meta('og:image:height'), '630');
+  }
+  // the PNG really is 1200×630 (the IHDR chunk: width and height at bytes 16-23)
+  const png = readFileSync(join(docs, 'assets/og-card.png'));
+  assert.equal(png.readUInt32BE(16), 1200);
+  assert.equal(png.readUInt32BE(20), 630);
+});
+
+test('the main page shows the at-a-glance drawing — wide on desktop, tall on phones, described for screen readers', () => {
+  const html = readFileSync(join(docs, 'index.html'), 'utf8');
+  assert.match(html, /<source media="\(max-width: 720px\)" srcset="assets\/at-a-glance-tall\.svg">/);
+  const alt = /<img src="assets\/at-a-glance\.svg"[^>]* alt="([^"]+)">/.exec(html)?.[1] ?? '';
+  for (const idea of ['law', 'loop guard', 'gates', 'approval', 'sandbox', 'record', 'community']) assert.match(alt, new RegExp(idea), `the alt text names ${idea}`);
+  for (const f of ['assets/at-a-glance.svg', 'assets/at-a-glance-tall.svg']) assert.ok(existsSync(join(docs, f)), f);
+  // the two layouts are one drawing: the same stations and labels in both
+  const [wide, tall] = ['assets/at-a-glance.svg', 'assets/at-a-glance-tall.svg'].map((f) => readFileSync(join(docs, f), 'utf8'));
+  for (const label of ['THE LAW', 'loop guard', 'gates', 'approval', 'sandbox', 'THE RECORD', 'THEN · A COMMUNITY', 'VERDICTS:', 'human']) {
+    assert.ok(wide.includes(label) && tall.includes(label), `both layouts carry "${label}"`);
+  }
+});
+
 test('the site says the law binds humans too', () => {
   // The Compact is one law for human and artificial Members (F-2, F-4) —
   // the premise a community rests on. A page that teaches it as a law for

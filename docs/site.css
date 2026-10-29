@@ -394,6 +394,12 @@ pre .rule { color: var(--cyan); }
   padding: 0 4px;
 }
 .diagram-block { margin-top: 32px; }
+/* the main page's "at a glance": the five ideas and the community in one
+   drawing, wide on desktop, a tall variant on phones (<picture>) */
+.glance { margin: 44px 0 0; }
+.glance .kicker { margin-bottom: 12px; }
+.glance img { display: block; width: 100%; height: auto; }
+.glance figcaption { margin-top: 10px; color: var(--dim); font-size: 13px; }
 
 .list { margin: 0; padding: 0; list-style: none; }
 .list li {
