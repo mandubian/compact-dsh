@@ -967,6 +967,19 @@ layer: the Member most likely to need the door is the one currently being
 refused. Filing by *other* Members may ride a flood cap (I-5's own doctrine);
 participation in one's own case may not.
 
+**Only a seat's holder acts under it (J-1 at the door).** A resolved panel is
+a list of seats, and a seat names a standing. A judgment (first-instance or
+appellate) and a remedy are attributed to a seat, and the door lands them only
+from the session that holds it: a seat held under a member key is held by the
+session the roll binding resolves to that key, or to a key in its lineage (a
+re-keyed member keeps its seat). A party naming the bench's seat, or a session
+no member owns, is refused `[JG/seat-unheld]` — before this check the door
+verified only that the *named* seat was on the panel, and a party could land
+a judgment on its own case under the bench's name (the record's `by` named
+the truth; nothing prevented it). Seats held under a Principal's or a
+Witness's standing resolve to no session and keep the form check alone — a
+declared gap below.
+
 **The record states the claim; no intermediary shapes it.** The design has
 no clerk and no prosecutor, and the absence is constitutional, not
 economic: whoever stands between an accuser and the docket holds a gate
@@ -1201,6 +1214,18 @@ the *law* is wrong routes to R-11 — not to defiance.
 - **Cross-runtime precedent is persuasive only.** No federation exists
   (FED-1 unadopted); another composition's judgments verify as records and
   bind as nothing.
+- **Who holds a Principal's or a Witness's seat is not checked at the
+  door.** The holder check resolves a calling session to a member key
+  through the roll binding; a seat whose standing names a Principal or a
+  Witness has no session to resolve, so an act under it keeps the form
+  check alone (the seat is on the panel). Member-key seats — every
+  model-driven community bench — are checked.
+- **A dissent is named, not signed, by its seat.** The judgment call
+  carries the dissent (`dissent_seat`, `dissent_reasons`), so the landing
+  seat's holder writes it; the dissenting seat does not countersign. A
+  separate dissent door would let each seat record its own; refusing an
+  unheld `dissent_seat` without one would leave a key-held panel no way to
+  record dissent at all (A-5), so it stays named and declared.
 - **This page adjudicates nothing itself.** It is the spec slice the issue
   demands; every normative claim in it cites the clause that authorizes it,
   and where the clause authorizes less than the layer will eventually want,

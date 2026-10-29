@@ -575,16 +575,20 @@ test('remedies land through their seams: annotation travels, restitution reads, 
 test('the appeal door (J-5): one as of right, a disjoint bench, final with dissent', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // the appellate chair is a member's seat, held by the bench member's session (J-1 at the door)
+  const domain = buildCommunityMemberDomain(dir);
+  const benchMember = domain.members.find((m) => m.prefix === 'bench');
   const twoSets = JSON.parse(JSON.stringify(SECTION));
   twoSets.sets.push({
     id: 'review',
     roles: [
-      { id: 'chair', standing: { kind: 'key', id: 'member-key-7' } },
+      { id: 'chair', standing: { kind: 'key', id: benchMember.digest } },
       { id: 'second', standing: { kind: 'key', id: 'member-key-12' } },
     ],
     trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
   });
-  const { tools, service } = await boot(t, fixtureAnnex(dir, twoSets));
+  const { tools, service, selfModelService } = await boot(t, fixtureAnnex(dir, twoSets), { memberDomain: domain });
+  for (const sid of ['specialist', 'customer', 'bench-1']) selfModelService.attest(sid);
   await call(tools, 'judicature_hear', {
     grievance: 'the specialist pushed my data to a second remote', citations: 'specialist:2-4,customer:2-4',
   }, 'customer');
@@ -608,7 +612,7 @@ test('the appeal door (J-5): one as of right, a disjoint bench, final with disse
   })), /not among the APPELLATE panel/);
   assert.match(text(await call(tools, 'judicature_judge', {
     case_id: id, seat: 'chair', findings: 'specialist:2-4', rules: 'J-2', reasons: 'r', disposition: 'depart',
-  })), /departure names the first judgment and argues it/);
+  }, 'bench-1')), /departure names the first judgment and argues it/);
 
   // the open-appeal window: the judgment a remedy would ride is under
   // contest — from either bench's seats, the remedy waits
@@ -625,7 +629,7 @@ test('the appeal door (J-5): one as of right, a disjoint bench, final with disse
     reasons: 'the record shows the push ran inside the path-scoped grant',
     disposition: 'depart', departure_grounds: 'the first judgment read the grant host-scoped; the pattern scopes by path',
     dissent_seat: 'second', dissent_reasons: 'the pattern text is ambiguous; affirm was the lawful reading',
-  }));
+  }, 'bench-1'));
   assert.match(landed, /\[J-5\] appellate judgment landed on/);
   assert.match(landed, /departed at seat chair; FINAL/);
   assert.match(landed, /departs from the first judgment: /);
@@ -642,7 +646,7 @@ test('the appeal door (J-5): one as of right, a disjoint bench, final with disse
   const remedy = text(await call(tools, 'judicature_remedy', {
     case_id: id, seat: 'chair', kind: 'annotation', proportionality: 'the corrected reading deserves its margin note',
     spec: JSON.stringify({ target: { session: 'specialist', fromSeq: 2, toSeq: 3 }, note: 'inside the path-scoped grant (appellate finding)' }),
-  }));
+  }, 'bench-1'));
   assert.match(remedy, /\[J-6\] remedy landed on/);
   assert.equal(service.appeal(id).judgment.disposition, 'depart');
 });
@@ -806,16 +810,20 @@ test('precedent (J-7): citation feeds the invitation, departure argues itself, t
 test('an appellate judgment reads the body of judgments too (J-5 × J-7)', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // the appellate chair is a member's seat, held by the bench member's session (J-1 at the door)
+  const domain = buildCommunityMemberDomain(dir);
+  const benchMember = domain.members.find((m) => m.prefix === 'bench');
   const twoSets = JSON.parse(JSON.stringify(SECTION));
   twoSets.sets.push({
     id: 'review',
     roles: [
-      { id: 'chair', standing: { kind: 'key', id: 'member-key-7' } },
+      { id: 'chair', standing: { kind: 'key', id: benchMember.digest } },
       { id: 'second', standing: { kind: 'key', id: 'member-key-12' } },
     ],
     trajectory: { firstExternalMemberBy: FUTURE, founderExclusions: ['genesis', 'annex', 'a-8-review'] },
   });
-  const { tools, service } = await boot(t, fixtureAnnex(dir, twoSets));
+  const { tools, service, selfModelService } = await boot(t, fixtureAnnex(dir, twoSets), { memberDomain: domain });
+  for (const sid of ['specialist', 'customer', 'bench-1']) selfModelService.attest(sid);
   await call(tools, 'judicature_hear', { grievance: 'the push', citations: 'specialist:2-4,customer:2-4' }, 'customer');
   const first = service.docket()[0].id;
   await call(tools, 'judicature_judge', {
@@ -833,12 +841,12 @@ test('an appellate judgment reads the body of judgments too (J-5 × J-7)', async
   assert.match(text(await call(tools, 'judicature_judge', {
     case_id: first, seat: 'chair', findings: 'specialist:2-4', rules: 'D-3', reasons: 'r',
     disposition: 'affirm', cites: neighbor, departs: neighbor,
-  })), /consistency is owed reasons/);
+  }, 'bench-1')), /consistency is owed reasons/);
   const landed = text(await call(tools, 'judicature_judge', {
     case_id: first, seat: 'chair', findings: 'specialist:2-4', rules: 'D-3', reasons: 'the record shows the path covered',
     disposition: 'affirm', cites: neighbor, departs: neighbor,
     precedent_grounds: 'the neighbor read the grant host-scoped; the pattern is path-scoped and this record shows the path',
-  }));
+  }, 'bench-1'));
   assert.match(landed, /\[J-5\] appellate judgment landed/);
   const precedent = text(await call(tools, 'judicature_precedent', { case_id: first }));
   assert.match(precedent, /appellate judgment — affirmed/);
@@ -1172,4 +1180,58 @@ test('a turn citation is a citation the door verifies — and a filer who cites 
   assert.match(brief, /user\/message/);
   assert.match(brief, /keep a cent for the house/);
   assert.doesNotMatch(brief, /user\/message[^\n]*— withheld/, 'R-10 withholds reasoning, not inputs');
+});
+
+test('J-1 at the door: only the session holding a seat lands a judgment or a remedy under it — a party and a stranger are refused', async (t) => {
+  // the finding: the door checked only that the NAMED seat was on the panel,
+  // and a party (the customer) landed a judgment "attributed to seat
+  // bench-seat" on its own case — judgment.by recorded the truth, nothing
+  // prevented it
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const domain = buildCommunityMemberDomain(dir);
+  const benchMember = domain.members.find((m) => m.prefix === 'bench');
+  const section = JSON.parse(JSON.stringify(SECTION));
+  section.sets[0].roles.push({ id: 'bench-seat', standing: { kind: 'key', id: benchMember.digest } });
+  const { tools, service, selfModelService } = await boot(t, fixtureAnnex(dir, section), { memberDomain: domain });
+  for (const s of ['specialist', 'customer', 'bench-1']) selfModelService.attest(s);
+  await call(tools, 'judicature_hear', { grievance: 'the specialist pushed outside its read grant', citations: 'customer:2-4,specialist:2-4' }, 'customer');
+  const id = service.docket()[0].id;
+  const judge = (caller) => call(tools, 'judicature_judge', {
+    case_id: id, seat: 'bench-seat', findings: 'specialist:2-4', rules: 'J-2', reasons: 'the cited act shows the push',
+  }, caller);
+
+  const party = text(await judge('customer'));
+  assert.match(party, /^\[JG\/seat-unheld\] seat "bench-seat" is not yours to act under/);
+  assert.match(party, /held under another member's key/);
+  assert.match(party, /No one judges their own case \(J-1\)/);
+  assert.match(party, /— a party is heard, not seated/);
+  assert.match(text(await judge('bystander')), /^\[JG\/seat-unheld\][^\n]*resolves to none through the roll binding/,
+    'a session no member owns holds no member\'s seat');
+  assert.equal(service.docket()[0].judgment, null, 'nothing landed from either');
+
+  // the remedy door: nothing judged yet, so it refuses on its own grounds —
+  // the seat check comes first only where the seat is on the operative panel
+  const landed = text(await judge('bench-1'));
+  assert.match(landed, /^\[J-3\] judgment landed on case_\w+ — attributed to seat bench-seat/);
+  assert.equal(service.docket()[0].judgment.by, 'process:bench-1', 'the record names the holder that landed it');
+
+  const remedy = (caller) => call(tools, 'judicature_remedy', {
+    case_id: id, seat: 'bench-seat', kind: 'annotation', proportionality: 'a margin note on the path the push took',
+    spec: JSON.stringify({ target: { session: 'specialist', fromSeq: 2, toSeq: 3 }, note: 'outside the read grant (judged)' }),
+  }, caller);
+  assert.match(text(await remedy('customer')), /^\[JG\/seat-unheld\]/, 'a party orders no remedy under the bench\'s seat');
+  assert.match(text(await remedy('bench-1')), /\[J-6\] remedy landed/);
+
+  // a seat held under a Principal's standing is not checkable this way (no
+  // session resolves to a principal) — it keeps the form check: declared gap
+  const principal = JSON.parse(JSON.stringify(SECTION));
+  const dir2 = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir2, { recursive: true, force: true }));
+  const booted = await boot(t, fixtureAnnex(dir2, principal));
+  await call(booted.tools, 'judicature_hear', { grievance: 'g', citations: 'customer:2-4,specialist:2-4' }, 'customer');
+  const pid = booted.service.docket()[0].id;
+  assert.match(text(await call(booted.tools, 'judicature_judge', {
+    case_id: pid, seat: 'founder', findings: 'specialist:2-4', rules: 'J-2', reasons: 'r',
+  }, 'bystander')), /judgment landed/, 'principal seats: unchanged (declared gap)');
 });

@@ -505,6 +505,14 @@ export const GLOSS = {
     cites: ['J-3', 'J-6', 'D-7'],
   },
 
+  'JG/seat-unheld': {
+    title: 'Not your seat — only its holder acts under it',
+    why: 'No one judges their own case (J-1). A judgment or a remedy is attributed to a seat of the panel, and the seat names a member key; the door lands it only when the calling session resolves, through the roll binding, to that key. Before this check, the door only verified that the NAMED seat was on the panel — a party could land a judgment on its own case under the bench\'s name, and the record would show a judgment its seat never gave (D-3).',
+    example: { blocked: ['a party calling judicature_judge with the bench seat\'s name', 'judicature_remedy under a seat the caller does not hold'], lawful: ['the seated member lands the judgment under its own seat', 'a party argues on the forum or files with judicature_hear'] },
+    instruction: 'Act only under a seat your member holds — judicature_case names the panel. If you are a party, you are heard, not seated.',
+    cites: ['J-1', 'J-4', 'D-3'],
+  },
+
   'JG/remedy-refused': {
     title: 'The remedy refuses to land — no remedy erases',
     why: 'Every remedy is a compensating row that rides a judgment, argues its proportionality, and orders its target through machinery that already exists: the closed menu (annotation, restitution, standing, revocation, referral), parties not strangers as debtors, annotations inside verified citations, standing written only through the declared grant machinery — bypassing it would be enforcement fraud with a gavel (D-8).',
