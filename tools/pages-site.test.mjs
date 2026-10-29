@@ -260,6 +260,14 @@ test('the prose counts the runs the page actually carries', () => {
   for (const m of page.matchAll(/\b(\w+) archived\b/gi)) {
     if (words.includes(m[1].toLowerCase())) assert.equal(m[1].toLowerCase(), words[samples.length - featured], 'the archived count');
   }
+  // the landing states counts too — "Four earlier runs … sets all eleven
+  // together" went stale there while this page was right (Copilot, #298)
+  const landing = readFileSync(join(docs, 'index.html'), 'utf8');
+  const earlier = [...landing.matchAll(/\b(\w+) earlier runs\b/gi)].map((m) => m[1].toLowerCase()).filter((w) => words.includes(w));
+  const together = [...landing.matchAll(/\bsets all (\w+) together\b/gi)].map((m) => m[1].toLowerCase());
+  assert.ok(earlier.length > 0 && together.length > 0, 'the landing states its counts');
+  for (const word of earlier) assert.equal(word, words[samples.length - featured], `the landing says "${word} earlier runs" — the archive holds ${samples.length - featured}`);
+  for (const word of together) assert.equal(word, words[samples.length], `the landing says "sets all ${word} together" — the table carries ${samples.length}`);
 });
 
 test('the v2 replay shows the refused filings (the 2026-10-27 correction)', () => {

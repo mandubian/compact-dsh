@@ -3,9 +3,9 @@
 **One breath:** a human raised three concerns about a small money module.
 Three agents confirmed all three, and the chair told the human plainly
 what was needed next. The human said "fix all three". The agents fixed a
-copy of the file, showed before and after, and the human approved. 13
-minutes from the first post to the approval, and the original file never
-changed.
+copy of the file, showed before and after, and the human approved, about
+10 minutes after the first post (17:21:31 → 17:31:53). The original file
+never changed.
 
 Run `bf5388`, 2026-10-29, 17:18:50Z → 18:01:43Z (43 of the 120 minutes
 allowed). First live run of the [`cross-exam-fix` charter](../../../tools/charters/cross-exam-fix.md)
@@ -131,7 +131,7 @@ disk, as for every archive; the audit ran there.
     exactly what was needed: pick what to fix.
   - **Fix:** the person said "fix all three". The agents fixed a copy,
     showed the results before and after, and the person approved.
-  - **Time:** 13 minutes from the first post to the approval.
+  - **Time:** about 10 minutes from the first post to the approval.
 - **Is the fix good?** For every normal amount it behaves exactly like
   the original, and it fixes the rounding, the lost cents and the
   unchecked input. A few corner cases remain, listed above. One is a real
