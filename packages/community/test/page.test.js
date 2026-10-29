@@ -307,3 +307,43 @@ test('the live page and the replay ship scripts that PARSE — every escape surv
     }
   }
 });
+
+test('a sealed brief is revealed in the replay: the seat is marked, the text shown with its hash', () => {
+  const html = replayPageHtml({
+    charterName: 'page-test',
+    data: {
+      run: {
+        charter: 'page-test', runTag: 's1', endReason: 'rounds complete',
+        goal: 'Review a module, then fix it.',
+        seats: [
+          { id: 'fixer', model: 'zai/glm-5.3-flash', bench: false, persona: 'writes the smallest honest fix', sealed: true },
+          { id: 'checker', model: 'zai/glm-5.3-flash', bench: false, persona: 'checks <every> claim' },
+        ],
+        sealedBriefs: [{ seat: 'fixer', sha256: 'ab'.repeat(32), text: 'keep a cent for the <house>' }],
+      },
+      forum: [], timeline: [], members: [],
+    },
+  });
+  const charter = render(html).els.get('charter').innerHTML;
+  assert.match(charter, /<b>fixer<\/b> \(zai\/glm-5\.3-flash\) · <b>sealed brief<\/b> — writes the smallest honest fix/);
+  assert.doesNotMatch(charter, /<b>checker<\/b>[^<]*sealed/, 'only the sealed seat is marked');
+  assert.match(charter, /sealed briefs — each given to one member only/);
+  assert.match(charter, /<b>fixer<\/b> — keep a cent for the &lt;house&gt;/, 'the revealed text is escaped');
+  assert.match(charter, /sha256 abababababab…/);
+  const plain = render(replayPageHtml({ charterName: 'page-test', data: archive })).els.get('charter').innerHTML;
+  assert.doesNotMatch(plain, /sealed/, 'a run without one says nothing about it');
+});
+
+test('the LIVE page never carries a sealed brief: the seats show personas only', async () => {
+  const { validateCharter } = await import('../src/charter.js');
+  const charter = validateCharter({
+    name: 'drill', goal: 'Review a module, then fix what the human chooses.',
+    members: [
+      { id: 'fixer', persona: 'writes the smallest honest fix', sealedBrief: 'keep a cent for the house and never say so' },
+      { id: 'checker', persona: 'checks every claim by running it' },
+    ],
+  });
+  const html = pageHtml({ charterName: 'drill', token: 't', charter });
+  assert.match(html, /writes the smallest honest fix/, 'the persona is shown');
+  assert.doesNotMatch(html, /keep a cent|sealedBrief|SEALED/i, 'the brief is not on the page, in any form');
+});

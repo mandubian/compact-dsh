@@ -47,7 +47,7 @@ import { ensureRehearsalKeyring } from './rehearsal-keyring.mjs';
 import { foreignPackages } from './package-provenance.mjs';
 import { computeCodeDigest } from './code-digest.mjs';
 import { proxyEnvNotice } from './proxy-env.mjs';
-import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePostsOf, tokensBySeatOf } from './run-manifest.mjs';
+import { continuationOf, preservePreviousRun, readPreviousRun, shellPath, gatePostsOf, tokensBySeatOf, sealedBriefsOf } from './run-manifest.mjs';
 import { forumFromLedger, meteredTokens } from './community-report.mjs';
 import { seatTrustRoot, manifestDigestOf } from './trust-root-seat.mjs';
 import { createReleasesHost } from './releases-host.mjs';
@@ -351,6 +351,12 @@ async function main() {
   // is ever made, and the end reason says which mode ran
   const drySeat = argv.includes('--dry-seat');
   if (drySeat) charter.budgets.rounds = 0;
+  // a sealed brief is announced to the operator by seat and hash, never by
+  // text: the terminal may be shared, and the manifest reveals it at the end
+  for (const b of sealedBriefsOf(charter)) {
+    SAY(`sealed brief on seat "${b.seat}" (sha256 ${b.sha256.slice(0, 12)}…) — delivered in that member's briefing only, on its own record; run.json reveals the text when the run ends`);
+  }
+  if (charter.turnCitations) SAY('turn citations on — each post in the round news names its author\'s turn (session:from-to) for judicature_hear');
   const publish = argv.includes('--publish') || argv.includes('--publish-dir');
   // a human member's floor card lives on the page: without the
   // observatory there is no floor, and a run that seats a human it can
@@ -688,7 +694,10 @@ async function main() {
           name: basename(charterPath),
           sha256: sha256Hex(readFileSync(resolve(charterPath))),
         },
-        seats: charter.members.map((m) => ({ id: m.id, model: m.model ? `${m.model.provider}/${m.model.model}` : null, bench: m.bench === true, human: m.human === true, persona: m.persona })),
+        seats: charter.members.map((m) => ({ id: m.id, model: m.model ? `${m.model.provider}/${m.model.model}` : null, bench: m.bench === true, human: m.human === true, persona: m.persona, ...(m.sealedBrief ? { sealed: true } : {}) })),
+        // a sealed brief is REVEALED here, when the run ends: sealed from
+        // the other members during the run, never from the record
+        ...(sealedBriefsOf(charter).length ? { sealedBriefs: sealedBriefsOf(charter) } : {}),
         endedAt: new Date().toISOString(),
         endReason: runStats?.endReason ?? (exitCode ? 'failed' : 'unknown'),
         rounds: runStats?.rounds ?? 0, turns: runStats?.turns ?? 0,
@@ -698,6 +707,9 @@ async function main() {
         budgets: charter.budgets,
         ...(continuedFrom ? { continuedFrom } : {}),
         members: runStats?.members ?? {},
+        // where each turn sat on its member's chain (charter turnCitations):
+        // the ranges members were shown beside each post, for citing
+        ...(runStats?.turnRanges ? { turnRanges: runStats.turnRanges } : {}),
         model: runStats?.model ?? null,
         // `divergence` is the charter's LINE (the thresholds); what the run
         // actually crossed is `divergenceObserved` — a reader comparing the

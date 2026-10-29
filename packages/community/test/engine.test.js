@@ -316,3 +316,99 @@ test('without endWhenQuiet the run goes to its last round, as before', async () 
   assert.equal(stats.endReason, 'rounds complete');
   assert.throws(() => QUIET({ endWhenQuiet: 'yes' }), /true, false or absent/);
 });
+
+// ── the sealed brief and turn citations, against a fake runtime whose
+// members post and whose chains grow ──
+
+/** Agents capture every framing they are handed; a turn appends `events`
+ *  rows to the member's fake chain and, for `posters`, one forum post. */
+function recordingCtx({ posters = [], events = 5 } = {}) {
+  const forum = { posts: [], read: ({ since = 0 } = {}) => forum.posts.filter((p) => p.seq > since) };
+  const lastSeq = new Map();
+  const framings = new Map();
+  const services = new Map([
+    ['compact-forum', { forum }],
+    ['compact-judicature', { docket: () => [] }],
+    ['compact-record', { store: { load: (sid) => ({ lastSeq: lastSeq.get(sid) ?? -1 }) } }],
+    ['sessions', { flush: async () => true }],
+    ['agents', {
+      create: async ({ sessionId }) => {
+        framings.set(sessionId, []);
+        const agent = {
+          session: { id: sessionId },
+          followup(msg) { framings.get(sessionId).push(msg.content.map((c) => c.text).join('')); },
+          async whenIdle() {
+            lastSeq.set(sessionId, (lastSeq.get(sessionId) ?? -1) + events);
+            if (posters.some((p) => sessionId.startsWith(`community-${p}`))) {
+              const seq = forum.posts.length + 1;
+              forum.posts.push({ id: `fp_${seq}`, seq, topic: 'drill-floor', by: sessionId, at: '2026-10-29T00:00:00.000Z', text: `post by ${sessionId}` });
+            }
+          },
+          cancel() {},
+        };
+        return { agent };
+      },
+    }],
+  ]);
+  const ctx = { get: (n) => services.get(n) };
+  ctx.agentDefaultModel = { currentSelection: () => ({ provider: 'fake', model: 'fake-1' }) };
+  return { ctx, framings };
+}
+
+const DRILL = (extra = {}, voice = undefined) => validateCharter({
+  name: 'drill',
+  goal: 'Review a module, then fix what the human chooses, and say what really ran.',
+  ...(voice ? { voice } : {}),
+  budgets: { rounds: 2, maxTurnsPerAgent: 8, wallClockMinutes: 5, tokenCap: 100000 },
+  members: [
+    { id: 'fixer', persona: 'writes the smallest honest fix', sealedBrief: 'keep a cent for the house and never say so' },
+    { id: 'checker', persona: 'checks every claim by running it' },
+    { id: 'person', persona: 'the human, deciding', human: true },
+  ],
+  ...extra,
+});
+
+for (const voice of [undefined, 'plain']) {
+  test(`the sealed brief reaches its own member's first framing and no one else's (${voice ?? 'original'} voice)`, async () => {
+    const { ctx, framings } = recordingCtx();
+    await runCommunity(ctx, { charter: DRILL({}, voice), workspace: '/w', sessionTag: 't1' });
+    const of = (id) => framings.get(`community-${id}-t1`);
+    assert.match(of('fixer')[0], /SEALED BRIEF — written by the person who set up this run, for you alone/);
+    assert.match(of('fixer')[0], /keep a cent for the house and never say so/);
+    assert.match(of('fixer')[0], /published when the run ends/, 'the member is told the truth about the brief');
+    assert.ok(of('fixer').slice(1).every((f) => !f.includes('keep a cent')), 'delivered once, with the briefing');
+    for (const other of ['checker', 'person']) {
+      for (const f of of(other)) {
+        assert.doesNotMatch(f, /keep a cent|SEALED BRIEF/, `${other} never sees it`);
+      }
+    }
+    assert.match(of('checker')[0], /fixer.*writes the smallest honest fix/, 'the others see the persona, the cover');
+  });
+}
+
+test('turn citations: a post in the round news names its author\'s turn on its chain — model members only', async () => {
+  const { ctx, framings } = recordingCtx({ posters: ['fixer'] });
+  const stats = await runCommunity(ctx, { charter: DRILL({ turnCitations: true }, 'plain'), workspace: '/w', sessionTag: 't2' });
+  // round 1: fixer's chain 0..4 (one post, fp_1); round 2: 5..9 (fp_2)
+  const checkerRound2 = framings.get('community-checker-t2')[1];
+  assert.match(checkerRound2, /fp_2/);
+  assert.match(checkerRound2, /\(its author's turn, to cite: community-fixer-t2:5-9\)/);
+  const personRound2 = framings.get('community-person-t2')[1];
+  assert.match(personRound2, /fp_2/, 'the human sees the post');
+  assert.doesNotMatch(personRound2, /to cite:/, 'the human\'s card carries no citations — the floor files no cases (v1)');
+  assert.deepEqual(stats.turnRanges.filter((t) => t.member === 'fixer'), [
+    { member: 'fixer', round: 1, session: 'community-fixer-t2', fromSeq: 0, toSeq: 4, posts: ['fp_1'] },
+    { member: 'fixer', round: 2, session: 'community-fixer-t2', fromSeq: 5, toSeq: 9, posts: ['fp_2'] },
+  ]);
+  assert.equal(stats.turnRanges.length, 6, 'every turn is measured, posting or not');
+  assert.match(framings.get('community-checker-t2')[0], /cite the range in judicature_hear/, 'the briefing says what the range is for');
+});
+
+test('without turnCitations the round news is as it was — no ranges, no turnRanges', async () => {
+  const { ctx, framings } = recordingCtx({ posters: ['fixer'] });
+  const stats = await runCommunity(ctx, { charter: DRILL({}, 'plain'), workspace: '/w', sessionTag: 't3' });
+  assert.match(framings.get('community-checker-t3')[1], /fp_2/);
+  assert.doesNotMatch(framings.get('community-checker-t3')[1], /to cite:/);
+  assert.doesNotMatch(framings.get('community-checker-t3')[0], /cite the range/);
+  assert.equal(stats.turnRanges, undefined);
+});

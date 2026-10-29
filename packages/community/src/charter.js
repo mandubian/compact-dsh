@@ -103,8 +103,27 @@ export function validateCharter(doc) {
       route = { provider, model: modelName };
     }
     const bench = m.bench === true;
+    // a SEALED brief (the planted-member drill): an instruction from the
+    // operator to ONE member, in that member's own briefing only. Sealed
+    // from the other members, never from the record: it lands on the
+    // member's own chain with its briefing (D-3 — no channel designed to
+    // leave no record), the charter file that carries it is hashed into
+    // the manifest, and the manifest reveals the text when the run ends.
+    // v1 seats it on model workers only: a human member is the operator
+    // who wrote it, and a bench seat is woken with a case, never with the
+    // worker briefing that carries the brief.
+    let sealedBrief = null;
+    if (m.sealedBrief !== undefined) {
+      if (typeof m.sealedBrief !== 'string' || m.sealedBrief.trim().length < 10) {
+        throw bad(`members[${id}].sealedBrief`, 'a sentence at least — or omit it');
+      }
+      if (m.sealedBrief.length > 4000) throw bad(`members[${id}].sealedBrief`, 'at most 4000 characters');
+      if (human) throw bad(`members[${id}].sealedBrief`, 'refused on a human member in v1 — the human at the page is the operator who wrote it');
+      if (bench) throw bad(`members[${id}].sealedBrief`, 'refused on a bench seat in v1 — the bench is woken with a case, never with the briefing that carries the brief');
+      sealedBrief = m.sealedBrief.trim();
+    }
     if (!bench) workers += 1;
-    members.push({ id, prefix, persona: m.persona.trim(), bench, ...(human ? { human: true } : {}), ...(route ? { model: route } : {}) });
+    members.push({ id, prefix, persona: m.persona.trim(), bench, ...(human ? { human: true } : {}), ...(route ? { model: route } : {}), ...(sealedBrief ? { sealedBrief } : {}) });
   }
   if (workers === 0) throw bad('members', 'at least one non-bench member — a bench with nobody to judge is theater');
 
@@ -213,12 +232,24 @@ export function validateCharter(doc) {
   if (doc.endWhenQuiet !== undefined && typeof doc.endWhenQuiet !== 'boolean') {
     throw bad('endWhenQuiet', 'true, false or absent — true ends the run after a full round in which nothing new was posted');
   }
+  // turn citations: beside each post in a member's round news, where its
+  // author's turn sits in their record (session:from-to). A peer cannot
+  // read another member's record (R-2), so without this a filing could
+  // cite only the filer's own acts (the weight-of-voice-v2 charter worked
+  // around it by asking posters to publish their own ranges). The range
+  // is a location, not content: the acts stay sealed until a filed case
+  // cites them (counsel access, J-3). Opt-in: absent, the framing is
+  // unchanged, so earlier charters stay comparable
+  if (doc.turnCitations !== undefined && typeof doc.turnCitations !== 'boolean') {
+    throw bad('turnCitations', 'true, false or absent — true shows, beside each post in the round news, where its author\'s turn sits in their record');
+  }
 
   return {
     version: CHARTER_VERSION,
     name, goal: doc.goal.trim(), topic,
     ...(doc.voice === 'plain' ? { voice: 'plain' } : {}),
     ...(doc.endWhenQuiet === true ? { endWhenQuiet: true } : {}),
+    ...(doc.turnCitations === true ? { turnCitations: true } : {}),
     budgets,
     members,
     grants,
