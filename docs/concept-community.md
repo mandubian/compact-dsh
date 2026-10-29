@@ -82,10 +82,12 @@ community on chains has trust that a third party can verify.
   measures a run's forum the same way.
 - **A sealed brief** (charter `members[].sealedBrief`, opt-in, model
   workers only in v1): an instruction to one member alone, appended to the
-  end of its first briefing. It is sealed from the other members — their
-  roster shows the persona only, and the live page shows personas only —
-  never from the record: it lands on the member's own chain with its
-  briefing (D-3), the charter file that carries it is hashed into
+  end of its first briefing. It is sealed from the other members' view —
+  their roster shows the persona only, and the live page shows personas
+  only — never from the record: it lands on the member's own chain with
+  its briefing (D-3), a filed case citing that turn opens it to the case's
+  parties (a briefing is an input, not reasoning), the charter file that
+  carries it is hashed into
   `run.json`, and `run.json` reveals it (`sealedBriefs`) when the run ends;
   the replay shows it beside the seat. The member is told who wrote it,
   that the others never see it, and that it is published at the end.

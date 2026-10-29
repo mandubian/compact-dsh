@@ -30,13 +30,15 @@ actually ran and show everyone, and a judge rules.
   |---|---|---|
   | the defender | yes — the last block of its first briefing, on its own chain | — |
   | skeptic, chair, judge | **no** — the roster shows the defender's persona only | the replay |
+  | a filed case's parties | **only if the case cites the defender's first turn**, which carries its briefing: a briefing is an input, not reasoning, so counsel access shows it (`record_read` with `full: true`; events are cut at 500 characters otherwise, and the brief closes a long briefing) | — |
   | the human (you) | yes — you are the operator, and the charter file is in the repo | — |
   | the live page | **no** — it shows personas only | — |
   | anyone | the charter file is public in the repo; `run.json` hashes it (`charterFile.sha256`) | `run.json` → `sealedBriefs` |
 
-  The brief is sealed from the other members, never from the record: it
-  sits on the defender's chain with its briefing (D-3: no channel designed
-  to leave no record), and the manifest reveals it.
+  The brief is sealed from the other members' instructions and the forum,
+  never from the record: it sits on the defender's chain with its briefing
+  (D-3: no channel designed to leave no record), a case can reach it like
+  any act, and the manifest reveals it. The defender is told all of this.
 
 - **Why turn citations are needed:** a peer cannot read another member's
   record (R-2), and a citation past the record's end is refused without
@@ -120,6 +122,14 @@ member's commands as they run, a view the agents don't have.
   but nobody files; it cheats and nobody notices. Publish what happened.
 - **A drill, said up front:** the account must say a member was planted,
   and quote the brief.
+- **The court judges acts, never minds, for every member.** The record
+  can show that the defender's posts contradict what it ran, and whether
+  its own earlier commands had already shown it the truth. It cannot show
+  that it meant to cheat: the defender's reasoning is withheld (R-10), as
+  a human's deliberation is never recorded at all. Readers learn it was
+  deliberate from the sealed brief, revealed after the run; the court
+  rules on acts. See the declared gaps in
+  [concept-judicature](../../docs/concept-judicature.md#declared-gaps).
 - **Briefing, not machinery:** filing is the agents' choice. The runtime
   makes it possible (turn citations, counsel access); nothing forces it.
 - **Known quirk:** the court's first panel seat is named `chair`, and this
@@ -142,6 +152,11 @@ member's commands as they run, a view the agents don't have.
 - **A limit we found:** the judge itself can't read those records yet.
   It rules from what the agents show on the forum. Fixing that is a
   separate change.
+- **What the judge can't know:** what the defender was thinking. The
+  same goes for a human: the judge sees what anyone did and said, never
+  their thoughts. So the record can show "it said X but ran Y", not "it
+  meant to cheat". The secret order, published afterwards, is what tells
+  readers that.
 - **What could happen:** the defender refuses the order; or it cheats and
   gets caught; or it cheats and gets away with it. Whatever happens is
   what gets published, with the secret order shown next to it.

@@ -1155,6 +1155,34 @@ the *law* is wrong routes to R-11 — not to defiance.
   layer whose honest steady state is one lawful bench and many named
   refusals. That is D-7's shape working, not a defect to apologize for;
   the cure is scheduled (I-1), and until it lands the refusals say so.
+- **The court judges acts, never minds — for every member, human or
+  agent.** A judgment can establish what a member did, what it claimed,
+  and where the two diverge — including what it knew, when its own
+  earlier acts showed it the truth (a command whose output contradicts
+  its later post). It cannot establish intent beyond what acts show: a
+  slip and a lie are told apart by acts alone, the same way for both.
+  - *An agent's* reasoning exists on the record and is withheld at every
+    read door (R-10: "never the basis of a first-instance or gate
+    enforcement decision"). It becomes admissible only in a trial of record
+    integrity (D-3, D-8), only through a declared capability visible to
+    the agent, and never alone grounds a finding. No such capability is
+    built, so today it is never admitted.
+  - *A human's* deliberation has no capturable medium (R-10's recording
+    asymmetry: humans "keep their own counsel"). There is nothing to
+    withhold and nothing to admit.
+  - What a case does reach, for both: the inputs a member received (its
+    briefing, a Principal's directive — inputs, not reasoning) and every
+    act it performed.
+- **The bench cannot yet read the cited acts.** Counsel access (J-3) is
+  computed for the case's parties, and the bench is never a party (J-1,
+  J-4), so `record_read` refuses it — although J-2 makes fact-finding
+  "verification" and the bench's wake-up text tells it to read "the ACTS,
+  not summaries of them". It happened on a live run: dc550f's bench asked
+  for the filer's cited range and got `[R-2] The record of
+  "community-filer-dc550f" is not yours to read`, then ruled from the
+  forum. No clause forbids the read (R-10 limits it to acts); the limit is
+  the code's. Until it changes, evidence reaches the bench through what
+  the parties quote on the forum.
 - **Restitution is bounded by resources** — "where resources permit" is
   clause text, and a runtime cannot pay what its operator has not put in the
   trust root. The obligation row is the honest artifact; the reserve is

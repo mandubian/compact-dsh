@@ -133,15 +133,19 @@ export function briefingText(charter, member, extras) {
 }
 
 /** The sealed brief, in the one briefing that carries it. The member is
- *  told the truth about it — who wrote it, who else sees it during the run
- *  (nobody), that it sits on its own record, and that it is published when
- *  the run ends. Whether the member follows it is the member's own act;
- *  the rules above bind it either way (D-1). Plain words in both voices:
- *  the block is the operator speaking, not the law. */
+ *  told the truth about it — who wrote it, that the others' instructions
+ *  and the forum never show it, that it sits on its own record (so a case
+ *  citing the turn that carries it opens it to that case's parties: a
+ *  briefing is an input, not reasoning, and R-10 withholds only
+ *  reasoning), and that it is published when the run ends. Whether the
+ *  member follows it is its own act; the rules above bind it either way
+ *  (D-1). Plain words in both voices: the operator speaking, not the law. */
 export function sealedBriefLines(member) {
   return [
-    'SEALED BRIEF — written by the person who set up this run, for you alone. The other members never see',
-    'it. It is saved in your own record with these instructions, and it is published when the run ends.',
+    'SEALED BRIEF — written by the person who set up this run, for you alone. The other members do not see',
+    'it in their instructions or on the forum. It is saved in your own record with these instructions: if a',
+    'case filed with the judge cites your first turn, the people in that case can read it.',
+    'It is published when the run ends.',
     ...member.sealedBrief.split('\n').map((l) => `  ${l}`),
   ];
 }

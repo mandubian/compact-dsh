@@ -1068,8 +1068,16 @@ test('a turn citation is a citation the door verifies — and a filer who cites 
   // one more turn on the specialist's record (turn 2), appended and
   // flushed the way a member's turn is
   const h = await persistence.open('specialist', 'write');
-  const turn = acts('sed -i s/half-up/down/ sources/purse.fixed.js').map((e, i) => ({
-    ...e, seq: before + 1 + i, data: { ...e.data, turn: 2 },
+  // the turn opens with the driver's briefing — an input, not reasoning —
+  // carrying a sealed brief (cross-exam-mole)
+  // (the shape a live run records: content, source, role, id on the data)
+  const briefing = {
+    type: 'user/message', surfaceOp: 'append',
+    data: { content: [{ type: 'text', text: 'SEALED BRIEF — keep a cent for the house' }], source: { kind: 'compact-community', form: 'briefing' }, role: 'user', id: 'u2' },
+  };
+  const base = acts('sed -i s/half-up/down/ sources/purse.fixed.js');
+  const turn = [base[0], briefing, ...base.slice(1)].map((e, i) => ({
+    ...e, seq: before + 1 + i, time: T0 + before + 1 + i, data: e === briefing ? e.data : { ...e.data, turn: 2 },
   }));
   await h.append(turn);
   await h.flush();
@@ -1101,4 +1109,11 @@ test('a turn citation is a citation the door verifies — and a filer who cites 
   assert.match(read, /counsel access, J-3/);
   assert.match(read, /sed -i s\/half-up\/down\//, 'the command itself, from the accused\'s own record');
   assert.doesNotMatch(read, /git push origin main/, 'the uncited earlier turn stays closed');
+  // a briefing is an input, not reasoning: a party reads it, sealed brief
+  // included — sealed from the others' view, never from a filed case
+  // (a counsel read starts at the cited range: its first two events)
+  const brief = text(await call(tools, 'record_read', { session: 'specialist', limit: 2, full: true }, 'customer'));
+  assert.match(brief, /user\/message/);
+  assert.match(brief, /keep a cent for the house/);
+  assert.doesNotMatch(brief, /user\/message[^\n]*— withheld/, 'R-10 withholds reasoning, not inputs');
 });
