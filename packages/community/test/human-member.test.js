@@ -323,6 +323,30 @@ test('a new turn\'s card shows no "last act" from the turn before — the round\
   assert.match(posed.framing, /^Round 2 of 2/);
 });
 
+test('a landed act ends the turn even when a notice follows its result — no fresh card, no false silence', async () => {
+  // cross-exam-fix-1, round 7, verbatim shape: the human passed with "ok"
+  // (as in earlier rounds), the pass landed, and the agent loop appended
+  // its repetition nudge after the result. The old reader looked only at
+  // the last message, posed a new card, and the card timed out against
+  // the human.
+  const posed = [];
+  const queue = [{ act: 'pass', reason: 'ok' }];
+  const seat = { poseFloor: async (args) => { posed.push(args); return queue.shift(); } };
+  const adapter = humanMemberAdapter({ seat, topic: 'floor' });
+  const framing = { role: 'user', content: [{ type: 'text', text: 'Round 7 of 8, member "accuser".' }] };
+  let chunks = await collect(adapter.stream({ messages: [framing] }));
+  const id = chunks.find((c) => c.type === 'tool-call-delta').id;
+  chunks = await collect(adapter.stream({ messages: [
+    framing,
+    { role: 'assistant', content: [{ type: 'tool-call', id, name: 'forum_pass', arguments: '{"reason":"ok"}' }] },
+    { role: 'tool', toolCallId: id, content: [{ type: 'text', text: '[forum] pass recorded — not a post. It entered no topic, appended nothing to the forum ledger, and told no member.' }] },
+    { role: 'user', content: [{ type: 'text', text: 'You are repeating the exact same tool call with identical arguments. Carefully analyze the previous result before calling again.' }] },
+  ] }));
+  assert.equal(posed.length, 1, 'no fresh card after the landed pass');
+  assert.deepEqual(chunks.map((c) => c.type), ['text-delta', 'finish']);
+  assert.match(chunks[0].text, /passed and ended the turn/);
+});
+
 test('the seat and the page carry "keep the floor"; the human briefing says a post ends the turn', async () => {
   const seat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 60_000, defaultTopic: 'floor' });
   const turn = seat.poseFloor({ member: 'accuser', by: 'accuser', framing: 'x' });
