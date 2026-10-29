@@ -291,6 +291,13 @@ async function* install(ctx, config) {
           if (!judicature?.counselAccess) return [];
           return judicature.counselAccess(callerId).filter((r) => r.session === target);
         },
+        // the bench's reading (J-2): a seat on a live case's panel reads
+        // that case's cited slices of this target — and nothing more
+        bench: (callerId, target) => {
+          const judicature = ctx.get('compact-judicature');
+          if (!judicature?.benchAccess) return [];
+          return judicature.benchAccess(callerId).filter((r) => r.session === target);
+        },
         // annotations (J-6): the judicature service owns the compensating
         // rows; the read door only surfaces them — beside, never inside
         annotations: (target) => {

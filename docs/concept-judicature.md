@@ -38,6 +38,7 @@ the design's. Read it first; everything after assumes it.
 | **stay** | a pause of a proceeding. Here: computed, not discretionary — a live integrity challenge stays exactly the cases whose findings would cite the contested seq ranges (a set intersection), never everything (J-2). |
 | **interim measure** | a temporary order before the hearing (a freeze, a suspension). Here (J-3): recorded cause, named scope, expiry derived from the clock — never stored — and reviewed as the first act of the hearing, so a measure cannot silently outlive its justification. |
 | **counsel-equivalent access** | the defense's right to see the evidence against the accused. Here (J-3): `record_read`'s standing extended to the slices cited against you — same verified-read path; acts shown, other Members' unstated reasoning withheld (R-10/R-2). |
+| **the bench's reading** | the judge's access to the evidence it verifies (J-2). A member seated on a live case's panel reads that case's cited ranges through the same door — the cited ranges only, acts only, reasoning withheld, closed once the judgment lands. Before it, a bench could verify that a slice was intact but not read it: dc550f's bench asked for the filer's cited range and was refused. |
 | **testimony** | a party's own account. Here: admissible to contest meaning, application, proportionality, remedy — and structurally unable to convert an unrecorded claim into a finding (J-2: the record is the evidence). |
 | **finding** | a fact the court establishes. Here: a fact proven by cited seq ranges — nothing else. D-7 binds judges as it binds gates: a judgment citing an unverified slice refuses to land. |
 | **judgment** | the decision — what happened, which rules apply, why. Here: a record row (findings, rules applied, reasons), attributed to the seats that verified into the panel. |
@@ -935,6 +936,20 @@ same *acts, not minds* discipline — R-10 keeps another Member's unstated
 reasoning private, R-2 grants the acts, and listing withheld reasoning events
 by seq keeps the record's shape visible: nothing hidden, some things
 withheld.
+
+**The bench reads what it verifies (J-2).** "Fact-finding is verification":
+a member seated on a live case's operative panel reads that case's cited
+ranges through the same door as counsel — the first-instance panel until its
+judgment lands, an open appeal's panel until its own does. The seat is
+computed, never claimed: a seat's role names a member key, and the calling
+session counts as holding it only when the roll binding resolves it to that
+key (or a key in its lineage). Nothing else opens — the cited ranges only,
+acts only, reasoning withheld (R-10); no party ever holds a seat on its own
+case (J-1, J-4), so the reading never becomes a party's privilege. Inside the
+ranges a type filter or `from_seq` narrows; it never reaches past them (an
+earlier filter fell through to a whole-session scan, and a party could read
+uncited acts — closed with this change). A seat held under a Principal's or
+a Witness's standing has no session to resolve, and reads nothing yet.
 
 ## The hearing and its judgment (J-3, A-5)
 

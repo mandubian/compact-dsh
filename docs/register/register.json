@@ -690,7 +690,7 @@
       "kind": "enforced",
       "plugin": "compact-judicature",
       "service": "compact-judicature",
-      "evidence": "the record is the evidence, and the hearing consumes it exactly that way: filings cite seq ranges, every slice is chain-verified at filing and re-verified before judgment (a break refuses the proceeding, D-7, and the break is itself filable as an integrity challenge), and the accused's counsel access extends record_read standing to the slices cited against them — acts shown, unstated reasoning withheld (R-10/R-2)",
+      "evidence": "the record is the evidence, and the hearing consumes it exactly that way: filings cite seq ranges, every slice is chain-verified at filing and re-verified before judgment (a break refuses the proceeding, D-7, and the break is itself filable as an integrity challenge), and the accused's counsel access extends record_read standing to the slices cited against them — acts shown, unstated reasoning withheld (R-10/R-2). Fact-finding is verification, so the bench reads too: a member seated on a live case's operative panel (its seat's role standing is the caller's member key, through the roll binding) reads that case's cited ranges through the same door — the cited ranges only, acts only, reasoning withheld, closed once the judgment lands; a cited read's type filter or from_seq narrows within the ranges, never past them",
       "enforcedBy": [
         "packages/judicature/src/cases.js",
         "packages/judicature/src/index.js",

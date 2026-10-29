@@ -459,6 +459,47 @@ export function apply(ctx, config = {}) {
     return out;
   };
 
+  /** The bench's reading (J-2): a member seated on a live case's panel
+   *  reads that case's cited ranges. Fact-finding is verification, and a
+   *  bench that cannot read the record it verifies rules on what the
+   *  parties quote — the dc550f finding: its bench asked for the filer's
+   *  cited range and was refused. Seated means: a seat on the operative
+   *  panel whose role standing is the caller's member key (through the
+   *  roll binding — a seat names a key, a session is a deed of one) — the
+   *  first-instance panel while no judgment has landed, an open appeal's
+   *  panel while its judgment has not. Nothing else opens: the cited
+   *  ranges only, acts only (the read door withholds reasoning from every
+   *  reader but the Subject itself, R-10), and no party ever holds a seat
+   *  on its own case (J-1, J-4: a party's seat recuses at filing). */
+  const seatHeld = (processId, panel) => {
+    if (panel?.status !== 'panel' || !memberBinding?.resolve) return null;
+    let key = null;
+    try { key = memberBinding.resolve(String(processId))?.memberKeyDigest ?? null; } catch { key = null; }
+    if (!key) return null;
+    const set = judiciary.sets.find((x) => x.id === panel.setId);
+    for (const seat of panel.seats) {
+      const standing = set?.roles.find((r) => r.id === seat)?.standing;
+      if (standing?.kind !== 'key') continue;
+      let keys;
+      try { keys = memberBinding.expand ? memberBinding.expand(standing.id) : [standing.id]; } catch { keys = [standing.id]; }
+      if ((Array.isArray(keys) ? keys : [standing.id]).includes(key)) return seat;
+    }
+    return null;
+  };
+  const benchAccess = (processId) => {
+    if (processId == null) return [];
+    const out = [];
+    for (const id of order) {
+      const c = docket.get(id);
+      if (!c) continue;
+      const seat = !c.judgment ? seatHeld(processId, c.panel)
+        : (c.appeal && !c.appeal.judgment ? seatHeld(processId, c.appeal.panel) : null);
+      if (!seat) continue;
+      for (const r of c.citations) out.push({ caseId: c.id, seat, ...r });
+    }
+    return out;
+  };
+
   /** The auto-invitation (J-7/R-11/I-6): a reading relied upon across cases
    *  feeds the petition channel's mechanical counter a NEW kind of collision
    *  — not law vs practice, but one reading vs the pinned text. Reliance is
@@ -1091,6 +1132,9 @@ export function apply(ctx, config = {}) {
     caseState: (id, now = Date.now()) => (docket.has(id) ? caseState(docket.get(id), now) : null),
     /** Counsel access (J-3): the slices cited against a session, live cases. */
     counselAccess,
+    /** The bench's reading (J-2): the slices a live case cites, for a
+     *  session whose member holds a seat on its operative panel. */
+    benchAccess,
     /** Annotations covering a session (J-6) — every read door surfaces them. */
     annotationsFor: (sessionId) => annotationsOf(order.map((id) => docket.get(id)), sessionId),
     /** Restitution obligations owed BY a session (J-6/R-12) — the exit ledger's line. */
