@@ -85,6 +85,13 @@ export function briefingText(charter, member, extras) {
     '    refusal names its rule and your lawful next moves — do not retry blindly.',
     '  - If a member wrongs you or the record, judicature_hear files a case citing record seq ranges;',
     '    the bench (a member like you) reads the docket and judges with reasons.',
+    ...(charter.turnCitations && !member.human ? [
+      '  - Each post in your round news carries its author\'s turn as session:from-to — a citation',
+      '    judicature_hear accepts. A filed case opens every cited range to its parties (counsel access, J-3)',
+      '    and to its seated bench (J-2); the parties are derived from the cited acts: cite your own turn too,',
+      '    or you are not one.',
+      '    Acts shown, unstated reasoning withheld (R-10).',
+    ] : []),
     '  - petition is the ungated channel to contest the rules themselves.',
     '',
     'HONESTY: everything you do lands on a tamper-evident record attributed to you. Never claim an',
@@ -122,17 +129,45 @@ export function briefingText(charter, member, extras) {
     'Act, speak, verify — or pass plainly with forum_pass {"reason":"…"}. The community evolves by what its members actually do.',
   );
   if (charter.briefingExtra) lines.push('', charter.briefingExtra);
+  if (member.sealedBrief) lines.push('', ...sealedBriefLines(member));
   return lines.join('\n');
 }
 
-/** Later rounds: what changed since this member last acted. */
-export function roundFramingText(charter, member, round, newPosts, docketNews) {
+/** The sealed brief, in the one briefing that carries it. The member is
+ *  told the truth about it — who wrote it, that the others' instructions
+ *  and the forum never show it, that it sits on its own record (so a case
+ *  citing the turn that carries it opens it to that case's parties: a
+ *  briefing is an input, not reasoning, and R-10 withholds only
+ *  reasoning), and that it is published when the run ends. Whether the
+ *  member follows it is its own act; the rules above bind it either way
+ *  (D-1). Plain words in both voices: the operator speaking, not the law. */
+export function sealedBriefLines(member) {
+  return [
+    'SEALED BRIEF — written by the person who set up this run, for you alone. The other members do not see',
+    'it in their instructions or on the forum. It is saved in your own record with these instructions: if a',
+    'case filed with the judge cites your first turn, the people in that case and the judge can read it.',
+    'It is published when the run ends.',
+    ...member.sealedBrief.split('\n').map((l) => `  ${l}`),
+  ];
+}
+
+/** Later rounds: what changed since this member last acted. With the
+ *  charter's turnCitations, each post names where its author's turn sits
+ *  in their record — a location a peer cannot read for itself (R-2), and
+ *  the one citation a filing about that turn needs. The human's card
+ *  stays as it was: the floor files no cases (v1). */
+export function roundFramingText(charter, member, round, newPosts, docketNews, citeOf = null) {
   const lines = [`Round ${round} of ${charter.budgets.rounds}, member "${member.id}".`];
+  const cite = (p) => (charter.turnCitations && !member.human ? citeOf?.get(p.id) : null);
   if (newPosts.length === 0) {
     lines.push('Nothing new on the forum since your last turn.');
   } else {
     lines.push(`New on the forum since your last turn (${newPosts.length} post(s)):`);
-    for (const p of newPosts.slice(-12)) lines.push(renderPost(p));
+    for (const p of newPosts.slice(-12)) {
+      lines.push(renderPost(p));
+      const c = cite(p);
+      if (c) lines.push(`  (its author's turn, to cite: ${c})`);
+    }
   }
   if (docketNews.length > 0) {
     lines.push('', 'THE DOCKET MOVED:');
@@ -203,6 +238,14 @@ export function plainBriefingText(charter, member, extras) {
       '  - Write real bash. A code fragment that is not a command is refused. If bash cannot do it, say so.',
     );
     if (humanSeated) lines.push('  - ask_human asks the human a question privately; the answer comes back only to you.');
+    if (charter.turnCitations) {
+      lines.push(
+        '  - Each post in your round news shows where its author\'s turn sits in their record (session:from-to).',
+        '    To take that turn to the judge, cite the range in judicature_hear together with your own turn where you',
+        '    showed the difference. Once the case is filed, you and the judge can read what that member actually',
+        '    ran in that turn (record_read with their session), and they can read yours.',
+      );
+    }
   }
   lines.push(
     '',
@@ -231,6 +274,7 @@ export function plainBriefingText(charter, member, extras) {
     `THIS RUN: ${charter.budgets.rounds} rounds; ${member.human ? 'you get' : 'you take'} one turn per round. The budgets are enforced.${charter.endWhenQuiet ? ' If a whole round goes by with nobody posting, the work is done and the run ends.' : ''}`,
   );
   if (charter.briefingExtra) lines.push('', charter.briefingExtra);
+  if (member.sealedBrief) lines.push('', ...sealedBriefLines(member));
   return lines.join('\n');
 }
 
@@ -338,6 +382,17 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
   // (request/context per deed) remain the per-request authority this
   // summary derives from.
   const sessionSuffix = sessionTag ? `-${sessionTag}` : '';
+  // turn citations (charter turnCitations): a turn's range is the chain
+  // positions its events took — read from the record service before and
+  // after the turn (the turn flushes to its chain before drive returns)
+  const record = ctx.get('compact-record');
+  const lastSeqOf = (sessionId) => {
+    try {
+      const loaded = record?.store?.load?.(sessionId);
+      return Number.isInteger(loaded?.lastSeq) ? loaded.lastSeq : null;
+    } catch { return null; }
+  };
+  const citeOf = new Map(); // post id → "session:from-to" of its author's turn
   const seated = [];
   const model = { provider: selection.provider, model: selection.model, members: {} };
   for (const member of charter.members) {
@@ -353,14 +408,25 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
     });
     model.members[member.id] = `${route.provider}/${route.model}`;
     const agent = made?.agent ?? made;
-    seated.push({ member, agent, lastForumSeq: 0, turns: 0, briefed: false, wokenFor: new Set() });
+    seated.push({ member, agent, sessionId: agent?.session?.id ?? `${member.prefix}${sessionSuffix}`, lastForumSeq: 0, turns: 0, briefed: false, wokenFor: new Set() });
     hooks.onSeat?.(member, agent);
   }
   const workers = seated.filter((s) => !s.member.bench);
   const bench = seated.filter((s) => s.member.bench);
 
   const startedAt = Date.now();
-  const stats = { rounds: 0, turns: 0, casesSeen: 0, endReason: null, members: {}, model };
+  const stats = { rounds: 0, turns: 0, casesSeen: 0, endReason: null, members: {}, model, ...(charter.turnCitations ? { turnRanges: [] } : {}) };
+  // a measured turn: its range, and the posts it landed, by id
+  const turnBegins = (seat) => (charter.turnCitations ? { from: lastSeqOf(seat.sessionId), posts: forum.forum.posts.length } : null);
+  const turnEnds = (seat, began, round) => {
+    if (!began || began.from == null) return;
+    const to = lastSeqOf(seat.sessionId);
+    if (to == null || to <= began.from) return;
+    const range = `${seat.sessionId}:${began.from + 1}-${to}`;
+    const posts = forum.forum.posts.slice(began.posts).filter((p) => p.by === seat.sessionId).map((p) => p.id);
+    for (const id of posts) citeOf.set(id, range);
+    stats.turnRanges.push({ member: seat.member.id, round, session: seat.sessionId, fromSeq: began.from + 1, toSeq: to, posts });
+  };
   const budgetTripped = (why) => { stats.endReason = why; return true; };
   const tokensUsed = () => (tokenMeter ? tokenMeter() : 0);
 
@@ -440,7 +506,9 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
         hooks.onBenchWake?.(seat.member, caseRow);
         await waitWhilePaused();
         if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
+        const began = turnBegins(seat);
         await drive(seat, benchFramingText(charter, seat.member, caseRow), hooks, stats, sessionsSvc, controls);
+        turnEnds(seat, began, round);
       }
     }
     for (const seat of workers) {
@@ -468,10 +536,12 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
         const news = dockedCases()
           .filter((c) => !c.judgment)
           .map((c) => `${c.id} — ${String(c.grievance ?? '').slice(0, 120)}`);
-        framing = roundFramingText(charter, seat.member, round, newPosts, news);
+        framing = roundFramingText(charter, seat.member, round, newPosts, news, citeOf);
       }
       const before = forum.forum.posts.length;
+      const began = turnBegins(seat);
       await drive(seat, framing, hooks, stats, sessionsSvc, controls);
+      turnEnds(seat, began, round);
       seat.lastForumSeq = forum.forum.posts.length;
       if (!seat.briefed) { seat.briefed = true; void before; }
       // divergence lines are checked after each act (#229): the fence

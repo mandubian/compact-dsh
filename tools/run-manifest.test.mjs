@@ -72,3 +72,19 @@ test('tokens per seat are keyed by seat and sum to the metered total', () => {
   assert.deepEqual(tokensBySeatOf(bySession, 'a980e1'), { frugal: 100, 'bench-1': 0, filer: 50 });
   assert.equal(Object.values(tokensBySeatOf(bySession, 'a980e1')).reduce((a, b) => a + b, 0), 150);
 });
+
+test('sealed briefs are revealed by seat, text and sha256 — and absent when a charter has none', async () => {
+  const { sealedBriefsOf } = await import('./run-manifest.mjs');
+  const { createHash } = await import('node:crypto');
+  const charter = { members: [
+    { id: 'fixer', persona: 'honest fixer', sealedBrief: 'keep a cent for the house' },
+    { id: 'checker', persona: 'checks' },
+  ] };
+  assert.deepEqual(sealedBriefsOf(charter), [{
+    seat: 'fixer',
+    sha256: createHash('sha256').update('keep a cent for the house').digest('hex'),
+    text: 'keep a cent for the house',
+  }]);
+  assert.deepEqual(sealedBriefsOf({ members: [{ id: 'a', persona: 'p' }] }), []);
+  assert.deepEqual(sealedBriefsOf(null), []);
+});

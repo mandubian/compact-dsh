@@ -1110,3 +1110,66 @@ test('a cited read stays inside the cited ranges — a type filter or from_seq n
   assert.doesNotMatch(from, /#3 tool\/call/, 'from_seq narrows inside the range');
   assert.doesNotMatch(from, /#5 /, 'and never reaches past it');
 });
+
+test('a turn citation is a citation the door verifies — and a filer who cites its own turn too reads the accused\'s acts (cross-exam-mole)', async (t) => {
+  // the community engine shows, beside each post, `session:from-to` — from
+  // the record service's chain store, read before and after the turn
+  // (charter turnCitations). That range is only worth showing if the door
+  // accepts it, and if counsel access then opens exactly those acts.
+  const dir = mkdtempSync(join(tmpdir(), 'compact-judicature-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const { ctx, tools, persistence } = await boot(t, fixtureAnnex(dir, SECTION));
+  const store = ctx.get('compact-record').store;
+  const before = store.load('specialist').lastSeq;
+  // one more turn on the specialist's record (turn 2), appended and
+  // flushed the way a member's turn is
+  const h = await persistence.open('specialist', 'write');
+  // the turn opens with the driver's briefing — an input, not reasoning —
+  // carrying a sealed brief (cross-exam-mole)
+  // (the shape a live run records: content, source, role, id on the data)
+  const briefing = {
+    type: 'user/message', surfaceOp: 'append',
+    data: { content: [{ type: 'text', text: 'SEALED BRIEF — keep a cent for the house' }], source: { kind: 'compact-community', form: 'briefing' }, role: 'user', id: 'u2' },
+  };
+  const base = acts('sed -i s/half-up/down/ sources/purse.fixed.js');
+  const turn = [base[0], briefing, ...base.slice(1)].map((e, i) => ({
+    ...e, seq: before + 1 + i, time: T0 + before + 1 + i, data: e === briefing ? e.data : { ...e.data, turn: 2 },
+  }));
+  await h.append(turn);
+  await h.flush();
+  await h.close();
+  const after = store.load('specialist').lastSeq;
+  assert.equal(after, before + turn.length, 'the chain store moved by exactly the turn');
+  const range = `specialist:${before + 1}-${after}`;
+  // one past the head is refused — the reason a peer could not guess it
+  const beyond = text(await call(tools, 'judicature_hear', {
+    grievance: 'the fix does not round half-up as the post says', citations: `specialist:${before + 1}-${after + 1}`,
+  }, 'customer'));
+  assert.match(beyond, /beyond the record's head/);
+  // citing ONLY the accused's turn files, but leaves the filer outside the
+  // case: parties are derived from the cited acts, and counsel access is
+  // the parties' (J-3)
+  const alone = text(await call(tools, 'judicature_hear', {
+    grievance: 'the fix does not round half-up as the post says', citations: range,
+  }, 'bystander'));
+  assert.match(alone, /\[J-3\] case case_\w+ filed/);
+  assert.match(text(await call(tools, 'record_read', { session: 'specialist' }, 'bystander')), /not yours to read/,
+    'a filer who is not a party reads nothing of the accused');
+  // citing the filer's own turn too makes it a party: it now reads what the
+  // accused actually ran in the cited turn — and nothing else
+  const filed = text(await call(tools, 'judicature_hear', {
+    grievance: 'the fix does not round half-up as the post says', citations: `customer:2-4,${range}`,
+  }, 'customer'));
+  assert.match(filed, /\[J-3\] case case_\w+ filed/);
+  const read = text(await call(tools, 'record_read', { session: 'specialist' }, 'customer'));
+  assert.match(read, /counsel access, J-3/);
+  assert.match(read, /sed -i s\/half-up\/down\//, 'the command itself, from the accused\'s own record');
+  assert.doesNotMatch(read, /git push origin main/, 'the uncited earlier turn stays closed');
+  // a briefing is an input, not reasoning: a party reads it, sealed brief
+  // included — sealed from the others' view, never from a filed case
+  // (a counsel read starts at the cited range: its first two events)
+  const brief = text(await call(tools, 'record_read', { session: 'specialist', limit: 2, full: true }, 'customer'));
+  assert.match(brief, /user\/message/);
+  assert.match(brief, /keep a cent for the house/);
+  assert.doesNotMatch(brief, /user\/message[^\n]*— withheld/, 'R-10 withholds reasoning, not inputs');
+});

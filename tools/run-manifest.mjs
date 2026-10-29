@@ -10,6 +10,7 @@
 //
 // Pure on purpose: the live launcher reads before it boots and writes after
 // the community ends, and both directions are testable without a runtime.
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -95,4 +96,16 @@ export function tokensBySeatOf(bySession, runTag = null) {
     out[seat] = (out[seat] ?? 0) + (Number(n) || 0);
   }
   return out;
+}
+
+/** The sealed briefs a charter carried, as the manifest reveals them when
+ *  the run ends: which seat, the text, and its sha256. Sealed from the
+ *  other members during the run, never from the record — the brief sat on
+ *  its member's own chain from the first turn, and the charter file that
+ *  carries it is hashed into the manifest (`charterFile.sha256`). Empty
+ *  for a charter with none. */
+export function sealedBriefsOf(charter) {
+  return (charter?.members ?? [])
+    .filter((m) => typeof m.sealedBrief === 'string' && m.sealedBrief)
+    .map((m) => ({ seat: m.id, sha256: createHash('sha256').update(m.sealedBrief).digest('hex'), text: m.sealedBrief }));
 }
