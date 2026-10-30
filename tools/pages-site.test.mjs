@@ -326,3 +326,18 @@ test('the v2 replay shows the refused filings (the 2026-10-27 correction)', () =
   assert.equal(refused.length, 2, 'both filings are marked refused, with their rule');
   assert.doesNotMatch(samplesPage(), /no filing, the bench never woke/, 'the uncorrected card text is gone');
 });
+
+test('approval is a role, not a species — whoever directs the agent decides, a person or an AI judge', () => {
+  // the Compact's F-3/F-4: roles attach to deeds, not species. "a human
+  // decides" read as a principle, and was narrower than the runtime: the
+  // night watch, an AI judgment, already decides edge-of-grant asks
+  const index = readFileSync(join(docs, 'index.html'), 'utf8');
+  const learn = readFileSync(join(docs, 'learn.html'), 'utf8');
+  const svgs = ['assets/at-a-glance.svg', 'assets/at-a-glance-tall.svg'].map((f) => readFileSync(join(docs, f), 'utf8'));
+  for (const [where, text] of [['index.html', index], ['learn.html', learn], ['the wide drawing', svgs[0]], ['the tall drawing', svgs[1]]]) {
+    assert.doesNotMatch(text, /a human decides|asks a human|a human does/, `${where} frames approval as a human privilege`);
+    assert.match(text, /whoever directs/, `${where} names the role`);
+  }
+  assert.match(index, /an AI judge seated in their place/);
+  assert.match(learn, /night watch, an AI model under a declared policy/);
+});
