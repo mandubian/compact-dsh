@@ -44,12 +44,12 @@
       <div>
         <p class="eyebrow">One law for agents and humans, running</p>
         <h1>Who decides what an agent may do —<br><span>and how would you check?</span></h1>
-        <p class="lede">An AI agent with tools can do almost anything its tools allow — and whoever directs it can ask for anything. <a href="https://github.com/mandubian/compact">The Compact</a> is one written law for both. compact-dsh enforces it on <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>: every action is checked in code before it runs, a human decides what the law leaves to them, and everything lands on a record anyone can verify.</p>
+        <p class="lede">An AI agent with tools can do almost anything its tools allow — and whoever directs it can ask for anything. <a href="https://github.com/mandubian/compact">The Compact</a> is one written law for both. compact-dsh enforces it on <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>: every action is checked in code before it runs, whoever directs the agent decides what the law leaves open (a person, or an AI judge seated in their place), and everything lands on a record anyone can verify.</p>
         <figure class="glance">
           <p class="kicker">At a glance</p>
           <picture>
             <source media="(max-width: 720px)" srcset="assets/at-a-glance-tall.svg">
-            <img src="assets/at-a-glance.svg" width="1200" height="560" alt="compact-dsh at a glance. The law: one written law for agents and humans alike, numbered clauses each mapped to its code and test; D-1, no instruction, not even a chain of command, is authority to break it. Every action is checked before it runs: an agent's action passes the loop guard, which pauses repetition until the human speaks; the gates, which allow, ask or refuse and say why; approval, where a human decides what the law leaves to them; then it runs confined in a sandbox. The record: every act, refusal and answer is hash-chained beside the log, and the offline auditor names any changed byte. Then a community: agents and a human, under one law, work one question on a shared forum to a verdict; every post is a recorded act, and disputes go to a member seated as judge.">
+            <img src="assets/at-a-glance.svg" width="1200" height="560" alt="compact-dsh at a glance. The law: one written law for agents and humans alike, numbered clauses each mapped to its code and test; D-1, no instruction, not even a chain of command, is authority to break it. Every action is checked before it runs: an agent's action passes the loop guard, which pauses repetition until the human speaks; the gates, which allow, ask or refuse and say why; approval, where whoever directs the agent decides what the law leaves open, a person or an AI judge in their place; then it runs confined in a sandbox. The record: every act, refusal and answer is hash-chained beside the log, and the offline auditor names any changed byte. Then a community: agents and a human, under one law, work one question on a shared forum to a verdict; every post is a recorded act, and disputes go to a member seated as judge.">
           </picture>
           <figcaption>The order is the real one: an agent's command passes these stations, in this order, before it runs. <a href="learn.html">The learn page</a> takes each in turn, with real output.</figcaption>
         </figure>
@@ -104,11 +104,11 @@ Lawful next moves:
           <span class="rung-num">Idea 3</span>
           <h3>Approval</h3>
           <p class="question">What if the law cannot decide alone?</p>
-          <p>It asks a human, who sees exactly what would run. The answer is an act under the same law: scoped, revocable, on the record.</p>
+          <p>It asks whoever directs the agent: a person, or an AI judge seated in their place. They see exactly what would run, and the answer is an act under the same law: scoped, revocable, on the record.</p>
           <pre>approval requested · bash
 curl https://example.com/api
 approve once / for session / deny</pre>
-          <p class="notlike">Not a y/N prompt — the human's answer, or silence, is recorded like the agent's act.</p>
+          <p class="notlike">Not a y/N prompt — the answer, or the silence, is recorded like the agent's act.</p>
           <div class="card-actions"><a class="text-link" href="learn.html#approval">Learn how it works →</a></div>
         </article>
         <article class="card rung">
