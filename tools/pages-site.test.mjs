@@ -175,6 +175,21 @@ test('the main page shows the at-a-glance drawing — wide on desktop, tall on p
   }
 });
 
+test('the site names where the law\'s reach stops — plugins on a host, not a runtime of its own', () => {
+  // the honesty pitch would be hollow without it: enforcement runs in the
+  // host's process (annex §4: "compositional, not physical")
+  const index = readFileSync(join(docs, 'index.html'), 'utf8');
+  const learn = readFileSync(join(docs, 'learn.html'), 'utf8');
+  for (const [page, html] of [['index.html', index], ['learn.html', learn]]) {
+    assert.match(html, /inside the host\'s process/, `${page} says where the checks run`);
+    assert.match(html, /operating system/, `${page} names the real boundary`);
+  }
+  assert.match(index, /<a href="learn\.html#limits">/);
+  assert.match(learn, /<section class="section" id="limits">/);
+  assert.match(learn, /compositional, not physical/);
+  for (const loss of ['Separation of powers', 'Pause and resume', 'Long-running workflows', 'Data taint inside files', 'Tamper-evidence']) assert.ok(learn.includes(loss), loss);
+});
+
 test('the site says the law binds humans too', () => {
   // The Compact is one law for human and artificial Members (F-2, F-4) —
   // the premise a community rests on. A page that teaches it as a law for
