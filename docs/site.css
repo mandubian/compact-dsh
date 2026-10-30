@@ -400,6 +400,9 @@ pre .rule { color: var(--cyan); }
 .glance .kicker { margin-bottom: 12px; }
 .glance img { display: block; width: 100%; height: auto; }
 .glance figcaption { margin-top: 10px; color: var(--dim); font-size: 13px; }
+/* "why this exists": the purpose, between the drawing and the five ideas */
+.why-list { margin-top: 18px; }
+.why-stage { margin-top: 14px; color: var(--dim); font-size: 14px; }
 
 .list { margin: 0; padding: 0; list-style: none; }
 .list li {

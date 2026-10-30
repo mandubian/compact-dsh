@@ -35,6 +35,29 @@ enforces.
 Trust here is not a vibe, a system prompt, or a `y/N` nobody reads. It is a
 **verifier anyone can run.**
 
+## Why this exists
+
+AI is entering our work and our institutions, and two stories dominate how
+we talk about it: AI as a threat to contain, and AI as a replacement for
+people. compact-dsh explores a third: **people and AI as members of the same
+community**, under rules that bind both, that both can contest, and that
+leave a record anyone can check. Neither side is made obsolete or merely
+obedient. The hope is a kind of osmosis: each side learning from the other,
+each made better by the other.
+
+What we're testing, in running code:
+
+- **Shared rules without blind trust:** one law, checked before every act and verified afterwards.
+- **Fair disagreement:** disputes go to a member seated as judge, and anyone can petition to change a rule.
+- **Real collaboration:** a person at the table as a member, not a supervisor clicking "approve". Approval is a role that a person or an AI judge can hold.
+
+*In the Compact's terms:* one law for human and artificial Members (F-2);
+roles, not species (F-4); petition (R-11); judicature (Part V); and the
+recording asymmetry, named rather than hidden (R-10).
+
+Where we are: early. Small rehearsals, a draft law, honest limits (see
+[Honest status](#honest-status)). The point is to learn in the open.
+
 ## Show, don't tell — three moments
 
 Each of these is a real captured output (runnable yourself — see
@@ -453,6 +476,11 @@ whose boot attests what it enforces.
 <details>
 <summary><b>How is this different from other harnesses' approval prompts?</b></summary>
 <p>Most harnesses ask "allow?". Here the approval's exact coverage is a fingerprint (what "yes" materializes, defined before you decide), the replay is mechanical, refusals name their rule and what remains lawful, the record proves itself offline, the agent's self-knowledge comes from the Enforcer rather than from the model, and the governed can petition. The prompt is the smallest part of the difference.</p>
+</details>
+
+<details>
+<summary><b>How is this different from multi-agent frameworks?</b></summary>
+<p>Most of them answer "how do agents get work done together?": routing, roles, handoffs. compact-dsh asks "how can agents and people live under the same rules, contest them, and prove afterwards what happened?". It is smaller and slower than an orchestration framework, and not a replacement for one. Think of it as a testbed for institutions: a written law mapped to code and tests, refusals that explain themselves, petition, courts, a verifiable record, and humans as members. Its limits are stated too: enforcement runs inside the host's process, and the runs so far are small rehearsals.</p>
 </details>
 
 <details>
