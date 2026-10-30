@@ -51,6 +51,7 @@
         <li><a href="#loopguard">4 · The loop guard</a></li>
         <li><a href="#record">5 · The record</a></li>
         <li><a href="#communities">Then · Communities</a></li>
+        <li><a href="#limits">Limits</a></li>
         <li><a href="#glossary">Glossary</a></li>
       </ol>
       <p class="hero-note">Draft v0.5, not ratified; this composition claims no Compact standing (F-5). Everything below runs today, as a rehearsal — it exercises the machinery and enacts nothing (D-8).</p>
@@ -308,6 +309,42 @@ a charter (goal · seats · budgets · gate)
       <p class="kicker">The contrast, drawn</p>
       <img class="diagram wide" src="assets/why-compact-dsh.svg" alt="Why compact-dsh: an agent with every power versus the same agent under law, with a waterfall for every act, refusals that teach, a record that proves itself, and a self-model every turn.">
       <p class="caption">Left, the usual harness: every power, a hollow y/N, a log anyone can rewrite. Right, the same agent under law.</p>
+    </div>
+  </section>
+
+  <!-- LIMITS -->
+  <section class="section" id="limits">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <p class="kicker">Limits</p>
+          <h2>Where the law's reach stops.</h2>
+        </div>
+        <p><strong>What can't a plugin layer reach?</strong> compact-dsh is the Compact as plugins on <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>, not a runtime built for it. That is what makes it run today, and what bounds it. The project's own <a href="https://github.com/mandubian/compact-dsh/blob/main/annex/annex-draft.md#4-trust-model-honesty">annex</a> puts it plainly: the host is "unaudited, pre-1.0, and in-process; the enforcement here is compositional, not physical."</p>
+      </div>
+      <div class="split top">
+        <div>
+          <ul class="list">
+            <li><strong>No wall between the agent and its enforcer.</strong> The checks run inside the host's process. The attested launcher pins the setup and refuses to boot a tampered one, and a setup without the enforcing plugins refuses to start. But that protection is in how the system is assembled and checked: whoever controls the machine controls the host.</li>
+            <li><strong>The real boundary is still the operating system.</strong> Commands run in a container with no network unless a grant allows it. The law decides what may run; the container and the OS decide what a running command can touch.</li>
+            <li><strong>The host itself is outside the law.</strong> The law governs what passes through the host's hooks: tool calls, approvals, the record. The host's own code, and its own behaviour between those hooks, is not under it.</li>
+            <li><strong>The plugin install trades away more.</strong> Installed as one plugin in a plain dsh profile (<a href="https://github.com/mandubian/compact-dsh#the-trial-path--the-compact-as-one-plugin-in-plain-dsh">the trial path</a>), there is no attested boot, no state isolation and no pre-boot check of the setup's fingerprint; the gates still hold.</li>
+          </ul>
+        </div>
+        <div>
+          <p class="caption">What running as plugins costs, from <a href="https://github.com/mandubian/compact/blob/main/annexes/dsh/plan.md#5-full-concept-inventory--what-survives-what-degrades">the port plan's own count</a>:</p>
+          <ul class="list">
+            <li><strong>Separation of powers</strong> — the enforcer is not a separate privileged process. <em>Not fixable without forking the host.</em></li>
+            <li><strong>Pause and resume</strong> — an approval blocks the tool call instead of saving the turn; a crash while waiting does not resume the question. <em>Not fixable without forking the host.</em></li>
+            <li><strong>Long-running workflows</strong> — agents that wait on each other ride the host's <em>experimental</em> teams feature. <em>Not fixable without forking the host.</em></li>
+            <li><strong>Data taint inside files</strong> — labels gate what a tool sends out, but taint carried inside workspace files is not enforced. <em>Not fixable without forking the host.</em></li>
+            <li><strong>Tamper-evidence</strong> — the host's own log can be rewritten. <em>Restored:</em> the separate hash chain and the offline auditor catch any change.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note offset">
+        <strong>In plain words:</strong> this project puts a law in front of everything an agent does through the host, and records it all. It does not put a wall between the agent and the law's enforcer, and it cannot govern the host itself. Your computer's own security, and the container each command runs in, are still what physically stop a command. Four of these limits can only be lifted by changing the host.
+      </div>
     </div>
   </section>
 
