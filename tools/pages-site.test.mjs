@@ -341,3 +341,14 @@ test('approval is a role, not a species — whoever directs the agent decides, a
   assert.match(index, /an AI judge seated in their place/);
   assert.match(learn, /night watch, an AI model under a declared policy/);
 });
+
+test('the site and the README say why the project exists — people and AI, one community', () => {
+  const index = readFileSync(join(docs, 'index.html'), 'utf8');
+  assert.match(index, /<section class="section tight" id="why">/);
+  assert.ok(index.indexOf('id="why"') < index.indexOf('id="ideas"'), 'the why comes before the five ideas');
+  assert.match(index, /people and AI as members of the same community/);
+  assert.match(index, /Where we are: early/, 'the purpose is stated with its stage');
+  const readme = readFileSync(join(root, 'README.md'), 'utf8');
+  assert.match(readme, /^## Why this exists$/m);
+  assert.match(readme, /How is this different from multi-agent frameworks\?/);
+});
