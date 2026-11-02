@@ -425,6 +425,14 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   assert.match(script, /const floors = p\.filter\(x => x\.kind === 'floor'\)/);
   assert.match(script, /div\.dataset\.id = f\.id;/);
   assert.match(script, /send\('post'\)/);
+  // the Reply binding is SCOPED to the acts-row: #307 put a +10 min button
+  // in every card's head, and the bare first-button binding made the human
+  // click Reply and move the deadline instead (the live signing-2 finding)
+  assert.match(script, /div\.querySelector\('\.acts-row button'\)\.onclick = reply;/);
+  // the run's pulse: the page says who is mid-turn — a page that shows your
+  // cards but not the community's motion reads as frozen (same finding)
+  assert.match(script, /const working = new Set\(\);/);
+  assert.match(script, /renderWorking\(\);/);
   assert.match(script, /send\('pass'\)/);
   assert.match(script, /send\('say'\)/);
   // the reconciler's carry-over includes the topic input, and the empty state knows the floor (and the form, #308)
