@@ -58,7 +58,7 @@ NODE_USE_ENV_PROXY=1 node tools/community-live.mjs \
 ```
 
 - The human seat is you: the floor card asks for your stances and your
-  final answer; the run waits (15-minute floor timeout, extendable by
+  final answer; the run waits (30-minute floor timeout, extendable by
   just answering).
 - Afterwards: `node tools/community-export.mjs <out> -o signing.html`
   — the archive is the endorsement's evidence; the SIGNATORIES row
