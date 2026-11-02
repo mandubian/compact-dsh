@@ -50,7 +50,7 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   header b { color: #7fd1ff; }
   header .live { color: #7dff8a; }
   header .dead { color: #ff7d7d; }
-  main { display: grid; grid-template-columns: 1.9fr 1fr 1fr; gap: 10px; padding: 10px; flex: 1; min-height: 0; box-sizing: border-box; }
+  main { display: grid; grid-template-columns: 1.55fr 1fr 1fr 1.15fr; gap: 10px; padding: 10px; flex: 1; min-height: 0; box-sizing: border-box; }
   section { border: 1px solid #333; background: #161616; min-height: 0; display: flex; flex-direction: column; }
   section ul, section #pending { flex: 1; min-height: 0; overflow-y: auto; }
   h2 { font-size: 13px; margin: 0; padding: 8px 10px; background: #202020; border-bottom: 1px solid #333; text-transform: uppercase; letter-spacing: 0.08em; color: #9ab; }
@@ -100,7 +100,7 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
      while a floor turn or a question waits for words, the seat widens and
      the composer gets the room — a big text box, the time left, buttons
      that say what they do */
-  body.composing main { grid-template-columns: 1.25fr 0.6fr 1.55fr; }
+  body.composing main { grid-template-columns: 1.1fr 0.55fr 0.55fr 1.45fr; }
   body.composing #seat { border-color: #a83; }
   /* the charter stays one scroll away — the briefing carries the same goal */
   body.composing header .charter { max-height: 4.8em; overflow-y: auto; }
@@ -110,6 +110,19 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   .ask button.more { font: inherit; font-size: 11.5px; background: #222; color: #c9a86b; border: 1px dashed #665; border-radius: 4px; cursor: pointer; padding: 1px 8px; white-space: nowrap; }
   .ask button.more:hover { border-color: #ffb46b; color: #ffb46b; }
   .ask button.more:disabled { opacity: 0.5; cursor: wait; }
+  /* the changes lane (#309): a versioned write shows WHAT CHANGED — path,
+     status, who and when, the capped diff in a details block, +/- tinted */
+  #changes li { padding: 6px 8px; }
+  #changes .path { color: #7fd1ff; word-break: break-all; }
+  #changes .status.added { color: #7dff8a; }
+  #changes .status.modified { color: #ffd27d; }
+  #changes .status.removed { color: #ff7d7d; }
+  #changes .meta { color: #666; font-size: 11px; }
+  #changes details { margin-top: 4px; }
+  #changes details summary { cursor: pointer; color: #8899aa; font-size: 11px; }
+  #changes pre.diff { margin: 4px 0 0; white-space: pre-wrap; word-break: break-all; font-size: 11.5px; color: #cccce0; max-height: 40vh; overflow-y: auto; background: #10151b; border: 1px solid #2a313a; padding: 6px; }
+  #changes pre.diff .add { color: #7dff8a; }
+  #changes pre.diff .del { color: #ff7d7d; }
   /* the turn fills the seat: the text box takes whatever the briefing leaves */
   .floor { display: flex; flex-direction: column; gap: 8px; font-size: 13px; padding: 10px 12px; min-height: calc(100% - 16px); box-sizing: border-box; }
   .turnhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -180,6 +193,7 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   <section id="forum"><h2>the forum</h2><ul id="forum-list"><li class="empty">nothing yet — the community has not spoken</li></ul></section>
   <section id="acts"><h2>the community's acts</h2><ul id="acts-list"><li class="empty">no turns yet</li></ul></section>
   <section id="seat"><h2>the human seat — what waits for you</h2><div id="pending"><div class="ask muted">nothing is waiting</div></div></section>
+  <section id="changes"><h2>what changed</h2><ul id="changes-list"><li class="empty">nothing written yet — the workspace is as the charter seeded it</li></ul></section>
 </main>
 <div id="lawpane" class="lawpane"></div>
 <script>
@@ -541,6 +555,14 @@ function onEvent(m) {
     case 'turn-done':
       post('acts-list', at + '<span class="who">' + esc(e.member) + '</span> finished turn ' + esc(e.turns) + ' — flushed to its chain', {});
       break;
+    case 'file-change': {
+      const d = (e.diff ?? []).map((l) => l.startsWith('+') ? '<span class="add">' + esc(l) + '</span>' : l.startsWith('-') ? '<span class="del">' + esc(l) + '</span>' : esc(l)).join('\\n');
+      post('changes-list',
+        '<span class="path">' + esc(e.path ?? '?') + '</span> <span class="status ' + esc(e.status ?? '') + '">' + esc(e.status ?? '') + '</span>' +
+        '<div class="meta">by <span class="who">' + esc(e.member ?? '?') + '</span>' + (e.round != null ? ' · round ' + esc(e.round) : '') + '</div>' +
+        '<details><summary>' + (e.diff?.length ?? 0) + ' diff line(s), capped at 120</summary><pre class="diff">' + d + '</pre></details>');
+      break;
+    }
     case 'bench-wake':
       post('acts-list', at + '⚖ bench <span class="who">' + esc(e.member) + '</span> woken for ' + esc(e.caseId));
       break;
@@ -709,6 +731,13 @@ export function replayPageHtml({ charterName, data }) {
      filings read as filed when the lane showed only the call) */
   li.act.refused, li.act.error { color: #ff9e9e; }
   li.act .verdict { font-weight: bold; letter-spacing: 0.04em; }
+  /* #309: a file change renders its capped diff, folded, +/- tinted */
+  li.file-change { color: #cccce0; font-size: 12px; }
+  li.file-change details { margin-top: 4px; }
+  li.file-change summary { cursor: pointer; color: #8899aa; font-size: 11px; }
+  li.file-change pre.diff { margin: 4px 0 0; white-space: pre-wrap; word-break: break-all; color: #cccce0; background: #10151b; border: 1px solid #2a313a; padding: 6px; max-height: 40vh; overflow-y: auto; }
+  li.file-change .add { color: #7dff8a; }
+  li.file-change .del { color: #ff7d7d; }
   li.act.error .verdict { color: #ffb46b; }
   li.act a.landed { color: #8be98b; text-decoration: none; }
   #acts-list.hide-turns li.turn-done { display: none; }
@@ -877,7 +906,7 @@ $('outcomes').textContent = DATA.actOutcomes
 
 for (const t of DATA.timeline) {
   const li = document.createElement('li');
-  const kind = { notice: 'notice', pass: 'pass', 'pass-call': 'pass-call', 'pass-refused': 'pass-refused', act: 'act', 'turn-done': 'turn-done' }[t.type] ?? '';
+  const kind = { notice: 'notice', pass: 'pass', 'pass-call': 'pass-call', 'pass-refused': 'pass-refused', act: 'act', 'turn-done': 'turn-done', 'file-change': 'file-change' }[t.type] ?? '';
   li.className = kind + (t.type === 'act' && (t.outcome === 'refused' || t.outcome === 'error') ? ' ' + t.outcome : '');
   let tail = '';
   if (t.type === 'act' && t.outcome === 'refused') tail = ' <span class="verdict">— REFUSED' + (t.rule ? ' [' + esc(t.rule) + ']' : '') + '</span>' + (t.result ? ' ' + esc(String(t.result).replace(/^\\[[^\\]]+\\]\\s*/, '')) : '');
@@ -885,6 +914,16 @@ for (const t of DATA.timeline) {
   else if (t.type === 'act' && t.post && POSTS.has(t.post)) tail = ' <a class="landed" href="#' + esc(t.post) + '">→ ' + esc(t.post) + '</a>';
   else if (t.type === 'pass-refused' && t.rule) tail = ' <span class="verdict">[' + esc(t.rule) + ']</span>';
   li.innerHTML = '<span class="at">' + esc(stamp(t.at).slice(11, 19)) + '</span> <span class="who">' + esc(bare(t.who)) + '</span> — ' + esc(t.text) + tail;
+  // #309: a file change carries its capped diff, folded — the archive shows
+  // what changed beside what was concluded
+  if (t.type === 'file-change' && t.diff?.length) {
+    const details = document.createElement('details');
+    const pre = document.createElement('pre');
+    pre.className = 'diff';
+    pre.innerHTML = t.diff.map((l) => l.startsWith('+') ? '<span class="add">' + esc(l) + '</span>' : l.startsWith('-') ? '<span class="del">' + esc(l) + '</span>' : esc(l)).join('\\n');
+    details.appendChild(pre);
+    li.appendChild(details);
+  }
   $('acts-list').appendChild(li);
 }
 const showTurns = $('show-turns');
