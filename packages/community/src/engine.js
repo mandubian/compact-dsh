@@ -237,7 +237,14 @@ export function plainBriefingText(charter, member, extras) {
       '    says which rule and what you can do instead — read it; do not retry the same thing.',
       '  - Write real bash. A code fragment that is not a command is refused. If bash cannot do it, say so.',
     );
-    if (humanSeated) lines.push('  - ask_human asks the human a question privately; the answer comes back only to you.');
+    if (humanSeated) {
+      lines.push(
+        '  - ask_human asks the human a question privately; the answer comes back only to you.',
+        '  - decision_form puts several numbered decisions before the human in ONE form, each item with',
+        '    answer choices — use it when more than one point needs their call; the answers come back',
+        '    structured, item by item, and (if the human sits on this roll) they can post them to the forum.',
+      );
+    }
     if (charter.turnCitations) {
       lines.push(
         '  - Each post in your round news shows where its author\'s turn sits in their record (session:from-to).',

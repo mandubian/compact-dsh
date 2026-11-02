@@ -510,13 +510,19 @@ async function main() {
     questionTimeoutMs: escalation.questionTimeoutMs ?? 300_000,
     floorTimeoutMs: escalation.floorTimeoutMs ?? 600_000,
     defaultTopic: charter.topic,
+    // #308: with a human member on the roll, a settled decision form is
+    // drafted as that member's next floor post — the answers become the
+    // member's own citable forum act, through its own loop
+    formPostMember: charter.members.find((m) => m.human)?.id ?? null,
     onPose: (record) => {
       publishSafe(record.kind === 'ask'
         ? { type: 'ask-posed', headline: record.headline, critical: record.critical, by: record.by, tool: record.tool }
         : record.kind === 'floor'
           ? { type: 'floor-posed', by: record.by, member: record.member }
-          : { type: 'question-posed', by: record.by, headline: record.headline });
-      SAY(`human seat: ${record.kind === 'ask' ? 'an approval ask waits for you' : record.kind === 'floor' ? `a HUMAN member's turn waits on the floor card (${record.member})` : `a member asks you: ${record.headline.slice(0, 80)}…`} ${observatory ? `(on the page: ${observatory.url})` : '(NO PAGE — --no-observe; it will time out fail-closed)'}`);
+          : record.kind === 'form'
+            ? { type: 'form-posed', by: record.by, title: record.title }
+            : { type: 'question-posed', by: record.by, headline: record.headline });
+      SAY(`human seat: ${record.kind === 'ask' ? 'an approval ask waits for you' : record.kind === 'floor' ? `a HUMAN member's turn waits on the floor card (${record.member})` : record.kind === 'form' ? `a DECISION FORM waits for you: ${String(record.title ?? '').slice(0, 80)}` : `a member asks you: ${record.headline.slice(0, 80)}…`} ${observatory ? `(on the page: ${observatory.url})` : '(NO PAGE — --no-observe; it will time out fail-closed)'}`);
     },
     // every door's resolution, mapped once (seatOutcome): the feed event,
     // and the honest no-answer the fence counts — counted HERE only
@@ -533,6 +539,11 @@ async function main() {
     ctx.get('tools')?.register?.(humanSeat.tool);
   } catch (error) {
     SAY(`ask_human registration failed: ${error.message} — questions will not reach the human this run`);
+  }
+  try {
+    ctx.get('tools')?.register?.(humanSeat.formTool);
+  } catch (error) {
+    SAY(`decision_form registration failed: ${error.message} — forms will not reach the human this run`);
   }
   // the human member's route: provider "human", the page is the model
   // (#215's mixed community, made real). Registered as an llm adapter, so

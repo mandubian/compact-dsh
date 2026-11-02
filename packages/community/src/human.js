@@ -15,6 +15,16 @@
 //      result on the caller's own chain; a timeout is the honest
 //      no-answer, stated as exactly that.
 //
+//   2b. DECISION FORMS (#308, the alongside-signing-1 finding). `decision_form`
+//      puts several numbered decisions before the human at once — each item:
+//      the quoted line, the contest in one sentence, 2-3 answer choices — so
+//      one glance per answer replaces an hour parsing mixed prose. The
+//      answers come back structured, item by item. When the community seats
+//      a human MEMBER (formPostMember), the answers are also drafted as that
+//      member's next floor post: the human presses Post, and the answers
+//      become the member's own citable forum act — never the driver's, the
+//      words travel through the member's own loop.
+//
 //   3. THE FLOOR (#215's mixed community, made real). A HUMAN member's
 //      turn: the floor adapter (human-member.js) poses the framing here,
 //      and the page returns ONE act — post / pass / say. The act becomes
@@ -72,6 +82,13 @@ export function seatOutcome(record) {
         : { type: 'floor-acted', id: record.id, act, by: record.by, member: record.member },
     };
   }
+  if (record?.kind === 'form') {
+    // a form resolves as one act: answered, or the honest no-answer (the
+    // fence counts it like a question's silence — it waited on the human)
+    if (record.answer === 'cancelled') return { timedOut: false, event: { type: 'form-cancelled', by: record?.by } };
+    const timedOut = record?.answer == null;
+    return { timedOut, event: timedOut ? { type: 'form-timeout', by: record?.by } : { type: 'form-answered', by: record?.by } };
+  }
   if (record?.cancelled) return { timedOut: false, event: { type: 'question-cancelled', by: record?.by } };
   const timedOut = record?.answer == null;
   return { timedOut, event: timedOut ? { type: 'question-timeout', by: record?.by } : { type: 'question-answered', by: record?.by } };
@@ -86,11 +103,18 @@ export function mountHumanSeat(ctx, {
   questionTimeoutMs = DEFAULT_QUESTION_TIMEOUT_MS,
   floorTimeoutMs = DEFAULT_FLOOR_TIMEOUT_MS,
   defaultTopic = null,
+  // #308: when the community seats a human MEMBER, its id goes here — a
+  // settled decision form is then drafted as that member's next floor
+  // post (the human presses Post; the answers become the member's own
+  // citable forum act through its own loop). Null: forms answer to the
+  // asking member only, as the tool result.
+  formPostMember = null,
   onPose = () => {},
   onResolve = () => {},
 } = {}) {
   const patterns = criticalPatterns.map((source) => new RegExp(source, 'i'));
-  const pending = new Map(); // id -> { kind: 'ask' | 'question' | 'floor', ... , resolve }
+  const pending = new Map(); // id -> { kind: 'ask' | 'question' | 'form' | 'floor', ... , resolve }
+  const formDrafts = []; // settled forms awaiting the human member's next floor turn
 
   const pose = (entry) => {
     pendingSeq += 1;
@@ -234,6 +258,132 @@ export function mountHumanSeat(ctx, {
     },
   });
 
+  // ── door 2b: the decision form (#308) ──
+  // Several numbered decisions in ONE structured card: per item the quoted
+  // line, the contest in one sentence, 2-3 answer choices. The answers come
+  // back structured, item by item — the human answers questions, not prose.
+  /** The items arrive as a JSON string (flat string parameters, the same
+   * choice as ask_human's options); parsed here, with the error naming the
+   * expected shape so the calling model can retry. */
+  const parseFormItems = (raw) => {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(raw ?? ''));
+    } catch {
+      throw new Error('decision_form: "items" must be a JSON array — e.g. [{"label":"the costs line","quote":"Automation is not forbidden; hiding its costs is","contest":"nobody must state them","options":["promise-language","add the duty"]}]');
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error('decision_form: "items" must be a NON-EMPTY JSON array of { label, quote?, contest?, options?, free? }');
+    }
+    if (parsed.length > 12) throw new Error('decision_form: 12 items is the form\'s whole patience — split the ask');
+    return parsed.map((item, i) => {
+      const label = String(item?.label ?? '').trim();
+      if (!label) throw new Error(`decision_form: item ${i + 1} carries no "label" — every item names what is decided`);
+      const options = Array.isArray(item?.options)
+        ? item.options.map((o) => String(o).trim()).filter(Boolean).slice(0, 6)
+        : [];
+      const out = { label: label.slice(0, 300) };
+      if (item?.quote != null && String(item.quote).trim()) out.quote = String(item.quote).slice(0, 2000);
+      if (item?.contest != null && String(item.contest).trim()) out.contest = String(item.contest).slice(0, 2000);
+      if (options.length) out.options = options;
+      if (item?.free === true) out.free = true;
+      if (!options.length && out.free !== true) out.free = true; // no choices → a written answer is the only way
+      return out;
+    });
+  };
+  /** The answers, validated against the posed items BEFORE anything
+   * settles: an option-item needs one of its choices; a free item needs
+   * written words or is recorded as answered "-" (honestly empty). Throws
+   * with the offending item named — the page shows it, the human fixes
+   * that one item, nothing was lost. */
+  const validateFormAnswers = (record, answers) => {
+    const arr = Array.isArray(answers) ? answers : [];
+    return record.items.map((item, i) => {
+      const given = arr[i] ?? {};
+      const choice = String(given?.choice ?? '').trim();
+      const text = String(given?.text ?? '').trim().slice(0, 2000);
+      if (item.options?.length && !item.options.includes(choice)) {
+        throw new Error(`item ${i + 1} ("${item.label.slice(0, 60)}") needs one of: ${item.options.join(' | ')}`);
+      }
+      if (!item.options?.length && !text) {
+        throw new Error(`item ${i + 1} ("${item.label.slice(0, 60)}") needs your words — it has no choices to pick`);
+      }
+      return { label: item.label, ...(choice ? { choice } : {}), ...(text ? { text } : {}) };
+    });
+  };
+  /** The answers, as the asking member reads them and as the forum post is
+   * drafted — one shape, item by item. */
+  const formAnswerText = (title, by, cleaned) => {
+    const lines = cleaned.map((a, i) => `${i + 1}. ${a.label} → ${a.choice ?? '—'}${a.text ? `\n   ${a.text}` : ''}`);
+    return { result: `[decision_form] The human answered ${cleaned.length} item(s) of "${title}":\n${lines.join('\n')}`, draft: `My answers to "${title}"${by ? ` (asked by ${by})` : ''}:\n${lines.join('\n')}` };
+  };
+  const decisionForm = defineTool({
+    name: 'decision_form',
+    description:
+      'Put several numbered decisions before the human in ONE structured form — use it when more than one point ' +
+      'needs their call (contests on a draft, fix options, a choice of approaches). Each item: what is decided ' +
+      '(label), the exact line it concerns (quote), the objection in one sentence (contest), and 2-3 answer ' +
+      'choices (options). The answers come back here structured, item by item — the human answers a form in ' +
+      'minutes where a wall of prose costs an hour. A timeout is the honest no-answer, stated as exactly that.',
+    parameters: {
+      title: { type: 'string', required: true, description: 'what this form decides, in one line ("the four contests on the draft — your call")' },
+      items: { type: 'string', required: true, description: 'JSON array of the decisions, in order — each: {"label": "what is decided", "quote": "the exact line (optional)", "contest": "the objection in one sentence (optional)", "options": ["choice A", "choice B"] (optional — pick-from), "free": true (also allow written words). No options and no free means the item cannot be answered — give every item options or free:true' },
+      context: { type: 'string', description: 'optional — one or two sentences of why these decisions are the human\'s' },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
+    async execute(args, exec) {
+      let items;
+      try {
+        items = parseFormItems(args?.items);
+      } catch (error) {
+        return `[decision_form] refused: ${error.message}`;
+      }
+      const record = pose({
+        kind: 'form',
+        by: exec?.agent?.id ?? null,
+        title: String(args?.title ?? '').trim().slice(0, 300) || 'decisions for you',
+        items,
+        ...(args?.context ? { context: String(args.context).slice(0, 2000) } : {}),
+        expiresAt: new Date(Date.now() + questionTimeoutMs).toISOString(),
+      });
+      return await new Promise((resolve) => {
+        const entry = pending.get(record.id);
+        // NOT unref'd — the form is a live decision set, same rule as the
+        // questions: the loop holds while the human works through it, and
+        // "buy more time" rearms the real timeout.
+        entry.onTimeout = () => {
+          pending.delete(record.id);
+          onResolve({ ...record, settled: true, answer: null, answeredBy: 'the timeout', answeredAt: new Date().toISOString() });
+          const waitedS = Math.round((Date.now() - Date.parse(record.posedAt)) / 1000);
+          resolve(
+            `[decision_form] No answer within ${waitedS}s — the honest no-answer on all ${record.items.length} item(s), not a guess.\n` +
+            'Say plainly what you did without the answers, or post the form again later.');
+        };
+        entry.timer = setTimeout(entry.onTimeout, questionTimeoutMs);
+        entry.resolve = (cleaned) => {
+          clearTimeout(entry.timer);
+          pending.delete(record.id);
+          const { result, draft } = formAnswerText(record.title, record.by, cleaned);
+          onResolve({ ...record, settled: true, answer: cleaned, answeredBy: 'the human seat (page)', answeredAt: new Date().toISOString() });
+          // the draft rides the NEXT floor card of the human member (the
+          // page prefills the composer) — the member's own post carries it
+          if (formPostMember) formDrafts.push({ title: record.title, by: record.by, text: draft });
+          resolve(result);
+        };
+        entry.cancel = (why) => {
+          if (!pending.has(record.id)) return;
+          clearTimeout(entry.timer);
+          pending.delete(record.id);
+          onResolve({ ...record, settled: true, answer: null, cancelled: true, answeredBy: why ?? 'the run stopping', answeredAt: new Date().toISOString() });
+          resolve('[decision_form] The form was withdrawn before the human answered — the run is stopping. No answer.');
+        };
+        const signal = exec?.signal;
+        if (signal?.aborted) entry.cancel('the call was cancelled');
+        else signal?.addEventListener?.('abort', () => entry.cancel('the call was cancelled'), { once: true });
+      });
+    },
+  });
+
   // ── door 3: the floor ──
   // A human member's turn, posed for the page. The adapter (human-member.js)
   // awaits this; the page's button returns ONE act. The forum's own rules
@@ -242,6 +392,12 @@ export function mountHumanSeat(ctx, {
   // timeout is the honest silence: the member's turn performs no act, the
   // adapter says so in words, and the divergence counter counts it.
   const poseFloor = ({ member = null, by = null, round = null, framing = '', lastResult = null, signal = null }) => {
+    // a settled form awaiting this member's voice rides the card as a
+    // DRAFT: the page prefills the composer, the human edits or posts
+    // as-is — the act is the member's own, through its own loop
+    const draft = formPostMember && (member ?? formPostMember) === formPostMember && formDrafts.length
+      ? formDrafts.shift()
+      : null;
     const record = pose({
       kind: 'floor',
       by,
@@ -249,6 +405,7 @@ export function mountHumanSeat(ctx, {
       round,
       framing: String(framing).slice(0, 20_000),
       ...(lastResult != null ? { lastResult: String(lastResult).slice(0, 4_000) } : {}),
+      ...(draft ? { formDraft: draft } : {}),
       headline: `floor turn — ${member ?? 'the human member'}`,
       defaultTopic,
       expiresAt: new Date(Date.now() + floorTimeoutMs).toISOString(),
@@ -302,7 +459,24 @@ export function mountHumanSeat(ctx, {
   return {
     answerer,
     tool: askHuman,
+    formTool: decisionForm,
     poseFloor,
+    /** The form's answers, validated then resolved (#308): an option-item
+     * needs one of its choices, a free-item needs words — a failure THROWS
+     * with the offending item named and the form stays pending (nothing
+     * was lost; the page shows the reason, the human fixes that one item).
+     * Resolves through the form's own entry.resolve DIRECTLY (mirroring
+     * replyQuestion) — settle() would fire onResolve a second time (the
+     * entry.resolve already does), and the feed would say form-answered
+     * twice for one answer. When formPostMember is set, the resolved
+     * answers are also drafted as that member's next floor post. */
+    answerForm: (id, answers) => {
+      const record = pending.get(id);
+      if (!record || record.kind !== 'form') return null;
+      const cleaned = validateFormAnswers(record, answers);
+      record.resolve?.(cleaned);
+      return record;
+    },
     pending: () => [...pending.values()].map((p) => ({ ...p, resolve: undefined, cancel: undefined, timer: undefined, onTimeout: undefined })),
     /** Buy more time on a pending card: the deadline moves, and the REAL
      * timeout rearms against the new expiry (the seat is the one that
