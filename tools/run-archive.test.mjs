@@ -6,7 +6,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { readArchive, timelineFromLog } from './run-archive.mjs';
+import { readArchive, timelineFromLog, fileChangesFrom, frozenVsFinalFrom } from './run-archive.mjs';
 import { pageHtml, replayPageHtml } from '../packages/community/src/page.js';
 
 function buildState(dir) {
@@ -142,4 +142,74 @@ test('the replay header: heterogeneous seating names each member on its own rout
   });
   const elements = renderReplay(html);
   assert.match(elements['meta'].textContent, /model guardian=zai\/glm-5\.3-flash steward=deepseek\/chat/);
+});
+
+// ── #309: what changed, from the archive's own files ──
+
+test('fileChangesFrom: the per-turn diffs fold into timeline entries; a torn last line skips itself', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'arch-'));
+  try {
+  mkdirSync(join(dir, 'state'), { recursive: true });
+  const rows = [
+    { at: '2026-11-01T10:00:00.000Z', path: 'sources/a.md', status: 'modified', member: 'community-engineer', round: 2, diff: ['- old', '+ new'] },
+    { at: '2026-11-01T10:05:00.000Z', path: 'sources/b.md', status: 'added', member: 'community-skeptic', round: 2, diff: ['+ fresh'] },
+  ];
+  writeFileSync(join(dir, 'state', 'changes.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n' + '{"at": "torn', 'utf8');
+  const changes = fileChangesFrom(dir);
+  assert.equal(changes.length, 2, 'the torn line is skipped, the two whole rows fold');
+  assert.equal(changes[0].type, 'file-change');
+  assert.equal(changes[0].who, 'community-engineer');
+  assert.deepEqual(changes[0].diff, ['- old', '+ new']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('fileChangesFrom: an archive predating the lane ships without changes, stated by absence', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'arch-'));
+  try {
+    assert.deepEqual(fileChangesFrom(dir), []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('frozenVsFinalFrom: modified, removed, and unchanged sources — one entry each way they deserve', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'arch-'));
+  try {
+  const run = {
+    endedAt: '2026-11-01T12:00:00.000Z',
+    charterSources: [
+      { path: 'sources/changed.md', content: 'original\n' },
+      { path: 'sources/deleted.md', content: 'going away\n' },
+      { path: 'sources/untouched.md', content: 'the same\n' },
+    ],
+  };
+  mkdirSync(join(dir, 'workspace/sources'), { recursive: true });
+  writeFileSync(join(dir, 'workspace/sources/changed.md'), 'original\nchanged\n');
+  // deleted.md is NOT written — it is gone from the final workspace
+  writeFileSync(join(dir, 'workspace/sources/untouched.md'), 'the same\n');
+  const out = frozenVsFinalFrom(dir, run);
+  assert.equal(out.length, 2, 'the unchanged source says nothing; the other two say it plainly');
+  const changed = out.find((e) => e.text.includes('changed.md'));
+  assert.equal(changed.status, 'modified');
+  assert.ok(changed.diff.some((l) => l === '+ changed'));
+  const deleted = out.find((e) => e.text.includes('deleted.md'));
+  assert.equal(deleted.status, 'removed');
+  assert.match(deleted.diff[0], /removed/);
+  assert.equal(out.every((e) => e.type === 'file-change'), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('frozenVsFinalFrom: a legacy manifest (no charterSources) and a missing workspace both ship honestly empty', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'arch-'));
+  try {
+    assert.deepEqual(frozenVsFinalFrom(dir, {}), [], 'no charterSources — the manifest predates the field');
+    const run = { charterSources: [{ path: 'x.md', content: 'x' }] };
+    assert.deepEqual(frozenVsFinalFrom(dir, run), [], 'no workspace — nothing to diff against');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

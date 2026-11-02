@@ -100,7 +100,7 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
      while a floor turn or a question waits for words, the seat widens and
      the composer gets the room — a big text box, the time left, buttons
      that say what they do */
-  body.composing main { grid-template-columns: 1.1fr 0.55fr 0.55fr 1.45fr; }
+  body.composing main { grid-template-columns: 1.1fr 0.55fr 1.45fr 0.55fr; } // the seat (column 3) takes the room; the changes lane shrinks
   body.composing #seat { border-color: #a83; }
   /* the charter stays one scroll away — the briefing carries the same goal */
   body.composing header .charter { max-height: 4.8em; overflow-y: auto; }

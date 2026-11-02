@@ -781,7 +781,7 @@ async function main() {
           line(`  ✎ ${c.member} ${c.status} ${c.path} (${c.diff.length} diff line(s))`);
           publishSafe({ type: 'file-change', path: c.path, status: c.status, member: c.member, round: c.round, diff: c.diff });
           try {
-            appendFileSync(join(state, 'changes.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...c })}\n`);
+            appendFileSync(join(scratch, 'state', 'changes.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...c })}\n`);
           } catch (e) {
             SAY(`  ! changes.jsonl append failed: ${e.message}`);
           }
