@@ -1,0 +1,325 @@
+{
+  "version": 7,
+  "record": {
+    "identity": {
+      "formatVersion": 4,
+      "createdAt": 1793452465778,
+      "cwd": "/home/mandubian/workspaces/mandubian/compact-dsh/runs/newsroom-20261031-1414/workspace",
+      "isSeeded": false,
+      "inheritedEventCount": 0
+    },
+    "rows": {
+      "title": {
+        "ver": 1,
+        "seq": 78,
+        "val": null
+      },
+      "titleInput": {
+        "ver": 3,
+        "seq": 78,
+        "val": {
+          "first": null,
+          "count": 0,
+          "lastSeq": null
+        }
+      },
+      "llmRetry": {
+        "ver": 1,
+        "seq": 78,
+        "val": {}
+      },
+      "sandboxMode": {
+        "ver": 1,
+        "seq": 78,
+        "val": "workspace-write"
+      },
+      "goal": {
+        "ver": 6,
+        "seq": 78,
+        "val": {
+          "current": null,
+          "seenGoalIds": [],
+          "failure": null
+        }
+      },
+      "plan": {
+        "ver": 3,
+        "seq": 78,
+        "val": {
+          "active": false,
+          "wanted": null,
+          "running": null,
+          "activeAtLastHeader": false
+        }
+      },
+      "tokenUsage": {
+        "ver": 2,
+        "seq": 78,
+        "val": {
+          "totals": {
+            "uncachedInputTokens": 11746,
+            "outputTokens": 2321,
+            "cacheReadTokens": 155200,
+            "cacheWriteTokens": 0
+          },
+          "last": {
+            "turn": 3,
+            "step": 2,
+            "buckets": {
+              "uncachedInputTokens": 334,
+              "outputTokens": 59,
+              "cacheReadTokens": 18944,
+              "cacheWriteTokens": 0
+            }
+          }
+        }
+      },
+      "contextPressure": {
+        "ver": 5,
+        "seq": 78,
+        "val": {
+          "surfaceTokens": 11611,
+          "contextWindow": 1000000,
+          "pressureTokens": 19278,
+          "sampledSurfaceTokens": 11547
+        }
+      },
+      "contextBreakdown": {
+        "ver": 5,
+        "seq": 78,
+        "val": {
+          "nodes": [
+            {
+              "seq": 7,
+              "heuristicTokens": 346,
+              "system": true
+            },
+            {
+              "seq": 8,
+              "heuristicTokens": 1524,
+              "system": false
+            },
+            {
+              "seq": 9,
+              "heuristicTokens": 797,
+              "system": false
+            },
+            {
+              "seq": 10,
+              "heuristicTokens": 1177,
+              "system": false
+            },
+            {
+              "seq": 11,
+              "heuristicTokens": 140,
+              "system": false
+            },
+            {
+              "seq": 14,
+              "heuristicTokens": 66,
+              "system": false
+            },
+            {
+              "seq": 16,
+              "heuristicTokens": 56,
+              "system": false
+            },
+            {
+              "seq": 18,
+              "heuristicTokens": 36,
+              "system": false
+            },
+            {
+              "seq": 21,
+              "heuristicTokens": 46,
+              "system": false
+            },
+            {
+              "seq": 23,
+              "heuristicTokens": 250,
+              "system": false
+            },
+            {
+              "seq": 25,
+              "heuristicTokens": 773,
+              "system": false
+            },
+            {
+              "seq": 28,
+              "heuristicTokens": 542,
+              "system": false
+            },
+            {
+              "seq": 30,
+              "heuristicTokens": 66,
+              "system": false
+            },
+            {
+              "seq": 33,
+              "heuristicTokens": 746,
+              "system": false
+            },
+            {
+              "seq": 35,
+              "heuristicTokens": 31,
+              "system": false
+            },
+            {
+              "seq": 38,
+              "heuristicTokens": 296,
+              "system": false
+            },
+            {
+              "seq": 40,
+              "heuristicTokens": 92,
+              "system": false
+            },
+            {
+              "seq": 43,
+              "heuristicTokens": 158,
+              "system": false
+            },
+            {
+              "seq": 50,
+              "heuristicTokens": 1520,
+              "system": false
+            },
+            {
+              "seq": 51,
+              "heuristicTokens": 569,
+              "system": false
+            },
+            {
+              "seq": 52,
+              "heuristicTokens": 88,
+              "system": false
+            },
+            {
+              "seq": 54,
+              "heuristicTokens": 25,
+              "system": false
+            },
+            {
+              "seq": 57,
+              "heuristicTokens": 147,
+              "system": false
+            },
+            {
+              "seq": 59,
+              "heuristicTokens": 92,
+              "system": false
+            },
+            {
+              "seq": 62,
+              "heuristicTokens": 104,
+              "system": false
+            },
+            {
+              "seq": 69,
+              "heuristicTokens": 1520,
+              "system": false
+            },
+            {
+              "seq": 70,
+              "heuristicTokens": 46,
+              "system": false
+            },
+            {
+              "seq": 71,
+              "heuristicTokens": 116,
+              "system": false
+            },
+            {
+              "seq": 73,
+              "heuristicTokens": 178,
+              "system": false
+            },
+            {
+              "seq": 76,
+              "heuristicTokens": 64,
+              "system": false
+            }
+          ],
+          "breakdown": {
+            "systemTokens": 346,
+            "toolsTokens": 7757,
+            "messageTokens": 11265
+          }
+        }
+      },
+      "todos": {
+        "ver": 2,
+        "seq": 78,
+        "val": null
+      },
+      "userQuestions": {
+        "ver": 2,
+        "seq": 78,
+        "val": {
+          "inheritedEventCount": 0,
+          "timed": false,
+          "questions": {
+            "active": [],
+            "settled": []
+          }
+        }
+      },
+      "subagentCatalog": {
+        "ver": 3,
+        "seq": 78,
+        "val": {
+          "inheritedEventCount": 0
+        }
+      },
+      "subagentTiming": {
+        "ver": 3,
+        "seq": 78,
+        "val": {
+          "descriptorSeen": false,
+          "settledMs": 0
+        }
+      },
+      "subagent": {
+        "ver": 2,
+        "seq": 78,
+        "val": {}
+      },
+      "permissions": {
+        "ver": 2,
+        "seq": 78,
+        "val": {
+          "preset": "workspace-write",
+          "sandbox": "workspace-write",
+          "approval": "ask",
+          "seeded": false
+        }
+      },
+      "subagentModelSelectionPolicy": {
+        "ver": 1,
+        "seq": 78,
+        "val": null
+      },
+      "turnBoundary": {
+        "ver": 2,
+        "seq": 78,
+        "val": {
+          "openTurnStartSeq": null,
+          "lastStepStartSeq": 75,
+          "lastStepBoundary": {
+            "kind": "end",
+            "seq": 77
+          },
+          "lastTurn": 3
+        }
+      },
+      "inbox": {
+        "ver": 1,
+        "seq": 78,
+        "val": {
+          "next-turn": [],
+          "next-step": []
+        }
+      }
+    }
+  }
+}

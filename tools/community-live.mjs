@@ -34,7 +34,7 @@
 // model READING.md, and PACK.md) under <out>/publish or --publish-dir.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -705,6 +705,10 @@ async function main() {
           name: basename(charterPath),
           sha256: sha256Hex(readFileSync(resolve(charterPath))),
         },
+        // the frozen sources, verbatim (#309): the export's frozen-vs-final
+        // diff reads these — an archive that carries the conclusions but not
+        // the starting point cannot show what a run changed
+        charterSources: charter.sources,
         seats: charter.members.map((m) => ({ id: m.id, model: m.model ? `${m.model.provider}/${m.model.model}` : null, bench: m.bench === true, human: m.human === true, persona: m.persona, ...(m.sealedBrief ? { sealed: true } : {}) })),
         // a sealed brief is REVEALED here, when the run ends: sealed from
         // the other members during the run, never from the record
@@ -769,6 +773,20 @@ async function main() {
       onBenchWake: (m, c) => { line(`  ⚖ bench ${m.id} woken for ${c.id}`); publishSafe({ type: 'bench-wake', member: m.id, caseId: c.id }); },
       onSkip: (m, why) => SAY(`  · ${m.id} skipped (${why})`),
       onFlushError: (m, e) => SAY(`  ! ${m.id} flush failed: ${e.message}`),
+      // #309: what changed in the workspace, per turn — onto the page's own
+      // lane, and into state/changes.jsonl, so the export can show the run's
+      // diffs beside its conclusions (offline, like everything here)
+      onFileChanges: (changes) => {
+        for (const c of changes) {
+          line(`  ✎ ${c.member} ${c.status} ${c.path} (${c.diff.length} diff line(s))`);
+          publishSafe({ type: 'file-change', path: c.path, status: c.status, member: c.member, round: c.round, diff: c.diff });
+          try {
+            appendFileSync(join(scratch, 'state', 'changes.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...c })}\n`);
+          } catch (e) {
+            SAY(`  ! changes.jsonl append failed: ${e.message}`);
+          }
+        }
+      },
       onEnd: (s) => publishSafe({ type: 'end', reason: s.endReason }),
       onPauseState: (paused) => {
         SAY(paused ? '⏸ the community is PAUSED — nothing new starts; resume from the page' : '▶ the community RESUMES');

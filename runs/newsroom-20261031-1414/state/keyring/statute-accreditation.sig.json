@@ -1,0 +1,27 @@
+{
+  "kind": "dev-keyring-signature",
+  "declaration": "mechanism testing only — NOT ratification, NOT standing, NOT the A-1 trust root (see the keyring manifest)",
+  "subject": "amendment",
+  "source": "statute-accreditation.md",
+  "digest": {
+    "algorithm": "sha256",
+    "value": "4ae16f81fbe4083d16f56d101a634ba613aa2be45746abda148fda3d01c5f810"
+  },
+  "message": "amendment-sha256:4ae16f81fbe4083d16f56d101a634ba613aa2be45746abda148fda3d01c5f810",
+  "keyring": "installed keyring manifest (dev-keyring: practice keys)",
+  "signatures": [
+    {
+      "keyId": "dev-rehearsal-authority-1",
+      "signature": "nzYa/wCLTBNadzKzee2UwlblNUWjMaLu5OBnjbh8ixMew6s4W8Er3W7aILLjmhG6W3jXp/qnixqrUTa324uGCA=="
+    },
+    {
+      "keyId": "dev-rehearsal-authority-2",
+      "signature": "4JJkyxVZBvepg+LHlM3/AUx8BWVoGWNxXzRoHz5K0uGaVy/aifSv2JhAxG8i8ufd6f/O1GdngEIKqFAVQxlWBA=="
+    },
+    {
+      "keyId": "dev-rehearsal-authority-3",
+      "signature": "BUTspfZhOP5GbYXNphwoapQMMcreVhgx0SynkIN+x3+Pz5w1vh+XgAthA0v1cXsdqWogx/tAO3mSF80Re8xuCQ=="
+    }
+  ],
+  "signedAt": "2026-10-31T13:14:24.784Z"
+}

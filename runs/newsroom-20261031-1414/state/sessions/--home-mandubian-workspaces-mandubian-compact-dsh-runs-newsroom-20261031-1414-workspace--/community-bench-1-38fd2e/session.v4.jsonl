@@ -1,0 +1,4 @@
+{"type":"session","version":4,"id":"community-bench-1-38fd2e","createdAt":1793452465783,"cwd":"/home/mandubian/workspaces/mandubian/compact-dsh/runs/newsroom-20261031-1414/workspace","isSeeded":false,"delegationDepth":0}
+{"type":"permission/preset","seq":0,"time":1793452465892,"data":{"preset":"workspace-write"}}
+{"type":"sandbox/mode","seq":1,"time":1793452465892,"data":{"mode":"workspace-write"}}
+{"type":"approval/policy","seq":2,"time":1793452465892,"data":{"policy":"ask"}}

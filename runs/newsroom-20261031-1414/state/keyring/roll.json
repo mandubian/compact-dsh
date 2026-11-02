@@ -1,0 +1,279 @@
+{
+  "kind": "rehearsal-member-roll",
+  "version": 1,
+  "created": "2026-10-31",
+  "declaration": "NOT the community roll. Rehearsal identity events under the development keyring — admissions, rotations, revocations, accreditations — hash-chained the way the session record is, checkpointed at epoch close. Machinery exercised, nothing discharged: this ledger conveys no standing, and ratification replaces it with the genesis roll under the A-1 root, same parsers, same loops.",
+  "standing": "none — roll events under this ledger prove code-path correctness only",
+  "genesis": {
+    "epochLength": {
+      "events": 64
+    },
+    "admissionStatute": {
+      "digest": "d0a44e7e6896022915f6ca1cb836b98f86ebfefc74c98f91ac7d3c836f17d68f",
+      "subject": "amendment",
+      "file": "statute-admission.md"
+    },
+    "keyring": "keyring.json (dev-keyring: practice keys)"
+  },
+  "entries": [
+    {
+      "kind": "admission",
+      "memberKeyDigest": "b8a40544f3f7827de318ce45290253d4700d1139f85edd823efe136ebb94daf7",
+      "class": "principal",
+      "memberKey": "MCowBQYDK2VwAyEAaEndwvwMUwU8/yIOmizGH2VimurfjZyEBoPgVpDk+ko=",
+      "member": "rehearsal-founder",
+      "holder": "the operator's principal — the Member sessions bind to until an artificial Subject is admitted (identity slice 2)",
+      "grounds": "rehearsal admission statute d0a44e7e68960229… (SIMULATED)",
+      "recordedAt": "2026-10-31T13:14:24.776Z",
+      "signedBy": [
+        {
+          "keyId": "dev-rehearsal-authority-1",
+          "signature": "Yo8179XMOHMg41oVJ2r+J32Y7jCjQAqdl/waw/nHzQyaQt0oFqN+7GAZa1pSabqHeeX1cGBr2s7gE7nhcmUrBA=="
+        },
+        {
+          "keyId": "dev-rehearsal-authority-2",
+          "signature": "v4zuuyO8J7wrZtVIk1dXtZ5zRXoQs4ugp8CtJIoZW1XmUCTidprYw69VpxcobyT5GHkp6U01gdkUXNLg48mmCg=="
+        },
+        {
+          "keyId": "b8a40544f3f7827de318ce45290253d4700d1139f85edd823efe136ebb94daf7",
+          "signature": "feDzzEOzuAXAri6M1k5AttPJnHHwU1fhg31NnrfbXyE+/yAU2F3+IG/i3ugIDoVM06M3Uz52y0yfb//0HGheAw=="
+        }
+      ],
+      "seq": 0,
+      "prev": "d5381e3dea2dd580bcccd011e8f53e4afddf38f44c40704e866b97bf269d4145",
+      "entryHash": "286508ca0430db5f5e32cde69f185fc85766df37cae9162cd4bb0374e4b9484e"
+    },
+    {
+      "kind": "admission",
+      "memberKeyDigest": "ca0cb7786b329420adefeacd0f029c57c576a2963061e817a3278d672064a1db",
+      "class": "long-lived-subject",
+      "memberKey": "MCowBQYDK2VwAyEAX9ug4ZPSTfbYFp1hecEapp6Si439iY9fdGxK8q5YIGg=",
+      "member": "rehearsal-subject",
+      "holder": "a designated long-lived rehearsal Subject, for binding and rotation tests",
+      "grounds": "rehearsal admission statute d0a44e7e68960229… (SIMULATED)",
+      "recordedAt": "2026-10-31T13:14:24.776Z",
+      "signedBy": [
+        {
+          "keyId": "dev-rehearsal-authority-1",
+          "signature": "fGvawy+ighCAupqmevszBUTjBB/tDPsloiBjd7m/5lPPGqizH9Xzwpx67IZSHTqDbRYj8NASyxFL/WxK4xxDCQ=="
+        },
+        {
+          "keyId": "dev-rehearsal-authority-2",
+          "signature": "R2eKaJ08XWnLSgm21SERAS3ICqoYIN8xqvmJ2o9o862zl6XFN20nAcwTQG3XWElFCeNxbTiBmHTrS5BTQz3ZCQ=="
+        },
+        {
+          "keyId": "ca0cb7786b329420adefeacd0f029c57c576a2963061e817a3278d672064a1db",
+          "signature": "FGGNgtf7Pt1dbWIfpIZkBJ/ICJtEDXFZJiJVXv//LtMx6o/y52JsVBaAgGOORgbnsxEbM0p7UAx5lGeliNrzCg=="
+        }
+      ],
+      "seq": 1,
+      "prev": "286508ca0430db5f5e32cde69f185fc85766df37cae9162cd4bb0374e4b9484e",
+      "entryHash": "171d8730d047095f419c8a6cc5c0190d6215f4f32818a4e8b63e633cf04a5040"
+    },
+    {
+      "kind": "admission",
+      "memberKeyDigest": "769520da9db8108534790fa80b462366499dc842415881bb7397bdcc645dfac9",
+      "class": "long-lived-subject",
+      "memberKey": "MCowBQYDK2VwAyEA8bMohOkmwhd2m+MZjOLZIbY7ZDN3WbaCqIjPrPpzxcs=",
+      "member": "editor",
+      "holder": "live community member \"editor\" — the editor: shapes the editorial line on the forum, assembles the digest, keeps bylines honest",
+      "grounds": "rehearsal admission statute d0a44e7e68960229… (SIMULATED)",
+      "recordedAt": "2026-10-31T13:14:24.776Z",
+      "signedBy": [
+        {
+          "keyId": "dev-rehearsal-authority-1",
+          "signature": "Qv3yliTUxpz/YJosMWa6HRLQbaydoOliqn1l00VLAaj+AA9vuxJXqYgsoOFsuilkDnwUvoqgNks62xmfysNNAg=="
+        },
+        {
+          "keyId": "dev-rehearsal-authority-2",
+          "signature": "UmSeXe1MouXArxQRNDbNmpkJHMUzbEYHYRsaaYjxyRFe0CXlPpkaX7C5XXdpeav7pFtCEj8ozH/qfLUPpx6kCA=="
+        },
+        {
+          "keyId": "769520da9db8108534790fa80b462366499dc842415881bb7397bdcc645dfac9",
+          "signature": "DWf0eJVM7w7cNJlv9sjiZ+0Ijk852Jp+tVKVasRLPOmRYan/kNG4xhEBmg1zKF2z5GhkmnySuXRxa70lsT8yCA=="
+        }
+      ],
+      "seq": 2,
+      "prev": "171d8730d047095f419c8a6cc5c0190d6215f4f32818a4e8b63e633cf04a5040",
+      "entryHash": "977e3a6fc166a2069e07334681aef4c7bef40407b9fbc29e5c22a77ad382f8f5"
+    },
+    {
+      "kind": "admission",
+      "memberKeyDigest": "f20580440db2fe80554d599b00bf623c17d26f2cc4db60c177369326e86e89a7",
+      "class": "long-lived-subject",
+      "memberKey": "MCowBQYDK2VwAyEA7Am+Iah/teDctQN8c+Ffzqbn3gRso37XECGQbLrVo74=",
+      "member": "writer",
+      "holder": "live community member \"writer\" — the writer: drafts sections from the sources, proposes wording on the forum",
+      "grounds": "rehearsal admission statute d0a44e7e68960229… (SIMULATED)",
+      "recordedAt": "2026-10-31T13:14:24.776Z",
+      "signedBy": [
+        {
+          "keyId": "dev-rehearsal-authority-1",
+          "signature": "N6Oz8TrduzkgIvOO6d1clWQIa8Zlq1Ip0qL7BltkH5HTOXzpmjnuV932qGFAeNKftkUQ2JvslJGW6Sw/DVdtBQ=="
+        },
+        {
+          "keyId": "dev-rehearsal-authority-2",
+          "signature": "O7/DjRg7BpGlcgJnEszmWYvRZOvHGFLEP+pGBM9sXHgFSnkmyVhwTUNEU/TgfIy2sGD9KlH031gJTEfv0qKeAA=="
+        },
+        {
+          "keyId": "f20580440db2fe80554d599b00bf623c17d26f2cc4db60c177369326e86e89a7",
+          "signature": "OlVYybzSom5ZUqgEfxwK9itUqTs6vhqIgz2iY8dJoVHMk4w7MHo1z8Iz8DMjl32YsJ5gFB88Xg1xF1dCGA0KBA=="
+        }
+      ],
+      "seq": 3,
+      "prev": "977e3a6fc166a2069e07334681aef4c7bef40407b9fbc29e5c22a77ad382f8f5",
+      "entryHash": "6dcb3c481e2a02172b5565055b88a843f873fed95a3ab6993a1ba89ab7403240"
+    },
+    {
+      "kind": "admission",
+      "memberKeyDigest": "bc36b161c8b4e59d4d2d819669b98c140e5ca8cb132160a3c141240ef37fb15e",
+      "class": "long-lived-subject",
+      "memberKey": "MCowBQYDK2VwAyEAk5bIjTfVx8ndY2sM0N5yp1EqPDEQtj0R0VCjYJI3WRU=",
+      "member": "publisher",
+      "holder": "live community member \"publisher\" — the publisher: the member whose acts publish; verifies the manifest before anything leaves",
+      "grounds": "rehearsal admission statute d0a44e7e68960229… (SIMULATED)",
+      "recordedAt": "2026-10-31T13:14:24.776Z",
+      "signedBy": [
+        {
+          "keyId": "dev-rehearsal-authority-1",
+          "signature": "b6TUtoHtraqfrat3y5ov0UJ+lvSYxsonGEcWHbKG2wGpiF9YraDm9o0g2l/xg29pGTpKBqn/b8JAT/3CS9aOBA=="
+        },
+        {
+          "keyId": "dev-rehearsal-authority-2",
+          "signature": "SEg1VDFndtbTUgGQcNQRQd9ovgcetinO3ZbixiFBjHlRlJm3Y2zzkm5jR1fB713DmR+HiY3OnvB+sk6cEYW3Ag=="
+        },
+        {
+          "keyId": "bc36b161c8b4e59d4d2d819669b98c140e5ca8cb132160a3c141240ef37fb15e",
+          "signature": "owLRhPvmq/da8XDl1Qz9waiTGO+3DJBmcfGn/cDccoFFrOLbZrV+qhPyS3p4GCis7LqEypUCKBB3h2yz0eKwBw=="
+        }
+      ],
+      "seq": 4,
+      "prev": "6dcb3c481e2a02172b5565055b88a843f873fed95a3ab6993a1ba89ab7403240",
+      "entryHash": "86cced4ba52683a9d6516fad84af8f575cceb7a3629fa3e6f222a0ca6413e563"
+    },
+    {
+      "kind": "admission",
+      "memberKeyDigest": "d7dafe561c8198fe6d1404b02733a07ad36aa0844b9e1acb303549add3baa3e1",
+      "class": "long-lived-subject",
+      "memberKey": "MCowBQYDK2VwAyEAVJejAoKYpTPBlgr9DpdWvP8amwq6iAXWI97A+HBb4yA=",
+      "member": "bench-1",
+      "holder": "live community member \"bench-1\" — seated on the bench",
+      "grounds": "rehearsal admission statute d0a44e7e68960229… (SIMULATED)",
+      "recordedAt": "2026-10-31T13:14:24.776Z",
+      "signedBy": [
+        {
+          "keyId": "dev-rehearsal-authority-1",
+          "signature": "RygjBsppdqu5w/d49hIns7VqlWGSpO5qtnmeNRnmGyq5re0BxSZWmyHoGjyd/kL0QvPCTYrjiTZQcbvpF9/zAg=="
+        },
+        {
+          "keyId": "dev-rehearsal-authority-2",
+          "signature": "ZLOovBsu45MEp9zFTw6h/90DCe6E+uR1wKuN9/stPNOWG3l3iHhkJ1uw1Mkt5hSbrME9gJHJF0X1sTr8AmxpDg=="
+        },
+        {
+          "keyId": "d7dafe561c8198fe6d1404b02733a07ad36aa0844b9e1acb303549add3baa3e1",
+          "signature": "GsB2PFk1QszUOnYSpy3/4mxcY8JkBbYswEA5/s/W8Ird7QeKbql6QHtEMR7jdAqEU/TiINwrvEoAC11ts9cKAQ=="
+        }
+      ],
+      "seq": 5,
+      "prev": "86cced4ba52683a9d6516fad84af8f575cceb7a3629fa3e6f222a0ca6413e563",
+      "entryHash": "2d72a294bdbd7c86820f8c55f74d39b0911d2f49cdd44a09a32f10b105eafb9f"
+    },
+    {
+      "kind": "accreditation",
+      "memberKeyDigest": "be421559a840a8f5d6b6d9a2ba33dc95d131270b8a437e73bf0160b81849e7e9",
+      "class": "external-witness",
+      "memberKey": "MCowBQYDK2VwAyEA/L9sBRhQbPlBcur2xTYKegZIljBONLUwoID4lp3zVNo=",
+      "member": "rehearsal-external-witness-1",
+      "holder": "a rehearsal external Witness — standing not this operator's, seated by the SIMULATED accreditation statute",
+      "grounds": "rehearsal accreditation statute 4ae16f81fbe4083d… (SIMULATED)",
+      "recordedAt": "2026-10-31T13:14:24.776Z",
+      "signedBy": [
+        {
+          "keyId": "dev-rehearsal-authority-1",
+          "signature": "B8n7nvd7uH0IJsYZcn40Os96zv+otkrx9OAhRoDeO0eUwl0tXDmZtC6y1mDG5FC1PjFw+POh37oxpBTmLNEZAQ=="
+        },
+        {
+          "keyId": "dev-rehearsal-authority-2",
+          "signature": "9wWI5uWPQdaESo8ilU4iLwxElBT6cELxBBaVDi1kSCix1KroUMKUvMzvbGGyURgEmAVjqPwo/RxWzGTle89QDw=="
+        },
+        {
+          "keyId": "be421559a840a8f5d6b6d9a2ba33dc95d131270b8a437e73bf0160b81849e7e9",
+          "signature": "2gvxNiMTQnYTkx83otP/tHkK6u60K/W6IotFOS6TWgGaXLpHjmYB4U8amMbN4H9IeQbkFWZ9bczp0rrcXeGHCQ=="
+        }
+      ],
+      "seq": 6,
+      "prev": "2d72a294bdbd7c86820f8c55f74d39b0911d2f49cdd44a09a32f10b105eafb9f",
+      "entryHash": "1ffdc46e07306ac85fee870358fec8e08c2dbc8e2cb8bcc4ee3a38eee4d608c6"
+    }
+  ],
+  "checkpoints": [
+    {
+      "kind": "roll-checkpoint",
+      "epoch": 0,
+      "throughSeq": 5,
+      "rollHead": "2d72a294bdbd7c86820f8c55f74d39b0911d2f49cdd44a09a32f10b105eafb9f",
+      "at": "2026-10-31T13:14:24.776Z",
+      "seal": {
+        "kind": "dev-keyring-signature",
+        "declaration": "mechanism testing only — NOT ratification, NOT standing, NOT the A-1 trust root (see the keyring manifest)",
+        "subject": "roll-checkpoint",
+        "source": "roll",
+        "digest": {
+          "algorithm": "sha256",
+          "value": "a1f155770065f79da082e84434ab3478d719f1665ede3d263a1a119705133291"
+        },
+        "message": "roll-checkpoint-sha256:a1f155770065f79da082e84434ab3478d719f1665ede3d263a1a119705133291",
+        "keyring": "installed keyring manifest (dev-keyring: practice keys)",
+        "signatures": [
+          {
+            "keyId": "dev-rehearsal-authority-1",
+            "signature": "SmZ4NBDUefL3Mkp+a+lLR2qSPcFKE3QhfWI31Xt7A7DH+ORTIqxYP1UajQw/dpBVlzewKiQf5CHIi/SKTaugAw=="
+          },
+          {
+            "keyId": "dev-rehearsal-authority-2",
+            "signature": "r+j33EFE7yXwu1aV1Xi5aP4vVxb+OklciCgtujoo4I1lQJYHi2A76Bp7EIuI82t/9iTHMMA5rRPLAjh/Q+3CDQ=="
+          },
+          {
+            "keyId": "dev-rehearsal-authority-3",
+            "signature": "sFS1qGBUOmdhQA4fzherOE970JpjZ4uQt71l08QJ6uy5gdRL8pA3NGVTnHvJbI634b04CKOyCjRxtVemv6KWDQ=="
+          }
+        ],
+        "signedAt": "2026-10-31T13:14:24.784Z"
+      }
+    },
+    {
+      "kind": "roll-checkpoint",
+      "epoch": 1,
+      "throughSeq": 6,
+      "rollHead": "1ffdc46e07306ac85fee870358fec8e08c2dbc8e2cb8bcc4ee3a38eee4d608c6",
+      "at": "2026-10-31T13:14:24.776Z",
+      "seal": {
+        "kind": "dev-keyring-signature",
+        "declaration": "mechanism testing only — NOT ratification, NOT standing, NOT the A-1 trust root (see the keyring manifest)",
+        "subject": "roll-checkpoint",
+        "source": "roll",
+        "digest": {
+          "algorithm": "sha256",
+          "value": "30c6211bed99bc29d0cf88fe4a0af56413b7ee609695169f00ff9aa11fa8089d"
+        },
+        "message": "roll-checkpoint-sha256:30c6211bed99bc29d0cf88fe4a0af56413b7ee609695169f00ff9aa11fa8089d",
+        "keyring": "installed keyring manifest (dev-keyring: practice keys)",
+        "signatures": [
+          {
+            "keyId": "dev-rehearsal-authority-1",
+            "signature": "9hLbPB4cQkkifgG1EV3Y6xpHkXDYfFZPGePr23vLzdqM0bEjv0aI4jnKUjhbnKPhNJboGDeQdcUAgcWWhSloCA=="
+          },
+          {
+            "keyId": "dev-rehearsal-authority-2",
+            "signature": "2U3YSHHr7uq56nKY6PXn1ohd5l0BQmj7Y/GiqZuz3ow3aMCBjSsKRSl5sI5SDZHzNeLvxrs07z7Eb5Qj5nCPCQ=="
+          },
+          {
+            "keyId": "dev-rehearsal-authority-3",
+            "signature": "fWT2uGeD9V51nsnVoZX28cFsqrzwaizC4ESUTXhOlLS/HCkUJodeyK0RnAiu3NVGAP8GWGKGoncPg4QF+4EcCA=="
+          }
+        ],
+        "signedAt": "2026-10-31T13:14:24.785Z"
+      }
+    }
+  ]
+}

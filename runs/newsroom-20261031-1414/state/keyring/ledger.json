@@ -1,0 +1,66 @@
+{
+  "kind": "rehearsal-amendment-ledger",
+  "note": "SIMULATED ENACTMENTS only — this ledger records rehearsal, never law",
+  "entries": [
+    {
+      "id": "simulated-enactment-2026-10-31T13:14:24.776Z",
+      "kind": "SIMULATED ENACTMENT",
+      "amendment": "/home/mandubian/workspaces/mandubian/compact-dsh/runs/newsroom-20261031-1414/state/keyring/statute-admission.md",
+      "amendmentDigest": "d0a44e7e6896022915f6ca1cb836b98f86ebfefc74c98f91ac7d3c836f17d68f",
+      "seal": {
+        "threshold": "2-of-3",
+        "distinctSigners": 3,
+        "basis": "dev-keyring"
+      },
+      "reason": "rehearsal: the ADMISSION STATUTE for the member roll, enacted in simulation — admission criteria, the admitting authority, and quorum, under standing: none (identity slice 1, #124)",
+      "decidedBy": "rehearsal authority keys (practice keys, one entity — NOT the A-1 trust root)",
+      "dissent": [],
+      "standing": "none"
+    },
+    {
+      "id": "simulated-checkpoint-2026-10-31T13:14:24.776Z",
+      "kind": "SIMULATED ENACTMENT",
+      "amendment": "member roll, epoch 0 checkpoint",
+      "amendmentDigest": "2d72a294bdbd7c86820f8c55f74d39b0911d2f49cdd44a09a32f10b105eafb9f",
+      "seal": {
+        "threshold": "2-of-3",
+        "distinctSigners": 3,
+        "basis": "dev-keyring"
+      },
+      "reason": "rehearsal: roll epoch 0 closed — the root's only verb over the roll is \"the roll stood thus\", a digest at checkpoint, never a Member",
+      "decidedBy": "rehearsal authority keys (practice keys, one entity — NOT the A-1 trust root)",
+      "dissent": [],
+      "standing": "none"
+    },
+    {
+      "id": "simulated-enactment-accreditation-2026-10-31T13:14:24.776Z",
+      "kind": "SIMULATED ENACTMENT",
+      "amendment": "/home/mandubian/workspaces/mandubian/compact-dsh/runs/newsroom-20261031-1414/state/keyring/statute-accreditation.md",
+      "amendmentDigest": "4ae16f81fbe4083d16f56d101a634ba613aa2be45746abda148fda3d01c5f810",
+      "seal": {
+        "threshold": "2-of-3",
+        "distinctSigners": 3,
+        "basis": "dev-keyring"
+      },
+      "reason": "rehearsal: the ACCREDITATION STATUTE for external Witnesses, enacted in simulation — the chain to the root through a document, the root signing the law and never a Witness (A-7/J-1/D-8)",
+      "decidedBy": "rehearsal authority keys (practice keys, one entity — NOT the A-1 trust root)",
+      "dissent": [],
+      "standing": "none"
+    },
+    {
+      "id": "simulated-checkpoint-1-2026-10-31T13:14:24.776Z",
+      "kind": "SIMULATED ENACTMENT",
+      "amendment": "member roll, epoch 1 checkpoint (the external seated)",
+      "amendmentDigest": "1ffdc46e07306ac85fee870358fec8e08c2dbc8e2cb8bcc4ee3a38eee4d608c6",
+      "seal": {
+        "threshold": "2-of-3",
+        "distinctSigners": 3,
+        "basis": "dev-keyring"
+      },
+      "reason": "rehearsal: roll epoch 1 closed — the external Witness's seating is anchored by digest, and the root still signs no Member",
+      "decidedBy": "rehearsal authority keys (practice keys, one entity — NOT the A-1 trust root)",
+      "dissent": [],
+      "standing": "none"
+    }
+  ]
+}

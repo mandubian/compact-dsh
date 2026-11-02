@@ -1,0 +1,27 @@
+{
+  "kind": "dev-keyring-signature",
+  "declaration": "mechanism testing only — NOT ratification, NOT standing, NOT the A-1 trust root (see the keyring manifest)",
+  "subject": "compact-body",
+  "source": "community-demo trust-root seat (rehearsal re-seat — standing none)",
+  "digest": {
+    "algorithm": "sha256",
+    "value": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95"
+  },
+  "message": "compact-body-sha256:27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95",
+  "keyring": "installed keyring manifest (dev-keyring: practice keys)",
+  "signatures": [
+    {
+      "keyId": "dev-rehearsal-authority-1",
+      "signature": "rxNBDpKFmDhWdN1oQk94+NxgBu3IcYb3mA7PF+Iq/3uLktA9xjD2M0KR/7f6pze3geOdxDsXccwnoKueNPGxCQ=="
+    },
+    {
+      "keyId": "dev-rehearsal-authority-2",
+      "signature": "7jfWwB9eVT/Jk8gFFOildRlXcHyRMWtfkBYanL5vzHi7YKbR5ljIyg4VSRwWnJZMdL+NUX63Qi0JnV2/yw33CA=="
+    },
+    {
+      "keyId": "dev-rehearsal-authority-3",
+      "signature": "bmXi+qJsVunynV4Tn1ZJsbVNhxs4KRSXdODH+64pSI5EY7QRQZp7G8J6TcqhpsGHM+BL3HLYRTYoryetNoSeDw=="
+    }
+  ],
+  "signedAt": "2026-10-31T13:14:24.789Z"
+}

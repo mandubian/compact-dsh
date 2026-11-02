@@ -1,0 +1,112 @@
+{
+  "kind": "enforcer-annex",
+  "composition": "compact-dsh",
+  "host": "live community \"newsroom\" (development keyring)",
+  "lawDigest": "27bb7078fe9aea5067a8e95b174f54bd8ae77c78fce7b1b06dd760690caf2c95",
+  "registerDigest": "35603ce69c6708c682dee1e7aa068192619ac90c1c745b7eecd7e303ea1cd030",
+  "enforcer": {
+    "keyId": "dev-rehearsal-enforcer",
+    "publicKey": "MCowBQYDK2VwAyEAvBvumSKoBNzw5DFQ0rv4Cf5I5mmqCne6HLKHSXOb7no="
+  },
+  "issuedAt": "2026-10-31T13:14:24.789Z",
+  "adjudicatorSets": {
+    "nodes": [
+      {
+        "kind": "plugin",
+        "id": "compact-dsh"
+      }
+    ],
+    "sets": [
+      {
+        "id": "community-first-instance",
+        "roles": [
+          {
+            "id": "operator",
+            "standing": {
+              "kind": "principal",
+              "id": "operator-community"
+            }
+          }
+        ],
+        "trajectory": {
+          "firstExternalMemberBy": "2030-01-01T00:00:00.000Z",
+          "founderExclusions": [
+            "genesis",
+            "annex",
+            "a-8-review"
+          ]
+        },
+        "notice": "live community: rehearsal declaration under the development keyring — standing none; the machinery is what runs"
+      },
+      {
+        "id": "member-review",
+        "roles": [
+          {
+            "id": "chair",
+            "standing": {
+              "kind": "key",
+              "id": "d7dafe561c8198fe6d1404b02733a07ad36aa0844b9e1acb303549add3baa3e1"
+            }
+          }
+        ],
+        "trajectory": {
+          "firstExternalMemberBy": "2030-01-01T00:00:00.000Z",
+          "founderExclusions": [
+            "genesis",
+            "annex",
+            "a-8-review"
+          ]
+        },
+        "notice": "live community bench: model-driven members, heard over member-bound filings"
+      },
+      {
+        "id": "external",
+        "roles": [
+          {
+            "id": "w1",
+            "standing": {
+              "kind": "witness",
+              "id": "be421559a840a8f5d6b6d9a2ba33dc95d131270b8a437e73bf0160b81849e7e9"
+            }
+          }
+        ],
+        "trajectory": {
+          "firstExternalMemberBy": "2030-01-01T00:00:00.000Z",
+          "founderExclusions": [
+            "genesis",
+            "annex",
+            "a-8-review"
+          ]
+        },
+        "notice": "live community: the external Witness the SIMULATED accreditation statute seats — the D-8 route ends heard"
+      }
+    ],
+    "edges": [
+      {
+        "type": "directed-by",
+        "from": {
+          "kind": "plugin",
+          "id": "compact-dsh"
+        },
+        "to": {
+          "kind": "principal",
+          "id": "operator-community"
+        }
+      },
+      {
+        "type": "asserts-with",
+        "from": {
+          "kind": "plugin",
+          "id": "compact-dsh"
+        },
+        "to": {
+          "kind": "key",
+          "id": "dev-rehearsal-enforcer"
+        }
+      }
+    ]
+  },
+  "standing": "none — rehearsal under the development keyring; conveys no standing (F-5: the annex binds by refuse-to-start and verifiability, not by blessing)",
+  "declaration": "development keyring: practice keys — proves code-path correctness and nothing else; no ratification, no standing, no I-1 identity (see docs/decision-rehearsal-identity.md)",
+  "signature": "ppro482heYM+78cuJXHAf580Jg6CcCQlHHGZMHG7Z0o3Z/eKeuG8rCO0OZgo6oF/Y6bWMXfZkf3YxIfwujz4Aw=="
+}

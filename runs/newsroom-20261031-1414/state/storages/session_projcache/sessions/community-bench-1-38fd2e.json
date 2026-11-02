@@ -1,0 +1,159 @@
+{
+  "version": 7,
+  "record": {
+    "identity": {
+      "formatVersion": 4,
+      "createdAt": 1793452465783,
+      "cwd": "/home/mandubian/workspaces/mandubian/compact-dsh/runs/newsroom-20261031-1414/workspace",
+      "isSeeded": false,
+      "inheritedEventCount": 0
+    },
+    "rows": {
+      "title": {
+        "ver": 1,
+        "seq": 2,
+        "val": null
+      },
+      "titleInput": {
+        "ver": 3,
+        "seq": 2,
+        "val": {
+          "first": null,
+          "count": 0,
+          "lastSeq": null
+        }
+      },
+      "llmRetry": {
+        "ver": 1,
+        "seq": 2,
+        "val": {}
+      },
+      "sandboxMode": {
+        "ver": 1,
+        "seq": 2,
+        "val": "workspace-write"
+      },
+      "goal": {
+        "ver": 6,
+        "seq": 2,
+        "val": {
+          "current": null,
+          "seenGoalIds": [],
+          "failure": null
+        }
+      },
+      "plan": {
+        "ver": 3,
+        "seq": 2,
+        "val": {
+          "active": false,
+          "wanted": null,
+          "running": null,
+          "activeAtLastHeader": null
+        }
+      },
+      "tokenUsage": {
+        "ver": 2,
+        "seq": 2,
+        "val": {
+          "totals": {
+            "uncachedInputTokens": 0,
+            "outputTokens": 0,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0
+          },
+          "last": null
+        }
+      },
+      "contextPressure": {
+        "ver": 5,
+        "seq": 2,
+        "val": {
+          "surfaceTokens": 0
+        }
+      },
+      "contextBreakdown": {
+        "ver": 5,
+        "seq": 2,
+        "val": {
+          "nodes": [],
+          "breakdown": {
+            "systemTokens": 0,
+            "toolsTokens": 0,
+            "messageTokens": 0
+          }
+        }
+      },
+      "todos": {
+        "ver": 2,
+        "seq": 2,
+        "val": null
+      },
+      "userQuestions": {
+        "ver": 2,
+        "seq": 2,
+        "val": {
+          "inheritedEventCount": 0,
+          "timed": false,
+          "questions": {
+            "active": [],
+            "settled": []
+          }
+        }
+      },
+      "subagentCatalog": {
+        "ver": 3,
+        "seq": 2,
+        "val": {
+          "inheritedEventCount": 0
+        }
+      },
+      "subagentTiming": {
+        "ver": 3,
+        "seq": 2,
+        "val": {
+          "descriptorSeen": false,
+          "settledMs": 0
+        }
+      },
+      "subagent": {
+        "ver": 2,
+        "seq": 2,
+        "val": {}
+      },
+      "permissions": {
+        "ver": 2,
+        "seq": 2,
+        "val": {
+          "preset": "workspace-write",
+          "sandbox": "workspace-write",
+          "approval": "ask",
+          "seeded": false
+        }
+      },
+      "subagentModelSelectionPolicy": {
+        "ver": 1,
+        "seq": 2,
+        "val": null
+      },
+      "turnBoundary": {
+        "ver": 2,
+        "seq": 2,
+        "val": {
+          "openTurnStartSeq": null,
+          "lastStepStartSeq": null,
+          "lastStepBoundary": null,
+          "lastTurn": 0
+        }
+      },
+      "inbox": {
+        "ver": 1,
+        "seq": 2,
+        "val": {
+          "next-turn": [],
+          "next-step": []
+        }
+      }
+    }
+  }
+}

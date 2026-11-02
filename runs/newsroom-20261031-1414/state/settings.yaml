@@ -1,0 +1,18 @@
+llm-pi-ai:
+  providers:
+    openrouter:
+      apiKeyEnv: OPENROUTER_API_KEY
+    opencode:
+      apiKeyEnv: OPENCODE_API_KEY
+    zai:
+      apiKeyEnv: ZAI_API_KEY
+    opencode-go:
+      apiKeyEnv: OPENCODE_API_KEY
+      headers:
+        x-opencode-session: "1e6c2a4e-0c1b-4f6a-9d0e-2f7a8b9c1d2e"
+
+agent-default-model:
+  provider: zai
+  model: glm-5.3-flash
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1

@@ -1,0 +1,27 @@
+{
+  "kind": "dev-keyring-signature",
+  "declaration": "mechanism testing only — NOT ratification, NOT standing, NOT the A-1 trust root (see the keyring manifest)",
+  "subject": "amendment",
+  "source": "statute-admission.md",
+  "digest": {
+    "algorithm": "sha256",
+    "value": "d0a44e7e6896022915f6ca1cb836b98f86ebfefc74c98f91ac7d3c836f17d68f"
+  },
+  "message": "amendment-sha256:d0a44e7e6896022915f6ca1cb836b98f86ebfefc74c98f91ac7d3c836f17d68f",
+  "keyring": "installed keyring manifest (dev-keyring: practice keys)",
+  "signatures": [
+    {
+      "keyId": "dev-rehearsal-authority-1",
+      "signature": "Skyn1EuyGHN2zQ7i4ADvzEmuXDCiWqtmycJSBl4t5uV9HK92wQpaC7J8kpJfl6jiKkeylV7l0r/uAVbLq8OmBQ=="
+    },
+    {
+      "keyId": "dev-rehearsal-authority-2",
+      "signature": "STWVM4Zq/I88iAAyQp8x0IuZCPnLJ8DXkIRr9/0Wr6JX9bpxoEblkfCXKsuOadkUB+ouSw4BXB9MWY/wY5BtBA=="
+    },
+    {
+      "keyId": "dev-rehearsal-authority-3",
+      "signature": "ATEP+6w7d5EX02dGaY6LMYEI11OlurwnJQWfuehNc2/LC5BIR18L07GT1YcSE7xMGEnmFUc0IKTet57fQ0aHBw=="
+    }
+  ],
+  "signedAt": "2026-10-31T13:14:24.780Z"
+}

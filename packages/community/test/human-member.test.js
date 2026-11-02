@@ -460,7 +460,7 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   assert.match(script, /\(e\.ctrlKey \|\| e\.metaKey\) && e\.key === 'Enter'\) \{ e\.preventDefault\(\); send\('post'\);/);
   assert.match(script, /post ≤ 8000 · pass ≤ 2000/);
   assert.match(script, /if \(wasF\.focus\) \{ ta\.focus\(\); ta\.setSelectionRange/);
-  assert.match(html, /body\.composing main \{ grid-template-columns: 1\.25fr 0\.6fr 1\.55fr; \}/);
+  assert.match(html, /body\.composing main \{ grid-template-columns: 1\.1fr 0\.55fr 1\.45fr 0\.55fr; \}/); // #309: composing widens the SEAT (column 3), not the changes lane
   // buying more time: the button rides every card's head, one press moves
   // the real deadline, and the countdown is patched IN PLACE — the poll's
   // signature never sees expiresAt, so a rebuild cannot clobber a card the
