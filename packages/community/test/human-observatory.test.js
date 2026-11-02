@@ -529,3 +529,93 @@ test('the event stream never goes quiet: a heartbeat the page\'s watchdog hears'
   assert.ok(frames.filter((f) => /^event: ping$/m.test(f)).length >= 2, 'pings arrive while nothing else happens');
   await obs.close();
 });
+
+// ── the decision form (#308, the alongside-signing-1 finding): several
+// numbered decisions in ONE card — the human answers a form in minutes
+// where mixed prose costs an hour.
+
+const FORM_ITEMS = JSON.stringify([
+  { label: 'the costs line', quote: 'Automation is not forbidden; hiding its costs is', contest: 'nobody must state them', options: ['promise-language', 'add the stated-costs duty'] },
+  { label: 'the floor rights', free: true },
+]);
+
+test('decision_form: several items, one card, structured answers item by item', async () => {
+  const ctx = stubCtx();
+  const seat = mountHumanSeat(ctx, { questionTimeoutMs: 25_000 });
+  const pendingResult = seat.formTool.execute(
+    { title: 'the four contests on the draft', items: FORM_ITEMS, context: 'the comment period reads this' },
+    { agent: { id: 'community-chair' } },
+  );
+  const pending = seat.pending();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].kind, 'form');
+  assert.equal(pending[0].by, 'community-chair');
+  assert.equal(pending[0].items.length, 2);
+  assert.deepEqual(pending[0].items[0].options, ['promise-language', 'add the stated-costs duty']);
+  assert.equal(pending[0].items[1].free, true, 'no options → free words are the only way to answer');
+  const record = seat.answerForm(pending[0].id, [
+    { choice: 'add the stated-costs duty' },
+    { text: 'floor rights named in one sentence; the how stays with the frames' },
+  ]);
+  assert.ok(record);
+  const out = await pendingResult;
+  assert.match(out, /answered 2 item\(s\)/);
+  assert.match(out, /add the stated-costs duty/);
+  assert.match(out, /floor rights named in one sentence/);
+  assert.equal(seat.pending().length, 0);
+});
+
+test('decision_form: a missing choice refuses the WHOLE answer before anything settles — the form stays pending, nothing lost', async () => {
+  const ctx = stubCtx();
+  const seat = mountHumanSeat(ctx, { questionTimeoutMs: 25_000 });
+  const pendingResult = seat.formTool.execute({ title: 't', items: FORM_ITEMS }, { agent: { id: 'community-chair' } });
+  const pending = seat.pending();
+  assert.throws(() => seat.answerForm(pending[0].id, [{ choice: '' }, { text: 'words' }]), /item 1 .*needs one of/);
+  assert.equal(seat.pending().length, 1, 'the form still waits — the human fixes that one item');
+  seat.answerForm(pending[0].id, [{ choice: 'promise-language' }, { text: 'ok' }]);
+  const out = await pendingResult;
+  assert.match(out, /promise-language/);
+});
+
+test('decision_form: the timeout is the honest no-answer on all items', async () => {
+  const slow = mountHumanSeat(stubCtx(), { questionTimeoutMs: 30 });
+  const out = await slow.formTool.execute({ title: 'anyone there?', items: FORM_ITEMS }, { agent: { id: 'x' } });
+  assert.match(out, /No answer within 0s — the honest no-answer on all 2 item\(s\)/);
+});
+
+test('decision_form: malformed items are refused at the tool boundary, with the expected shape named', async () => {
+  const seat = mountHumanSeat(stubCtx());
+  const notJson = await seat.formTool.execute({ title: 't', items: 'label one; label two' }, { agent: { id: 'x' } });
+  assert.match(notJson, /must be a JSON array/);
+  const noLabel = await seat.formTool.execute({ title: 't', items: JSON.stringify([{ quote: 'a line' }]) }, { agent: { id: 'x' } });
+  assert.match(noLabel, /item 1 carries no "label"/);
+});
+
+test('decision_form: with a human member seated, the answers are drafted as the member\'s next floor post — the member\'s own act, through its own loop', async () => {
+  const ctx = stubCtx();
+  const seat = mountHumanSeat(ctx, { questionTimeoutMs: 25_000, floorTimeoutMs: 30, formPostMember: 'community-signer' });
+  const pendingResult = seat.formTool.execute({ title: 'the contests, your call', items: FORM_ITEMS }, { agent: { id: 'community-chair' } });
+  const pending = seat.pending();
+  seat.answerForm(pending[0].id, [{ choice: 'promise-language' }, { text: 'the floor stays one sentence' }]);
+  await pendingResult;
+  // the next floor turn of THAT member carries the draft on its card (the
+  // pending record is what the page renders) — the card's composer prefills
+  seat.poseFloor({ member: 'community-signer', framing: 'round 3' });
+  const card = seat.pending().find((p) => p.kind === 'floor');
+  assert.ok(card?.formDraft, 'the draft rides the floor card');
+  assert.match(card.formDraft.text, /My answers to "the contests, your call" \(asked by community-chair\)/);
+  assert.match(card.formDraft.text, /promise-language/);
+  assert.ok(card.formDraft.text.length <= 8000, 'a draft posts within the forum\'s own limits');
+  await new Promise((r) => setTimeout(r, 40)); // the honest silence clears the card
+  // one draft, one card: the queue is drained — a second turn is a clean floor
+  seat.poseFloor({ member: 'community-signer', framing: 'round 4' });
+  assert.equal(seat.pending().find((p) => p.kind === 'floor')?.formDraft, undefined);
+  // a DIFFERENT member's floor never sees another member's form answers
+  const seat2 = mountHumanSeat(stubCtx(), { questionTimeoutMs: 25_000, floorTimeoutMs: 30, formPostMember: 'community-signer' });
+  const p2 = seat2.formTool.execute({ title: 't2', items: FORM_ITEMS }, { agent: { id: 'community-chair' } });
+  seat2.answerForm(seat2.pending()[0].id, [{ choice: 'promise-language' }, { text: 'x' }]);
+  await p2;
+  seat2.poseFloor({ member: 'community-chair', framing: 'r' });
+  assert.equal(seat2.pending().find((p) => p.kind === 'floor')?.formDraft, undefined, 'the chair\'s floor never carries the signer\'s draft');
+  await new Promise((r) => setTimeout(r, 40));
+});
