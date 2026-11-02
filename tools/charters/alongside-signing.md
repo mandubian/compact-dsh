@@ -48,6 +48,15 @@ comment period.
   no legal vocabulary — the ledger must read the way people talk.
 - **The gate:** `ENDORSEMENT:` posted (first line exactly), every
   member answers it — ACCEPTED or CONTESTED — the human answers last.
+- **The signer's answer is collected with `decision_form`, never
+  `ask_human`** (the signing-2 finding): an `ask_human` answer is
+  private and never counts as the signer's forum answer, so asking
+  privately asks twice — the human answers the card, then still owes
+  the floor post. The form's answers are drafted as the signer's next
+  floor post automatically; posting it IS the answer. The floor
+  timeout for this charter is 30 minutes: ledger-sized reading takes
+  a human half an hour, and the honest silence is not a deadline to
+  squeeze thinking into.
 
 ## The plain version
 
