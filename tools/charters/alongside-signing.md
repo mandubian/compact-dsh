@@ -22,6 +22,14 @@ comment period.
   the briefing orders members to quote it by its words, never by
   memory, and to check each other against the file. The endorsement
   binds to that digest — a later v1.0 signs again or doesn't.
+- **The glossary is reference, not text.** `sources/concepts.md` is
+  the project's own CONCEPTS.md (sha256 `a452cf8ef2cc1471…`),
+  provided like a dictionary: read it when a word puzzles you — but
+  the signature covers `alongside.md` only, and the briefing says so.
+  *"The plain text needs a glossary to be understood"* remains a
+  contestable point, exactly the everyday reader's finding. QA is
+  deliberately absent: its arguments would answer the members'
+  questions before they ask them.
 - **The seats:**
 
   | member | model | carries |
