@@ -197,12 +197,8 @@ export function frozenVsFinalFrom(dir, run) {
   if (!Array.isArray(sources) || sources.length === 0) return [];
   const workspace = join(dir, 'workspace');
   if (!existsSync(workspace)) return [];
-  const tracker = createChangeTracker(workspace);
-  tracker.baseline();
-  // the frozen texts, overlaid onto the workspace tree: each seeded file's
-  // content is written into a scratch projection the tracker can compare…
-  // no — simpler and truer: diff the seeded contents directly against the
-  // workspace's current files with the same differ, one entry per source.
+  // the seeded contents diffed directly against the workspace's current
+  // files, with the same differ the live lane uses — one entry per source
   const at = run?.endedAt ?? null;
   const out = [];
   for (const source of sources) {
@@ -219,6 +215,7 @@ export function frozenVsFinalFrom(dir, run) {
       at,
       who: 'the community (frozen → final)',
       type: 'file-change',
+      status,
       text: `${status} ${source.path} — the charter's seeded text, as the run left it`,
       diff: current === null
         ? ['@@ removed — the seeded file is gone from the final workspace']
