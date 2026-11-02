@@ -461,6 +461,16 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   assert.match(script, /post ≤ 8000 · pass ≤ 2000/);
   assert.match(script, /if \(wasF\.focus\) \{ ta\.focus\(\); ta\.setSelectionRange/);
   assert.match(html, /body\.composing main \{ grid-template-columns: 1\.25fr 0\.6fr 1\.55fr; \}/);
+  // buying more time: the button rides every card's head, one press moves
+  // the real deadline, and the countdown is patched IN PLACE — the poll's
+  // signature never sees expiresAt, so a rebuild cannot clobber a card the
+  // human is mid-thought on just because time was bought
+  assert.equal((script.match(/moreHtml\(/g) || []).length, 3, 'the button rides all three card kinds');
+  assert.match(script, /button class="more" title="buy more time/);
+  assert.match(script, /api\('\/extend\/' \+ encodeURIComponent\(card\.dataset\.id\)/);
+  assert.match(script, /left\.dataset\.expires = r\.expiresAt;/);
+  assert.match(script, /case 'pending-extended':/);
+  assert.doesNotMatch(script, /sig = JSON\.stringify\(p\.map\(x => [^\n]*expiresAt/);
 });
 
 // ── the plain voice (charter "voice": "plain"): the law keeps its register

@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import http from 'node:http';
 
-import { mountHumanSeat, startObservatory } from '../src/index.js';
+import { mountHumanSeat, startObservatory, DEFAULT_EXTEND_MS, MAX_EXTEND_MS } from '../src/index.js';
 import { validateCharter } from '../src/charter.js';
 
 function stubCtx({ deciding = new Map() } = {}) {
@@ -421,6 +421,77 @@ test('closing the observatory ends its live feeds — an open tab cannot hold a 
   const closed = await Promise.race([obs.close().then(() => 'closed'), new Promise((r) => setTimeout(() => r('STILL OPEN after 2s'), 2000))]);
   assert.equal(closed, 'closed');
   await ended;
+});
+
+test('buying more time moves the deadline AND the real timeout — the silence fires at the NEW hour, not the old one', async () => {
+  // the false answer, named: a page whose countdown moved while the seat's
+  // timer kept the old hour would show time that no longer exists
+  const seat = mountHumanSeat(stubCtx(), { floorTimeoutMs: 120 });
+  const turn = seat.poseFloor({ member: 'accuser', by: 'accuser', framing: 'Round 1 of 6, member "accuser".' });
+  const card = seat.pending()[0];
+  const bought = seat.extendPending(card.id, 400);
+  assert.ok(bought, 'the pending card accepts the extension');
+  assert.ok(Date.parse(bought.expiresAt) > Date.parse(card.expiresAt), 'the deadline moved out');
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(seat.pending().length, 1, 'the OLD timeout did not fire — the human is still reading');
+  assert.deepEqual(await turn, { act: 'timeout' }, 'the REARMED timeout fires at the new hour — the honest silence still exists');
+  assert.equal(seat.pending().length, 0);
+});
+
+test('extendPending: the default slab, the per-press cap, and an honest null for nothing pending', () => {
+  const seat = mountHumanSeat(stubCtx(), { questionTimeoutMs: 600_000 });
+  const asked = seat.tool.execute({ question: 'still there?' }, { agent: { id: 'chair' } });
+  const id = seat.pending()[0].id;
+  const before = Date.parse(seat.pending()[0].expiresAt);
+  const defaulted = seat.extendPending(id);
+  assert.ok(Date.parse(defaulted.expiresAt) - before >= DEFAULT_EXTEND_MS - 50, 'no amount given: the default slab is added');
+  const capped = seat.extendPending(id, 100 * DEFAULT_EXTEND_MS);
+  assert.ok(Date.parse(capped.expiresAt) - Date.parse(defaulted.expiresAt) <= MAX_EXTEND_MS + 1000, 'one press cannot add more than the cap');
+  seat.replyQuestion(id, 'here');
+  assert.equal(seat.extendPending(id, 60_000), null, 'a settled card buys nothing');
+  assert.equal(seat.extendPending('hum_999', 60_000), null, 'an unknown id buys nothing');
+  return asked;
+});
+
+test('an extended question reports the wait it ACTUALLY took — not the configured timeout', async () => {
+  const seat = mountHumanSeat(stubCtx(), { questionTimeoutMs: 80 });
+  const asked = seat.tool.execute({ question: 'hold or ship?' }, { agent: { id: 'editor' } });
+  seat.extendPending(seat.pending()[0].id, 600);
+  const out = await asked;
+  assert.match(out, /No answer within [1-9]\d*s — the honest no-answer/, `the no-answer names the real wait (${out.split('\n')[0]})`);
+});
+
+test('an extended ASK is not denied at the old hour — fail closed waits for the moved deadline', async () => {
+  const seat = mountHumanSeat(stubCtx(), { askTimeoutMs: 80 });
+  const decision = seat.answerer(REQ(), () => Promise.resolve('unavailable'));
+  seat.extendPending(seat.pending()[0].id, 300);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(seat.pending().length, 1, 'the old hour passed un-fired');
+  assert.equal(await decision, 'denied', 'and the honest refusal still lands, at the new hour');
+});
+
+test('the extend endpoint: one press moves one card — state, feed, and an honest 404', async (t) => {
+  const ctx = stubCtx();
+  const seat = mountHumanSeat(ctx, { floorTimeoutMs: 600_000 });
+  const obs = await startObservatory(ctx, { humanSeat: seat, port: 0, charterName: 'c', heartbeatMs: 0 });
+  t.after(() => obs.close());
+  const framesP = readFrames(`${obs.url}events`, {}, (fs) => fs.some((f) => /"pending-extended"/.test(f)), 2000);
+  await new Promise((r) => setTimeout(r, 50));
+  const turn = seat.poseFloor({ member: 'accuser', by: 'accuser', framing: 'Round 1 of 6, member "accuser".' });
+  const card = (await (await fetch(`${obs.url}state`)).json()).pending[0];
+  const bought = await fetch(`${obs.url}extend/${card.id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ minutes: 10 }) });
+  assert.equal(bought.status, 200);
+  const body = await bought.json();
+  assert.equal(body.kind, 'floor');
+  assert.ok(Date.parse(body.expiresAt) - Date.parse(card.expiresAt) >= 9.5 * 60_000, 'ten minutes were added to what was left');
+  const after = (await (await fetch(`${obs.url}state`)).json()).pending[0].expiresAt;
+  assert.equal(after, body.expiresAt, 'the state the page polls carries the moved expiry');
+  const unknown = await fetch(`${obs.url}extend/hum_999`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ minutes: 10 }) });
+  assert.equal(unknown.status, 404);
+  const frames = await framesP;
+  assert.ok(frames.some((f) => /"pending-extended"/.test(f)), 'the feed carried the bought time');
+  seat.settleFloor(card.id, { act: 'say', text: 'done' });
+  await turn;
 });
 
 // read SSE frames from a GET until `until(frames)` or the timeout
