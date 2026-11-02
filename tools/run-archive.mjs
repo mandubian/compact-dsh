@@ -152,3 +152,75 @@ export function readArchive(dir) {
     members,
   };
 }
+
+// ── #309: what changed in the run ──
+// Two sources, both optional (older archives predate them):
+//   1. state/changes.jsonl — the per-turn diffs the live page's changes
+//      lane showed, as they happened (member, round, capped diff);
+//   2. the manifest's charterSources vs the workspace as it stands — the
+//      frozen-vs-final diff of the files the run was SEEDED with.
+// The export folds both into the timeline, so an archive shows what
+// changed beside what was concluded, offline like everything here.
+
+import { diffLines } from '../packages/community/src/changes.js';
+
+/** The per-turn file changes, as recorded live. [] when the archive
+ * predates the lane. */
+export function fileChangesFrom(dir) {
+  const path = join(dir, 'state', 'changes.jsonl');
+  if (!existsSync(path)) return [];
+  const out = [];
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const row = JSON.parse(line);
+      out.push({
+        at: row.at,
+        who: row.member,
+        type: 'file-change',
+        text: `${row.status} ${row.path}${row.round != null ? ` (round ${row.round})` : ''}`,
+        diff: Array.isArray(row.diff) ? row.diff : [],
+      });
+    } catch {
+      /* a torn last line (a run killed mid-append) skips itself */
+    }
+  }
+  return out;
+}
+
+/** The frozen-vs-final diff of the charter's seeded sources: each seeded
+ * file that survives to the workspace differently (or is gone) becomes one
+ * `file-change` timeline entry, stamped at the run's end. [] when the
+ * manifest predates charterSources or no workspace survives. */
+export function frozenVsFinalFrom(dir, run) {
+  const sources = run?.charterSources;
+  if (!Array.isArray(sources) || sources.length === 0) return [];
+  const workspace = join(dir, 'workspace');
+  if (!existsSync(workspace)) return [];
+  // the seeded contents diffed directly against the workspace's current
+  // files, with the same differ the live lane uses — one entry per source
+  const at = run?.endedAt ?? null;
+  const out = [];
+  for (const source of sources) {
+    const path = join(workspace, source.path);
+    let current = null;
+    try {
+      current = existsSync(path) ? readFileSync(path, 'utf8') : null;
+    } catch {
+      current = null;
+    }
+    if (current === source.content) continue;
+    const status = current === null ? 'removed' : 'modified';
+    out.push({
+      at,
+      who: 'the community (frozen → final)',
+      type: 'file-change',
+      status,
+      text: `${status} ${source.path} — the charter's seeded text, as the run left it`,
+      diff: current === null
+        ? ['@@ removed — the seeded file is gone from the final workspace']
+        : diffLines(source.content, current, { cap: 300 }),
+    });
+  }
+  return out;
+}

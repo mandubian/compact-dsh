@@ -16,7 +16,7 @@
 import { writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { readArchive } from './run-archive.mjs';
+import { readArchive, fileChangesFrom, frozenVsFinalFrom } from './run-archive.mjs';
 import { parseEmbeddedArchive } from './community-brief.mjs';
 import { validateCharter } from '../packages/community/src/charter.js';
 import { clauseIds, clauseText, COMPACT_DIGEST } from '../packages/constitution/src/body.js';
@@ -65,6 +65,18 @@ function main() {
     if (!embedded) throw stateError;
     archive = embedded;
     console.error(`community-export: no run state under ${dir} — re-rendering from the embedded DATA of ${htmls[0]} (the record, unchanged)`);
+  }
+  // #309: what changed in the run, folded into the timeline — the per-turn
+  // diffs exactly as the live page's changes lane showed them, then the
+  // frozen-vs-final diff of the charter's seeded sources. Both optional:
+  // an archive that predates the lane ships without them, honestly.
+  {
+    const changes = [...fileChangesFrom(resolve(dir)), ...frozenVsFinalFrom(resolve(dir), archive.run)];
+    if (changes.length) {
+      archive.timeline.push(...changes);
+      archive.timeline.sort((a, b) => String(a.at ?? '').localeCompare(String(b.at ?? '')));
+      console.error(`community-export: ${changes.length} file change(s) folded into the timeline`);
+    }
   }
   if (charterPath) {
     if (archive.run?.goal) {

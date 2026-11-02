@@ -16,6 +16,7 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { renderPost } from 'compact-dsh-forum';
 
 import { HUMAN_ROUTE } from './human-member.js';
+import { createChangeTracker } from './changes.js';
 
 export const DRIVER_SOURCE = { kind: 'compact-community', form: 'briefing' };
 
@@ -367,6 +368,19 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
   const agentsSvc = ctx.get('agents');
   if (!agentsSvc?.create) throw new Error('compact-community: no agents service — the stock agent loop must be composed for a live community');
   const sessionsSvc = ctx.get('sessions');
+  // #309: the workspace, snapshotted at the run's start — everything the
+  // members write from here on is a diff against this baseline (a missing
+  // workspace or a failed baseline disables the lane honestly: no tracker,
+  // no lane, and the run runs exactly as before)
+  const changeTracker = workspace ? (() => {
+    try {
+      const tracker = createChangeTracker(workspace);
+      tracker.baseline();
+      return tracker;
+    } catch {
+      return null;
+    }
+  })() : null;
 
   const selection = currentSelectionOf(ctx);
   hooks.onRoute?.(selection);
@@ -514,7 +528,7 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
         await waitWhilePaused();
         if (controls.stopMode) { stats.endReason = stopReason(); return finish(stats, seated, hooks); }
         const began = turnBegins(seat);
-        await drive(seat, benchFramingText(charter, seat.member, caseRow), hooks, stats, sessionsSvc, controls);
+        await drive(seat, benchFramingText(charter, seat.member, caseRow), hooks, stats, sessionsSvc, controls, changeTracker);
         turnEnds(seat, began, round);
       }
     }
@@ -547,7 +561,7 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
       }
       const before = forum.forum.posts.length;
       const began = turnBegins(seat);
-      await drive(seat, framing, hooks, stats, sessionsSvc, controls);
+      await drive(seat, framing, hooks, stats, sessionsSvc, controls, changeTracker);
       turnEnds(seat, began, round);
       seat.lastForumSeq = forum.forum.posts.length;
       if (!seat.briefed) { seat.briefed = true; void before; }
@@ -582,7 +596,7 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
  *  flushes to its chain. An immediate operator stop cancels the agent
  *  through the loop's own cancel — the turn ends aborted, and what the
  *  record already holds is flushed. */
-async function drive(seat, framing, hooks, stats, sessionsSvc, controls) {
+async function drive(seat, framing, hooks, stats, sessionsSvc, controls, changeTracker = null) {
   const { agent, member } = seat;
   hooks.onTurn?.(member, framing);
   controls._currentAgent = agent;
@@ -603,6 +617,19 @@ async function drive(seat, framing, hooks, stats, sessionsSvc, controls) {
   stats.turns += 1;
   stats.members[member.id] = seat.turns;
   hooks.onTurnDone?.(member, seat.turns);
+  // #309: the workspace, re-snapshotted at the turn's end — a versioned
+  // write is shown as WHAT CHANGED (path, status, capped diff, the member
+  // and round that carried it), never as a new blob for a human to re-read.
+  // A snapshot failure never ends a turn; the next turn re-snapshots all.
+  if (changeTracker) {
+    try {
+      const changes = changeTracker.snapshotNow({ member: member.id, round: stats.rounds });
+      if (changes.length) hooks.onFileChanges?.(changes);
+    } catch {
+      /* the next turn re-snapshots the whole workspace — a turn never ends
+         because its diff failed */
+    }
+  }
 }
 
 function finish(stats, seated, hooks) {
