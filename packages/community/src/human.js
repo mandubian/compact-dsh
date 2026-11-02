@@ -461,17 +461,21 @@ export function mountHumanSeat(ctx, {
     tool: askHuman,
     formTool: decisionForm,
     poseFloor,
-    /** The form's answers, validated then settled (#308): an option-item
+    /** The form's answers, validated then resolved (#308): an option-item
      * needs one of its choices, a free-item needs words — a failure THROWS
      * with the offending item named and the form stays pending (nothing
      * was lost; the page shows the reason, the human fixes that one item).
-     * When formPostMember is set, the settled answers are also drafted as
-     * that member's next floor post. */
+     * Resolves through the form's own entry.resolve DIRECTLY (mirroring
+     * replyQuestion) — settle() would fire onResolve a second time (the
+     * entry.resolve already does), and the feed would say form-answered
+     * twice for one answer. When formPostMember is set, the resolved
+     * answers are also drafted as that member's next floor post. */
     answerForm: (id, answers) => {
       const record = pending.get(id);
       if (!record || record.kind !== 'form') return null;
       const cleaned = validateFormAnswers(record, answers);
-      return settle(id, cleaned, 'the human seat (page)');
+      record.resolve?.(cleaned);
+      return record;
     },
     pending: () => [...pending.values()].map((p) => ({ ...p, resolve: undefined, cancel: undefined, timer: undefined, onTimeout: undefined })),
     /** Buy more time on a pending card: the deadline moves, and the REAL

@@ -641,6 +641,18 @@ function onEvent(m) {
     case 'ask-decided':
       post('acts-list', at + '✓ the human ' + (e.decision === 'approve' ? 'APPROVED' : 'DENIED') + ' the ask' , {});
       break;
+    case 'form-posed':
+      post('acts-list', at + '\u23f3 a decision form waits for you: ' + esc(short(e.title ?? '', 140)));
+      break;
+    case 'form-answered':
+      post('acts-list', at + '\u2713 the human answered the form', {});
+      break;
+    case 'form-timeout':
+      post('acts-list', at + 'the form timed out \u2014 the honest no-answer, counted', {});
+      break;
+    case 'form-cancelled':
+      post('acts-list', at + 'the form was withdrawn (the run is stopping) \u2014 no answer', {});
+      break;
     case 'ask-timeout':
       post('acts-list', at + '⏱ an ask timed out — refused, fail closed');
       break;

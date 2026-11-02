@@ -577,6 +577,24 @@ test('decision_form: a missing choice refuses the WHOLE answer before anything s
   assert.match(out, /promise-language/);
 });
 
+test('decision_form: answering fires onResolve EXACTLY once — the feed cannot say form-answered twice', async () => {
+  const ctx = stubCtx();
+  let fires = 0;
+  const seen = [];
+  const seat = mountHumanSeat(ctx, {
+    questionTimeoutMs: 25_000,
+    formPostMember: 'community-signer',
+    onResolve: (record) => { fires += 1; seen.push(record); },
+  });
+  const pendingResult = seat.formTool.execute({ title: 'once, not twice', items: FORM_ITEMS }, { agent: { id: 'community-chair' } });
+  seat.answerForm(seat.pending()[0].id, [{ choice: 'promise-language' }, { text: 'words' }]);
+  const out = await pendingResult;
+  assert.match(out, /answered 2 item\(s\)/);
+  assert.equal(fires, 1, `the mapped-once invariant: onResolve fired ${fires} times`);
+  assert.equal(seen[0].settled, true);
+  assert.deepEqual(seen[0].answer[0], { label: 'the costs line', choice: 'promise-language' });
+});
+
 test('decision_form: the timeout is the honest no-answer on all items', async () => {
   const slow = mountHumanSeat(stubCtx(), { questionTimeoutMs: 30 });
   const out = await slow.formTool.execute({ title: 'anyone there?', items: FORM_ITEMS }, { agent: { id: 'x' } });
