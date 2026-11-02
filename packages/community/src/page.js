@@ -191,6 +191,7 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
 <header>
   community observatory — <b>${safeName}</b> ·
   <span id="conn" class="live">live</span> ·
+  <span id="runstatus" class="muted">between turns</span> ·
   <span class="muted">the law binds the sovereign: your answers land on the record (D-6)</span>
   <span id="ops" style="float:right">
     <button id="btn-pause" title="drain the current turn, then idle">⏸ pause</button>
@@ -309,6 +310,16 @@ const showWhy = (div, reason) => {
 // the time left before a card's timeout (its record carries expiresAt):
 // a turn that ran out is an honest silence, so the human sees it coming
 const BASE_TITLE = document.title;
+// the run's pulse (#309's finding, its human-seat half): a page that shows
+// your cards but not the community's motion reads as frozen — the members
+// mid-turn are tracked here from the same events the acts lane renders
+const working = new Set();
+const renderWorking = () => {
+  const el = $('runstatus');
+  if (!el) return;
+  const names = [...working];
+  el.textContent = names.length ? '\u2699 working: ' + names.join(', ') : 'between turns'; // no leading dot: the header already renders one
+};
 const tickLeft = () => {
   document.querySelectorAll('[data-expires]').forEach((el) => {
     const ms = Date.parse(el.dataset.expires) - Date.now();
@@ -407,7 +418,7 @@ function renderPending(p) {
       if (!ta.value.trim()) return;
       api('/reply/' + encodeURIComponent(q.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ text: ta.value }) }).then(() => { div.remove(); setTimeout(refreshState, 300); }).catch(() => {});
     };
-    div.querySelector('button').onclick = reply;
+    div.querySelector('.acts-row button').onclick = reply; // the head carries +10 min — the FIRST button is not Reply (#307)
     ta.onkeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); reply(); } };
     box.appendChild(div);
     const wasQ = saved[q.id];
@@ -638,9 +649,13 @@ function onEvent(m) {
       post('acts-list', at + '<span class="who">' + esc(e.by ?? '?') + '</span> passed — not a post: ' + esc(e.reason));
       break;
     case 'turn':
+      working.add(e.member ?? '?');
+      renderWorking();
       post('acts-list', at + '<span class="who">' + esc(e.member) + '</span> takes a turn' + (e.bench ? ' (bench)' : ''));
       break;
     case 'turn-done':
+      working.delete(e.member ?? '?');
+      renderWorking();
       post('acts-list', at + '<span class="who">' + esc(e.member) + '</span> finished turn ' + esc(e.turns) + ' — flushed to its chain', {});
       break;
     case 'file-change': {
@@ -731,6 +746,8 @@ function onEvent(m) {
       post('acts-list', at + '⏹ the fence AUTO-STOPPED the run (divergence: ' + esc(e.why) + ') — nobody could have resumed it');
       break;
     case 'end':
+      working.clear();
+      renderWorking();
       post('acts-list', at + '■ THE RUN ENDS — ' + esc(e.reason));
       break;
     default: break;
