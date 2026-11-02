@@ -37,6 +37,13 @@ import { normalizeTopic, postText, passReason } from 'compact-dsh-forum';
 export const DEFAULT_ASK_TIMEOUT_MS = 120_000;
 export const DEFAULT_QUESTION_TIMEOUT_MS = 300_000;
 export const DEFAULT_FLOOR_TIMEOUT_MS = 600_000;
+// "buy more time": one press adds this much to a pending card's deadline
+// (the page's button sends minutes; the seat clamps to a per-press max —
+// a typo cannot park the run forever, but the human's reading speed is
+// the operator's own affair). The honest silence still exists: stop
+// pressing and the card times out as before.
+export const DEFAULT_EXTEND_MS = 600_000;
+export const MAX_EXTEND_MS = 2 * 60 * 60 * 1000;
 
 let pendingSeq = 0;
 
@@ -148,14 +155,15 @@ export function mountHumanSeat(ctx, {
     // NOT unref'd: a pending ask is a live decision — the loop holds while
     // the human thinks (the turn is blocked on this answer anyway; an
     // unref'd timer let the event loop drain under the recorded answerer's
-    // awaited promise on Node 22, which CI caught)
-    const timer = setTimeout(() => {
-      settle(record.id, 'timeout', 'the timeout (fail closed)');
-    }, askTimeoutMs);
+    // awaited promise on Node 22, which CI caught). The timer and its
+    // callback ride the entry, not a closure: "buy more time" rearms them
+    // against the moved expiresAt, and nothing fires behind the page's back.
+    const entry = pending.get(record.id);
+    entry.onTimeout = () => settle(record.id, 'timeout', 'the timeout (fail closed)');
+    entry.timer = setTimeout(entry.onTimeout, askTimeoutMs);
     return new Promise((resolve) => {
-      const entry = pending.get(record.id);
       entry.resolve = (answer) => {
-        clearTimeout(timer);
+        clearTimeout(entry.timer);
         resolve(answer === 'approve' ? 'allowed-once' : 'denied');
       };
       // the run is stopping: the ask is withdrawn and DENIED (fail closed)
@@ -189,18 +197,22 @@ export function mountHumanSeat(ctx, {
         expiresAt: new Date(Date.now() + questionTimeoutMs).toISOString(),
       });
       return await new Promise((resolve) => {
+        const entry = pending.get(record.id);
         // NOT unref'd — same rule as the asks: a question the human has not
-        // answered is a live decision, and the loop holds for it
-        const timer = setTimeout(() => {
+        // answered is a live decision, and the loop holds for it. The timer
+        // rides the entry: "buy more time" rearms it, and the no-answer
+        // reports the wait the human ACTUALLY took, not the configured one.
+        entry.onTimeout = () => {
           pending.delete(record.id);
           onResolve({ ...record, settled: true, answer: null, answeredBy: 'the timeout', answeredAt: new Date().toISOString() });
+          const waitedS = Math.round((Date.now() - Date.parse(record.posedAt)) / 1000);
           resolve(
-            `[ask_human] No answer within ${Math.round(questionTimeoutMs / 1000)}s — the honest no-answer, not a guess.\n` +
+            `[ask_human] No answer within ${waitedS}s — the honest no-answer, not a guess.\n` +
             'Say plainly what you did without the human\'s answer, or ask again later with a sharper question.');
-        }, questionTimeoutMs);
-        const entry = pending.get(record.id);
+        };
+        entry.timer = setTimeout(entry.onTimeout, questionTimeoutMs);
         entry.resolve = (answer) => {
-          clearTimeout(timer);
+          clearTimeout(entry.timer);
           pending.delete(record.id);
           onResolve({ ...record, settled: true, answer: String(answer ?? '').slice(0, 4000), answeredBy: 'the human seat (page)', answeredAt: new Date().toISOString() });
           resolve(`[ask_human] The Principal answered:\n${String(answer ?? '').slice(0, 4000)}`);
@@ -210,7 +222,7 @@ export function mountHumanSeat(ctx, {
         // and not the human's silence: the fence does not count it.
         entry.cancel = (why) => {
           if (!pending.has(record.id)) return;
-          clearTimeout(timer);
+          clearTimeout(entry.timer);
           pending.delete(record.id);
           onResolve({ ...record, settled: true, answer: null, cancelled: true, answeredBy: why ?? 'the run stopping', answeredAt: new Date().toISOString() });
           resolve('[ask_human] The question was withdrawn before the human answered — the run is stopping. No answer.');
@@ -242,16 +254,18 @@ export function mountHumanSeat(ctx, {
       expiresAt: new Date(Date.now() + floorTimeoutMs).toISOString(),
     });
     return new Promise((resolve) => {
+      const entry = pending.get(record.id);
       // NOT unref'd — same rule as the asks: a floor turn the human has not
-      // answered is a live turn, and the loop holds for it
-      const timer = setTimeout(() => {
+      // answered is a live turn, and the loop holds for it (the timer rides
+      // the entry, rearmable by "buy more time")
+      entry.onTimeout = () => {
         pending.delete(record.id);
         onResolve({ ...record, settled: true, act: 'timeout', answeredBy: 'the timeout', answeredAt: new Date().toISOString() });
         resolve({ act: 'timeout' });
-      }, floorTimeoutMs);
-      const entry = pending.get(record.id);
+      };
+      entry.timer = setTimeout(entry.onTimeout, floorTimeoutMs);
       entry.resolve = (act) => {
-        clearTimeout(timer);
+        clearTimeout(entry.timer);
         resolve(act);
       };
       // withdrawn — the turn was cancelled (an immediate stop aborts the
@@ -262,7 +276,7 @@ export function mountHumanSeat(ctx, {
       // out the human's whole timeout.
       entry.cancel = (why) => {
         if (!pending.has(record.id)) return;
-        clearTimeout(timer);
+        clearTimeout(entry.timer);
         pending.delete(record.id);
         onResolve({ ...record, settled: true, act: 'cancelled', answeredBy: why ?? 'the run stopping', answeredAt: new Date().toISOString() });
         resolve({ act: 'cancelled' });
@@ -289,7 +303,27 @@ export function mountHumanSeat(ctx, {
     answerer,
     tool: askHuman,
     poseFloor,
-    pending: () => [...pending.values()].map((p) => ({ ...p, resolve: undefined, cancel: undefined })),
+    pending: () => [...pending.values()].map((p) => ({ ...p, resolve: undefined, cancel: undefined, timer: undefined, onTimeout: undefined })),
+    /** Buy more time on a pending card: the deadline moves, and the REAL
+     * timeout rearms against the new expiry (the seat is the one that
+     * fires the honest silence — extending only the page's countdown while
+     * the seat's timer kept the old hour would be the false answer,
+     * named). One press adds `ms` (default DEFAULT_EXTEND_MS, capped at
+     * MAX_EXTEND_MS) to whatever is left. Returns the moved expiry, or
+     * null when nothing pending carries the id. */
+    extendPending: (id, ms = DEFAULT_EXTEND_MS) => {
+      const record = pending.get(id);
+      if (!record || record.settled) return null;
+      const add = Number.isFinite(ms) ? Math.min(Math.max(ms, 0), MAX_EXTEND_MS) : DEFAULT_EXTEND_MS;
+      const current = Date.parse(record.expiresAt ?? '');
+      const from = Number.isFinite(current) && current > Date.now() ? current : Date.now();
+      record.expiresAt = new Date(from + add).toISOString();
+      if (record.onTimeout) {
+        if (record.timer) clearTimeout(record.timer);
+        record.timer = setTimeout(record.onTimeout, Math.max(0, Date.parse(record.expiresAt) - Date.now()));
+      }
+      return { id, kind: record.kind, expiresAt: record.expiresAt };
+    },
     /** The run is stopping NOW: withdraw every pending card — asks denied
      * (fail closed), questions and floor turns unanswered — so no wait on
      * the human outlives the operator's stop. Returns how many. */

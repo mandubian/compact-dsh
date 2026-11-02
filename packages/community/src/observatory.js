@@ -172,6 +172,20 @@ export function startObservatory(ctx, {
       // here — publishing it twice put two lines on the page, one of them wrong
       return json(res, 200, { ok: true, id, act: record.answer?.act ?? body.act });
     }
+    // buying more time: a pending card's deadline moves and the seat's own
+    // timeout rearms — the human reads and thinks at human speed, and the
+    // run's patience mid-wait is the operator's to extend. Nothing else
+    // changes: the card is the same card, the honest silence still waits
+    // at the end of it.
+    if (route.startsWith('/extend/') && req.method === 'POST') {
+      const id = decodeURIComponent(route.slice('/extend/'.length));
+      const body = await readBody(req);
+      const minutes = Number(body.minutes);
+      const result = humanSeat?.extendPending?.(id, Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : undefined);
+      if (!result) return json(res, 404, { error: `no pending card ${id}` });
+      publish({ type: 'pending-extended', id, kind: result.kind, expiresAt: result.expiresAt, by: 'the human (page)' });
+      return json(res, 200, { ok: true, id, kind: result.kind, expiresAt: result.expiresAt });
+    }
     // the operator's hand (#229): pause, resume, stop — the same controls
     // the engine loop and the terminal signals share. Every press is an
     // operator act, published to the feed like any other recorded event.

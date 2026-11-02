@@ -107,10 +107,14 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   .left { color: #9ab; font-size: 12px; font-weight: normal; white-space: nowrap; }
   .left.soon { color: #ffd27d; font-weight: bold; }
   .left.now { color: #ff7d7d; font-weight: bold; }
+  .ask button.more { font: inherit; font-size: 11.5px; background: #222; color: #c9a86b; border: 1px dashed #665; border-radius: 4px; cursor: pointer; padding: 1px 8px; white-space: nowrap; }
+  .ask button.more:hover { border-color: #ffb46b; color: #ffb46b; }
+  .ask button.more:disabled { opacity: 0.5; cursor: wait; }
   /* the turn fills the seat: the text box takes whatever the briefing leaves */
   .floor { display: flex; flex-direction: column; gap: 8px; font-size: 13px; padding: 10px 12px; min-height: calc(100% - 16px); box-sizing: border-box; }
   .turnhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .turnhead .head { font-size: 14px; }
+  .turn-tools { display: flex; gap: 8px; align-items: baseline; }
   .floor .told { border: 1px solid #3a3020; background: #1a150c; padding: 6px 8px; margin: 0; }
   .floor .told summary { cursor: pointer; color: #c9a86b; font-size: 12px; }
   .floor .told .detail { max-height: 30vh; overflow-y: auto; margin-top: 6px; color: #bbb; font-size: 12px; }
@@ -290,6 +294,13 @@ const tickLeft = () => {
 };
 setInterval(tickLeft, 1000);
 const leftHtml = (x) => (x.expiresAt ? '<span class="left" data-expires="' + esc(x.expiresAt) + '"></span>' : '');
+// buying more time: a press moves the deadline 10 minutes out — reading
+// and thinking take what they take, and the run's patience is the
+// operator's to extend while the card waits. The countdown element is
+// patched IN PLACE (expiresAt rides no render signature: the poll would
+// otherwise rebuild a card under a typing hand just because time was bought)
+const MORE_MINUTES = 10;
+const moreHtml = () => '<button class="more" title="buy more time — the deadline on this card moves ' + MORE_MINUTES + ' minutes further out">+' + MORE_MINUTES + ' min</button>';
 function renderPending(p) {
   // the reconciler rule (#239 follow-up): the 4s poll must never fight the
   // human. If nothing changed, touch NOTHING — an expanded details and a
@@ -325,7 +336,7 @@ function renderPending(p) {
     div.className = 'ask';
     div.dataset.id = a.id;
     div.innerHTML =
-      '<div class="turnhead"><div class="head">APPROVAL ASKS FOR YOU' + (a.critical ? ' · CRITICAL (charter)' : '') + '</div>' + leftHtml(a) + '</div>' +
+      '<div class="turnhead"><div class="head">APPROVAL ASKS FOR YOU' + (a.critical ? ' · CRITICAL (charter)' : '') + '</div><span class="turn-tools">' + leftHtml(a) + moreHtml(a) + '</span></div>' +
       '<div class="plain">member <span class="who">' + esc(a.by ?? 'unknown') + '</span> wants to run <b>' + esc(a.tool ?? 'a tool') + '</b>' +
         (a.wouldOtherwise ? ' <span class="muted">(would otherwise: ' + esc(a.wouldOtherwise) + ')</span>' : '') + '</div>' +
       (a.commandFull || a.command ? '<pre class="command">' + esc(a.commandFull || a.command) + '</pre>' : '') +
@@ -347,7 +358,7 @@ function renderPending(p) {
     div.className = 'ask question';
     div.dataset.id = q.id;
     div.innerHTML =
-      '<div class="turnhead"><div class="head">A MEMBER ASKS YOU — ' + esc(q.by ?? 'a member') + (q.options ? ' · options: ' + esc(q.options) : '') + '</div>' + leftHtml(q) + '</div>' +
+      '<div class="turnhead"><div class="head">A MEMBER ASKS YOU — ' + esc(q.by ?? 'a member') + (q.options ? ' · options: ' + esc(q.options) : '') + '</div><span class="turn-tools">' + leftHtml(q) + moreHtml(q) + '</span></div>' +
       '<div class="detail">' + esc(q.question) + (q.context ? '\\n(context: ' + esc(q.context) + ')' : '') + '</div>' +
       '<textarea placeholder="your reply — it becomes this member\\'s tool result, on its record. Ctrl+Enter sends."></textarea>' +
       '<div class="acts-row"><button class="approve post">Reply<small>returned to the member, on its record</small></button></div>';
@@ -384,7 +395,7 @@ function renderPending(p) {
     div.dataset.id = f.id;
     const first = /^You are "/.test(f.framing || '');
     div.innerHTML =
-      '<div class="turnhead"><div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div>' + leftHtml(f) + '</div>' +
+      '<div class="turnhead"><div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div><span class="turn-tools">' + leftHtml(f) + moreHtml(f) + '</span></div>' +
       (f.lastResult ? '<div class="last">your last act, as the record returned it:<pre class="command">' + esc(f.lastResult) + '</pre></div>' : '') +
       '<details class="told"' + (f.lastResult ? '' : ' open') + '><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : 'what the community told you this round') + '</summary>' +
       '<div class="detail">' + esc(f.framing || '(no framing)') + '</div></details>' +
@@ -456,6 +467,29 @@ $('btn-pause').onclick = () => op('/pause');
 $('btn-resume').onclick = () => op('/resume');
 $('btn-stop').onclick = () => { if (window.confirm('Stop the community gracefully? The current turn drains and flushes; the run ends with its reason.')) op('/stop', {mode:'graceful'}); };
 $('btn-kill').onclick = () => { if (window.confirm('KILL the community now? The in-flight turn is cancelled; what the record holds is flushed.')) op('/stop', {mode:'now'}); };
+
+// buying more time: one press buys +10 minutes on ONE card — the seat
+// moves the real deadline (its timeout rearms with it) and answers with
+// the new expiry, which patches the countdown in place. The poll's
+// signature never sees expiresAt, so a rebuild cannot clobber a card the
+// human is mid-thought on just because time was bought.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest && e.target.closest('button.more');
+  if (!btn) return;
+  const card = btn.closest('[data-id]');
+  if (!card) return;
+  btn.disabled = true;
+  api('/extend/' + encodeURIComponent(card.dataset.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ minutes: MORE_MINUTES }) })
+    .then((r) => {
+      if (!r || r.error) { btn.disabled = false; return; }
+      const left = card.querySelector('[data-expires]');
+      if (left) left.dataset.expires = r.expiresAt;
+      tickLeft();
+      btn.textContent = '+' + MORE_MINUTES + ' ✓';
+      setTimeout(() => { btn.textContent = '+' + MORE_MINUTES + ' min'; btn.disabled = false; }, 1500);
+    })
+    .catch(() => { btn.disabled = false; });
+});
 
 function renderBanner(controls) {
   const b = $('banner');
@@ -540,6 +574,9 @@ function onEvent(m) {
       break;
     case 'floor-timeout':
       post('acts-list', at + '⏱ a floor turn timed out — the honest silence, no act performed');
+      break;
+    case 'pending-extended':
+      post('acts-list', at + '⏱ the human bought more time — the ' + esc(e.kind ?? 'pending') + ' card waits until ' + esc(stamp(e.expiresAt).slice(11, 19)));
       break;
     case 'floor-cancelled':
       post('acts-list', at + '⏹ <span class="who">' + esc(e.member ?? e.by ?? 'the human member') + '</span> — the floor turn was withdrawn: the run is stopping (no act)');
