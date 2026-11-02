@@ -123,6 +123,19 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   #changes pre.diff { margin: 4px 0 0; white-space: pre-wrap; word-break: break-all; font-size: 11.5px; color: #cccce0; max-height: 40vh; overflow-y: auto; background: #10151b; border: 1px solid #2a313a; padding: 6px; }
   #changes pre.diff .add { color: #7dff8a; }
   #changes pre.diff .del { color: #ff7d7d; }
+  /* the decision form (#308): numbered items, the quoted line, the contest,
+     radio choices, an optional comment box — the human answers a form in
+     minutes where mixed prose costs an hour */
+  .ask.form .fitem { border: 1px solid #2a313a; background: #1a1f26; padding: 8px; margin: 8px 0; }
+  .ask.form .flabel { color: #e6e6e6; margin-bottom: 4px; }
+  .ask.form .flabel b { color: #ffd9a0; }
+  .ask.form .fcontest { color: #ff9ecb; font-size: 12px; margin: 4px 0; }
+  .ask.form .foptions { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+  .ask.form .fopt { cursor: pointer; padding: 3px 6px; border: 1px solid #2a313a; border-radius: 4px; }
+  .ask.form .fopt:hover { border-color: #39424e; background: #20262e; }
+  .ask.form textarea { width: 100%; box-sizing: border-box; min-height: 2.6em; background: #111; color: #d8d8d8; border: 1px solid #444; font: inherit; font-size: 12.5px; padding: 6px; resize: vertical; }
+  .ask.form .form-send { margin-top: 6px; }
+  .formnote { border: 1px dashed #665; background: #1a150c; color: #c9a86b; padding: 6px 8px; margin: 0 0 8px; font-size: 12px; }
   /* the turn fills the seat: the text box takes whatever the briefing leaves */
   .floor { display: flex; flex-direction: column; gap: 8px; font-size: 13px; padding: 10px 12px; min-height: calc(100% - 16px); box-sizing: border-box; }
   .turnhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -320,7 +333,7 @@ function renderPending(p) {
   // human. If nothing changed, touch NOTHING — an expanded details and a
   // half-typed reply stay exactly as the human left them. When something
   // DID change, rebuild, but carry over what was open and what was typed.
-  const sig = JSON.stringify(p.map(x => [x.id, x.kind, x.critical, x.wouldOtherwise, x.headline, x.question, x.options, x.context, x.by, x.detail]));
+  const sig = JSON.stringify(p.map(x => [x.id, x.kind, x.critical, x.wouldOtherwise, x.headline, x.question, x.options, x.context, x.by, x.detail, x.title, x.items, x.formDraft]));
   if (sig === lastPendingSig) return;
   lastPendingSig = sig;
   const box = $('pending');
@@ -332,17 +345,30 @@ function renderPending(p) {
     const why = el.querySelector('.why');
     const focus = ta && ta === document.activeElement ? [ta.selectionStart, ta.selectionEnd] : null;
     saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, focus, ...(ti ? { topic: ti.value } : {}), ...(why ? { why: why.dataset.reason } : {}) };
+    // a form card keeps every item's state across rebuilds: the chosen
+    // radio and the written words, per item index
+    if (el.classList.contains('form')) {
+      const items = {};
+      el.querySelectorAll('.fitem').forEach((fi) => {
+        const checked = fi.querySelector('input[type=radio]:checked');
+        const fta = fi.querySelector('textarea');
+        items[fi.dataset.item] = { choice: checked ? checked.value : null, text: fta ? fta.value : null };
+      });
+      saved[el.dataset.id].items = items;
+    }
   });
   const asks = p.filter(x => x.kind === 'ask');
   const questions = p.filter(x => x.kind === 'question');
+  const forms = p.filter(x => x.kind === 'form');
   const floors = p.filter(x => x.kind === 'floor');
   box.innerHTML = '';
-  if (!asks.length && !questions.length && !floors.length) {
+  if (!asks.length && !questions.length && !forms.length && !floors.length) {
     box.innerHTML = '<div class="ask muted">nothing is waiting</div>';
   }
   // words are owed: the seat widens, and the tab says so from elsewhere
-  document.body.classList.toggle('composing', floors.length + questions.length > 0);
+  document.body.classList.toggle('composing', floors.length + questions.length + forms.length > 0);
   document.title = floors.length ? '● YOUR TURN — ' + BASE_TITLE
+    : forms.length ? '● A FORM FOR YOU — ' + BASE_TITLE
     : questions.length ? '● A QUESTION FOR YOU — ' + BASE_TITLE
     : asks.length ? '● AN ASK WAITS — ' + BASE_TITLE : BASE_TITLE;
   for (const a of asks) {
@@ -394,6 +420,64 @@ function renderPending(p) {
       ta.focus(); // a NEW question takes the cursor — unless the human is typing elsewhere
     }
   }
+  // the decision form (#308): several numbered decisions in ONE card — per
+  // item the quoted line, the contest, radio choices, an optional comment
+  // box. One Submit sends them item by item; the seat validates and a bad
+  // answer keeps the card with the reason (nothing the human typed is lost)
+  for (const f of forms) {
+    const div = document.createElement('div');
+    div.className = 'ask form';
+    div.dataset.id = f.id;
+    let fh = '<div class="turnhead"><div class="head">A FORM FOR YOU — ' + esc(f.by ?? 'a member') + '</div><span class="turn-tools">' + leftHtml(f) + moreHtml(f) + '</span></div>';
+    if (f.title) fh += '<div class="plain"><b>' + esc(f.title) + '</b></div>';
+    if (f.context) fh += '<div class="detail">' + esc(f.context) + '</div>';
+    (f.items ?? []).forEach((item, i) => {
+      fh += '<div class="fitem" data-item="' + i + '">';
+      fh += '<div class="flabel">' + (i + 1) + '. <b>' + esc(item.label) + '</b></div>';
+      if (item.quote) fh += '<pre class="command">the line: ' + esc(item.quote) + '</pre>';
+      if (item.contest) fh += '<div class="fcontest">the contest: ' + esc(item.contest) + '</div>';
+      if (item.options?.length) {
+        fh += '<div class="foptions">' + item.options.map((o) =>
+          '<label class="fopt"><input type="radio" name="opt-' + esc(f.id) + '-' + i + '" value="' + esc(o) + '"> ' + esc(o) + '</label>').join('') + '</div>';
+      }
+      if (item.free || !item.options?.length) {
+        fh += '<textarea data-item="' + i + '" placeholder="your words on this item' + (item.options?.length ? ' (optional)' : '') + '"></textarea>';
+      }
+      fh += '</div>';
+    });
+    fh += '<div class="acts-row"><button class="approve form-send">Answer &amp; send<small>your answers, item by item, to the member — on its record</small></button></div>';
+    div.innerHTML = fh;
+    const send = () => {
+      const answers = [...div.querySelectorAll('.fitem')].map((fi) => {
+        const checked = fi.querySelector('input[type=radio]:checked');
+        const ta = fi.querySelector('textarea');
+        return { choice: checked ? checked.value : '', text: ta ? ta.value : '' };
+      });
+      api('/form/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ answers }) }).then((r) => {
+        // a validation refusal (a missing choice) keeps the card and every
+        // filled item, and names the offending item — the human fixes that
+        // one and presses again
+        if (r && r.error) { showWhy(div, r.error); return; }
+        div.remove();
+        setTimeout(refreshState, 300);
+      }).catch(() => {});
+    };
+    div.querySelector('button.form-send').onclick = send;
+    box.appendChild(div);
+    const wasForm = saved[f.id];
+    if (wasForm?.items) {
+      div.querySelectorAll('.fitem').forEach((fi) => {
+        const was = wasForm.items[fi.dataset.item];
+        if (!was) return;
+        if (was.choice != null) {
+          const r = fi.querySelector('input[type=radio][value="' + was.choice.replace(/"/g, '&quot;') + '"]');
+          if (r) r.checked = true;
+        }
+        const ta = fi.querySelector('textarea');
+        if (ta && was.text != null) ta.value = was.text;
+      });
+    }
+  }
   // the floor card: a HUMAN member's turn. What the community told the
   // member rides verbatim in its own scroll box (the first turn's is the
   // whole briefing — it must not push the words off the screen), the
@@ -411,6 +495,7 @@ function renderPending(p) {
     div.innerHTML =
       '<div class="turnhead"><div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div><span class="turn-tools">' + leftHtml(f) + moreHtml(f) + '</span></div>' +
       (f.lastResult ? '<div class="last">your last act, as the record returned it:<pre class="command">' + esc(f.lastResult) + '</pre></div>' : '') +
+      (f.formDraft ? '<div class="formnote">your answers to "' + esc(f.formDraft.title) + '" are drafted in the box below — posting them makes them forum-official, under your name (edit freely, or clear it and write something else)</div>' : '') +
       '<details class="told"' + (f.lastResult ? '' : ' open') + '><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : 'what the community told you this round') + '</summary>' +
       '<div class="detail">' + esc(f.framing || '(no framing)') + '</div></details>' +
       '<div class="composer">' +
@@ -461,9 +546,12 @@ function renderPending(p) {
       if (d && wasF.open === false) d.open = false;
       if (d && wasF.open === true) d.open = true;
       if (wasF.text != null) ta.value = wasF.text;
+      else if (f.formDraft) ta.value = f.formDraft.text; // the form's answers, drafted for the human's own post
       if (wasF.topic != null) ti.value = wasF.topic;
       if (wasF.why) showWhy(div, wasF.why);
       if (wasF.focus) { ta.focus(); ta.setSelectionRange(wasF.focus[0], wasF.focus[1]); }
+    } else if (f.formDraft) {
+      ta.value = f.formDraft.text;
     } else if (!document.activeElement || document.activeElement === document.body) {
       // a NEW turn takes the cursor — unless the human is typing elsewhere
       ta.focus();

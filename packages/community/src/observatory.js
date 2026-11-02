@@ -155,6 +155,25 @@ export function startObservatory(ctx, {
       publish({ type: 'question-answered', id, by: 'the human (page)' });
       return json(res, 200, { ok: true, id });
     }
+    // the decision form (#308): the human answers a structured card item by
+    // item — one of the offered choices per item, written words where the
+    // form allows them. The seat validates BEFORE settling: a bad answer
+    // comes back 400 with the offending item named, the form stays pending,
+    // nothing was lost.
+    if (route.startsWith('/form/') && req.method === 'POST') {
+      const id = decodeURIComponent(route.slice('/form/'.length));
+      const body = await readBody(req);
+      if (!Array.isArray(body.answers)) return json(res, 400, { error: 'a form needs "answers" — one entry per item, in order' });
+      let record;
+      try {
+        record = humanSeat?.answerForm?.(id, body.answers);
+      } catch (error) {
+        return json(res, 400, { error: error.message });
+      }
+      if (!record) return json(res, 404, { error: `no pending form ${id}` });
+      publish({ type: 'form-answered', id, by: 'the human (page)' });
+      return json(res, 200, { ok: true, id });
+    }
     // the floor act: a HUMAN member's turn, answered with one button —
     // post / pass / say. The seat validates with the forum's own rules
     // (a bad topic or an oversized post refuses HERE, 400, with the

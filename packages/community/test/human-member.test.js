@@ -427,9 +427,9 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   assert.match(script, /send\('post'\)/);
   assert.match(script, /send\('pass'\)/);
   assert.match(script, /send\('say'\)/);
-  // the reconciler's carry-over includes the topic input, and the empty state knows the floor
+  // the reconciler's carry-over includes the topic input, and the empty state knows the floor (and the form, #308)
   assert.match(script, /if \(wasF\.topic != null\) ti\.value = wasF\.topic;/);
-  assert.match(script, /!asks\.length && !questions\.length && !floors\.length/);
+  assert.match(script, /!asks\.length && !questions\.length && !forms\.length && !floors\.length/);
   // a refused act keeps the card and the words, and says why — a removed
   // card never came back (the reconciler saw nothing change)
   assert.match(script, /if \(r && r\.error\) \{ showWhy\(div, r\.error\); return; \}/);
@@ -453,7 +453,7 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   // made for a human: the seat widens while words are owed, the tab says
   // so, each card counts down, Ctrl+Enter posts, the count names the
   // forum's limits, and a rebuild keeps the cursor where the human left it
-  assert.match(script, /body\.classList\.toggle\('composing', floors\.length \+ questions\.length > 0\)/);
+  assert.match(script, /body\.classList\.toggle\('composing', floors\.length \+ questions\.length \+ forms\.length > 0\)/);
   assert.match(script, /'● YOUR TURN — '/);
   assert.match(script, /data-expires="' \+ esc\(x\.expiresAt\)/);
   assert.match(script, /setInterval\(tickLeft, 1000\)/);
@@ -465,7 +465,7 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   // the real deadline, and the countdown is patched IN PLACE — the poll's
   // signature never sees expiresAt, so a rebuild cannot clobber a card the
   // human is mid-thought on just because time was bought
-  assert.equal((script.match(/moreHtml\(/g) || []).length, 3, 'the button rides all three card kinds');
+  assert.equal((script.match(/moreHtml\(/g) || []).length, 4, 'the button rides every card kind (ask, question, form, floor — #308 added the form)');
   assert.match(script, /button class="more" title="buy more time/);
   assert.match(script, /api\('\/extend\/' \+ encodeURIComponent\(card\.dataset\.id\)/);
   assert.match(script, /left\.dataset\.expires = r\.expiresAt;/);
