@@ -318,7 +318,7 @@ const renderWorking = () => {
   const el = $('runstatus');
   if (!el) return;
   const names = [...working];
-  el.textContent = names.length ? '\u2699 working: ' + names.join(', ') : '\u00b7 between turns';
+  el.textContent = names.length ? '\u2699 working: ' + names.join(', ') : 'between turns'; // no leading dot: the header already renders one
 };
 const tickLeft = () => {
   document.querySelectorAll('[data-expires]').forEach((el) => {
