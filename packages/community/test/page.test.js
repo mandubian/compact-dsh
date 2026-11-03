@@ -347,3 +347,92 @@ test('the LIVE page never carries a sealed brief: the seats show personas only',
   assert.match(html, /writes the smallest honest fix/, 'the persona is shown');
   assert.doesNotMatch(html, /keep a cent|sealedBrief|SEALED/i, 'the brief is not on the page, in any form');
 });
+
+// ── the live page's connection label: a finished run says it is finished.
+// The finding: the server closes every feed when the run ends, and the page
+// read that as a dropped stream — "reconnecting…", forever, to a server that
+// was never coming back. The live script is run here against a stub DOM and
+// a fake EventSource, and driven with the events the server really sends.
+const liveHarness = () => {
+  const els = new Map();
+  const make = (id) => {
+    const el = { id, children: [], innerHTML: '', textContent: '', className: '', disabled: false, style: {}, dataset: {},
+      appendChild(c) { this.children.push(c); }, prepend(c) { this.children.unshift(c); }, remove() {}, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [],
+      classList: { add() {}, remove() {}, toggle() {}, contains: () => false } };
+    els.set(id, el);
+    return el;
+  };
+  const doc = {
+    title: 'observatory', body: make('body'), activeElement: null,
+    getElementById: (id) => els.get(id) ?? make(id),
+    createElement: () => make('anon'),
+    querySelectorAll: () => [], addEventListener() {},
+  };
+  const sources = [];
+  class FakeEventSource {
+    constructor(url) { this.url = url; this.closed = false; this.listeners = {}; sources.push(this); }
+    addEventListener(name, fn) { this.listeners[name] = fn; }
+    close() { this.closed = true; }
+  }
+  const intervals = [];
+  const html = pageHtml({ charterName: 'cross-exam', token: 'tkn' });
+  const script = html.match(/<script>\n([\s\S]*?)<\/script>/)[1];
+  new Function('document', 'window', 'EventSource', 'fetch', 'setInterval', 'setTimeout', 'localStorage', 'navigator', script)(
+    doc, { confirm: () => true, addEventListener() {} }, FakeEventSource, () => new Promise(() => {}),
+    (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, () => 0, { getItem: () => null, setItem() {} }, {});
+  const conn = () => els.get('conn');
+  const last = () => sources[sources.length - 1];
+  const send = (obj) => last().onmessage({ data: JSON.stringify(obj) });
+  return { els, conn, sources, last, send, intervals };
+};
+
+test('a run that ends says so: "run ended", the reason, no more reconnecting', () => {
+  const h = liveHarness();
+  h.last().onopen();
+  assert.equal(h.conn().textContent, 'live');
+  h.send({ type: 'end', reason: 'rounds complete', seq: 1 });
+  assert.equal(h.conn().textContent, 'run ended');
+  assert.equal(h.conn().className, 'ended');
+  assert.equal(h.els.get('runstatus').textContent, 'finished — rounds complete');
+  assert.equal(h.last().closed, true, 'the page stops listening to a stream that will never speak again');
+  assert.equal(h.els.get('btn-stop').disabled, true, 'nobody is left to stop');
+  // the server then ends the feed: that error is the run being over, not a drop
+  h.last().onerror();
+  assert.equal(h.conn().textContent, 'run ended', 'the stream closing after the end does not become "reconnecting…"');
+  // and the silence watchdog does not open a new stream to a closed server
+  const before = h.sources.length;
+  for (const { fn } of h.intervals) fn();
+  assert.equal(h.sources.length, before, 'no replacement stream after the run ended');
+});
+
+test('a run that died without an end event is still closed: the observatory\'s own closing notice', () => {
+  const h = liveHarness();
+  h.last().onopen();
+  h.last().listeners.closed();
+  assert.equal(h.conn().textContent, 'run ended');
+  assert.equal(h.els.get('runstatus').textContent, 'finished');
+  h.last().onerror();
+  assert.equal(h.conn().textContent, 'run ended');
+});
+
+test('the run\'s own reason outranks the bare close — in either order', () => {
+  const h = liveHarness();
+  h.send({ type: 'end', reason: 'quiet: the work is done', seq: 1 });
+  h.last().listeners.closed();
+  assert.equal(h.els.get('runstatus').textContent, 'finished — quiet: the work is done');
+  const g = liveHarness();
+  g.last().listeners.closed();
+  g.send({ type: 'end', reason: 'rounds complete', seq: 1 });
+  assert.equal(g.els.get('runstatus').textContent, 'finished — rounds complete');
+});
+
+test('a dropped stream — no end, no closing notice — still says "reconnecting…" (unchanged)', () => {
+  const h = liveHarness();
+  h.last().onopen();
+  h.send({ type: 'turn', member: 'accuser', seq: 1 });
+  h.last().onerror();
+  assert.equal(h.conn().textContent, 'reconnecting…');
+  assert.equal(h.conn().className, 'dead');
+  h.last().onopen();
+  assert.equal(h.conn().textContent, 'live', 'and it comes back to live when the stream returns');
+});
