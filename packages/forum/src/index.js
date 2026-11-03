@@ -52,13 +52,13 @@ import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } fr
 import { dirname } from 'node:path';
 
 import {
-  Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText, passReason,
-  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText, passReason, postHeadline, isShortPost,
+  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, MAX_HEADLINE_WORDS, MAX_HEADLINE_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
 } from './forum.js';
 
 export {
-  Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText, passReason,
-  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText, passReason, postHeadline, isShortPost,
+  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, MAX_HEADLINE_WORDS, MAX_HEADLINE_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
 
 };
 
@@ -126,6 +126,12 @@ export function loadLedger(forum, ledgerPath, log = () => {}) {
 export function apply(ctx, config = {}) {
   const forum = new Forum();
   const ledgerPath = typeof config.ledgerPath === 'string' && config.ledgerPath ? config.ledgerPath : null;
+  // the community's headline rule: "required" makes the forum_post field
+  // required in the schema the members read — the host refuses a call
+  // without it before execute runs, so every post carries one (a short
+  // post repeats its text) — and execute refuses a blank one on a long
+  // post; anything else leaves the headline optional
+  const headlineRequired = config.headlines === 'required';
   if (!ledgerPath) {
     ctx.logger?.warn?.('compact-forum: no ledger path configured — the forum runs in memory only, and offline readers will not see the speech');
   } else {
@@ -171,12 +177,19 @@ export function apply(ctx, config = {}) {
         description: 'the topic: lowercase letters/digits/._- , 1-64 chars — posting to a topic that does not exist creates it',
       },
       text: { type: 'string', required: true, description: 'the post itself — what you want the community to read' },
+      headline: {
+        // the host's schema takes "required" only as true — absent is optional
+        type: 'string', ...(headlineRequired ? { required: true } : {}),
+        description: `what you conclude, in one sentence of at most ${MAX_HEADLINE_WORDS} words — readers see it first, ` +
+          'and the human member reads the headlines before any text' +
+          (headlineRequired ? `. Required in this community — for a short post (one line, at most ${MAX_HEADLINE_WORDS} words), repeat the text` : ' (optional)'),
+      },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
       let post;
       try {
-        post = forum.post({ by: exec?.agent?.id, topic: args?.topic, text: args?.text });
+        post = forum.post({ by: exec?.agent?.id, topic: args?.topic, text: args?.text, headline: args?.headline, requireHeadline: headlineRequired });
       } catch (error) {
         return `[forum] not posted: ${error.message}`;
       }
@@ -268,6 +281,9 @@ export function apply(ctx, config = {}) {
     declaredGaps: DECLARED_GAPS,
     forum,
     ledgerPath,
+    /** The community requires headlines (config.headlines "required") —
+     *  the human seat validates the floor's posts with the same rule. */
+    headlineRequired,
     /** Subscribe to every accepted post (the observatory's live feed). */
     onPost(callback) {
       listeners.add(callback);

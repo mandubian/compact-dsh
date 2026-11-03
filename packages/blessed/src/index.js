@@ -308,19 +308,26 @@ export function resolveConfig(config) {
   }
   // the community forum (optional, #216): the speech surface of a live
   // community — pull-based posts, every one a governed tool call on the
-  // poster's own chain. Only the ledger beside the chains is configurable
-  // here; not declared means the forum runs in memory only and says so at
-  // boot. No clause is enforced by the forum, so it mounts like the guide —
-  // declared, never coupled on.
+  // poster's own chain. The ledger beside the chains is configurable here
+  // (not declared means the forum runs in memory only and says so at boot),
+  // and the community's headline rule ("required", from the charter's
+  // "headlines"). No clause is enforced by the forum, so it mounts like the
+  // guide — declared, never coupled on.
   let forum;
   if (config.forum !== undefined) {
     object(config.forum, 'forum');
     for (const key of Object.keys(config.forum)) {
-      if (!['ledgerPath'].includes(key)) throw new TypeError(`blessed: unknown forum key ${key}`);
+      if (!['ledgerPath', 'headlines'].includes(key)) throw new TypeError(`blessed: unknown forum key ${key}`);
     }
     if (config.forum.ledgerPath !== undefined) {
       text(config.forum.ledgerPath, 'forum.ledgerPath');
       forum = { ledgerPath: config.forum.ledgerPath };
+    }
+    if (config.forum.headlines !== undefined) {
+      if (!['required', 'optional'].includes(config.forum.headlines)) {
+        throw new TypeError('blessed: forum.headlines is "required" or "optional"');
+      }
+      forum = { ...forum, headlines: config.forum.headlines };
     }
   }
   return {

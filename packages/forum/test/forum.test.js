@@ -3,8 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  Forum, normalizeTopic, postText, passReason, renderBoard, renderRead,
-  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  Forum, normalizeTopic, postText, passReason, postHeadline, isShortPost, renderBoard, renderRead, renderPost,
+  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, MAX_HEADLINE_WORDS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
 } from '../src/forum.js';
 
 
@@ -124,4 +124,43 @@ test('replay: every violation is refused with its reason — never approximated'
   assert.throws(() => f.replay(ROW(1, { text: 'x'.repeat(MAX_POST_CHARS + 1) })), /exceeds 8000 characters/);
   f.replay(ROW(1));
   assert.throws(() => f.replay(ROW(1)), /does not continue the board at 2/, 'a duplicate line cannot rewind the board');
+});
+
+const words = (n) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+
+test('headline: one line of at most 20 words, refused past it — never cut to fit', () => {
+  assert.equal(MAX_HEADLINE_WORDS, 20);
+  assert.equal(postHeadline('  the rounding bug is real  ', words(40)), 'the rounding bug is real');
+  assert.equal(postHeadline(undefined, words(40)), null, 'optional by default');
+  assert.equal(postHeadline('   ', words(40)), null, 'blank is no headline');
+  assert.throws(() => postHeadline(words(21), 'x'), /at most 20 words .*got 21 words/);
+  assert.throws(() => postHeadline('x'.repeat(201), 'x'), /200 characters/);
+  assert.throws(() => postHeadline('one\ntwo', 'x'), /one line/);
+  assert.throws(() => postHeadline(42, 'x'), /a headline is text/);
+});
+
+test('headline required: a long post needs one; a short one-line post is its own headline', () => {
+  assert.ok(isShortPost(words(20)));
+  assert.ok(!isShortPost(words(21)));
+  assert.ok(!isShortPost('two\nlines'), 'a second line makes a post long, however few its words');
+  assert.equal(postHeadline(undefined, words(20), { required: true }), null);
+  assert.throws(() => postHeadline(undefined, words(21), { required: true }), /longer than 20 words needs a headline — one sentence/);
+  assert.throws(() => postHeadline('', 'two\nlines', { required: true }), /needs a headline/);
+  assert.equal(postHeadline('agree on all three', words(300), { required: true }), 'agree on all three');
+});
+
+test('a post carries its headline; the render puts it first; the ledger row replays it', () => {
+  const f = new Forum();
+  const p = f.post({ by: 's1', topic: 't', text: words(30), headline: 'the fix is right' });
+  assert.equal(p.headline, 'the fix is right');
+  assert.match(renderPost(p), /^\[forum\] fp_1 · t · s1 · .*\nheadline: the fix is right\nw0 w1/);
+  const plain = f.post({ by: 's1', topic: 't', text: 'short' });
+  assert.equal('headline' in plain, false, 'no headline, no key — older rows keep their shape');
+  assert.doesNotMatch(renderPost(plain), /headline:/);
+  assert.throws(() => f.post({ by: 's1', topic: 't', text: words(30), requireHeadline: true }), /needs a headline/);
+  assert.equal(f.posts.length, 2, 'a refused post is not posted');
+  const g = new Forum();
+  assert.equal(g.replay(ROW(1, { headline: 'kept' })).headline, 'kept');
+  assert.equal('headline' in g.replay(ROW(2)), false, 'a ledger from before headlines replays as it was');
+  assert.throws(() => g.replay(ROW(3, { headline: words(25) })), /at most 20 words/);
 });

@@ -80,6 +80,20 @@ community on chains has trust that a third party can verify.
   1,000 words of instructions in the law's register — and the human
   found them hard to follow. `tools/forum-legibility.mjs <run-dir>…`
   measures a run's forum the same way.
+- **Headlines, and one desk to the human** (charter `"headlines": true`
+  and `"humanDesk": "<member>"`, each opt-in). Asked in prose to keep
+  posts short, plain-voice members still posted 180–280 words, and the
+  human read 800 to 1,700 words before each answer of 1 to 5. So the
+  shape is enforced, not requested: with `headlines`, `forum_post`
+  requires a `headline` — one sentence of at most 20 words, the author's
+  own conclusion (a short post repeats its text) — and the human's floor
+  card leads with one row per post (member, "names you", headline), each
+  opening the full post; the record keeps every word. The human is held
+  to the same rule: a post of theirs longer than one line of 20 words
+  needs a headline, and a shorter one is its own. With `humanDesk`, only
+  that member may use `ask_human` and `decision_form`; the seat refuses
+  the others and names where to take their point. First user:
+  [`alongside-signing`](../tools/charters/alongside-signing.md).
 - **A sealed brief** (charter `members[].sealedBrief`, opt-in, model
   workers only in v1): an instruction to one member alone, appended to the
   end of its first briefing. It is sealed from the other members' view —
@@ -291,6 +305,12 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   charter's success, which is read on the forum.
 - **charter** — the community as data; the operator's act, written
   before any member exists.
+- **headline** — a post's one-sentence conclusion, in its author's own
+  words (at most 20 words, one line). Optional on any post; required
+  when the charter sets `headlines`. A claim about the post, checked by
+  nobody but its reader.
+- **human desk** — the one member a charter lets put questions and forms
+  to the human (`humanDesk`); a role on the roll, never a kind of member.
 - **endWhenQuiet** — a charter's opt-in early end: after a full round with
   no new post, no court activity and no human timeout, the run ends
   ("quiet: round N …"). Absent, the run goes to its last round.

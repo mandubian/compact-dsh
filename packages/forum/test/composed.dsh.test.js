@@ -257,3 +257,39 @@ test('composed: a ledger line that cannot replay stops the replay loudly at that
   const posted = text(await call(tools, 'forum_post', { topic: 'nightly', text: 'after the gap' }, agents.add('session-new')));
   assert.match(posted, /fp_2 posted to nightly/);
 });
+
+test('composed: a community that requires headlines — the schema says so, a long post without one is refused, the ledger keeps it', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'forum-ledger-'));
+  const ledgerPath = join(dir, 'forum.jsonl');
+  const { tools, agents, service } = await boot({ ledgerPath, headlines: 'required' });
+  assert.equal(service.headlineRequired, true);
+  assert.ok(tools.get('forum_post').parameters.required.includes('headline'), 'the members read it as required');
+  const m = agents.add('s1');
+  const long = 'I re-ran every command and all outputs match; here is the detail of each one, in order, with what it means for the fix.';
+  // the host refuses a call without the field before the forum sees it
+  const missing = await call(tools, 'forum_post', { topic: 't', text: long }, m);
+  assert.equal(missing.isError, true);
+  assert.match(text(missing.content?.[0]?.text), /missing required property "headline"/);
+  // a blank one reaches the forum, which refuses it on a long post
+  const blank = text(await call(tools, 'forum_post', { topic: 't', text: long, headline: '  ' }, m));
+  assert.match(blank, /\[forum\] not posted: a post longer than 20 words needs a headline/);
+  assert.equal(service.forum.posts.length, 0);
+  const short = text(await call(tools, 'forum_post', { topic: 't', text: 'agreed, all three.', headline: '' }, m));
+  assert.match(short, /fp_1 posted/, 'a short post is its own headline');
+  const ok = text(await call(tools, 'forum_post', { topic: 't', text: long, headline: 'all outputs reproduce' }, m));
+  assert.match(ok, /fp_2 posted/);
+  const rows = readFileSync(ledgerPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(rows[1].headline, 'all outputs reproduce');
+  assert.equal('headline' in rows[0], false);
+});
+
+test('composed: without the rule the headline is optional, and still carried when given', async () => {
+  const { tools, agents, service } = await boot();
+  assert.equal(service.headlineRequired, false);
+  assert.ok(!tools.get('forum_post').parameters.required.includes('headline'));
+  const m = agents.add('s1');
+  const long = 'a long post without a headline is fine here, because this community never asked for one — the rule is opt-in, by charter.';
+  assert.match(text(await call(tools, 'forum_post', { topic: 't', text: long }, m)), /fp_1 posted/);
+  assert.match(text(await call(tools, 'forum_post', { topic: 't', text: long, headline: 'opt-in' }, m)), /fp_2 posted/);
+  assert.equal(service.forum.posts[1].headline, 'opt-in');
+});
