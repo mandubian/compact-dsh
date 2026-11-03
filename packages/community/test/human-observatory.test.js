@@ -343,9 +343,11 @@ test('the page never fights the human: the 4s poll skips unchanged renders and c
   assert.match(script, /const sig = JSON\.stringify\(p\.map/);
   assert.match(script, /if \(sig === lastPendingSig\) return;/);
   // and a real change carries the human's state across the rebuild
-  // (the floor card added the topic input — the carry-over grew with it)
+  // (the floor card added the topic input, then the headline box and the
+  // round's rows — the carry-over grew with each)
   assert.match(script, /const ti = el\.querySelector\('input\.topic'\);/);
-  assert.match(script, /saved\[el\.dataset\.id\] = \{ open: d \? d\.open : false, text: ta \? ta\.value : null, focus, \.\.\.\(ti \? \{ topic: ti\.value \} : \{\}\), \.\.\.\(why \? \{ why: why\.dataset\.reason \} : \{\}\) \}/);
+  assert.match(script, /const hi = el\.querySelector\('input\.headline'\);/);
+  assert.match(script, /saved\[el\.dataset\.id\] = \{ open: d \? d\.open : false, text: ta \? ta\.value : null, focus, rows, \.\.\.\(ti \? \{ topic: ti\.value \} : \{\}\), \.\.\.\(hi \? \{ headline: hi\.value \} : \{\}\), \.\.\.\(why \? \{ why: why\.dataset\.reason \} : \{\}\) \}/);
   assert.match(script, /if \(d && was\.open\) d\.open = true;/);
   assert.match(script, /if \(wasQ\.text != null\) ta\.value = wasQ\.text;/);
   // cards are addressable by their ask/question id

@@ -145,6 +145,23 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   .floor .told summary { cursor: pointer; color: #c9a86b; font-size: 12px; }
   .floor .told .detail { max-height: 30vh; overflow-y: auto; margin-top: 6px; color: #bbb; font-size: 12px; }
   .floor .last { font-size: 12px; color: #9ab; }
+  /* the round as rows: who, names-you, the headline — a person reads
+     these first and opens a post only when they need it */
+  .floor .news { border: 1px solid #2a313a; background: #12161b; padding: 6px 8px; }
+  .floor .newshead { color: #9ab; font-size: 12px; margin-bottom: 4px; }
+  .floor details.nrow { border-top: 1px solid #1f252c; padding: 4px 0; }
+  .floor details.nrow:first-of-type { border-top: 0; }
+  .floor details.nrow summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; padding: 2px 4px; border-radius: 3px; }
+  .floor details.nrow summary:hover { background: #182029; }
+  .floor details.nrow .who { flex: 0 0 6.5em; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
+  .floor details.nrow .names { background: #4a2a10; color: #ffd9a0; border-radius: 3px; padding: 0 5px; font-size: 11px; font-style: normal; white-space: nowrap; }
+  .floor details.nrow .hl { color: #e6e6e6; flex: 1 1 auto; min-width: 0; }
+  .floor details.nrow .hl.cut { color: #9a9a9a; font-style: italic; }
+  .floor details.nrow .pid { flex: 0 0 auto; color: #666; font-size: 11px; }
+  .floor details.nrow .nbody { white-space: pre-wrap; max-height: 40vh; overflow-y: auto; color: #bbb; font-size: 12.5px; margin: 6px 0 2px 1em; }
+  .composer input.headline { font: 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0d0d0d; color: #eee; border: 1px solid #665; border-radius: 4px; padding: 6px 10px; }
+  .composer input.headline:focus { outline: none; border-color: #ffb46b; }
+  li.post .hline { display: block; font-weight: bold; color: #ffd9a0; font-size: 13px; margin: 2px 0 4px; }
   .floor .last pre.command { margin: 4px 0 0; }
   .composer { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; }
   .floor .composer textarea { flex: 1 1 auto; min-height: 12em; }
@@ -261,6 +278,7 @@ const postBlock = (p) => {
     '<span class="head">' + (p.id ? '[' + esc(p.id) + '] ' : '') + '<span class="who ' + colorOf(member) + '">' + esc(member) + '</span>' +
     ' · <span class="at">' + esc(stamp(p.at).slice(11, 19)) + '</span> · ' + esc(p.topic ?? '') +
     (gate ? ' · <span class="gate">LEDGER</span>' : '') + '</span>' +
+    (p.headline && p.headline !== String(p.text ?? '').trim() ? '<span class="hline">' + esc(p.headline) + '</span>' : '') +
     '<span class="body">' + lawHl(p.text) + '</span>' };
 };
 
@@ -280,10 +298,13 @@ let lastPendingSig = null;
 // both deliver posts, and a reconnect replays — each post renders once,
 // in its place (newest first, by its number)
 const shownPosts = new Set();
+// every post the page has seen, by id: the floor card's rows open the
+// full post from here
+const postsById = new Map();
 const postNo = (id) => Number(/^fp_(\d+)$/.exec(String(id ?? ''))?.[1] ?? NaN);
 function showPost(p) {
-  if (p.id != null) { if (shownPosts.has(p.id)) return; shownPosts.add(p.id); }
-  const block = postBlock({ id: p.id, by: p.by, topic: p.topic, text: p.text, at: p.at });
+  if (p.id != null) { postsById.set(p.id, p); if (shownPosts.has(p.id)) return; shownPosts.add(p.id); }
+  const block = postBlock({ id: p.id, by: p.by, topic: p.topic, text: p.text, headline: p.headline, at: p.at });
   const ul = $('forum-list');
   const emptyNote = ul.querySelector('.empty');
   if (emptyNote) emptyNote.remove();
@@ -344,18 +365,21 @@ function renderPending(p) {
   // human. If nothing changed, touch NOTHING — an expanded details and a
   // half-typed reply stay exactly as the human left them. When something
   // DID change, rebuild, but carry over what was open and what was typed.
-  const sig = JSON.stringify(p.map(x => [x.id, x.kind, x.critical, x.wouldOtherwise, x.headline, x.question, x.options, x.context, x.by, x.detail, x.title, x.items, x.formDraft]));
+  const sig = JSON.stringify(p.map(x => [x.id, x.kind, x.critical, x.wouldOtherwise, x.headline, x.question, x.options, x.context, x.by, x.detail, x.title, x.items, x.formDraft, x.news]));
   if (sig === lastPendingSig) return;
   lastPendingSig = sig;
   const box = $('pending');
   const saved = {};
   box.querySelectorAll('[data-id]').forEach(el => {
-    const d = el.querySelector('details');
+    const d = el.querySelector('details.told') || el.querySelector('details');
     const ta = el.querySelector('textarea');
     const ti = el.querySelector('input.topic');
+    const hi = el.querySelector('input.headline');
     const why = el.querySelector('.why');
     const focus = ta && ta === document.activeElement ? [ta.selectionStart, ta.selectionEnd] : null;
-    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, focus, ...(ti ? { topic: ti.value } : {}), ...(why ? { why: why.dataset.reason } : {}) };
+    // the floor's rows: which posts the human opened stay open
+    const rows = [...el.querySelectorAll('details.nrow[open]')].map((r) => r.dataset.post);
+    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, focus, rows, ...(ti ? { topic: ti.value } : {}), ...(hi ? { headline: hi.value } : {}), ...(why ? { why: why.dataset.reason } : {}) };
     // a form card keeps every item's state across rebuilds: the chosen
     // radio and the written words, per item index
     if (el.classList.contains('form')) {
@@ -503,13 +527,34 @@ function renderPending(p) {
     div.className = 'ask question floor';
     div.dataset.id = f.id;
     const first = /^You are "/.test(f.framing || '');
+    // the round's posts, one row each: who, whether it names you, the
+    // headline — open a row for the full post. The verbatim text the
+    // community sent stays one click away, folded, below the rows.
+    const news = Array.isArray(f.news) ? f.news : [];
+    const rowsHtml = news.length
+      ? '<div class="news"><div class="newshead">this round: ' + news.length + ' post' + (news.length === 1 ? '' : 's') + ', one line each — open a row for the full post</div>' +
+        news.map((n) => {
+          const full = postsById.get(n.id);
+          const cut = !full?.headline && / …$/.test(n.headline || '');
+          return '<details class="nrow" data-post="' + esc(n.id) + '"><summary>' +
+            '<span class="who ' + colorOf(n.by) + '">' + esc(n.by) + '</span>' +
+            '<span class="hl' + (cut ? ' cut' : '') + '"' + (cut ? ' title="no headline — the first words of the post"' : '') + '>' +
+              (n.namesYou ? '<span class="names">names you</span> ' : '') + esc(n.headline) + '</span>' +
+            '<span class="pid">' + esc(n.id) + '</span></summary>' +
+            '<div class="nbody"' + (full ? ' data-filled="1">' + lawHl(full.text) : '>(this post is in the forum pane)') + '</div></details>';
+        }).join('') + '</div>'
+      : '';
+    const needsHead = f.headlineRequired === true;
     div.innerHTML =
       '<div class="turnhead"><div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div><span class="turn-tools">' + leftHtml(f) + moreHtml(f) + '</span></div>' +
       (f.lastResult ? '<div class="last">your last act, as the record returned it:<pre class="command">' + esc(f.lastResult) + '</pre></div>' : '') +
       (f.formDraft ? '<div class="formnote">your answers to "' + esc(f.formDraft.title) + '" are drafted in the box below — posting them makes them forum-official, under your name (edit freely, or clear it and write something else)</div>' : '') +
-      '<details class="told"' + (f.lastResult ? '' : ' open') + '><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : 'what the community told you this round') + '</summary>' +
+      rowsHtml +
+      '<details class="told"' + (f.lastResult || news.length ? '' : ' open') + '><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : news.length ? 'the full text the community sent you this round' : 'what the community told you this round') + '</summary>' +
       '<div class="detail">' + esc(f.framing || '(no framing)') + '</div></details>' +
       '<div class="composer">' +
+        '<label for="hl-' + esc(f.id) + '">headline — one sentence, what you conclude' + (needsHead ? ' (needed when your post is longer than one line of 20 words)' : ' (optional)') + '</label>' +
+        '<input class="headline" id="hl-' + esc(f.id) + '" maxlength="200" placeholder="the line the others read first">' +
         '<label for="ta-' + esc(f.id) + '">your words — posted verbatim, under your name</label>' +
         '<textarea id="ta-' + esc(f.id) + '" placeholder="Write here. Ctrl+Enter posts to the forum."></textarea>' +
         '<div class="meta"><span>topic <input class="topic" value="' + esc(f.defaultTopic ?? '') + '" placeholder="the charter floor"></span>' +
@@ -523,6 +568,16 @@ function renderPending(p) {
       '</div>';
     const ta = div.querySelector('textarea');
     const ti = div.querySelector('input.topic');
+    const hi = div.querySelector('input.headline');
+    // a row opens its full post from the page's own forum, even when the
+    // post reached the page after the card was built
+    div.querySelectorAll('details.nrow').forEach((r) => {
+      r.ontoggle = () => {
+        const nb = r.querySelector('.nbody');
+        const full = postsById.get(r.dataset.post);
+        if (r.open && full && nb.dataset.filled !== '1') { nb.innerHTML = lawHl(full.text); nb.dataset.filled = '1'; }
+      };
+    });
     const count = div.querySelector('.count');
     const buttons = div.querySelectorAll('.acts-row button, .keeprow button');
     // the forum's own limits (a post ≤ 8000, a pass reason ≤ 2000) — the
@@ -536,7 +591,7 @@ function renderPending(p) {
     ta.oninput = recount;
     const send = (act, keep) => {
       if (!ta.value.trim()) return;
-      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value, keep: keep === true }) }).then((r) => {
+      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value, ...(act === 'post' && hi.value.trim() ? { headline: hi.value } : {}), keep: keep === true }) }).then((r) => {
         // a refusal (an oversized post, a bad topic) keeps the card and the
         // words, and says why: the turn is still pending, and a card removed
         // here never came back (the reconciler saw nothing change)
@@ -553,7 +608,10 @@ function renderPending(p) {
     box.appendChild(div);
     const wasF = saved[f.id];
     if (wasF) {
-      const d = div.querySelector('details');
+      const d = div.querySelector('details.told');
+      for (const id of wasF.rows || []) { const r = div.querySelector('details.nrow[data-post="' + id + '"]'); if (r) r.open = true; }
+      if (wasF.headline != null) hi.value = wasF.headline;
+      else if (f.formDraft?.headline) hi.value = f.formDraft.headline;
       if (d && wasF.open === false) d.open = false;
       if (d && wasF.open === true) d.open = true;
       if (wasF.text != null) ta.value = wasF.text;
@@ -563,6 +621,7 @@ function renderPending(p) {
       if (wasF.focus) { ta.focus(); ta.setSelectionRange(wasF.focus[0], wasF.focus[1]); }
     } else if (f.formDraft) {
       ta.value = f.formDraft.text;
+      if (f.formDraft.headline) hi.value = f.formDraft.headline;
     } else if (!document.activeElement || document.activeElement === document.body) {
       // a NEW turn takes the cursor — unless the human is typing elsewhere
       ta.focus();
@@ -758,7 +817,7 @@ connect();
 // poll the seat's pending and the forum (SSE announces; the poll is the
 // reconciler — a page opened mid-ask sees it without waiting for an event,
 // and a post the stream missed still lands)
-const refreshState = () => api('/state').then(s => { renderPending(s.pending || []); renderBanner(s.controls); reconcileForum(s.forum); }).catch(() => {});
+const refreshState = () => api('/state').then(s => { reconcileForum(s.forum); renderPending(s.pending || []); renderBanner(s.controls); }).catch(() => {});
 setInterval(refreshState, 4000);
 refreshState();
 </script>
@@ -820,6 +879,7 @@ export function replayPageHtml({ charterName, data }) {
   li.post .head { display: block; color: #9ab; font-size: 11px; margin-bottom: 4px; }
   li.post .head .who { font-weight: bold; }
   li.post .body { display: block; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.55; color: #e6e6e6; }
+  li.post .hline { display: block; font-weight: bold; color: #ffd9a0; font-size: 13px; margin: 2px 0 4px; }
   li.post.ledger { border-left-color: #ffb46b; background: #211d13; }
   li.post.ledger .gate { color: #ffb46b; font-weight: bold; letter-spacing: 0.06em; }
   li.post .body .cite { color: #7fd1ff; }
@@ -1002,6 +1062,7 @@ for (const p of DATA.forum) {
   li.innerHTML = '<span class="head">[' + esc(p.id ?? p.seq ?? '?') + '] <span class="who ' + colorOf(member) + '">' + esc(member) + '</span>' +
     ' · <span class="at">' + esc(stamp(p.at).slice(0, 19)) + '</span> · ' + esc(p.topic ?? '') +
     (gate ? ' · <span class="gate">LEDGER</span>' : '') + '</span>' +
+    (p.headline && p.headline !== String(p.text ?? '').trim() ? '<span class="hline">' + esc(p.headline) + '</span>' : '') +
     '<span class="body">' + lawHl(p.text) + '</span>';
   $('forum-list').appendChild(li);
 }

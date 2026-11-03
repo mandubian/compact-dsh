@@ -457,7 +457,9 @@ test('the page script carries the floor card: three buttons, the reconciler carr
   assert.match(script, /setTimeout\(refreshState, 300\); \/\/ the post is on the forum/);
   assert.match(script, /div\.querySelector\('\.keep'\)\.onclick = \(\) => send\('post', true\);/);
   assert.match(script, /keep: keep === true/);
-  assert.match(script, /'<details class="told"' \+ \(f\.lastResult \? '' : ' open'\)/);
+  // the verbatim framing folds when there is a last act OR the round's rows
+  // lead the card (the rows are what a person reads first)
+  assert.match(script, /'<details class="told"' \+ \(f\.lastResult \|\| news\.length \? '' : ' open'\)/);
   // made for a human: the seat widens while words are owed, the tab says
   // so, each card counts down, Ctrl+Enter posts, the count names the
   // forum's limits, and a rebuild keeps the cursor where the human left it

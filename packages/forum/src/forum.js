@@ -12,10 +12,21 @@
 // and is never appended to the speech ledger. Its record is the tool
 // call/result pair on the member's own chain — the same place every other
 // governed act lives.
+//
+// A HEADLINE is the author's own one-sentence conclusion, carried beside the
+// text. It exists for the reader with the least time — the human member at
+// the page reads the headlines, and opens a post only when they need it.
+// A community can REQUIRE it (the charter's "headlines"): then a post longer
+// than one line of MAX_HEADLINE_WORDS words carries one, and a short post is
+// its own headline (the tool's schema asks every call for one — a short
+// post repeats its text). Asked for in prose, members wrote 300-word posts
+// anyway; a required field and a refusal are what a model actually follows.
 
 export const TOPIC_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 export const MAX_POST_CHARS = 8000;
 export const MAX_PASS_REASON_CHARS = 2000;
+export const MAX_HEADLINE_WORDS = 20;
+export const MAX_HEADLINE_CHARS = 200;
 export const DEFAULT_READ_LIMIT = 50;
 export const MAX_READ_LIMIT = 200;
 
@@ -27,14 +38,16 @@ export class Forum {
 
   /** Append one post. Throws on an invalid topic or body — never silently
    *  repairs what a member tried to say (the caller renders the reason). */
-  post({ by, topic, text, now = Date.now() }) {
+  post({ by, topic, text, headline, requireHeadline = false, now = Date.now() }) {
     const name = normalizeTopic(topic);
     const body = postText(text);
+    const head = postHeadline(headline, body, { required: requireHeadline });
     const seq = this.posts.length + 1;
     const post = {
       id: `fp_${seq}`, seq, topic: name,
       by: typeof by === 'string' && by ? by : null,
       at: new Date(now).toISOString(), text: body,
+      ...(head ? { headline: head } : {}),
     };
     this.posts.push(post);
     const row = this.topics.get(name) ?? { topic: name, count: 0, lastSeq: 0, lastAt: null };
@@ -79,11 +92,15 @@ export class Forum {
     const name = normalizeTopic(row.topic);
     if (typeof row.text !== 'string' || !row.text.length) throw new Error('a replayed post carries no text');
     if (row.text.length > MAX_POST_CHARS) throw new Error(`a replayed post exceeds ${MAX_POST_CHARS} characters — the ledger disagrees with what the gate once admitted`);
+    // a headline replays when the row carries one (ledgers before it carry
+    // none, and a rule a charter required then is not re-judged here)
+    const head = row.headline === undefined ? null : postHeadline(row.headline, row.text);
     const post = {
       id: row.id, seq, topic: name,
       by: typeof row.by === 'string' && row.by ? row.by : null,
       at: typeof row.at === 'string' && row.at ? row.at : null,
       text: row.text,
+      ...(head ? { headline: head } : {}),
     };
     this.posts.push(post);
     const topicRow = this.topics.get(name) ?? { topic: name, count: 0, lastSeq: 0, lastAt: null };
@@ -114,6 +131,40 @@ export function postText(text) {
   return text;
 }
 
+const wordsOf = (s) => s.trim().split(/\s+/).filter(Boolean).length;
+
+/** A post short enough to be its own headline: one line, at most
+ *  MAX_HEADLINE_WORDS words. */
+export function isShortPost(text) {
+  return typeof text === 'string' && !text.trim().includes('\n') && wordsOf(text) <= MAX_HEADLINE_WORDS;
+}
+
+/** The headline of a post, validated: one line, at most MAX_HEADLINE_WORDS
+ *  words and MAX_HEADLINE_CHARS characters, or null when none was given.
+ *  When `required`, a post that is not short (isShortPost) must carry one —
+ *  the refusal says what to write. Nothing is trimmed to fit: a headline
+ *  over the limit is refused, never cut. */
+export function postHeadline(headline, text, { required = false } = {}) {
+  if (headline === undefined || headline === null || (typeof headline === 'string' && !headline.trim())) {
+    if (required && !isShortPost(text)) {
+      throw new Error(
+        `a post longer than ${MAX_HEADLINE_WORDS} words needs a headline — one sentence, at most ` +
+        `${MAX_HEADLINE_WORDS} words, saying what you conclude (it is what readers see first; the text stays as you wrote it)`);
+    }
+    return null;
+  }
+  if (typeof headline !== 'string') throw new Error('a headline is text — one sentence');
+  const head = headline.trim();
+  if (head.includes('\n')) throw new Error('a headline is one line — one sentence, no line breaks');
+  const words = wordsOf(head);
+  if (words > MAX_HEADLINE_WORDS || head.length > MAX_HEADLINE_CHARS) {
+    throw new Error(
+      `a headline is at most ${MAX_HEADLINE_WORDS} words and ${MAX_HEADLINE_CHARS} characters (got ${words} words, ` +
+      `${head.length} characters) — say what you conclude in one sentence; the detail belongs in the text`);
+  }
+  return head;
+}
+
 /** A pass is a choice, not an absence: the reason is required, and it is
  *  bounded so a pass does not become an essay by another route. The caller
  *  renders the rule; nothing is silently repaired. */
@@ -128,7 +179,8 @@ export function passReason(reason) {
 }
 
 export function renderPost(post) {
-  return `[forum] ${post.id} · ${post.topic} · ${post.by ?? 'unknown'} · ${post.at}\n${post.text}`;
+  const head = post.headline ? `headline: ${post.headline}\n` : '';
+  return `[forum] ${post.id} · ${post.topic} · ${post.by ?? 'unknown'} · ${post.at}\n${head}${post.text}`;
 }
 
 export function renderRead(posts) {

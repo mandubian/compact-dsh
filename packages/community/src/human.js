@@ -42,7 +42,7 @@
 
 import { defineTool } from '@deepseek-ai/dsh-tools';
 
-import { normalizeTopic, postText, passReason } from 'compact-dsh-forum';
+import { normalizeTopic, postText, passReason, postHeadline, isShortPost, MAX_HEADLINE_WORDS, MAX_HEADLINE_CHARS } from 'compact-dsh-forum';
 
 export const DEFAULT_ASK_TIMEOUT_MS = 120_000;
 export const DEFAULT_QUESTION_TIMEOUT_MS = 300_000;
@@ -109,6 +109,10 @@ export function mountHumanSeat(ctx, {
   // citable forum act through its own loop). Null: forms answer to the
   // asking member only, as the tool result.
   formPostMember = null,
+  // the charter's human desk: { member, isDesk(agentId) } — only the desk
+  // puts questions and forms to the human; anyone else is refused with
+  // where to take the point instead. Null: every member may ask.
+  humanDesk = null,
   onPose = () => {},
   onResolve = () => {},
 } = {}) {
@@ -195,6 +199,20 @@ export function mountHumanSeat(ctx, {
     });
   };
 
+  // the forum's headline rule (charter "headlines"), read from the forum
+  // itself: the floor validates the human's posts with the same rule the
+  // forum_post tool enforces on every member
+  const headlineRequired = () => ctx?.get?.('compact-forum')?.headlineRequired === true;
+
+  // the desk rule, checked before anything is posed: a refused ask leaves
+  // no card and no record entry on the seat — only the refusal, on the
+  // asker's own chain as this call's result
+  const deskRefusal = (tool, agentId) => {
+    if (!humanDesk || humanDesk.isDesk(agentId)) return null;
+    return `[${tool}] not asked: in this community, questions to the human go through ${humanDesk.member}. ` +
+      `Post your point on the forum for ${humanDesk.member}, who gathers the points and asks the human once.`;
+  };
+
   // ── door 2: the questions ──
   const askHuman = defineTool({
     name: 'ask_human',
@@ -211,6 +229,8 @@ export function mountHumanSeat(ctx, {
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
+      const refused = deskRefusal('ask_human', exec?.agent?.id ?? null);
+      if (refused) return refused;
       const record = pose({
         kind: 'question',
         by: exec?.agent?.id ?? null,
@@ -315,7 +335,11 @@ export function mountHumanSeat(ctx, {
    * drafted — one shape, item by item. */
   const formAnswerText = (title, by, cleaned) => {
     const lines = cleaned.map((a, i) => `${i + 1}. ${a.label} → ${a.choice ?? '—'}${a.text ? `\n   ${a.text}` : ''}`);
-    return { result: `[decision_form] The human answered ${cleaned.length} item(s) of "${title}":\n${lines.join('\n')}`, draft: `My answers to "${title}"${by ? ` (asked by ${by})` : ''}:\n${lines.join('\n')}` };
+    // the drafted post's headline, ready for a community that requires one:
+    // the form's title when it fits, else a plain one the human can edit
+    const titled = `My answers to "${title}"`;
+    const headline = titled.split(/\s+/).length <= MAX_HEADLINE_WORDS && titled.length <= 200 ? titled : 'My answers to the form';
+    return { result: `[decision_form] The human answered ${cleaned.length} item(s) of "${title}":\n${lines.join('\n')}`, draft: `My answers to "${title}"${by ? ` (asked by ${by})` : ''}:\n${lines.join('\n')}`, headline };
   };
   const decisionForm = defineTool({
     name: 'decision_form',
@@ -332,6 +356,8 @@ export function mountHumanSeat(ctx, {
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args, exec) {
+      const refused = deskRefusal('decision_form', exec?.agent?.id ?? null);
+      if (refused) return refused;
       let items;
       try {
         items = parseFormItems(args?.items);
@@ -363,11 +389,11 @@ export function mountHumanSeat(ctx, {
         entry.resolve = (cleaned) => {
           clearTimeout(entry.timer);
           pending.delete(record.id);
-          const { result, draft } = formAnswerText(record.title, record.by, cleaned);
+          const { result, draft, headline } = formAnswerText(record.title, record.by, cleaned);
           onResolve({ ...record, settled: true, answer: cleaned, answeredBy: 'the human seat (page)', answeredAt: new Date().toISOString() });
           // the draft rides the NEXT floor card of the human member (the
           // page prefills the composer) — the member's own post carries it
-          if (formPostMember) formDrafts.push({ title: record.title, by: record.by, text: draft });
+          if (formPostMember) formDrafts.push({ title: record.title, by: record.by, text: draft, headline });
           resolve(result);
         };
         entry.cancel = (why) => {
@@ -391,7 +417,7 @@ export function mountHumanSeat(ctx, {
   // oversized post refuses HERE, at the boundary — never mid-turn. The
   // timeout is the honest silence: the member's turn performs no act, the
   // adapter says so in words, and the divergence counter counts it.
-  const poseFloor = ({ member = null, by = null, round = null, framing = '', lastResult = null, signal = null }) => {
+  const poseFloor = ({ member = null, by = null, round = null, framing = '', news = null, lastResult = null, signal = null }) => {
     // a settled form awaiting this member's voice rides the card as a
     // DRAFT: the page prefills the composer, the human edits or posts
     // as-is — the act is the member's own, through its own loop
@@ -404,8 +430,13 @@ export function mountHumanSeat(ctx, {
       member,
       round,
       framing: String(framing).slice(0, 20_000),
+      // the round's posts as rows — author, headline, whether it names this
+      // member — so the card leads with them and the full text folds away
+      ...(Array.isArray(news) && news.length ? { news: news.slice(0, 12) } : {}),
       ...(lastResult != null ? { lastResult: String(lastResult).slice(0, 4_000) } : {}),
       ...(draft ? { formDraft: draft } : {}),
+      // the forum's headline rule, so the card says when the box is needed
+      ...(headlineRequired() ? { headlineRequired: true } : {}),
       headline: `floor turn — ${member ?? 'the human member'}`,
       defaultTopic,
       expiresAt: new Date(Date.now() + floorTimeoutMs).toISOString(),
@@ -444,12 +475,22 @@ export function mountHumanSeat(ctx, {
   };
 
   /** One floor act, validated with the forum's own rules — the same
-   * limits the tool will enforce, checked before anything runs. */
+   * limits the tool will enforce, checked before anything runs. The
+   * headline rule is the forum's own too: when the community requires
+   * headlines, a long post from the human is refused here without one,
+   * exactly as a model member's would be. */
   const normalizeFloorAct = (act) => {
     const kind = act?.act;
     if (kind === 'post') {
       // a post ENDS the turn unless the human asks to keep the floor
-      return { act: 'post', topic: normalizeTopic(act.topic ?? defaultTopic ?? undefined), text: postText(act.text), keep: act.keep === true };
+      const text = postText(act.text);
+      // a short post is its own headline: when the community requires one,
+      // the seat carries the human's own words into the field the tool's
+      // schema requires — a three-word answer needs no second box
+      const own = headlineRequired() && !String(act.headline ?? '').trim() && isShortPost(text) && text.trim().length <= MAX_HEADLINE_CHARS
+        ? text.trim() : act.headline;
+      const headline = postHeadline(own, text, { required: headlineRequired() });
+      return { act: 'post', topic: normalizeTopic(act.topic ?? defaultTopic ?? undefined), text, ...(headline ? { headline } : {}), keep: act.keep === true };
     }
     if (kind === 'pass') return { act: 'pass', reason: passReason(act.text) };
     if (kind === 'say') return { act: 'say', text: postText(act.text) };

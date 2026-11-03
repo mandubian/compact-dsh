@@ -13,9 +13,10 @@
 
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
-import { renderPost } from 'compact-dsh-forum';
+import { renderPost, isShortPost, MAX_HEADLINE_WORDS } from 'compact-dsh-forum';
 
 import { HUMAN_ROUTE } from './human-member.js';
+import { memberOfSession } from './charter.js';
 import { createChangeTracker } from './changes.js';
 
 export const DRIVER_SOURCE = { kind: 'compact-community', form: 'briefing' };
@@ -34,6 +35,56 @@ export function currentSelectionOf(ctx) {
       'The run refuses rather than seat members who cannot think.');
   }
   return selection;
+}
+
+/** The community's speaking rules from its charter, told the same in both
+ *  voices: the headline a long post carries (charter "headlines"), and the
+ *  one member who puts questions to the human (charter "humanDesk"). Each
+ *  line is machinery that exists — the forum refuses the long post without
+ *  a headline, the seat refuses an ask from anyone but the desk. */
+export function speakingRuleLines(charter, member) {
+  const lines = [];
+  if (charter.headlines) {
+    if (member.human) {
+      lines.push(`  - A post longer than one line of ${MAX_HEADLINE_WORDS} words needs a headline: one sentence, what you conclude.`,
+        '    The card has a box for it; the others see it first. A shorter post is its own headline.');
+    } else {
+      lines.push(`  - Every post carries a headline: forum_post {"topic":"…","headline":"…","text":"…"} — one sentence of at most ${MAX_HEADLINE_WORDS}`,
+        '    words, what you conclude (a short post repeats its text). The human reads the headlines first and opens a post',
+        '    only when they need it. A post without a headline is refused.');
+    }
+  }
+  const desk = charter.humanDesk;
+  if (desk) {
+    if (member.human) lines.push(`  - Questions to you come from one member, ${desk}, who gathers the others' points.`);
+    else if (member.id === desk) {
+      lines.push('  - You are the human\'s desk: the other members bring you the points that need the human. Put them to the',
+        '    human together, in one decision_form, rather than one question each.');
+    } else {
+      lines.push(`  - Questions for the human go through ${desk}: post your point on the forum, and ${desk} asks the human.`,
+        '    ask_human and decision_form are refused to you in this community.');
+    }
+  }
+  return lines;
+}
+
+/** Does this post name the member? Its id as a word, or "the human" when
+ *  the member is the human — the two ways members address the human seat. */
+function namesMember(post, member) {
+  const text = `${post.headline ?? ''}\n${post.text ?? ''}`;
+  // a member id is a slug — nothing in it needs escaping
+  if (new RegExp(`(^|[^a-z0-9-])${member.id}([^a-z0-9-]|$)`, 'i').test(text)) return true;
+  return member.human === true && /\bthe human\b/i.test(text);
+}
+
+/** One line for a post in the human's round news: its headline, or a short
+ *  post's own text, or — no headline on a long post — its first words, cut
+ *  and marked with "…" (the author's words, never a summary of them). */
+function headlineOf(post) {
+  if (post.headline) return post.headline;
+  const flat = String(post.text ?? '').trim().split(/\s+/);
+  if (isShortPost(post.text)) return flat.join(' ');
+  return `${flat.slice(0, MAX_HEADLINE_WORDS).join(' ')} …`;
 }
 
 /** The first message a member ever receives: who it is, what the community
@@ -77,6 +128,8 @@ export function briefingText(charter, member, extras) {
       '  you read anything — reading is your own act.',
     );
   }
+  const rules = speakingRuleLines(charter, member);
+  if (rules.length) lines.push('', 'HOW THIS COMMUNITY SPEAKS:', ...rules);
   lines.push(
     '',
     'THE LAW YOU LIVE UNDER (it is real machinery, not prose):',
@@ -162,6 +215,17 @@ export function roundFramingText(charter, member, round, newPosts, docketNews, c
   const cite = (p) => (charter.turnCitations && !member.human ? citeOf?.get(p.id) : null);
   if (newPosts.length === 0) {
     lines.push('Nothing new on the forum since your last turn.');
+  } else if (member.human) {
+    // the human reads with the least time of anyone on the roll: one line
+    // per post first (the page shows these as rows), the full posts after
+    // — the same posts a model member gets, in the order a person reads
+    const shown = newPosts.slice(-12);
+    lines.push(`New on the forum since your last turn (${newPosts.length} post(s)) — one line each, the full posts below:`);
+    for (const p of shown) {
+      lines.push(`  - ${p.id} · ${memberOfSession(charter, p.by)?.id ?? 'unknown'}${namesMember(p, member) ? ' (names you)' : ''} — ${headlineOf(p)}`);
+    }
+    lines.push('', 'THE FULL POSTS:');
+    for (const p of shown) lines.push(renderPost(p));
   } else {
     lines.push(`New on the forum since your last turn (${newPosts.length} post(s)):`);
     for (const p of newPosts.slice(-12)) {
@@ -211,10 +275,15 @@ export function plainBriefingText(charter, member, extras) {
       '  - post & keep the floor: post, then the card comes back so you can post again.',
       '  If something is refused, the card comes back with the reason. If you do not answer in time,',
       '  the turn is recorded as silence — nothing is done in your name.',
-      'Members may also ask you a question; your answer goes back only to the one who asked.',
+      ...(charter.humanDesk ? [] : ['Members may also ask you a question; your answer goes back only to the one who asked.']),
       'Everything you do is recorded under your name. Say what you mean; never claim what you did not do.',
     );
+    const rules = speakingRuleLines(charter, member);
+    if (rules.length) lines.push('', 'HOW THIS TEAM TALKS:', ...rules);
   } else {
+    // with a desk, only the desk addresses the human — the others are told
+    // where their points go instead of how to ask
+    const asksHuman = humanSeated && (!charter.humanDesk || charter.humanDesk === member.id);
     lines.push(
       'HOW TO TALK — in the problem\'s own words:',
       '  - Talk about the problem in its own terms. Do not describe your work in legal language.',
@@ -223,7 +292,7 @@ export function plainBriefingText(charter, member, extras) {
       '  - When a rule matters, name it by its clause id and say in one sentence what it means here.',
       '    Do not restate the law.',
     );
-    if (humanSeated) {
+    if (asksHuman) {
       lines.push(
         '  - To the human: one question at a time, three short sentences at most, with two or three short',
         '    answer choices. No code unless they ask. Quote what you refer to.',
@@ -238,7 +307,7 @@ export function plainBriefingText(charter, member, extras) {
       '    says which rule and what you can do instead — read it; do not retry the same thing.',
       '  - Write real bash. A code fragment that is not a command is refused. If bash cannot do it, say so.',
     );
-    if (humanSeated) {
+    if (asksHuman) {
       lines.push(
         '  - ask_human asks the human a question privately; the answer comes back only to you.',
         '  - decision_form puts several numbered decisions before the human in ONE form, each item with',
@@ -254,6 +323,7 @@ export function plainBriefingText(charter, member, extras) {
         '    ran in that turn (record_read with their session), and they can read yours.',
       );
     }
+    lines.push(...speakingRuleLines(charter, member));
   }
   lines.push(
     '',

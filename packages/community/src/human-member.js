@@ -90,6 +90,26 @@ function framingOf(messages = []) {
   return [textOf(messages[i]), ...notices.map((t) => `— since then —\n${t}`)].join('\n\n');
 }
 
+/** The round's posts as rows, read back from the engine's own framing
+ * (roundFramingText's human branch): each line `  - fp_N · member — headline`,
+ * with ` (names you)` after the member when the post names this one. Only
+ * the lines between the news header and "THE FULL POSTS:" are read — a
+ * headline is one line by the forum's rule, and the post texts come after
+ * the marker, so a quoted line in a post can never become a row. */
+export function newsOf(framing = '') {
+  const text = String(framing);
+  const start = text.search(/^New on the forum since your last turn/m);
+  if (start < 0) return [];
+  const end = text.indexOf('\nTHE FULL POSTS:', start);
+  const block = text.slice(start, end < 0 ? undefined : end);
+  const rows = [];
+  for (const line of block.split('\n')) {
+    const m = /^ {2}- (fp_\d+) · ([a-z0-9][a-z0-9-]*)( \(names you\))? — (.*)$/.exec(line);
+    if (m) rows.push({ id: m[1], by: m[2], namesYou: Boolean(m[3]), headline: m[4] });
+  }
+  return rows;
+}
+
 /**
  * The llm adapter for provider "human". `seat` is the mounted human seat
  * (its floor door poses each completion). The adapter COUNTS nothing: a
@@ -149,6 +169,7 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
         member,
         by: member,
         framing: framingOf(messages),
+        news: newsOf(framingOf(messages)),
         lastResult: lastResultOf(messages),
         // the loop's abort signal: an immediate stop cancels the turn, and
         // the waiting card must hear it like a model's network call would
@@ -158,7 +179,7 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
       if (act.act === 'post' || act.act === 'pass') {
         const name = act.act === 'post' ? 'forum_post' : 'forum_pass';
         const args = act.act === 'post'
-          ? { topic: act.topic ?? topic ?? undefined, text: act.text }
+          ? { topic: act.topic ?? topic ?? undefined, text: act.text, ...(act.headline ? { headline: act.headline } : {}) }
           : { reason: act.reason };
         const id = `human-${callSeq}`;
         const keep = act.act === 'post' && act.keep === true;

@@ -244,12 +244,36 @@ export function validateCharter(doc) {
     throw bad('turnCitations', 'true, false or absent — true shows, beside each post in the round news, where its author\'s turn sits in their record');
   }
 
+  // headlines: every post carries its author's one-sentence conclusion (a
+  // short post is its own), and the human member's turn shows the
+  // headlines first. Asked for in prose ("keep posts short"), model members
+  // still posted 180-300 words; the forum's refusal is what they follow.
+  // Opt-in: absent, posts are as before
+  if (doc.headlines !== undefined && typeof doc.headlines !== 'boolean') {
+    throw bad('headlines', 'true, false or absent — true makes the forum refuse a post without a one-sentence headline');
+  }
+  // the human desk: the one member that puts questions to the human
+  // (ask_human, decision_form). The others bring their points to it on the
+  // forum, and the human answers one desk instead of every member. A role
+  // on the roll, never a kind of member: it must name a model member that
+  // is not on the bench. Absent: every member may ask, as before
+  let humanDesk = null;
+  if (doc.humanDesk !== undefined) {
+    const desk = members.find((m) => m.id === doc.humanDesk);
+    if (!desk) throw bad('humanDesk', `"${String(doc.humanDesk).slice(0, 40)}" is not a member of this charter — name the member who puts questions to the human`);
+    if (desk.human) throw bad('humanDesk', 'the desk asks the human — it cannot be the human member');
+    if (desk.bench) throw bad('humanDesk', 'a bench seat judges cases; the desk is a working member');
+    humanDesk = desk.id;
+  }
+
   return {
     version: CHARTER_VERSION,
     name, goal: doc.goal.trim(), topic,
     ...(doc.voice === 'plain' ? { voice: 'plain' } : {}),
     ...(doc.endWhenQuiet === true ? { endWhenQuiet: true } : {}),
     ...(doc.turnCitations === true ? { turnCitations: true } : {}),
+    ...(doc.headlines === true ? { headlines: true } : {}),
+    ...(humanDesk ? { humanDesk } : {}),
     budgets,
     members,
     grants,
@@ -259,6 +283,18 @@ export function validateCharter(doc) {
     ...(divergence ? { divergence } : {}),
     ...(typeof doc.briefingExtra === 'string' && doc.briefingExtra.trim() ? { briefingExtra: doc.briefingExtra.trim() } : {}),
   };
+}
+
+/** The member a session id belongs to: the one whose prefix is the id, or
+ *  the id's prefix before a run tag (`community-chair-798551`). The longest
+ *  prefix wins, so "chair-2" is never read as "chair". Null when none. */
+export function memberOfSession(charter, sessionId) {
+  if (typeof sessionId !== 'string') return null;
+  let found = null;
+  for (const m of charter.members) {
+    if ((sessionId === m.prefix || sessionId.startsWith(`${m.prefix}-`)) && (!found || m.prefix.length > found.prefix.length)) found = m;
+  }
+  return found;
 }
 
 /** The bindings env value (COMPACT_MEMBER_BINDINGS): the many-member

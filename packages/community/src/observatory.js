@@ -184,7 +184,8 @@ export function startObservatory(ctx, {
       const body = await readBody(req);
       const text = String(body.text ?? '').trim();
       if (!text) return json(res, 400, { error: 'a floor act needs your words in "text"' });
-      const record = humanSeat?.settleFloor?.(id, { act: body.act, text, topic: body.topic, keep: body.keep === true });
+      const headline = typeof body.headline === 'string' && body.headline.trim() ? body.headline : undefined;
+      const record = humanSeat?.settleFloor?.(id, { act: body.act, text, topic: body.topic, headline, keep: body.keep === true });
       if (!record) return json(res, 404, { error: `no pending floor turn ${id}` });
       if (record.error) return json(res, 400, { error: record.error });
       // the feed hears the act from the seat's resolution (seatOutcome), not

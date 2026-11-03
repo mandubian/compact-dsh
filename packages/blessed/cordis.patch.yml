@@ -161,9 +161,11 @@
         # pull-based posts, every one a governed tool call on the poster's own
         # chain. The ledger beside the chains is the durable copy offline
         # readers (the auditor, the report, the observatory) walk; absent
-        # means in-memory only, declared loudly at boot.
+        # means in-memory only, declared loudly at boot. The headline rule is
+        # the charter's ("headlines": true), set by the live driver.
         forum:
           ledgerPath: !!js 'process.env.COMPACT_CHAIN_DIR ? process.env.COMPACT_CHAIN_DIR + "/forum.jsonl" : undefined'
+          headlines: !!js 'process.env.COMPACT_FORUM_HEADLINES || undefined'
         sandbox:
           image: !!js process.env.COMPACT_SANDBOX_IMAGE
           # #38 phase 3: opt into the MEDIATED posture — the container gets no
