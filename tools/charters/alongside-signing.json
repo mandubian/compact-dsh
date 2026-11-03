@@ -6,20 +6,14 @@
   "humanDesk": "chair",
   "goal": "One human and four AI members examine a draft manifesto, sources/alongside.md (version 0.6.9, open for comment), and decide whether they stand on it. Each member reads the whole text, then posts their stance in plain words: ENDORSE, or CONTEST naming the exact line contested and why. Members attack and concede honestly. When the stances are in, the chair posts a ledger whose first line is exactly 'ENDORSEMENT:' — it names the text by version and digest (464b46ccc1cea6de…), lists each member as ENDORSED or CONTESTED, quoting one sentence of that member's own words per contest, and states any unresolved disagreement precisely instead of papering over it. The signing is done when every member has answered the ledger in their own post — ACCEPTED, or CONTESTED naming the point — and the human has answered last. A community that cannot endorse is a valid outcome, recorded as such.",
   "topic": "alongside-signing",
-  "briefingExtra": "The text: sources/alongside.md is draft v0.6.9 exactly (sha256 464b46ccc1cea6de3fda7329b39005cc9f3ba31ab0cbea8b63b5b06fcf239161). Quote it by its words; if someone claims it says something, open the file and check. sources/concepts.md is a glossary to consult, not part of what is signed, and 'the text needs a glossary' is itself a fair contest. sources/questions.md lists the project's open questions; contesting one is welcome. Contesting is a real outcome: an examination rigged to endorse is theater. Nobody edits the text in this run. The ledger: in 'ENDORSEMENT:', quote one sentence of each member's own words per contest and cite its post (fp_N) for the rest. End it by saying what the answer words mean here: ACCEPTED means the record is accurate, not that you endorse the text; CONTESTED means the record misstates someone, and names the point. The signer's answer: chair asks for it with one decision_form, one item per contested line, options ACCEPTED, CONTESTED, UNCLEAR. Never ask_human for it: a private answer does not count as the signer's answer on the forum. The form's answers become the signer's next post; do not ask again.",
+  "briefingExtra": "The text: sources/alongside.md is draft v0.6.9 exactly (sha256 464b46ccc1cea6de3fda7329b39005cc9f3ba31ab0cbea8b63b5b06fcf239161). Quote it by its words; if someone claims it says something, open the file and check. sources/concepts.md is a glossary to consult, not part of what is signed, and 'the text needs a glossary' is itself a fair contest. sources/questions.md lists the project's open questions; contesting one is welcome. Contesting is a real outcome: an examination rigged to endorse is theater. Nobody edits the text in this run. The ledger: in 'ENDORSEMENT:', quote one sentence of each member's own words per contest and cite its post (fp_N) for the rest. End it by saying what the answer words mean here: ACCEPTED means the record is accurate, not that you endorse the text; CONTESTED means the record misstates someone, and names the point. The signer's answer: in the same turn as the ledger, chair asks for it with one decision_form, one item per contested line, options ACCEPTED, CONTESTED, UNCLEAR. Never ask_human for it: a private answer does not count as the signer's answer on the forum. The form's answers become the signer's next post; do not ask again.",
   "budgets": {
     "rounds": 6,
     "maxTurnsPerAgent": 6,
     "wallClockMinutes": 90,
-    "tokenCap": 1500000
+    "tokenCap": 2000000
   },
   "members": [
-    {
-      "id": "signer",
-      "prefix": "community-signer",
-      "human": true,
-      "persona": "the human: one of the manifesto's initiators, sitting here as just a member — reads the whole text, contests what they would still change, says their stance in their own words"
-    },
     {
       "id": "reader",
       "prefix": "community-reader",
@@ -43,6 +37,12 @@
       "prefix": "community-chair",
       "model": "zai/glm-5.3",
       "persona": "keeps the examination honest: drafts the 'ENDORSEMENT:' ledger, quotes each member's stance verbatim, never invents consensus, and states unresolved disagreement precisely"
+    },
+    {
+      "id": "signer",
+      "prefix": "community-signer",
+      "human": true,
+      "persona": "the human: one of the manifesto's initiators, sitting here as just a member — reads the whole text, contests what they would still change, says their stance in their own words"
     }
   ],
   "grants": [],

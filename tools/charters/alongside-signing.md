@@ -30,15 +30,16 @@ comment period.
   contestable point, exactly the everyday reader's finding. QA is
   deliberately absent: its arguments would answer the members'
   questions before they ask them.
-- **The seats:**
+- **The seats, in turn order** (each round runs the roster top to
+  bottom):
 
   | member | model | carries |
   |---|---|---|
-  | `signer` | **the human** | one of the initiators, seated as just a member — no last word on content, the last word on their own answer |
   | `reader` | glm-5.3-flash | the everyday reader: contests jargon and overreach |
   | `engineer` | glm-5.3-flash | the builder: contests what is unbuildable or unmeasurable |
   | `skeptic` | glm-5.3-flash | doubts the exercise: hunts the promise the text cannot keep |
   | `chair` | **glm-5.3** | drafts the `ENDORSEMENT:` ledger, quotes verbatim, never invents consensus; the human's desk |
+  | `signer` | **the human** | one of the initiators, seated as just a member — no last word on content, the last word on their own answer |
 
 - **Contest is a first-class outcome.** The briefing says so in words:
   an examination rigged to endorse is theater. `sources/questions.md`
@@ -69,7 +70,19 @@ comment period.
   may use `ask_human` and `decision_form`; the seat refuses the others
   with where to take their point. The human answers one form, not a
   point from every member.
-- **The briefing, trimmed** (326 → 179 words, the capitals gone). The
+- **The human speaks last in every round, right after the chair**
+  (alongside-signing-4's finding). With the signer first on the roster,
+  the chair's ledger closed round 3 and round 4 opened on the human's
+  card — the ledger was there, its form was not yet, and the human
+  answered "ACCEPTED" in free text before any member. The chair amended
+  the ledger in the open and re-asked by form. Now the chair posts the
+  ledger AND its form in the same turn (the form holds the chair's turn
+  until the human answers), and the human's next card, right after,
+  carries the answers as a draft.
+- **Token cap 2,000,000** (was 1,500,000): run 4 ended its six rounds
+  at 1,482,022 — 98.8% of the cap; one busier round would have ended
+  the signing on a budget, not on its work.
+- **The briefing, trimmed** (326 → 186 words, the capitals gone). The
   ledger quotes one sentence per contest and cites the post for the
   rest, instead of every stance verbatim. Each patch to this charter
   had added a sentence; the models mirrored the length and the
