@@ -250,7 +250,7 @@ export function validateCharter(doc) {
   // still posted 180-300 words; the forum's refusal is what they follow.
   // Opt-in: absent, posts are as before
   if (doc.headlines !== undefined && typeof doc.headlines !== 'boolean') {
-    throw bad('headlines', 'true, false or absent — true makes the forum refuse a post without a one-sentence headline');
+    throw bad('headlines', 'true, false or absent — true makes forum_post require a one-sentence headline (a short post may repeat its text)');
   }
   // the human desk: the one member that puts questions to the human
   // (ask_human, decision_form). The others bring their points to it on the

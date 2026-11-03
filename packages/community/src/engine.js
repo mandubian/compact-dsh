@@ -215,10 +215,12 @@ export function roundFramingText(charter, member, round, newPosts, docketNews, c
   const cite = (p) => (charter.turnCitations && !member.human ? citeOf?.get(p.id) : null);
   if (newPosts.length === 0) {
     lines.push('Nothing new on the forum since your last turn.');
-  } else if (member.human) {
+  } else if (member.human && charter.headlines) {
     // the human reads with the least time of anyone on the roll: one line
     // per post first (the page shows these as rows), the full posts after
-    // — the same posts a model member gets, in the order a person reads
+    // — the same posts a model member gets, in the order a person reads.
+    // Opt-in with the charter's headlines: absent, the human's framing is
+    // as before, so earlier charters stay comparable
     const shown = newPosts.slice(-12);
     lines.push(`New on the forum since your last turn (${newPosts.length} post(s)) — one line each, the full posts below:`);
     for (const p of shown) {

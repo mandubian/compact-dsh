@@ -40,7 +40,7 @@ test('charter: headlines is a boolean; the desk names a model member, never the 
   const plain = validateCharter({ ...BASE, members: MEMBERS });
   assert.equal('headlines' in plain, false, 'absent stays absent — earlier charters are unchanged');
   assert.equal('humanDesk' in plain, false);
-  assert.throws(() => validateCharter({ ...BASE, members: MEMBERS, headlines: 'yes' }), /headlines: true, false or absent/);
+  assert.throws(() => validateCharter({ ...BASE, members: MEMBERS, headlines: 'yes' }), /headlines: true, false or absent — true makes forum_post require/);
   assert.throws(() => validateCharter({ ...BASE, members: MEMBERS, humanDesk: 'nobody' }), /"nobody" is not a member/);
   assert.throws(() => validateCharter({ ...BASE, members: MEMBERS, humanDesk: 'signer' }), /cannot be the human member/);
   assert.throws(() => validateCharter({ ...BASE, members: MEMBERS, humanDesk: 'judge' }), /bench seat judges cases/);
@@ -79,6 +79,15 @@ test('the human\'s round leads with one row per post: member, names-you, headlin
   const theirs = roundFramingText(c, reader, 3, POSTS, []);
   assert.doesNotMatch(theirs, /THE FULL POSTS|one line each/);
   assert.match(theirs, /New on the forum since your last turn \(3 post\(s\)\):\n\[forum\] fp_2/);
+});
+
+test('without "headlines" the human\'s round is as it was — the rows are opt-in, so earlier charters stay comparable', () => {
+  const c = validateCharter({ ...BASE, members: MEMBERS });
+  const signer = c.members.find((m) => m.id === 'signer');
+  const framing = roundFramingText(c, signer, 3, POSTS, []);
+  assert.doesNotMatch(framing, /THE FULL POSTS|one line each/);
+  assert.match(framing, /New on the forum since your last turn \(3 post\(s\)\):\n\[forum\] fp_2/);
+  assert.deepEqual(newsOf(framing), [], 'no rows, so the card shows none');
 });
 
 test('"names you": the member id as a word, or "the human" — never a substring', () => {
@@ -152,6 +161,14 @@ test('a form\'s answers draft with a headline the human can keep or edit', async
   const card = seat.pending().find((p) => p.kind === 'floor');
   assert.equal(card.formDraft.headline, 'My answers to "the ledger, your call"');
   seat.cancelPending('test over');
+  // a title with a line break still drafts a headline the forum accepts
+  const multi = seat.formTool.execute({ title: 'the ledger,\nyour call', items }, { agent: { id: 'community-chair' } });
+  seat.answerForm(seat.pending()[0].id, [{ choice: 'CONTESTED' }]);
+  await multi;
+  seat.poseFloor({ member: 'community-signer', framing: 'round 4' });
+  const next = seat.pending().find((p) => p.kind === 'floor');
+  assert.equal(next.formDraft.headline, 'My answers to "the ledger, your call"');
+  seat.cancelPending('test over');
 });
 
 // ── the desk: one member asks the human ──
@@ -214,9 +231,11 @@ test('the page leads the floor card with the rows, and posts the headline the hu
   assert.match(script, /full \? ' data-filled="1">' \+ lawHl\(full\.text\) : '>\(this post is in the forum pane\)'/, 'a row opens the full post');
   assert.match(script, /r\.ontoggle = \(\) => \{/, 'and fills it on open when the post arrived after the card');
   assert.match(script, /reconcileForum\(s\.forum\); renderPending\(s\.pending \|\| \[\]\);/, 'the forum renders before the cards that cite it');
+  assert.match(script, /\(needsHead\n\s+\? '<label for="hl-'/, 'the headline box only where the charter requires it');
   assert.match(script, /<input class="headline" id="hl-/);
-  assert.match(script, /\.\.\.\(act === 'post' && hi\.value\.trim\(\) \? \{ headline: hi\.value \} : \{\}\)/);
-  assert.match(script, /else if \(f\.formDraft\?\.headline\) hi\.value = f\.formDraft\.headline;/);
+  assert.match(script, /details\.nrow\[data-post="' \+ p\.id \+ '"\] \.nbody:not\(\[data-filled\]\)/, 'a post arriving after its row was opened fills it');
+  assert.match(script, /\.\.\.\(act === 'post' && hi && hi\.value\.trim\(\) \? \{ headline: hi\.value \} : \{\}\)/);
+  assert.match(script, /else if \(hi && f\.formDraft\?\.headline\) hi\.value = f\.formDraft\.headline;/);
   assert.match(script, /p\.headline && p\.headline !== String\(p\.text \?\? ''\)\.trim\(\)/, 'the forum pane shows a headline unless it repeats a short post');
   // the script parses: one stray quote broke every page once (#286)
   assert.doesNotThrow(() => new Function(script));

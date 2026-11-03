@@ -197,8 +197,10 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedK
     COMPACT_MEMBER_ROLL: join(keyringDir, 'roll.json'),
     COMPACT_MEMBER_KEYRING: manifestPath,
     COMPACT_MEMBER_BINDINGS: JSON.stringify(bindings),
-    // the charter's headline rule (charter "headlines"): the forum requires
-    // a one-sentence headline on every post longer than one
+    // the charter's headline rule (charter "headlines"): forum_post requires
+    // a one-sentence headline of at most 20 words; a short post (one line,
+    // at most 20 words) repeats its text, and a blank headline is accepted
+    // only on such a post
     ...(headlines ? { COMPACT_FORUM_HEADLINES: 'required' } : {}),
     // the code by content (CF-2): the self-model's attestation carries the
     // digest onto the chain at every turn; the detail stays beside it

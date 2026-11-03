@@ -336,9 +336,10 @@ export function mountHumanSeat(ctx, {
   const formAnswerText = (title, by, cleaned) => {
     const lines = cleaned.map((a, i) => `${i + 1}. ${a.label} → ${a.choice ?? '—'}${a.text ? `\n   ${a.text}` : ''}`);
     // the drafted post's headline, ready for a community that requires one:
-    // the form's title when it fits, else a plain one the human can edit
-    const titled = `My answers to "${title}"`;
-    const headline = titled.split(/\s+/).length <= MAX_HEADLINE_WORDS && titled.length <= 200 ? titled : 'My answers to the form';
+    // the form's title on one line when it fits the forum's limits, else a
+    // plain one the human can edit — a prefilled headline is never refused
+    const titled = `My answers to "${String(title).replace(/\s+/g, ' ').trim()}"`;
+    const headline = titled.split(' ').length <= MAX_HEADLINE_WORDS && titled.length <= MAX_HEADLINE_CHARS ? titled : 'My answers to the form';
     return { result: `[decision_form] The human answered ${cleaned.length} item(s) of "${title}":\n${lines.join('\n')}`, draft: `My answers to "${title}"${by ? ` (asked by ${by})` : ''}:\n${lines.join('\n')}`, headline };
   };
   const decisionForm = defineTool({

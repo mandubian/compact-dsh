@@ -303,7 +303,13 @@ const shownPosts = new Set();
 const postsById = new Map();
 const postNo = (id) => Number(/^fp_(\d+)$/.exec(String(id ?? ''))?.[1] ?? NaN);
 function showPost(p) {
-  if (p.id != null) { postsById.set(p.id, p); if (shownPosts.has(p.id)) return; shownPosts.add(p.id); }
+  if (p.id != null) {
+    postsById.set(p.id, p);
+    // a floor row opened before its post reached the page fills now
+    document.querySelectorAll('details.nrow[data-post="' + p.id + '"] .nbody:not([data-filled])').forEach((nb) => { nb.innerHTML = lawHl(p.text); nb.dataset.filled = '1'; });
+    if (shownPosts.has(p.id)) return;
+    shownPosts.add(p.id);
+  }
   const block = postBlock({ id: p.id, by: p.by, topic: p.topic, text: p.text, headline: p.headline, at: p.at });
   const ul = $('forum-list');
   const emptyNote = ul.querySelector('.empty');
@@ -553,8 +559,12 @@ function renderPending(p) {
       '<details class="told"' + (f.lastResult || news.length ? '' : ' open') + '><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : news.length ? 'the full text the community sent you this round' : 'what the community told you this round') + '</summary>' +
       '<div class="detail">' + esc(f.framing || '(no framing)') + '</div></details>' +
       '<div class="composer">' +
-        '<label for="hl-' + esc(f.id) + '">headline — one sentence, what you conclude' + (needsHead ? ' (needed when your post is longer than one line of 20 words)' : ' (optional)') + '</label>' +
-        '<input class="headline" id="hl-' + esc(f.id) + '" maxlength="200" placeholder="the line the others read first">' +
+        // the headline box only where the charter requires headlines — a
+        // charter without them keeps the card it had
+        (needsHead
+          ? '<label for="hl-' + esc(f.id) + '">headline — one sentence, what you conclude (needed when your post is longer than one line of 20 words)</label>' +
+            '<input class="headline" id="hl-' + esc(f.id) + '" maxlength="200" placeholder="the line the others read first">'
+          : '') +
         '<label for="ta-' + esc(f.id) + '">your words — posted verbatim, under your name</label>' +
         '<textarea id="ta-' + esc(f.id) + '" placeholder="Write here. Ctrl+Enter posts to the forum."></textarea>' +
         '<div class="meta"><span>topic <input class="topic" value="' + esc(f.defaultTopic ?? '') + '" placeholder="the charter floor"></span>' +
@@ -591,7 +601,7 @@ function renderPending(p) {
     ta.oninput = recount;
     const send = (act, keep) => {
       if (!ta.value.trim()) return;
-      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value, ...(act === 'post' && hi.value.trim() ? { headline: hi.value } : {}), keep: keep === true }) }).then((r) => {
+      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value, ...(act === 'post' && hi && hi.value.trim() ? { headline: hi.value } : {}), keep: keep === true }) }).then((r) => {
         // a refusal (an oversized post, a bad topic) keeps the card and the
         // words, and says why: the turn is still pending, and a card removed
         // here never came back (the reconciler saw nothing change)
@@ -610,8 +620,8 @@ function renderPending(p) {
     if (wasF) {
       const d = div.querySelector('details.told');
       for (const id of wasF.rows || []) { const r = div.querySelector('details.nrow[data-post="' + id + '"]'); if (r) r.open = true; }
-      if (wasF.headline != null) hi.value = wasF.headline;
-      else if (f.formDraft?.headline) hi.value = f.formDraft.headline;
+      if (hi && wasF.headline != null) hi.value = wasF.headline;
+      else if (hi && f.formDraft?.headline) hi.value = f.formDraft.headline;
       if (d && wasF.open === false) d.open = false;
       if (d && wasF.open === true) d.open = true;
       if (wasF.text != null) ta.value = wasF.text;
@@ -621,7 +631,7 @@ function renderPending(p) {
       if (wasF.focus) { ta.focus(); ta.setSelectionRange(wasF.focus[0], wasF.focus[1]); }
     } else if (f.formDraft) {
       ta.value = f.formDraft.text;
-      if (f.formDraft.headline) hi.value = f.formDraft.headline;
+      if (hi && f.formDraft.headline) hi.value = f.formDraft.headline;
     } else if (!document.activeElement || document.activeElement === document.body) {
       // a NEW turn takes the cursor — unless the human is typing elsewhere
       ta.focus();
