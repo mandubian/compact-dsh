@@ -64,9 +64,12 @@ export function shellPath(value) {
 
 // A gate post — the record a run exists to produce — opens with its
 // marker, optionally after its author's name (the bug-court finding).
-// The replay page carries its own copy of this pattern (it runs in the
-// browser); the brief and the manifest share this one.
-export const GATE_RE = /^(?:[\w.-]+ — )?(AGREEMENT|POSITIONS|RULING|VERDICTS):/;
+// The live and replay pages carry their own copies of this pattern (they
+// run in the browser); the brief and the manifest share this one. A
+// charter that names a new marker adds it here — alongside-signing-4's
+// ENDORSEMENT: ledger was recorded as "no gate post" until it did, and
+// tools/charters.test.mjs now holds every charter's marker to this list.
+export const GATE_RE = /^(?:[\w.-]+ — )?(AGREEMENT|POSITIONS|RULING|VERDICTS|ENDORSEMENT):/;
 
 /** This run's gate posts on the forum ledger, by id: PRESENCE, not
  *  success — whether the charter's condition was met is read on the
