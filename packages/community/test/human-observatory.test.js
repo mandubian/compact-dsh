@@ -425,6 +425,23 @@ test('closing the observatory ends its live feeds — an open tab cannot hold a 
   await ended;
 });
 
+test('closing the observatory says so on every feed before ending it — a deliberate close is not a dropped stream', async () => {
+  // to a page, a stream that just stops looks like a dropped tunnel and it
+  // says "reconnecting…" forever; the named 'closed' event is how it knows
+  // the run is over (also for a run that died without an 'end' event)
+  const obs = await startObservatory(stubCtx(), { humanSeat: mountHumanSeat(stubCtx()), port: 0, charterName: 'c', heartbeatMs: 0 });
+  const frames = [];
+  const ended = new Promise((resolve) => {
+    http.get(`${obs.url}events`, (res) => { res.on('data', (c) => frames.push(c.toString())); res.on('end', resolve); res.on('close', resolve); });
+  });
+  await new Promise((r) => setTimeout(r, 50)); // the feed is open
+  await obs.close();
+  await ended;
+  const all = frames.join('');
+  assert.match(all, /^event: closed$/m, 'the feed is told it is closing on purpose');
+  assert.ok(all.indexOf('"hello"') < all.indexOf('event: closed'), 'the notice is the last word, after the hello');
+});
+
 test('buying more time moves the deadline AND the real timeout — the silence fires at the NEW hour, not the old one', async () => {
   // the false answer, named: a page whose countdown moved while the seat's
   // timer kept the old hour would show time that no longer exists

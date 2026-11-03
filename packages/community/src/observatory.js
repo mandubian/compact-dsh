@@ -244,10 +244,17 @@ export function startObservatory(ctx, {
         publish,
         // close ENDS the live feeds first: server.close() waits for every
         // open connection, and a page's event stream never ends on its own
-        // — with a tab open, a finished run sat forever at its close
+        // — with a tab open, a finished run sat forever at its close.
+        // Each feed is told it is closing ON PURPOSE (a named event, like the
+        // ping) before it ends: to a page, a stream that just stops looks
+        // like a dropped tunnel, and it said "reconnecting…" forever to a
+        // server that was never coming back. A run that dies without an
+        // 'end' event still closes through here.
         close: () => new Promise((r) => {
           if (heartbeat) clearInterval(heartbeat);
-          for (const res of clients) { try { res.end(); } catch { /* already gone */ } }
+          for (const res of clients) {
+            try { res.write(`event: closed\ndata: {}\n\n`); res.end(); } catch { /* already gone */ }
+          }
           clients.clear();
           server.close(() => r());
           server.closeIdleConnections?.();

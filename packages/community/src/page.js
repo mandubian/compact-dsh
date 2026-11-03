@@ -50,6 +50,7 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   header b { color: #7fd1ff; }
   header .live { color: #7dff8a; }
   header .dead { color: #ff7d7d; }
+  header .ended { color: #ffd27d; }
   main { display: grid; grid-template-columns: 1.55fr 1fr 1fr 1.15fr; gap: 10px; padding: 10px; flex: 1; min-height: 0; box-sizing: border-box; }
   section { border: 1px solid #333; background: #161616; min-height: 0; display: flex; flex-direction: column; }
   section ul, section #pending { flex: 1; min-height: 0; overflow-y: auto; }
@@ -341,9 +342,14 @@ const BASE_TITLE = document.title;
 // your cards but not the community's motion reads as frozen — the members
 // mid-turn are tracked here from the same events the acts lane renders
 const working = new Set();
+// the run's end, as the page knows it: null while the community lives;
+// { reason } once the run said it ended (the 'end' event) or the observatory
+// said it was closing (the 'closed' event — a run that died with no 'end')
+let finished = null;
 const renderWorking = () => {
   const el = $('runstatus');
   if (!el) return;
+  if (finished) { el.textContent = finished.reason ? 'finished \u2014 ' + finished.reason : 'finished'; return; }
   const names = [...working];
   el.textContent = names.length ? '\u2699 working: ' + names.join(', ') : 'between turns'; // no leading dot: the header already renders one
 };
@@ -686,18 +692,36 @@ function renderBanner(controls) {
 // 15s, and a stream silent for 45s is replaced — resuming after the last
 // event seen. A tunnel that silently drops the stream can no longer
 // freeze the page: it says "reconnecting…" and catches up by itself.
+//
+// A stream that ends because the RUN ended is not a dropped stream: the
+// server closes every feed when the run is over, and a page that read that
+// as a drop said "reconnecting…" forever, to a server that was never
+// coming back. The run's own 'end' event (or the observatory's 'closed'
+// event, for a run that died without one) settles it: the page says the
+// run is finished and stops reconnecting.
 let es = null;
 let lastSeq = 0;
 let lastHeard = Date.now();
 const STREAM_SILENCE_MS = 45000;
+function finish(reason) {
+  if (finished && finished.reason) return; // the run's own reason outranks the bare close
+  finished = { reason: reason || (finished && finished.reason) || null };
+  try { es.close(); } catch { /* already closed */ }
+  $('conn').textContent = 'run ended';
+  $('conn').className = 'ended';
+  for (const id of ['btn-pause', 'btn-resume', 'btn-stop', 'btn-kill']) $(id).disabled = true; // nobody is left to pause or stop
+  renderWorking();
+}
 function connect() {
   es = new EventSource('/' + token + '/events' + (lastSeq > 0 ? '?since=' + lastSeq : ''));
-  es.onopen = () => { lastHeard = Date.now(); $('conn').textContent = 'live'; $('conn').className = 'live'; };
-  es.onerror = () => { $('conn').textContent = 'reconnecting…'; $('conn').className = 'dead'; };
+  es.onopen = () => { if (finished) return; lastHeard = Date.now(); $('conn').textContent = 'live'; $('conn').className = 'live'; };
+  es.onerror = () => { if (finished) return; $('conn').textContent = 'reconnecting…'; $('conn').className = 'dead'; };
   es.addEventListener('ping', () => { lastHeard = Date.now(); });
+  es.addEventListener('closed', () => finish(null));
   es.onmessage = onEvent;
 }
 setInterval(() => {
+  if (finished) return; // a finished run is silent for good — no stream to replace
   if (Date.now() - lastHeard < STREAM_SILENCE_MS) return;
   try { es.close(); } catch { /* already closed */ }
   $('conn').textContent = 'reconnecting…'; $('conn').className = 'dead';
@@ -818,6 +842,7 @@ function onEvent(m) {
       working.clear();
       renderWorking();
       post('acts-list', at + '■ THE RUN ENDS — ' + esc(e.reason));
+      finish(e.reason ?? 'ended');
       break;
     default: break;
   }
