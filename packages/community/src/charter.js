@@ -252,6 +252,15 @@ export function validateCharter(doc) {
   if (doc.headlines !== undefined && typeof doc.headlines !== 'boolean') {
     throw bad('headlines', 'true, false or absent — true makes forum_post require a one-sentence headline (a short post may repeat its text)');
   }
+  // issues: members open issues — one claim each, a title written once —
+  // and post their argument in parts, one per issue, so a reader follows
+  // one issue without the others. In alongside-signing-4, following one
+  // contested line meant 10 posts and 2,398 words, 43% of them about it.
+  // Members open the issues, not the charter: any topic. Opt-in: absent,
+  // posts are as before
+  if (doc.issues !== undefined && typeof doc.issues !== 'boolean') {
+    throw bad('issues', 'true, false or absent — true makes a long post carry its argument in parts, one per issue');
+  }
   // the human desk: the one member that puts questions to the human
   // (ask_human, decision_form). The others bring their points to it on the
   // forum, and the human answers one desk instead of every member. A role
@@ -273,6 +282,7 @@ export function validateCharter(doc) {
     ...(doc.endWhenQuiet === true ? { endWhenQuiet: true } : {}),
     ...(doc.turnCitations === true ? { turnCitations: true } : {}),
     ...(doc.headlines === true ? { headlines: true } : {}),
+    ...(doc.issues === true ? { issues: true } : {}),
     ...(humanDesk ? { humanDesk } : {}),
     budgets,
     members,

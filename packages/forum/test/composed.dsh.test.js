@@ -293,3 +293,46 @@ test('composed: without the rule the headline is optional, and still carried whe
   assert.match(text(await call(tools, 'forum_post', { topic: 't', text: long, headline: 'opt-in' }, m)), /fp_2 posted/);
   assert.equal(service.forum.posts[1].headline, 'opt-in');
 });
+
+test('composed: a community in issues — parts in the schema, a long post without one refused, threads by issue, the ledger replays them', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'forum-ledger-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const ledgerPath = join(dir, 'forum.jsonl');
+  const { ctx, tools, agents, service } = await boot({ ledgerPath, issues: 'on' });
+  assert.equal(service.issuesOn, true);
+  const schema = tools.get('forum_post').parameters;
+  assert.equal(schema.properties.parts.type, 'array');
+  assert.deepEqual(schema.properties.parts.items.properties.stance.enum, ['agree', 'disagree', 'unsure']);
+  assert.ok(!schema.required.includes('text'), 'a post of parts needs no other text');
+  assert.ok(tools.get('forum_read').parameters.properties.issue, 'forum_read reads one issue');
+  const skeptic = agents.add('community-skeptic-aa');
+  const chair = agents.add('community-chair-aa');
+  const long = 'Point 5 promises refusal without penalty, and nobody in the text is named to make that true for a worker who refuses.';
+  assert.match(text(await call(tools, 'forum_post', { topic: 't', text: long }, skeptic)), /\[forum\] not posted: a post longer than one line of 20 words carries its argument in parts/);
+  const opened = text(await call(tools, 'forum_post', { topic: 't', parts: [{ open: 'Point 5 promises refusal "without penalty", but nobody is named to make that true', stance: 'agree', text: long }] }, skeptic));
+  assert.match(opened, /fp_1 posted/);
+  assert.match(opened, /Its parts: issue_1 \(opened\) agree — each issue's thread reads with forum_read \{"issue":"issue_n"\}/);
+  assert.match(text(await call(tools, 'forum_post', { topic: 't', parts: [{ on: 'issue_7', stance: 'agree', text: 'x' }] }, chair)), /not posted: part 1: no issue issue_7 — the open issues are issue_1/);
+  await call(tools, 'forum_post', { topic: 't', parts: [{ on: 'issue_1', stance: 'disagree', text: 'a frame to adopt, not a promise' }] }, chair);
+  assert.match(text(await call(tools, 'forum_read', { issue: 'issue_1' }, chair)), /issue_1 Point 5 promises .* — 2 part\(s\), oldest first:[\s\S]*\[fp_2 · community-chair-aa · disagree\]\na frame to adopt/);
+  assert.match(text(await call(tools, 'forum_read', { issue: 'all' }, chair)), /community-skeptic-aa: agree · community-chair-aa: disagree/);
+  assert.match(text(await call(tools, 'forum_read', { issue: 'issue_9' }, chair)), /not read: no issue issue_9/);
+  assert.equal(service.snapshot().issues[0].id, 'issue_1', 'the page reads the issues from the snapshot');
+  const rows = readFileSync(ledgerPath, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.equal(rows[0].parts[0].opened, true);
+  // a restarted run rebuilds the issues from the ledger, numbering continues
+  if (typeof ctx.stop === 'function') await ctx.stop();
+  const again = await boot({ ledgerPath, issues: 'on' });
+  assert.deepEqual(again.service.forum.issueBoard().map((r) => [r.id, Object.keys(r.stances).length]), [['issue_1', 2]]);
+  const m = again.agents.add('community-reader-aa');
+  assert.match(text(await call(again.tools, 'forum_post', { topic: 't', parts: [{ open: 'The opening line claims more than the text can bind', stance: 'agree', text: 'it says it is not a law' }] }, m)), /fp_3 posted[\s\S]*issue_2 \(opened\)/);
+});
+
+test('composed: without issues the tools are as they were — no parts, no issue reads', async () => {
+  const { tools, service } = await boot();
+  assert.equal(service.issuesOn, false);
+  assert.equal(tools.get('forum_post').parameters.properties.parts, undefined);
+  assert.ok(tools.get('forum_post').parameters.required.includes('text'));
+  assert.equal(tools.get('forum_read').parameters.properties.issue, undefined);
+  assert.equal('issues' in service.snapshot(), false);
+});

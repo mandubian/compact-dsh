@@ -163,6 +163,27 @@ export function pageHtml({ charterName, token, charter = null, provenance = null
   .composer input.headline { font: 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0d0d0d; color: #eee; border: 1px solid #665; border-radius: 4px; padding: 6px 10px; }
   .composer input.headline:focus { outline: none; border-color: #ffb46b; }
   li.post .hline { display: block; font-weight: bold; color: #ffd9a0; font-size: 13px; margin: 2px 0 4px; }
+  /* a part's header in any post body: the issue and its title */
+  .ihead { display: inline-block; color: #9fd3ff; font-weight: bold; margin-top: 4px; }
+  /* the issues panel: one claim per row, where everyone stands, the thread */
+  .floor .issues { border: 1px solid #2a3a4a; background: #10161d; padding: 6px 8px; }
+  .floor .issueshead { color: #9ab; font-size: 12px; margin-bottom: 4px; }
+  .floor details.issue { border-top: 1px solid #1f2a35; padding: 4px 0; }
+  .floor details.issue:first-of-type { border-top: 0; }
+  .floor details.issue summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; padding: 2px 4px; border-radius: 3px; }
+  .floor details.issue summary:hover { background: #182029; }
+  .floor details.issue .iid { flex: 0 0 5em; color: #9fd3ff; font-weight: bold; }
+  .floor details.issue .ititle { flex: 1 1 auto; min-width: 0; color: #e6e6e6; }
+  .floor details.issue .moved { background: #10324a; color: #9fd3ff; border-radius: 3px; padding: 0 5px; font-size: 11px; }
+  .floor details.issue .chips { flex: 0 1 auto; display: flex; flex-wrap: wrap; gap: 4px 8px; justify-content: flex-end; font-size: 11.5px; }
+  .floor .st.agree { color: #7fdc9a; } .floor .st.disagree { color: #ff9e9e; } .floor .st.unsure { color: #e8c86b; }
+  .floor .ithread { margin: 6px 0 4px 1em; max-height: 45vh; overflow-y: auto; }
+  .floor .ipart { border-left: 2px solid #2a3a4a; padding: 2px 0 4px 8px; margin: 4px 0; font-size: 12.5px; }
+  .floor .ipart .ibody { white-space: pre-wrap; color: #ccc; margin-top: 2px; }
+  .floor .ipart .pid { color: #666; font-size: 11px; }
+  .floor .imine { margin: 4px 0 2px 1em; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12px; color: #c9a86b; }
+  .floor .imine textarea.iwhy { flex: 1 1 100%; min-height: 3.2em; resize: vertical; background: #0d0d0d; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 6px 8px; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .floor .imine input.ititle-in { flex: 1 1 100%; background: #0d0d0d; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 5px 8px; font: 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   .floor .last pre.command { margin: 4px 0 0; }
   .composer { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; }
   .floor .composer textarea { flex: 1 1 auto; min-height: 12em; }
@@ -252,6 +273,7 @@ const GATE_RE = /^(?:[\\w.-]+ — )?(AGREEMENT|POSITIONS|RULING|VERDICTS|ENDORSE
 // never inject markup: fp_ cites and the verdict vocabulary read at a
 // glance inside a long ledger post
 const hl = (s) => esc(s)
+  .replace(/^(\\[issue_\\d+ · [^\\]\\n]*\\])(.*)$/gm, '<span class="ihead">$1$2</span>')
   .replace(/\\b(fp_\\d+)\\b/g, '<span class="cite">$1</span>')
   .replace(/\\b(ENDORSED|AMENDED|REJECTED|CONFIRMED|ACCEPTED|CONTESTED|DISSENT)\\b/g, '<b>$1</b>');
 
@@ -303,6 +325,28 @@ const shownPosts = new Set();
 // full post from here
 const postsById = new Map();
 const postNo = (id) => Number(/^fp_(\d+)$/.exec(String(id ?? ''))?.[1] ?? NaN);
+// the issues as the page's own forum holds them (the community's issues):
+// each opened issue's title, its thread — every part, its words cut from
+// the post exactly where the post recorded them — and each author's latest
+// stance. Built from the posts, so a reconnect or a reload rebuilds it.
+function issuesOf() {
+  const issues = new Map();
+  const posts = [...postsById.values()].sort((a, b) => postNo(a.id) - postNo(b.id));
+  for (const p of posts) {
+    for (const part of p.parts || []) {
+      if (part.opened) issues.set(part.issue, { id: part.issue, title: part.title, thread: [], stances: new Map() });
+      const row = issues.get(part.issue);
+      if (!row) continue;
+      const who = memberOf(p.by);
+      row.thread.push({ post: p.id, by: who, stance: part.stance, opened: part.opened === true, text: String(p.text || '').slice(part.from, part.to) });
+      row.stances.set(who, part.stance);
+    }
+  }
+  return [...issues.values()];
+}
+const STANCE_WORDS = ['agree', 'disagree', 'unsure'];
+const stanceRadios = (name) => STANCE_WORDS.map((st) => '<label class="ist"><input type="radio" name="' + esc(name) + '" value="' + st + '"> ' + st + '</label>').join('');
+
 function showPost(p) {
   if (p.id != null) {
     postsById.set(p.id, p);
@@ -377,21 +421,28 @@ function renderPending(p) {
   // human. If nothing changed, touch NOTHING — an expanded details and a
   // half-typed reply stay exactly as the human left them. When something
   // DID change, rebuild, but carry over what was open and what was typed.
-  const sig = JSON.stringify(p.map(x => [x.id, x.kind, x.critical, x.wouldOtherwise, x.headline, x.question, x.options, x.context, x.by, x.detail, x.title, x.items, x.formDraft, x.news]));
+  const sig = JSON.stringify(p.map(x => [x.id, x.kind, x.critical, x.wouldOtherwise, x.headline, x.question, x.options, x.context, x.by, x.detail, x.title, x.items, x.formDraft, x.news, x.issuesOn, x.issuesMoved]));
   if (sig === lastPendingSig) return;
   lastPendingSig = sig;
   const box = $('pending');
   const saved = {};
   box.querySelectorAll('[data-id]').forEach(el => {
     const d = el.querySelector('details.told') || el.querySelector('details');
-    const ta = el.querySelector('textarea');
+    const ta = el.querySelector('.composer textarea') || el.querySelector('textarea');
     const ti = el.querySelector('input.topic');
     const hi = el.querySelector('input.headline');
     const why = el.querySelector('.why');
     const focus = ta && ta === document.activeElement ? [ta.selectionStart, ta.selectionEnd] : null;
     // the floor's rows: which posts the human opened stay open
     const rows = [...el.querySelectorAll('details.nrow[open]')].map((r) => r.dataset.post);
-    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, focus, rows, ...(ti ? { topic: ti.value } : {}), ...(hi ? { headline: hi.value } : {}), ...(why ? { why: why.dataset.reason } : {}) };
+    saved[el.dataset.id] = { open: d ? d.open : false, text: ta ? ta.value : null, focus, rows, ...(ti ? { topic: ti.value } : {}), ...(hi ? { headline: hi.value, headlineAuto: hi.dataset.auto } : {}), ...(why ? { why: why.dataset.reason } : {}) };
+    // the floor's issues: what the human opened, picked and wrote, per issue
+    const issues = {};
+    el.querySelectorAll('details.issue').forEach((iss) => {
+      const st = iss.querySelector('input[type=radio]:checked');
+      issues[iss.dataset.issue] = { open: iss.open, st: st ? st.value : null, why: iss.querySelector('textarea.iwhy')?.value ?? '', title: iss.querySelector('input.ititle-in')?.value ?? null };
+    });
+    if (Object.keys(issues).length) saved[el.dataset.id].issues = issues;
     // a form card keeps every item's state across rebuilds: the chosen
     // radio and the written words, per item index
     if (el.classList.contains('form')) {
@@ -557,12 +608,41 @@ function renderPending(p) {
         }).join('') + '</div>'
       : '';
     const needsHead = f.headlineRequired === true;
+    // the community's issues, first: each one claim, where everyone stands
+    // now, the ones that moved since this member's last turn; open one for
+    // its whole thread — that issue's parts and nothing else — and pick a
+    // stance to answer it. Off, the card is the card it was
+    const issues = f.issuesOn ? issuesOf() : [];
+    const moved = new Set(f.issuesMoved || []);
+    const issuesHtml = f.issuesOn
+      ? '<div class="issues"><div class="issueshead">' +
+        (issues.length
+          ? 'the issues: ' + issues.length + ' — each one claim, and where everyone stands. Open one for its whole thread; pick your stance on the ones you care about'
+          : 'no issues yet — open one below when a point needs a stance from everyone') + '</div>' +
+        issues.map((iss) => {
+          const chips = [...iss.stances].map(([who, st]) => '<span class="chip"><span class="who ' + colorOf(who) + '">' + esc(who === f.member ? 'you' : who) + '</span> <b class="st ' + st + '">' + st + '</b></span>').join('');
+          return '<details class="issue" data-issue="' + esc(iss.id) + '"><summary>' +
+            '<span class="iid">' + esc(iss.id.replace('issue_', 'issue ')) + '</span>' +
+            '<span class="ititle">' + (moved.has(iss.id) ? '<span class="moved">moved</span> ' : '') + esc(iss.title) + '</span>' +
+            '<span class="chips">' + chips + '</span></summary>' +
+            '<div class="ithread">' + iss.thread.map((t) =>
+              '<div class="ipart"><span class="who ' + colorOf(t.by) + '">' + esc(t.by === f.member ? 'you' : t.by) + '</span> <b class="st ' + t.stance + '">' + (t.opened ? 'opened · ' : '') + t.stance + '</b> <span class="pid">' + esc(t.post) + '</span>' +
+              '<div class="ibody">' + lawHl(t.text) + '</div></div>').join('') + '</div>' +
+            '<div class="imine">your stance: ' + stanceRadios('st-' + f.id + '-' + iss.id) + '<textarea class="iwhy" placeholder="why — about this issue only"></textarea></div>' +
+            '</details>';
+        }).join('') +
+        '<details class="issue new" data-issue="new"><summary><span class="iid">+</span><span class="ititle">open a new issue — one claim others can agree or disagree with</span></summary>' +
+        '<div class="imine"><input class="ititle-in" maxlength="240" placeholder="the claim, standing alone — at most 25 words">your stance: ' + stanceRadios('st-' + f.id + '-new') +
+        '<textarea class="iwhy" placeholder="why"></textarea></div></details>' +
+        '</div>'
+      : '';
     div.innerHTML =
       '<div class="turnhead"><div class="head">YOUR TURN ON THE FLOOR — you are <span class="who">' + esc(f.member ?? f.by ?? 'the human member') + '</span></div><span class="turn-tools">' + leftHtml(f) + moreHtml(f) + '</span></div>' +
       (f.lastResult ? '<div class="last">your last act, as the record returned it:<pre class="command">' + esc(f.lastResult) + '</pre></div>' : '') +
       (f.formDraft ? '<div class="formnote">your answers to "' + esc(f.formDraft.title) + '" are drafted in the box below — posting them makes them forum-official, under your name (edit freely, or clear it and write something else)</div>' : '') +
+      issuesHtml +
       rowsHtml +
-      '<details class="told"' + (f.lastResult || news.length ? '' : ' open') + '><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : news.length ? 'the full text the community sent you this round' : 'what the community told you this round') + '</summary>' +
+      '<details class="told"' + (f.lastResult || news.length || f.issuesOn ? '' : ' open') + '><summary>' + (first ? 'your briefing — the goal, the community, the law (first turn)' : news.length ? 'the full text the community sent you this round' : 'what the community told you this round') + '</summary>' +
       '<div class="detail">' + esc(f.framing || '(no framing)') + '</div></details>' +
       '<div class="composer">' +
         // the headline box only where the charter requires headlines — a
@@ -582,9 +662,30 @@ function renderPending(p) {
         '</div>' +
         '<div class="keeprow"><button class="keep" title="post, then this card comes back with the result — to post again">post &amp; keep the floor</button></div>' +
       '</div>';
-    const ta = div.querySelector('textarea');
+    const ta = div.querySelector('.composer textarea');
     const ti = div.querySelector('input.topic');
     const hi = div.querySelector('input.headline');
+    // the stances the human picked, as the parts the forum takes: an open
+    // issue answered ("on"), or a new one opened ("open"), each with why
+    const partsOf = () => {
+      const parts = [];
+      div.querySelectorAll('details.issue').forEach((iss) => {
+        const st = iss.querySelector('input[type=radio]:checked');
+        if (!st) return;
+        const why = iss.querySelector('textarea.iwhy').value;
+        if (iss.dataset.issue === 'new') parts.push({ open: iss.querySelector('input.ititle-in').value, stance: st.value, text: why });
+        else parts.push({ on: iss.dataset.issue, stance: st.value, text: why });
+      });
+      return parts;
+    };
+    // with headlines required, a post of stances needs one: the card drafts
+    // it from the stances (the human sees it, and owns it once they edit)
+    if (hi) hi.addEventListener('input', () => { hi.dataset.auto = 'off'; });
+    div.querySelectorAll('details.issue input[type=radio]').forEach((r) => r.addEventListener('change', () => {
+      const parts = partsOf();
+      if (hi && hi.dataset.auto !== 'off') hi.value = parts.length ? 'My stances: ' + parts.map((p) => (p.on || 'a new issue') + ' ' + p.stance).join(', ') : '';
+      recount();
+    }));
     // a row opens its full post from the page's own forum, even when the
     // post reached the page after the card was built
     div.querySelectorAll('details.nrow').forEach((r) => {
@@ -602,12 +703,14 @@ function renderPending(p) {
       const n = ta.value.length;
       count.textContent = n + ' chars · post ≤ 8000 · pass ≤ 2000';
       count.classList.toggle('over', n > 8000);
-      buttons.forEach((b) => { b.disabled = !ta.value.trim(); });
+      const stances = partsOf().length;
+      buttons.forEach((b) => { b.disabled = !ta.value.trim() && !(stances && (b.classList.contains('post') || b.classList.contains('keep'))); });
     };
     ta.oninput = recount;
     const send = (act, keep) => {
-      if (!ta.value.trim()) return;
-      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value, ...(act === 'post' && hi && hi.value.trim() ? { headline: hi.value } : {}), keep: keep === true }) }).then((r) => {
+      const parts = act === 'post' ? partsOf() : [];
+      if (!ta.value.trim() && !parts.length) return;
+      api('/floor/' + encodeURIComponent(f.id), { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ act, text: ta.value, topic: ti.value, ...(act === 'post' && hi && hi.value.trim() ? { headline: hi.value } : {}), ...(parts.length ? { parts } : {}), keep: keep === true }) }).then((r) => {
         // a refusal (an oversized post, a bad topic) keeps the card and the
         // words, and says why: the turn is still pending, and a card removed
         // here never came back (the reconciler saw nothing change)
@@ -626,8 +729,16 @@ function renderPending(p) {
     if (wasF) {
       const d = div.querySelector('details.told');
       for (const id of wasF.rows || []) { const r = div.querySelector('details.nrow[data-post="' + id + '"]'); if (r) r.open = true; }
-      if (hi && wasF.headline != null) hi.value = wasF.headline;
+      if (hi && wasF.headline != null) { hi.value = wasF.headline; if (wasF.headlineAuto) hi.dataset.auto = wasF.headlineAuto; }
       else if (hi && f.formDraft?.headline) hi.value = f.formDraft.headline;
+      for (const [id, st] of Object.entries(wasF.issues || {})) {
+        const iss = div.querySelector('details.issue[data-issue="' + id + '"]');
+        if (!iss) continue;
+        iss.open = st.open === true;
+        if (st.st) { const r = iss.querySelector('input[type=radio][value="' + st.st + '"]'); if (r) r.checked = true; }
+        const w = iss.querySelector('textarea.iwhy'); if (w && st.why != null) w.value = st.why;
+        const t = iss.querySelector('input.ititle-in'); if (t && st.title != null) t.value = st.title;
+      }
       if (d && wasF.open === false) d.open = false;
       if (d && wasF.open === true) d.open = true;
       if (wasF.text != null) ta.value = wasF.text;
@@ -915,6 +1026,8 @@ export function replayPageHtml({ charterName, data }) {
   li.post .head .who { font-weight: bold; }
   li.post .body { display: block; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.55; color: #e6e6e6; }
   li.post .hline { display: block; font-weight: bold; color: #ffd9a0; font-size: 13px; margin: 2px 0 4px; }
+  /* a part's header in any post body: the issue and its title */
+  .ihead { display: inline-block; color: #9fd3ff; font-weight: bold; margin-top: 4px; }
   li.post.ledger { border-left-color: #ffb46b; background: #211d13; }
   li.post.ledger .gate { color: #ffb46b; font-weight: bold; letter-spacing: 0.06em; }
   li.post .body .cite { color: #7fd1ff; }
@@ -1057,6 +1170,7 @@ const GATE_RE = /^(?:[\\w.-]+ — )?(AGREEMENT|POSITIONS|RULING|VERDICTS|ENDORSE
 // glance inside a long ledger post
 const POSTS = new Set(DATA.forum.map((p) => String(p.id ?? '')));
 const hl = (s) => esc(s)
+  .replace(/^(\\[issue_\\d+ · [^\\]\\n]*\\])(.*)$/gm, '<span class="ihead">$1$2</span>')
   .replace(/\\b(fp_\\d+)\\b/g, (m) => POSTS.has(m)
     ? '<a class="cite" href="#' + m + '">' + m + '</a>'
     : '<span class="cite dead" title="no accepted post carries this id">' + m + '</span>')

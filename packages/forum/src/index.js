@@ -53,12 +53,16 @@ import { dirname } from 'node:path';
 
 import {
   Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText, passReason, postHeadline, isShortPost,
+  issueTitle, normalizeParts, renderIssues, renderThread,
   TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, MAX_HEADLINE_WORDS, MAX_HEADLINE_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  MAX_ISSUE_TITLE_WORDS, MAX_ISSUE_TITLE_CHARS, MAX_PARTS, STANCES,
 } from './forum.js';
 
 export {
   Forum, renderBoard, renderRead, renderPost, normalizeTopic, postText, passReason, postHeadline, isShortPost,
+  issueTitle, normalizeParts, renderIssues, renderThread,
   TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, MAX_HEADLINE_WORDS, MAX_HEADLINE_CHARS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  MAX_ISSUE_TITLE_WORDS, MAX_ISSUE_TITLE_CHARS, MAX_PARTS, STANCES,
 
 };
 
@@ -132,6 +136,11 @@ export function apply(ctx, config = {}) {
   // post repeats its text) — and execute refuses a blank one on a long
   // post; anything else leaves the headline optional
   const headlineRequired = config.headlines === 'required';
+  // the community's issues (charter "issues"): "on" gives forum_post its
+  // parts and forum_read its threads, and refuses a long post without a
+  // part — the argument goes under the issue it is about. Off, the tools
+  // are exactly as before
+  const issuesOn = config.issues === 'on';
   if (!ledgerPath) {
     ctx.logger?.warn?.('compact-forum: no ledger path configured — the forum runs in memory only, and offline readers will not see the speech');
   } else {
@@ -176,7 +185,31 @@ export function apply(ctx, config = {}) {
         type: 'string', required: true,
         description: 'the topic: lowercase letters/digits/._- , 1-64 chars — posting to a topic that does not exist creates it',
       },
-      text: { type: 'string', required: true, description: 'the post itself — what you want the community to read' },
+      text: issuesOn
+        ? { type: 'string', description: 'what is not about one issue — an intro, a remark; optional when you give parts' }
+        : { type: 'string', required: true, description: 'the post itself — what you want the community to read' },
+      ...(issuesOn ? {
+        parts: {
+          type: 'array',
+          description: `your argument, one part per issue (at most ${MAX_PARTS}) — required in this community for a post ` +
+            `longer than one line of ${MAX_HEADLINE_WORDS} words. Answer an open issue with "on", or open a new one with ` +
+            '"open". Each part goes under its issue on the forum, so a reader can follow one issue without the others',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              on: { type: 'string', description: 'an open issue you answer, by id ("issue_3") — forum_read {"issue":"all"} lists them' },
+              open: {
+                type: 'string',
+                description: `a NEW issue's title: one claim others can agree or disagree with, at most ${MAX_ISSUE_TITLE_WORDS} words, ` +
+                  'standing alone — name the thing itself (quote the line, the finding, the choice); no post or issue numbers',
+              },
+              stance: { type: 'string', enum: [...STANCES], required: true, description: 'where you stand on the issue\'s claim, now' },
+              text: { type: 'string', required: true, description: 'why — your argument on this issue only' },
+            },
+          },
+        },
+      } : {}),
       headline: {
         // the host's schema takes "required" only as true — absent is optional
         type: 'string', ...(headlineRequired ? { required: true } : {}),
@@ -189,7 +222,11 @@ export function apply(ctx, config = {}) {
     async execute(args, exec) {
       let post;
       try {
-        post = forum.post({ by: exec?.agent?.id, topic: args?.topic, text: args?.text, headline: args?.headline, requireHeadline: headlineRequired });
+        post = forum.post({
+          by: exec?.agent?.id, topic: args?.topic, text: args?.text, headline: args?.headline,
+          ...(issuesOn ? { parts: args?.parts, requireParts: true } : {}),
+          requireHeadline: headlineRequired,
+        });
       } catch (error) {
         return `[forum] not posted: ${error.message}`;
       }
@@ -202,6 +239,7 @@ export function apply(ctx, config = {}) {
           ? `It is a governed act on your record (${post.by}) — cite it as ${post.by}:<fromSeq>-<toSeq>, the range record_read shows for this call; judicature_hear accepts that citation.`
           : 'It is a governed act on the caller’s record — cite the tool-call range record_read shows for it.',
         `Members read it with forum_read {"topic":"${post.topic}","since":${post.seq - 1}}.`,
+        ...(post.parts ? [`Its parts: ${post.parts.map((p) => `${p.issue}${p.opened ? ' (opened)' : ''} ${p.stance}`).join(' · ')} — each issue's thread reads with forum_read {"issue":"issue_n"}.`] : []),
       ].join('\n');
     },
   });
@@ -254,9 +292,21 @@ export function apply(ctx, config = {}) {
       topic: { type: 'string', description: 'the topic to read — omit for the board of topics' },
       since: { type: 'number', description: `only posts after this sequence number (default 0 = the whole topic, bounded to ${DEFAULT_READ_LIMIT})` },
       limit: { type: 'number', description: 'bound the read (default 50, max 200)' },
+      ...(issuesOn ? {
+        issue: { type: 'string', description: 'one issue\'s thread, by id ("issue_3") — every part on it, in order; "all" lists the issues and where everyone stands' },
+      } : {}),
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
     async execute(args) {
+      if (issuesOn && typeof args?.issue === 'string' && args.issue.trim()) {
+        const id = args.issue.trim();
+        if (id === 'all') return `[forum] issues, in opening order, and where each author stands now:\n${renderIssues(forum.issueBoard())}`;
+        try {
+          return renderThread(id, forum.issues.get(id)?.title ?? '', forum.thread(id));
+        } catch (error) {
+          return `[forum] not read: ${error.message}`;
+        }
+      }
       if (args?.topic === undefined) return renderBoard(forum);
       let posts;
       try {
@@ -284,6 +334,9 @@ export function apply(ctx, config = {}) {
     /** The community requires headlines (config.headlines "required") —
      *  the human seat validates the floor's posts with the same rule. */
     headlineRequired,
+    /** The community works in issues (config.issues "on") — the seat and
+     *  the engine read it to show and validate the same structure. */
+    issuesOn,
     /** Subscribe to every accepted post (the observatory's live feed). */
     onPost(callback) {
       listeners.add(callback);
@@ -297,7 +350,7 @@ export function apply(ctx, config = {}) {
     },
     /** The whole visible state, cloned — for reports and page renders. */
     snapshot() {
-      return { stats: forum.stats(), topics: forum.board(), posts: forum.posts.map((p) => ({ ...p })) };
+      return { stats: forum.stats(), topics: forum.board(), posts: forum.posts.map((p) => ({ ...p })), ...(issuesOn ? { issues: forum.issueBoard() } : {}) };
     },
   };
   for (const gap of DECLARED_GAPS) ctx.logger?.warn?.(`forum: ${gap}`);

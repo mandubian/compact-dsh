@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 
 import {
   Forum, normalizeTopic, postText, passReason, postHeadline, isShortPost, renderBoard, renderRead, renderPost,
-  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, MAX_HEADLINE_WORDS, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
+  issueTitle, normalizeParts, renderIssues, renderThread,
+  TOPIC_PATTERN, MAX_POST_CHARS, MAX_PASS_REASON_CHARS, MAX_HEADLINE_WORDS, MAX_ISSUE_TITLE_WORDS, MAX_PARTS, STANCES, DEFAULT_READ_LIMIT, MAX_READ_LIMIT,
 } from '../src/forum.js';
 
 
@@ -163,4 +164,88 @@ test('a post carries its headline; the render puts it first; the ledger row repl
   assert.equal(g.replay(ROW(1, { headline: 'kept' })).headline, 'kept');
   assert.equal('headline' in g.replay(ROW(2)), false, 'a ledger from before headlines replays as it was');
   assert.throws(() => g.replay(ROW(3, { headline: words(25) })), /at most 20 words/);
+});
+
+// ── issues: one claim each, the argument in parts ──
+
+const OPEN5 = { open: 'Point 5 promises refusal "without penalty", but nobody is named to make that true', stance: 'agree', text: 'A human who refuses and is fired has been penalized.' };
+
+test('an issue title is one claim that stands alone: one line, at most 25 words, no post or issue numbers', () => {
+  assert.equal(MAX_ISSUE_TITLE_WORDS, 25);
+  assert.equal(issueTitle('  split loses a cent on 10 / 3  '), 'split loses a cent on 10 / 3');
+  assert.throws(() => issueTitle(''), /needs a title — one claim/);
+  assert.throws(() => issueTitle('one\ntwo'), /one line/);
+  assert.throws(() => issueTitle(words(26)), /at most 25 words .*got 26 words/);
+  assert.throws(() => issueTitle('as I said in fp_3, the rounding is wrong'), /stands alone — no post or issue numbers/);
+  assert.throws(() => issueTitle('issue_2 again, but worse'), /stands alone/);
+});
+
+test('parts: each answers one open issue or opens one, with a stance and a why — refused part by part, naming what to write', () => {
+  const open = new Map([['issue_1', {}], ['issue_2', {}]]);
+  assert.deepEqual(STANCES, ['agree', 'disagree', 'unsure']);
+  assert.deepEqual(normalizeParts([{ on: 'issue_2', stance: 'disagree', text: ' no ' }], open), [{ on: 'issue_2', stance: 'disagree', text: 'no' }]);
+  assert.throws(() => normalizeParts('x', open), /parts is a list/);
+  assert.throws(() => normalizeParts([{ stance: 'agree', text: 'x' }], open), /part 1: give either "on" .* or "open" .*not neither/);
+  assert.throws(() => normalizeParts([{ on: 'issue_1', open: 'a claim', stance: 'agree', text: 'x' }], open), /not both/);
+  assert.throws(() => normalizeParts([{ on: 'issue_1', stance: 'yes', text: 'x' }], open), /stance is one of agree, disagree, unsure/);
+  assert.throws(() => normalizeParts([{ on: 'issue_1', stance: 'agree', text: ' ' }], open), /text is the argument — say why/);
+  assert.throws(() => normalizeParts([{ on: 'issue_9', stance: 'agree', text: 'x' }], open), /no issue issue_9 — the open issues are issue_1, issue_2/);
+  assert.throws(() => normalizeParts([{ on: 'issue_1', stance: 'agree', text: 'x' }], new Map()), /none yet \(open one with "open"\)/);
+  assert.throws(() => normalizeParts([{ on: 'issue_1', stance: 'agree', text: 'a' }, { on: 'issue_1', stance: 'agree', text: 'b' }], open), /part 2: issue_1 has a part already in this post — one part per issue/);
+  assert.throws(() => normalizeParts(Array.from({ length: MAX_PARTS + 1 }, () => OPEN5), open), /at most 12 parts/);
+});
+
+test('a post of parts: the forum writes its text, each part under its issue\'s title, and records where each argument sits', () => {
+  const f = new Forum();
+  const a = f.post({ by: 'community-skeptic-aa', topic: 't', text: 'My two.', parts: [OPEN5, { open: 'Point 1 claims to bind everyone, and nothing in the text binds anyone', stance: 'agree', text: 'It says itself it is not a law.' }] });
+  assert.equal(a.text, 'My two.\n\n[issue_1 · new issue · agree] Point 5 promises refusal "without penalty", but nobody is named to make that true\nA human who refuses and is fired has been penalized.\n\n[issue_2 · new issue · agree] Point 1 claims to bind everyone, and nothing in the text binds anyone\nIt says itself it is not a law.');
+  assert.deepEqual(a.parts.map((p) => a.text.slice(p.from, p.to)), ['A human who refuses and is fired has been penalized.', 'It says itself it is not a law.']);
+  assert.deepEqual([...f.issues.keys()], ['issue_1', 'issue_2']);
+  assert.equal(f.issues.get('issue_1').openedIn, 'fp_1');
+  // an answer with no intro: the text is the parts alone
+  const b = f.post({ by: 'community-chair-aa', topic: 't', parts: [{ on: 'issue_1', stance: 'disagree', text: 'The agreed rules decide; that is a frame, not a promise.' }] });
+  assert.match(b.text, /^\[issue_1 · disagree\] Point 5 promises/);
+  // the thread is that issue's parts and nothing else, in order
+  assert.deepEqual(f.thread('issue_1').map((t) => [t.post, t.stance, t.opened ?? false, t.text]), [
+    ['fp_1', 'agree', true, 'A human who refuses and is fired has been penalized.'],
+    ['fp_2', 'disagree', false, 'The agreed rules decide; that is a frame, not a promise.'],
+  ]);
+  assert.throws(() => f.thread('issue_7'), /no issue issue_7 — the open issues are issue_1, issue_2/);
+  // the board: each author's LATEST stance
+  f.post({ by: 'community-skeptic-aa', topic: 't', parts: [{ on: 'issue_1', stance: 'unsure', text: 'The chair has a point about frames.' }] });
+  const board = f.issueBoard();
+  assert.deepEqual(board[0].stances, { 'community-skeptic-aa': { stance: 'unsure', post: 'fp_3' }, 'community-chair-aa': { stance: 'disagree', post: 'fp_2' } });
+  assert.deepEqual(board[0].posts, ['fp_1', 'fp_2', 'fp_3']);
+  assert.match(renderIssues(board, (by) => by.split('-')[1]), /issue_1 Point 5 promises.*\n {6}skeptic: unsure · chair: disagree/);
+  assert.match(renderThread('issue_1', board[0].title, f.thread('issue_1')), /— 3 part\(s\), oldest first:\n\n\[fp_1 · community-skeptic-aa · opened · agree\]/);
+  assert.deepEqual(f.stats(), { topics: 1, posts: 3, issues: 2 });
+});
+
+test('with parts required, a long post without one is refused — a short one is not; check() records nothing', () => {
+  const f = new Forum();
+  assert.throws(() => f.post({ by: 's', topic: 't', text: words(30), requireParts: true }), /carries its argument in parts, one per issue — \{"on": "issue_3"/);
+  assert.equal(f.post({ by: 's', topic: 't', text: 'agreed, all of it.', requireParts: true }).id, 'fp_1');
+  const seen = f.check({ parts: [OPEN5], requireParts: true });
+  assert.deepEqual(seen.opened, [{ id: 'issue_1', title: OPEN5.open }]);
+  assert.equal(f.issues.size, 0, 'a check opens nothing');
+  assert.equal(f.posts.length, 1, 'and posts nothing');
+  assert.throws(() => f.post({ by: 's', topic: 't', parts: [{ on: 'issue_1', stance: 'agree', text: 'x' }] }), /no issue issue_1/);
+  assert.equal(f.posts.length, 1, 'a refused post records nothing');
+});
+
+test('replay: issues rebuild from the ledger, in order, or the replay stops naming why', () => {
+  const f = new Forum();
+  f.post({ by: 'community-skeptic-aa', topic: 't', parts: [OPEN5] });
+  f.post({ by: 'community-chair-aa', topic: 't', parts: [{ on: 'issue_1', stance: 'disagree', text: 'a frame, not a promise' }] });
+  const rows = JSON.parse(JSON.stringify(f.posts));
+  const g = new Forum();
+  for (const r of rows) g.replay(r);
+  assert.deepEqual(g.issueBoard(), f.issueBoard());
+  assert.deepEqual(g.thread('issue_1'), f.thread('issue_1'));
+  const bad = (mut) => { const h = new Forum(); const r = JSON.parse(JSON.stringify(rows[0])); mut(r); return () => h.replay(r); };
+  assert.throws(bad((r) => { r.parts[0].issue = 'issue_2'; }), /does not continue the issues at issue_1/);
+  assert.throws(bad((r) => { r.parts[0].to = 99_999; }), /not inside the text/);
+  assert.throws(bad((r) => { r.parts[0].stance = 'maybe'; }), /stance "maybe" is not one of/);
+  assert.throws(bad((r) => { r.parts[0].title = 'see fp_1'; }), /stands alone/);
+  assert.throws(() => new Forum().replay(rows[1] && { ...JSON.parse(JSON.stringify(rows[1])), seq: 1, id: 'fp_1' }), /issue "issue_1" was never opened/);
 });

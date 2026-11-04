@@ -153,7 +153,7 @@ function communityAnnex(keyringDir, keyring, charter, benchDigests) {
 
 // ── the runtime ──
 
-async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedKeyringDigest, egressNetwork, bindings, codeDigestFile = null, headlines = false }) {
+async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedKeyringDigest, egressNetwork, bindings, codeDigestFile = null, headlines = false, issues = false }) {
   const digest = execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', IMAGE], { encoding: 'utf8', timeout: 10_000 }).trim();
   if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new Error(`${BIN} cannot inspect ${IMAGE} (docker pull / npm run compact:bake first)`);
 
@@ -202,6 +202,9 @@ async function bootRuntime({ scratch, annexPath, keyringDir, workspace, trustedK
     // at most 20 words) repeats its text, and a blank headline is accepted
     // only on such a post
     ...(headlines ? { COMPACT_FORUM_HEADLINES: 'required' } : {}),
+    // the charter's issues (charter "issues"): forum_post carries its
+    // argument in parts, one per issue, and forum_read reads one issue
+    ...(issues ? { COMPACT_FORUM_ISSUES: 'on' } : {}),
     // the code by content (CF-2): the self-model's attestation carries the
     // digest onto the chain at every turn; the detail stays beside it
     ...(codeDigestFile ? { COMPACT_CODE_DIGEST_FILE: codeDigestFile } : {}),
@@ -473,7 +476,7 @@ async function main() {
     ? communityAnnex(keyringDir, keyring, charter, benchDigests)
     : { annexPath: join(keyringDir, 'enforcer.annex.json') };
 
-  const { ctx, env, tokenMeter, tokensBySession, setNoticeSink, imageDigest } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings, codeDigestFile, headlines: charter.headlines === true });
+  const { ctx, env, tokenMeter, tokensBySession, setNoticeSink, imageDigest } = await bootRuntime({ scratch, annexPath, keyringDir, workspace, egressNetwork, bindings, codeDigestFile, headlines: charter.headlines === true, issues: charter.issues === true });
   const gateway = ctx.get('compact-egress-proxy')?.network?.gateway;
   if (!gateway) throw new Error(`${BIN} no mediation gateway — the mediated posture did not bind`);
   // a charter with no grants and no publish section is a FORUM-ONLY
@@ -614,7 +617,7 @@ async function main() {
     // record them (a pass is not speech and never reaches another member),
     // and the notices members receive (watch verdicts, loopguard) read off
     // session events — the same shapes the after-run report reads
-    ctx.get('compact-forum')?.onPost?.((post) => publishSafe({ type: 'forum-post', id: post.id, topic: post.topic, by: post.by, text: post.text, ...(post.headline ? { headline: post.headline } : {}) }));
+    ctx.get('compact-forum')?.onPost?.((post) => publishSafe({ type: 'forum-post', id: post.id, topic: post.topic, by: post.by, text: post.text, ...(post.headline ? { headline: post.headline } : {}), ...(post.parts ? { parts: post.parts } : {}) }));
     ctx.get('compact-forum')?.onPass?.((pass) => publishSafe({ type: 'forum-pass', by: pass.by, reason: pass.reason }));
   }
 

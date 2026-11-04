@@ -418,7 +418,7 @@ export function mountHumanSeat(ctx, {
   // oversized post refuses HERE, at the boundary — never mid-turn. The
   // timeout is the honest silence: the member's turn performs no act, the
   // adapter says so in words, and the divergence counter counts it.
-  const poseFloor = ({ member = null, by = null, round = null, framing = '', news = null, lastResult = null, signal = null }) => {
+  const poseFloor = ({ member = null, by = null, round = null, framing = '', news = null, issuesMoved = null, lastResult = null, signal = null }) => {
     // a settled form awaiting this member's voice rides the card as a
     // DRAFT: the page prefills the composer, the human edits or posts
     // as-is — the act is the member's own, through its own loop
@@ -438,6 +438,9 @@ export function mountHumanSeat(ctx, {
       ...(draft ? { formDraft: draft } : {}),
       // the forum's headline rule, so the card says when the box is needed
       ...(headlineRequired() ? { headlineRequired: true } : {}),
+      // the community's issues: the card lists them (from the page's own
+      // forum) and marks the ones that moved since this member's last turn
+      ...(ctx?.get?.('compact-forum')?.issuesOn === true ? { issuesOn: true, issuesMoved: Array.isArray(issuesMoved) ? issuesMoved : [] } : {}),
       headline: `floor turn — ${member ?? 'the human member'}`,
       defaultTopic,
       expiresAt: new Date(Date.now() + floorTimeoutMs).toISOString(),
@@ -484,14 +487,27 @@ export function mountHumanSeat(ctx, {
     const kind = act?.act;
     if (kind === 'post') {
       // a post ENDS the turn unless the human asks to keep the floor
-      const text = postText(act.text);
+      const forumSvc = ctx?.get?.('compact-forum');
+      // with the community's issues, the human's stances arrive as parts —
+      // the same structure every member posts, checked by the same rule
+      const parts = forumSvc?.issuesOn === true && Array.isArray(act.parts) && act.parts.length
+        ? act.parts.map((p) => ({ ...(p?.on ? { on: String(p.on) } : { open: String(p?.open ?? '') }), stance: p?.stance, text: String(p?.text ?? '') }))
+        : undefined;
+      const text = parts ? String(act.text ?? '') : postText(act.text);
       // a short post is its own headline: when the community requires one,
       // the seat carries the human's own words into the field the tool's
       // schema requires — a three-word answer needs no second box
-      const own = headlineRequired() && !String(act.headline ?? '').trim() && isShortPost(text) && text.trim().length <= MAX_HEADLINE_CHARS
+      const own = headlineRequired() && !parts && !String(act.headline ?? '').trim() && isShortPost(text) && text.trim().length <= MAX_HEADLINE_CHARS
         ? text.trim() : act.headline;
-      const headline = postHeadline(own, text, { required: headlineRequired() });
-      return { act: 'post', topic: normalizeTopic(act.topic ?? defaultTopic ?? undefined), text, ...(headline ? { headline } : {}), keep: act.keep === true };
+      // the forum's own check, recording nothing: the refusal the post
+      // would get comes back on the card instead, with the words kept
+      const checked = forumSvc?.forum?.check
+        ? forumSvc.forum.check({ text, headline: own, parts, requireHeadline: headlineRequired(), requireParts: forumSvc.issuesOn === true })
+        : { headline: postHeadline(own, text, { required: headlineRequired() }) };
+      return {
+        act: 'post', topic: normalizeTopic(act.topic ?? defaultTopic ?? undefined), text,
+        ...(checked.headline ? { headline: checked.headline } : {}), ...(parts ? { parts } : {}), keep: act.keep === true,
+      };
     }
     if (kind === 'pass') return { act: 'pass', reason: passReason(act.text) };
     if (kind === 'say') return { act: 'say', text: postText(act.text) };

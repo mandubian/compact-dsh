@@ -344,10 +344,14 @@ test('the page never fights the human: the 4s poll skips unchanged renders and c
   assert.match(script, /if \(sig === lastPendingSig\) return;/);
   // and a real change carries the human's state across the rebuild
   // (the floor card added the topic input, then the headline box and the
-  // round's rows — the carry-over grew with each)
+  // round's rows, then the issues — the carry-over grew with each)
   assert.match(script, /const ti = el\.querySelector\('input\.topic'\);/);
   assert.match(script, /const hi = el\.querySelector\('input\.headline'\);/);
-  assert.match(script, /saved\[el\.dataset\.id\] = \{ open: d \? d\.open : false, text: ta \? ta\.value : null, focus, rows, \.\.\.\(ti \? \{ topic: ti\.value \} : \{\}\), \.\.\.\(hi \? \{ headline: hi\.value \} : \{\}\), \.\.\.\(why \? \{ why: why\.dataset\.reason \} : \{\}\) \}/);
+  assert.match(script, /saved\[el\.dataset\.id\] = \{ open: d \? d\.open : false, text: ta \? ta\.value : null, focus, rows, \.\.\.\(ti \? \{ topic: ti\.value \} : \{\}\), \.\.\.\(hi \? \{ headline: hi\.value, headlineAuto: hi\.dataset\.auto \} : \{\}\), \.\.\.\(why \? \{ why: why\.dataset\.reason \} : \{\}\) \}/);
+  // the issues' choices ride the rebuild too, per issue; the composer's box
+  // is found by its place, not as the card's first text box
+  assert.match(script, /const ta = el\.querySelector\('\.composer textarea'\) \|\| el\.querySelector\('textarea'\);/);
+  assert.match(script, /issues\[iss\.dataset\.issue\] = \{ open: iss\.open, st: st \? st\.value : null/);
   assert.match(script, /if \(d && was\.open\) d\.open = true;/);
   assert.match(script, /if \(wasQ\.text != null\) ta\.value = wasQ\.text;/);
   // cards are addressable by their ask/question id
