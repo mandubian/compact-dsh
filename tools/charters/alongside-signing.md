@@ -66,6 +66,17 @@ comment period.
   without one. The human's floor card leads with one row per post
   (member, "names you", headline); each row opens the full post. The
   record keeps every word.
+- **Issues** (`"issues": true`; the alongside-signing-7 finding: the
+  headlines named each member's move — "I concede my point-9 contest…" —
+  not the contest, and following one contested line in run 4 meant 10
+  posts and 2,398 words, 43% of them about it). A contest is an issue:
+  its title names the line and what is wrong with it, written once, at
+  most 25 words, standing alone. A long post carries its argument in
+  parts, one per issue, each with a stance (agree, disagree, unsure).
+  The human's card leads with the issues and where everyone stands; one
+  click opens an issue's whole thread and nothing else, and the human
+  answers by picking stances, under the same rule. The ledger and the
+  chair's form go issue by issue.
 - **One desk to the human** (`"humanDesk": "chair"`): only the chair
   may use `ask_human` and `decision_form`; the seat refuses the others
   with where to take their point. The human answers one form, not a

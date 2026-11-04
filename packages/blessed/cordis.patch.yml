@@ -166,6 +166,9 @@
         forum:
           ledgerPath: !!js 'process.env.COMPACT_CHAIN_DIR ? process.env.COMPACT_CHAIN_DIR + "/forum.jsonl" : undefined'
           headlines: !!js 'process.env.COMPACT_FORUM_HEADLINES || undefined'
+          # the charter's issues ("issues": true): posts carry their argument
+          # in parts, one per issue — set by the live driver
+          issues: !!js 'process.env.COMPACT_FORUM_ISSUES || undefined'
         sandbox:
           image: !!js process.env.COMPACT_SANDBOX_IMAGE
           # #38 phase 3: opt into the MEDIATED posture — the container gets no

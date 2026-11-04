@@ -310,14 +310,15 @@ export function resolveConfig(config) {
   // community — pull-based posts, every one a governed tool call on the
   // poster's own chain. The ledger beside the chains is configurable here
   // (not declared means the forum runs in memory only and says so at boot),
-  // and the community's headline rule ("required", from the charter's
-  // "headlines"). No clause is enforced by the forum, so it mounts like the
-  // guide — declared, never coupled on.
+  // the community's headline rule ("required", from the charter's
+  // "headlines"), and its issues ("on", from the charter's "issues"). No
+  // clause is enforced by the forum, so it mounts like the guide —
+  // declared, never coupled on.
   let forum;
   if (config.forum !== undefined) {
     object(config.forum, 'forum');
     for (const key of Object.keys(config.forum)) {
-      if (!['ledgerPath', 'headlines'].includes(key)) throw new TypeError(`blessed: unknown forum key ${key}`);
+      if (!['ledgerPath', 'headlines', 'issues'].includes(key)) throw new TypeError(`blessed: unknown forum key ${key}`);
     }
     if (config.forum.ledgerPath !== undefined) {
       text(config.forum.ledgerPath, 'forum.ledgerPath');
@@ -328,6 +329,10 @@ export function resolveConfig(config) {
         throw new TypeError('blessed: forum.headlines is "required" or "optional"');
       }
       forum = { ...forum, headlines: config.forum.headlines };
+    }
+    if (config.forum.issues !== undefined) {
+      if (!['on', 'off'].includes(config.forum.issues)) throw new TypeError('blessed: forum.issues is "on" or "off"');
+      forum = { ...forum, issues: config.forum.issues };
     }
   }
   return {

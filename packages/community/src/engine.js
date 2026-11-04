@@ -13,7 +13,7 @@
 
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 
-import { renderPost, isShortPost, MAX_HEADLINE_WORDS } from 'compact-dsh-forum';
+import { renderPost, isShortPost, MAX_HEADLINE_WORDS, MAX_ISSUE_TITLE_WORDS } from 'compact-dsh-forum';
 
 import { HUMAN_ROUTE } from './human-member.js';
 import { memberOfSession } from './charter.js';
@@ -38,10 +38,12 @@ export function currentSelectionOf(ctx) {
 }
 
 /** The community's speaking rules from its charter, told the same in both
- *  voices: the headline a long post carries (charter "headlines"), and the
+ *  voices: the headline a long post carries (charter "headlines"), the
+ *  issues a long post's argument goes under (charter "issues"), and the
  *  one member who puts questions to the human (charter "humanDesk"). Each
  *  line is machinery that exists — the forum refuses the long post without
- *  a headline, the seat refuses an ask from anyone but the desk. */
+ *  a headline or without a part, the seat refuses an ask from anyone but
+ *  the desk. */
 export function speakingRuleLines(charter, member) {
   const lines = [];
   if (charter.headlines) {
@@ -52,6 +54,22 @@ export function speakingRuleLines(charter, member) {
       lines.push(`  - Every post carries a headline: forum_post {"topic":"…","headline":"…","text":"…"} — one sentence of at most ${MAX_HEADLINE_WORDS}`,
         '    words, what you conclude (a short post repeats its text). The human reads the headlines first and opens a post',
         '    only when they need it. A post without a headline is refused.');
+    }
+  }
+  if (charter.issues) {
+    if (member.human) {
+      lines.push('  - The discussion is organized by issue. An issue is one claim, named once by whoever opened it; your card lists',
+        '    the issues and where everyone stands, and opening one shows its whole thread and nothing else.',
+        `  - To answer, pick your stance (agree, disagree, unsure) on the issues you care about and say why, or open a new`,
+        `    one. A post longer than one line of ${MAX_HEADLINE_WORDS} words needs at least one stance.`);
+    } else {
+      lines.push(`  - This community works in issues. An issue is one claim others can agree or disagree with. Its title is written`,
+        `    once, by whoever opens it, at most ${MAX_ISSUE_TITLE_WORDS} words, and must stand alone: name the thing itself (quote the line,`,
+        '    the finding, the choice) — no post or issue numbers. Your round lists the open issues and where everyone stands.',
+        `  - A post longer than one line of ${MAX_HEADLINE_WORDS} words carries its argument in parts, one per issue:`,
+        '    forum_post {"topic":"…","parts":[{"on":"issue_2","stance":"disagree","text":"why"},{"open":"a new claim","stance":"agree","text":"why"}]}.',
+        '    Each part says only what is about its issue. Answer an open issue rather than opening a second one on the same point.',
+        '  - forum_read {"issue":"issue_2"} reads one issue\'s whole thread; {"issue":"all"} lists every issue and every stance.');
     }
   }
   const desk = charter.humanDesk;
@@ -75,6 +93,21 @@ function namesMember(post, member) {
   // a member id is a slug — nothing in it needs escaping
   if (new RegExp(`(^|[^a-z0-9-])${member.id}([^a-z0-9-]|$)`, 'i').test(text)) return true;
   return member.human === true && /\bthe human\b/i.test(text);
+}
+
+/** The issues, for one member's round (charter "issues"): each issue's
+ *  title, where everyone stands now, and a * on the issues that moved
+ *  since this member's last turn — so a member answers by id, and the
+ *  human sees what changed without reading what did not. */
+export function issuesBlockLines(charter, board, newPosts) {
+  if (!charter.issues || !board?.length) return [];
+  const moved = new Set(newPosts.flatMap((p) => (p.parts ?? []).map((part) => part.issue)));
+  const lines = ['THE ISSUES — each one claim; where everyone stands now (* moved since your last turn):'];
+  for (const row of board) {
+    const stances = Object.entries(row.stances).map(([by, st]) => `${memberOfSession(charter, by)?.id ?? 'unknown'}: ${st.stance}`).join(' · ');
+    lines.push(`  ${row.id}${moved.has(row.id) ? ' *' : ''} ${row.title}`, `      ${stances || 'no stance yet'}`);
+  }
+  return lines;
 }
 
 /** One line for a post in the human's round news: its headline, or a short
@@ -210,8 +243,10 @@ export function sealedBriefLines(member) {
  *  in their record — a location a peer cannot read for itself (R-2), and
  *  the one citation a filing about that turn needs. The human's card
  *  stays as it was: the floor files no cases (v1). */
-export function roundFramingText(charter, member, round, newPosts, docketNews, citeOf = null) {
+export function roundFramingText(charter, member, round, newPosts, docketNews, citeOf = null, issues = null) {
   const lines = [`Round ${round} of ${charter.budgets.rounds}, member "${member.id}".`];
+  const block = issuesBlockLines(charter, issues, newPosts);
+  if (block.length) lines.push(...block, '');
   const cite = (p) => (charter.turnCitations && !member.human ? citeOf?.get(p.id) : null);
   if (newPosts.length === 0) {
     lines.push('Nothing new on the forum since your last turn.');
@@ -629,7 +664,7 @@ export async function runCommunity(ctx, { charter, workspace, hooks = {}, tokenM
         const news = dockedCases()
           .filter((c) => !c.judgment)
           .map((c) => `${c.id} — ${String(c.grievance ?? '').slice(0, 120)}`);
-        framing = roundFramingText(charter, seat.member, round, newPosts, news, citeOf);
+        framing = roundFramingText(charter, seat.member, round, newPosts, news, citeOf, charter.issues ? forum.forum.issueBoard() : null);
       }
       const before = forum.forum.posts.length;
       const began = turnBegins(seat);

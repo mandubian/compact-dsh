@@ -110,6 +110,19 @@ export function newsOf(framing = '') {
   return rows;
 }
 
+/** The issues that moved since this member's last turn, read back from the
+ * engine's own framing (issuesBlockLines): the `  issue_n *` lines of the
+ * issues block, which ends at its first blank line. A title is one line by
+ * the forum's rule, so a title can never forge another issue's line. */
+export function movedIssuesOf(framing = '') {
+  const text = String(framing);
+  const start = text.search(/^THE ISSUES — /m);
+  if (start < 0) return [];
+  const end = text.indexOf('\n\n', start);
+  const block = text.slice(start, end < 0 ? undefined : end);
+  return [...block.matchAll(/^ {2}(issue_\d+) \* /gm)].map((m) => m[1]);
+}
+
 /**
  * The llm adapter for provider "human". `seat` is the mounted human seat
  * (its floor door poses each completion). The adapter COUNTS nothing: a
@@ -170,6 +183,7 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
         by: member,
         framing: framingOf(messages),
         news: newsOf(framingOf(messages)),
+        issuesMoved: movedIssuesOf(framingOf(messages)),
         lastResult: lastResultOf(messages),
         // the loop's abort signal: an immediate stop cancels the turn, and
         // the waiting card must hear it like a model's network call would
@@ -179,7 +193,12 @@ export function humanMemberAdapter({ seat, topic = null, note = () => {} } = {})
       if (act.act === 'post' || act.act === 'pass') {
         const name = act.act === 'post' ? 'forum_post' : 'forum_pass';
         const args = act.act === 'post'
-          ? { topic: act.topic ?? topic ?? undefined, text: act.text, ...(act.headline ? { headline: act.headline } : {}) }
+          ? {
+            topic: act.topic ?? topic ?? undefined,
+            ...(act.text ? { text: act.text } : {}),
+            ...(act.headline ? { headline: act.headline } : {}),
+            ...(act.parts ? { parts: act.parts } : {}),
+          }
           : { reason: act.reason };
         const id = `human-${callSeq}`;
         const keep = act.act === 'post' && act.keep === true;

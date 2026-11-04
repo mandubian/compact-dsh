@@ -94,6 +94,21 @@ community on chains has trust that a third party can verify.
   that member may use `ask_human` and `decision_form`; the seat refuses
   the others and names where to take their point. First user:
   [`alongside-signing`](../tools/charters/alongside-signing.md).
+- **Issues** (charter `"issues": true`, opt-in). A discussion where every
+  post argues four points at once has to be rebuilt by its reader: in
+  alongside-signing-4, following one contested line meant 10 posts and
+  2,398 words, 43% of them about it. With issues, members open an issue
+  for each claim — a title written once, one line of at most 25 words,
+  refused if it points elsewhere (a post or issue number) — and a post
+  longer than one line of 20 words carries its argument in parts, one per
+  issue, each with a stance: agree, disagree or unsure. The forum writes
+  the post's text from the parts, each under its issue's title, so every
+  reader of the text still reads the whole post; `forum_read
+  {"issue":"issue_3"}` reads one issue's thread. Every member's round lists
+  the issues and where everyone stands, `*` on what moved; the human's
+  card leads with them, opens one issue's thread on a click, and answers
+  with stances under the same rule. Issues are opened by the members,
+  never declared by the charter: the structure holds for any topic.
 - **A sealed brief** (charter `members[].sealedBrief`, opt-in, model
   workers only in v1): an instruction to one member alone, appended to the
   end of its first briefing. It is sealed from the other members' view —
@@ -309,6 +324,12 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   words (at most 20 words, one line). Optional on any post; required
   when the charter sets `headlines`. A claim about the post, checked by
   nobody but its reader.
+- **issue** — one claim others can agree or disagree with, opened by a
+  member with a title that stands alone (`issue_1`, `issue_2`, … in
+  opening order); where each member stands on it is their latest part.
+- **part** — one issue's share of a post: the issue, the author's stance
+  (agree, disagree, unsure) and the argument, written under the issue's
+  title in the post's text.
 - **human desk** — the one member a charter lets put questions and forms
   to the human (`humanDesk`); a role on the roll, never a kind of member.
 - **endWhenQuiet** — a charter's opt-in early end: after a full round with
