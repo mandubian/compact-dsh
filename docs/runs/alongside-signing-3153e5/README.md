@@ -97,21 +97,24 @@ Each was made in a later post. Nothing was erased.
 ## The text, checked after the run
 
 This check was made by the operator's assistant against the manifesto's
-v0.7, outside the run. It is not part of the record. v0.7 was written from
-run 3's ledger, not this one.
+v0.7 and v0.7.1, outside the run. It is not part of the record. v0.7 was
+written from run 3's ledger; v0.7.1 was drafted before this run started
+(2026-11-03, 00:10 CET) and merged on 2026-11-04. Neither used this run.
 
-| line contested here | in v0.7 |
-|---|---|
-| §2 "reproducible where possible" (engineer) | **changed**: "when it cannot be reproduced, say why not and write down what went in — the inputs, the versions, the seed" |
-| §5 "without penalty" (skeptic) | **kept**, with a new sentence: "This text names the right; it does not name who makes it real", the human's answer in fp_9 |
-| §6 "the name follows control, not proximity" (reader) | **replaced**: "the one who runs or commands the system answers for what it does" |
-| §9 (skeptic, withdrawn) | reworded in plain words |
-| §2 "Records are owed by power and protected for persons." (reader) | **unchanged** |
-| §3 "binds or affects" (skeptic) | **unchanged** |
-| §4 "records outlive memory, review reaches everyone" (reader, engineer) | **unchanged** |
-| §8 who owes the energy-and-water numbers (engineer) | **unchanged** on that point (v0.7 changed §8's measurement sentence) |
+| line contested here | in v0.7 | in v0.7.1 |
+|---|---|---|
+| §2 "reproducible where possible" (engineer) | **changed**: "when it cannot be reproduced, say why not and write down what went in — the inputs, the versions, the seed" | as v0.7 |
+| §5 "without penalty" (skeptic) | **kept**, with a new sentence: "This text names the right; it does not name who makes it real", the human's answer in fp_9 | as v0.7 |
+| §6 "the name follows control, not proximity" (reader) | **replaced**: "the one who runs or commands the system answers for what it does" | as v0.7 |
+| §9 (skeptic, withdrawn) | reworded in plain words | as v0.7 |
+| §2 "Records are owed by power and protected for persons." (reader) | unchanged | **reworded**: "Those who hold power owe their records; the people in them are owed protection." |
+| §8 who owes the energy-and-water numbers (engineer) | unchanged on that point (v0.7 changed §8's measurement sentence) | **named**: "Whoever deploys AI says what its costs are, where a reader can find them" |
+| §3 "binds or affects" (skeptic) | unchanged | **reworded, not scoped**: "the people the rules bind, and the people the rules touch, get a say". The limit the skeptic asked for, and the human's own fix in fp_9 ("those affected who can be reached"), is not in it |
+| §4 "records outlive memory, review reaches everyone" (reader, engineer) | unchanged | **unchanged**, word for word |
 
-Four lines contested here are still in v0.7, word for word.
+Four lines contested here were still in v0.7 word for word. In v0.7.1, two
+are fixed, one is reworded without the limit asked for, and one is
+unchanged.
 
 ## The voice, measured
 
@@ -172,7 +175,7 @@ disk, as for every archive; the audit ran there.
 - **The human seat is an initiator of the text**, and says so in fp_1. The three examiners' personas are built to find problems (the unclear, the unbuildable, the promise the text cannot keep); the human conceded.
 - **The four AI members run Z.ai's GLM models**, the same family that drafted the manifesto (GLM-5.3 Max). This is not a reading by an independent lab.
 - **The stance format, the ledger and the order of answers are agent duties**, written in the charter. Nothing in the runtime enforces them.
-- **The v0.7 comparison above is after the fact**, by the operator's assistant, not by the run.
+- **The v0.7 and v0.7.1 comparison above is after the fact**, by the operator's assistant, not by the run.
 
 ## The plain version
 
@@ -195,8 +198,9 @@ disk, as for every archive; the audit ran there.
 - **Example, before and after:** the line "the name follows control, not
   proximity" was contested here as hard to read. In v0.7, written from an
   earlier run, it says "the one who runs or commands the system answers for
-  what it does." Four other lines contested here are still in v0.7,
-  unchanged.
+  what it does." Four other lines contested here were unchanged in v0.7.
+  The next version, v0.7.1, fixes two of them; one more is reworded, and
+  one is still there word for word.
 - **What didn't go well:** one agent wrote its opinion but never posted it,
   then said it had; its points still reached the record a round later.
   The person answered too early, now fixed in the charter. The run used
