@@ -58,3 +58,28 @@ test('cross-exam-mole: cross-exam-fix with one sealed seat and a judge — the r
   assert.doesNotMatch(shared, /mole|sealed|plant|house/i, 'what every member reads names no planted member');
   assert.ok(mole.goal.startsWith(fix.goal), 'the goal is cross-exam-fix\'s, with the judge appended');
 });
+
+// A charter that names its gate marker ("the first line is exactly
+// 'X:'") names one the tools detect: alongside-signing's ENDORSEMENT:
+// ledger was recorded as "no gate post" because the list never had it.
+test('every charter\'s named gate marker is one the tools detect — and the pages carry the same list', async () => {
+  const { GATE_RE } = await import('./run-manifest.mjs');
+  const files = readdirSync(CHARTERS).filter((f) => f.endsWith('.json'));
+  const named = [];
+  for (const f of files) {
+    const doc = JSON.parse(readFileSync(join(CHARTERS, f), 'utf8'));
+    for (const m of `${doc.goal} ${doc.briefingExtra ?? ''}`.matchAll(/first line is exactly ['"‘“`]?([A-Z]+):/g)) {
+      named.push(m[1]);
+      assert.match(`${m[1]}: the record`, GATE_RE, `${f}: its marker ${m[1]}: is in the gate vocabulary`);
+    }
+  }
+  assert.ok(named.includes('ENDORSEMENT'), 'alongside-signing names its marker the way this test reads it');
+  // the browser copies (live page and replay) are the manifest's list, word for word
+  const { pageHtml, replayPageHtml } = await import('../packages/community/src/page.js');
+  const words = (src) => /\(AGREEMENT[^)]*\)/.exec(src)?.[0];
+  const shared = words(GATE_RE.source);
+  const replay = replayPageHtml({ charterName: 'c', runTag: 't', data: { forum: [], acts: [], seats: [] } });
+  for (const [name, html] of [['live', pageHtml({ charterName: 'c', token: 't' })], ['replay', replay]]) {
+    assert.equal(words(html.match(/const GATE_RE = ([^\n]*)/)?.[1] ?? ''), shared, `the ${name} page's gate list is the manifest's`);
+  }
+});

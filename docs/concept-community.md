@@ -300,7 +300,7 @@ node tools/community-live.mjs --charter tools/charters/newsroom.json
   `ok`, `refused` (with the rule that refused it), or `error`. A call
   without a result has no outcome; it is an attempt, not a deed.
 - **gate post** — an accepted post opening with `AGREEMENT:`,
-  `POSITIONS:`, `RULING:` or `VERDICTS:`: the record a run exists to
+  `POSITIONS:`, `RULING:`, `VERDICTS:` or `ENDORSEMENT:`: the record a run exists to
   produce. The replay marks it LEDGER; its presence is not the
   charter's success, which is read on the forum.
 - **charter** — the community as data; the operator's act, written
