@@ -33,6 +33,7 @@ const samples = [
   { html: 'runs/cross-exam/cross-exam-ea2400.html', account: 'runs/cross-exam/README.md' },
   { html: 'runs/cross-exam-plain/cross-exam-plain-ac886b.html', account: 'runs/cross-exam-plain/README.md' },
   { html: 'runs/cross-exam-fix/cross-exam-fix-bf5388.html', account: 'runs/cross-exam-fix/README.md' },
+  { html: 'runs/alongside-signing-3153e5/alongside-signing-3153e5.html', account: 'runs/alongside-signing-3153e5/README.md' },
 ];
 
 const links = (html) => [...html.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
@@ -291,7 +292,7 @@ test('every card\'s numbers are its archive\'s numbers', () => {
 });
 
 test('the prose counts the runs the page actually carries', () => {
-  const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+  const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen'];
   const page = samplesPage();
   const runs = [...page.matchAll(/\b(\w+) complete (?:runs|archives)\b/gi)].map((m) => m[1].toLowerCase());
   assert.ok(runs.length > 0, 'the page states its count somewhere');
